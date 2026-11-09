@@ -4312,6 +4312,12 @@ export function PracticePocScreen({
       ? arrowFromTo(boardFeedback.submittedMove)
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
+  const sessionBoardSquareTints = useBoardMoveSquareTints(
+    submittedMoveForCurrentPuzzle ?? displayedLastBoardMove,
+    submittedMoveForCurrentPuzzle
+      ? moveFeedbackTint(appTheme, boardFeedback?.result ?? "wrong")
+      : appTheme.colors.board.lastMoveSquare
+  );
   const arrowDuelBoardRenderKey =
     displayedPuzzle?.kind === "arrow_duel" && state && displayedBoardFen
       ? `${state.id}:${displayedPuzzle.puzzle.id}:${displayedBoardFen}`
@@ -4963,6 +4969,7 @@ export function PracticePocScreen({
             durations={CHESSBOARD_DURATIONS}
             spriteSource={CHESS_PIECE_SPRITE}
             colors={chessboardColorsFor(appTheme)}
+            squareHighlights={sessionBoardSquareTints}
             onReady={arrowDuelBoardRenderKey ? markArrowDuelBoardReady : undefined}
           />
         ) : (
@@ -5034,19 +5041,13 @@ export function PracticePocScreen({
         {displayedLastBoardMove ? (
           <LastMoveOverlay
             boardSize={boardSize}
-            flipped={boardFlipped}
             move={displayedLastBoardMove}
             overlayTestID="session-last-move-overlay"
           />
         ) : null}
 
         {submittedMoveForCurrentPuzzle ? (
-          <MoveFeedbackOverlay
-            boardSize={boardSize}
-            flipped={boardFlipped}
-            move={submittedMoveForCurrentPuzzle}
-            result={boardFeedback?.result ?? "wrong"}
-          />
+          <MoveFeedbackOverlay boardSize={boardSize} />
         ) : null}
 
         {displayedPuzzle?.kind === "arrow_duel"
@@ -7090,6 +7091,8 @@ function sessionGuideDemoState(
   };
 }
 
+const ARROW_DUEL_REPLY_GUIDE_LAST_MOVE: BoardMove = { from: "g6", to: "e8" };
+
 // Builds the session layout slots for one first-use guide step from the same
 // components the live session uses. The frozen example never starts a clock or
 // accepts moves; the current step's target carries `targetRef`.
@@ -7169,6 +7172,9 @@ function buildSessionGuideStageNodes({
           durations={CHESSBOARD_DURATIONS}
           spriteSource={CHESS_PIECE_SPRITE}
           colors={chessboardColorsFor(appTheme)}
+          squareHighlights={isReplyStep
+            ? boardMoveSquareTints(ARROW_DUEL_REPLY_GUIDE_LAST_MOVE, appTheme.colors.board.lastMoveSquare)
+            : undefined}
         />
         <BoardCoordinateOverlay boardSize={boardSize} flipped={false} />
         <BoardInputBlocker />
@@ -7183,8 +7189,7 @@ function buildSessionGuideStageNodes({
         {isReplyStep ? (
           <LastMoveOverlay
             boardSize={boardSize}
-            flipped={false}
-            move={{ from: "g6", to: "e8" }}
+            move={ARROW_DUEL_REPLY_GUIDE_LAST_MOVE}
             overlayTestID="practice-arrow-duel-guide-reply-last-move"
           />
         ) : null}
@@ -11641,19 +11646,19 @@ function coordinateTextStyle(styles: ReturnType<typeof useStyles>, row: number, 
   return (row + col) % 2 === 0 ? styles.coordinateTextOnLight : styles.coordinateTextOnDark;
 }
 
+// Accessible marker for the last move. The board itself paints the tint
+// beneath its pieces (`useBoardMoveSquareTints`); a tinted view here would sit
+// over the piece artwork and wash it out (#629).
 function LastMoveOverlay({
   boardSize,
-  flipped,
   move,
   overlayTestID
 }: {
   boardSize: number;
-  flipped: boolean;
   move: BoardMove;
   overlayTestID: string;
 }): React.JSX.Element {
   const styles = useStyles();
-  const squareSize = boardSize / 8;
   return (
     <View
       accessible
@@ -11662,26 +11667,33 @@ function LastMoveOverlay({
       pointerEvents="none"
       style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
       testID={overlayTestID}
-    >
-      {[move.from, move.to].map((square) => {
-        const pos = squareToTopLeft(square, squareSize, flipped);
-        return (
-          <View
-            key={square}
-            style={[
-              styles.lastMoveSquare,
-              {
-                height: squareSize,
-                left: pos.x,
-                top: pos.y,
-                width: squareSize
-              }
-            ]}
-          />
-        );
-      })}
-    </View>
+    />
   );
+}
+
+type BoardSquareTint = { square: Square; color: string };
+
+// Tints a move's origin and target. The board draws them beneath its pieces so
+// black and white piece artwork keeps its own contrast (#629).
+function boardMoveSquareTints(move: BoardMove, color: string): BoardSquareTint[] {
+  return [
+    { square: move.from as Square, color },
+    { square: move.to as Square, color }
+  ];
+}
+
+// Memoized per move and color so clock re-renders leave the board layer alone.
+function useBoardMoveSquareTints(move: BoardMove | null, color: string): BoardSquareTint[] | undefined {
+  const from = move?.from ?? null;
+  const to = move?.to ?? null;
+  return useMemo(
+    () => (from && to ? boardMoveSquareTints({ from, to }, color) : undefined),
+    [color, from, to]
+  );
+}
+
+function moveFeedbackTint(theme: Theme, result: "correct" | "wrong"): string {
+  return result === "correct" ? theme.colors.positive.flash : theme.colors.danger.flash;
 }
 
 function sessionBoardAccessibilityLabel(
@@ -11698,43 +11710,16 @@ function sessionBoardAccessibilityLabel(
   return parts.join(". ");
 }
 
-function MoveFeedbackOverlay({
-  boardSize,
-  flipped,
-  move,
-  result
-}: {
-  boardSize: number;
-  flipped: boolean;
-  move: BoardMove;
-  result: "correct" | "wrong";
-}): React.JSX.Element {
+// Marks the submitted move's feedback window. The board paints the correct or
+// wrong tint beneath its pieces (`useBoardMoveSquareTints`).
+function MoveFeedbackOverlay({ boardSize }: { boardSize: number }): React.JSX.Element {
   const styles = useStyles();
-  const appTheme = useTheme();
-  const squareSize = boardSize / 8;
-  const backgroundColor = result === "correct" ? appTheme.colors.positive.flash : appTheme.colors.danger.flash;
-
   return (
-    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none" testID="move-feedback-overlay">
-      {[move.from, move.to].map((square) => {
-        const pos = squareToTopLeft(square, squareSize, flipped);
-        return (
-          <View
-            key={square}
-            style={[
-              styles.feedbackMoveSquare,
-              {
-                backgroundColor,
-                height: squareSize,
-                left: pos.x,
-                top: pos.y,
-                width: squareSize
-              }
-            ]}
-          />
-        );
-      })}
-    </View>
+    <View
+      pointerEvents="none"
+      style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
+      testID="move-feedback-overlay"
+    />
   );
 }
 
@@ -14364,6 +14349,12 @@ function ReviewSession({
   const baseBoardFlipped = reviewPerspectiveSide === "b";
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
+  const reviewBoardSquareTints = useBoardMoveSquareTints(
+    feedbackMove ?? (feedback ? null : lastMove),
+    feedbackMove
+      ? moveFeedbackTint(appTheme, feedback?.result ?? "wrong")
+      : appTheme.colors.board.lastMoveSquare
+  );
   const isArrowDuelPunishmentLine = currentEntry.mode === "arrow_duel"
     && (
       reviewState.kind === "line"
@@ -15552,6 +15543,7 @@ function ReviewSession({
               durations={{ move: BOARD_MOVE_ANIMATION_MS }}
               spriteSource={CHESS_PIECE_SPRITE}
               colors={chessboardColorsFor(appTheme)}
+              squareHighlights={reviewBoardSquareTints}
             />
             <BoardCoordinateOverlay
               boardSize={boardSize}
@@ -15561,18 +15553,12 @@ function ReviewSession({
             {lastMove && !feedback ? (
               <LastMoveOverlay
                 boardSize={boardSize}
-                flipped={boardFlipped}
                 move={lastMove}
                 overlayTestID="review-last-move-overlay"
               />
             ) : null}
             {feedbackMove ? (
-              <MoveFeedbackOverlay
-                boardSize={boardSize}
-                flipped={boardFlipped}
-                move={feedbackMove}
-                result={feedback?.result ?? "wrong"}
-              />
+              <MoveFeedbackOverlay boardSize={boardSize} />
             ) : null}
             {reviewWhatIfVisible ? (
               <ArrowDuelWhatIfOverlay
@@ -21964,13 +21950,6 @@ const useStyles = makeStyles((theme) => ({
     position: "absolute",
     top: 0,
     left: 0
-  },
-  lastMoveSquare: {
-    backgroundColor: theme.colors.board.lastMoveSquare,
-    position: "absolute"
-  },
-  feedbackMoveSquare: {
-    position: "absolute"
   },
   debugLog: {
     color: theme.colors.text.strong,

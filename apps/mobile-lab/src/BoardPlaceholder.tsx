@@ -31,6 +31,7 @@ type BoardPlaceholderProps = {
   onIllegalMove?: (from: string, to: string) => void;
   onMove?: (result: BoardMoveResult) => void;
   onReady?: () => void;
+  squareHighlights?: ReadonlyArray<{ square: string; color: string }>;
 };
 
 type BoardPlaceholderRef = {
@@ -65,7 +66,8 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
     gestureEnabled = true,
     onIllegalMove,
     onMove,
-    onReady
+    onReady,
+    squareHighlights
   },
   ref
 ) {
@@ -269,6 +271,13 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
           />
         ))}
       </View>
+      {squareHighlights?.map(({ square, color }, index) => (
+        <View
+          key={`${square}-${index}`}
+          pointerEvents="none"
+          style={[styles.squareHighlight, squareFrame(square, boardSize, flipped), { backgroundColor: color }]}
+        />
+      ))}
       {previewLastMove ? (
         <View pointerEvents="none" style={styles.previewMoveOverlay} testID="lab-blunder-last-move">
           <View style={[styles.previewMoveSquare, squareFrame(previewLastMove.from, boardSize, flipped)]} />
@@ -662,6 +671,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0
+  },
+  squareHighlight: {
+    position: "absolute"
   },
   previewMoveOverlay: {
     ...StyleSheet.absoluteFill,
