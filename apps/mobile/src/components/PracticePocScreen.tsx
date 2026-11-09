@@ -6185,6 +6185,8 @@ type PracticeModeSummary = {
   rating?: number;
 };
 
+// Close, centered title and the primary action, matching the other direction A
+// sub-screens (#609). The side slots share one width so the title stays centered.
 function SprintStartHeader({
   actionLabel = "Start",
   closeAccessibilityLabel,
@@ -6211,6 +6213,7 @@ function SprintStartHeader({
   onStart: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   return (
     <View style={styles.sprintScreenHeader} testID={headerTestID}>
       {onClose ? (
@@ -6218,28 +6221,33 @@ function SprintStartHeader({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={closeAccessibilityLabel}
+            hitSlop={4}
             testID={closeTestID}
-            style={styles.analysisIconButton}
+            style={({ pressed }) => [styles.sprintHeaderCloseButton, pressed ? styles.sprintHeaderCloseButtonPressed : null]}
             onPress={onClose}
           >
-            <CloseGlyph />
+            <Icon color={appTheme.colors.accent.s600} name="close" size={20} weight="semibold" />
           </Pressable>
         </View>
       ) : null}
-      <View style={[styles.sprintHeaderTitleBlock, !onClose ? styles.sprintHeaderTitleBlockLeading : null]}>
-        <Text style={[styles.sprintScreenTitle, !onClose ? styles.sprintScreenTitleLeading : null]} testID={titleTestID}>{title}</Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={startAccessibilityLabel}
-        accessibilityState={{ disabled: startDisabled }}
-        disabled={startDisabled}
-        testID={startTestID}
-        style={[styles.sprintHeaderStartButton, startDisabled ? styles.disabledButton : null]}
-        onPress={onStart}
+      <AppText
+        accessibilityRole="header"
+        style={[styles.sprintScreenTitle, !onClose ? styles.sprintScreenTitleLeading : null]}
+        testID={titleTestID}
+        variant="headline"
       >
-        <Text style={styles.primaryButtonText}>{actionLabel}</Text>
-      </Pressable>
+        {title}
+      </AppText>
+      <View style={[styles.sprintHeaderSideSlot, styles.sprintHeaderSideSlotTrailing]}>
+        <Button
+          accessibilityLabel={startAccessibilityLabel}
+          disabled={startDisabled}
+          label={actionLabel}
+          size="compact"
+          testID={startTestID}
+          onPress={onStart}
+        />
+      </View>
     </View>
   );
 }
@@ -8383,6 +8391,7 @@ function PracticeRunEditor({
 }): React.JSX.Element | null {
   const styles = useStyles();
   const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const draft = presentation.draft;
   if (!draft) {
     return null;
@@ -8401,6 +8410,150 @@ function PracticeRunEditor({
     mode: draft.mode,
     perPuzzleSeconds: draft.perPuzzleSeconds
   });
+  const eloRow = (
+    <PracticeRunEloRow
+      key="elo"
+      directEntry={directRunEditing}
+      error={presentation.eloError ?? null}
+      inputValue={presentation.eloInput ?? String(draft.elo)}
+      isCreate={isCreate}
+      value={draft.elo}
+      onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
+      onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
+      onInputStep={(direction) => presentation.onIntent({ type: "step-elo-input", direction })}
+    />
+  );
+  // Section draws a full-bleed separator between each field row, so the rows
+  // are collected flat rather than nested in fragments.
+  const fieldRows: React.ReactNode[] = [];
+  if (canEditName) {
+    fieldRows.push(
+      <View key="name" style={[rowStyle, styles.editorFieldStack]}>
+        <View style={styles.runNameRow} testID="practice-run-name-row">
+          <View style={styles.runNameCopy}>
+            <AppText variant="body">Name</AppText>
+            <AppText tone="secondary" variant="footnote">Required · unique</AppText>
+          </View>
+          <TextInput
+            keyboardAppearance={appTheme.name}
+            accessibilityLabel="Run name"
+            autoCapitalize="words"
+            autoCorrect={false}
+            maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
+            placeholder="e.g. Tactics Focus"
+            placeholderTextColor={appTheme.colors.text.faint}
+            returnKeyType="done"
+            style={[styles.runNameInput, presentation.nameError ? styles.editorInputError : null]}
+            submitBehavior="blurAndSubmit"
+            testID="practice-run-name-input"
+            value={draft.name}
+            onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
+          />
+        </View>
+        {presentation.nameError ? (
+          <AppText
+            accessibilityLiveRegion="polite"
+            testID="practice-run-name-error"
+            tone="negative"
+            variant="footnote"
+          >
+            {presentation.nameError}
+          </AppText>
+        ) : null}
+      </View>
+    );
+  } else if (isCreate) {
+    fieldRows.push(
+      <CustomValueRow
+        key="fixed-name"
+        detail="Built-in run names stay fixed"
+        label="Name"
+        testID="practice-run-fixed-name"
+        value={draft.name}
+      />
+    );
+  }
+  if (isCreate) {
+    if (isCustom) {
+      fieldRows.push(
+        <CustomModeChoiceRow
+          key="mode"
+          value={customMode}
+          testID="practice-run-mode-row"
+          onChange={(mode) => presentation.onIntent({ type: "change-mode", mode })}
+        />
+      );
+      if (!themeCatalogPresentation) {
+        fieldRows.push(
+          <View key="theme-label" style={rowStyle}>
+            <AppText style={styles.editorRowLabel} variant="body">Themes</AppText>
+            <AppText tone="secondary" variant="footnote">Choose one or more</AppText>
+          </View>
+        );
+      }
+      fieldRows.push(
+        <CustomThemeChoiceRow
+          key="themes"
+          showDisclosure
+          selectedThemes={draft.themes}
+          themeCatalogPresentation={themeCatalogPresentation}
+          testID="practice-run-theme-row"
+          onChange={(theme) => presentation.onIntent({ type: "toggle-theme", theme })}
+        />,
+        <CustomOptionRow
+          key="duration"
+          label="Duration"
+          value={formatDurationLabel(draft.durationSeconds)}
+          stepperTestID="practice-run-duration-stepper"
+          options={PRACTICE_RUN_DURATION_OPTIONS.map((option) => ({
+            value: option,
+            label: formatDurationLabel(option),
+            testID: `practice-run-duration-${option}`
+          }))}
+          selected={draft.durationSeconds as (typeof PRACTICE_RUN_DURATION_OPTIONS)[number]}
+          onChange={(durationSeconds) => presentation.onIntent({ type: "change-duration", durationSeconds })}
+        />,
+        <CustomOptionRow
+          key="per-puzzle"
+          label="Time per puzzle"
+          value={`${draft.perPuzzleSeconds} sec`}
+          stepperTestID="practice-run-per-puzzle-stepper"
+          options={PRACTICE_RUN_PER_PUZZLE_OPTIONS.map((option) => ({
+            value: option,
+            label: `${option}s`,
+            testID: `practice-run-per-puzzle-${option}`
+          }))}
+          selected={draft.perPuzzleSeconds as (typeof PRACTICE_RUN_PER_PUZZLE_OPTIONS)[number]}
+          onChange={(perPuzzleSeconds) => presentation.onIntent({ type: "change-per-puzzle", perPuzzleSeconds })}
+        />
+      );
+    } else {
+      fieldRows.push(
+        <CustomValueRow
+          key="format"
+          label="Format"
+          testID="practice-run-fixed-format"
+          value={draft.kind === "arrow_duel" ? "Arrow Duel" : "Standard puzzles"}
+        />
+      );
+    }
+    fieldRows.push(eloRow);
+  } else {
+    if (directRunEditing) {
+      fieldRows.push(
+        <CustomValueRow
+          key="format"
+          detail="Cannot be changed after creation"
+          label="Format"
+          testID="practice-run-fixed-format"
+          value={draft.mode === "arrow_duel"
+            ? "Arrow Duel"
+            : draft.kind === "standard" ? "Standard puzzles" : "Regular puzzles"}
+        />
+      );
+    }
+    fieldRows.push(eloRow);
+  }
 
   return (
     <View style={styles.customSetupPanel} testID="practice-run-editor">
@@ -8425,174 +8578,40 @@ function PracticeRunEditor({
 
       <View style={styles.runEditorIntro}>
         {!isCreate && !directRunEditing ? (
-          <Text style={styles.runEditorRunName} testID="practice-run-editor-run-name">
+          <AppText testID="practice-run-editor-run-name" variant="headline">
             {draft.name}
-          </Text>
+          </AppText>
         ) : null}
-        <Text style={styles.helperText}>
+        <AppText tone="secondary" variant="subheadline">
           {isCreate
             ? "Saving adds this run to Home. It does not start a sprint."
             : directRunEditing
               ? "Change this Run's name, rating, and puzzle timing."
               : "Adjust the current rating. Run settings stay fixed."}
-        </Text>
+        </AppText>
       </View>
 
       {isCreate && presentation.canSave === false ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={[styles.customEligibilityCard, styles.customEligibilityWarning]}
-          testID="practice-run-availability-error"
-        >
-          <Text style={styles.sectionLabel}>No matching local puzzles</Text>
-          <Text style={styles.helperText}>
-            Choose different themes or settings before adding this Run to Home.
-          </Text>
+        <View accessibilityLiveRegion="polite" testID="practice-run-availability-error">
+          <Section rows>
+            <ListRow
+              icon="warning"
+              iconTone="warning"
+              subtitle="Choose different themes or settings before adding this Run to Home."
+              title="No matching local puzzles"
+            />
+          </Section>
         </View>
       ) : null}
 
-      {!isCreate && directRunEditing ? (
-        <Text
-          style={[styles.sectionLabel, styles.runEditorDetailsLabel]}
-          testID="practice-run-details-section"
-        >
-          Run details
-        </Text>
-      ) : null}
-
-      <View style={styles.customConfigCard} testID="practice-run-editor-fields">
-        {canEditName ? (
-          <View style={[styles.customConfigRow, styles.runNameRow]} testID="practice-run-name-row">
-            <View style={styles.runNameCopy}>
-              <Text style={styles.listText}>Name</Text>
-              <Text style={styles.requiredFieldLabel}>Required · unique</Text>
-            </View>
-            <TextInput
-              keyboardAppearance={appTheme.name}
-              accessibilityLabel="Run name"
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
-              placeholder="e.g. Tactics Focus"
-              placeholderTextColor={appTheme.colors.text.faint}
-              returnKeyType="done"
-              style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
-              submitBehavior="blurAndSubmit"
-              testID="practice-run-name-input"
-              value={draft.name}
-              onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
-            />
-          </View>
-        ) : isCreate ? (
-          <CustomValueRow
-            detail="Built-in run names stay fixed"
-            label="Name"
-            testID="practice-run-fixed-name"
-            value={draft.name}
-          />
-        ) : null}
-
-        {canEditName && presentation.nameError ? (
-          <View
-            accessibilityLiveRegion="polite"
-            style={styles.runNameError}
-            testID="practice-run-name-error"
-          >
-            <Text style={styles.runNameErrorText}>{presentation.nameError}</Text>
-          </View>
-        ) : null}
-
-        {isCreate ? (
-          <>
-            {isCustom ? (
-              <>
-                <CustomModeChoiceRow
-                  value={customMode}
-                  testID="practice-run-mode-row"
-                  onChange={(mode) => presentation.onIntent({ type: "change-mode", mode })}
-                />
-                {!themeCatalogPresentation ? (
-                  <View style={styles.runThemeLabelRow}>
-                    <Text style={styles.listText}>Themes</Text>
-                    <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
-                  </View>
-                ) : null}
-                <CustomThemeChoiceRow
-                  showDisclosure
-                  selectedThemes={draft.themes}
-                  themeCatalogPresentation={themeCatalogPresentation}
-                  testID="practice-run-theme-row"
-                  onChange={(theme) => presentation.onIntent({ type: "toggle-theme", theme })}
-                />
-                <CustomOptionRow
-                  label="Duration"
-                  value={formatDurationLabel(draft.durationSeconds)}
-                  stepperTestID="practice-run-duration-stepper"
-                  options={PRACTICE_RUN_DURATION_OPTIONS.map((option) => ({
-                    value: option,
-                    label: formatDurationLabel(option),
-                    testID: `practice-run-duration-${option}`
-                  }))}
-                  selected={draft.durationSeconds as (typeof PRACTICE_RUN_DURATION_OPTIONS)[number]}
-                  onChange={(durationSeconds) => presentation.onIntent({ type: "change-duration", durationSeconds })}
-                />
-                <CustomOptionRow
-                  label="Time per puzzle"
-                  value={`${draft.perPuzzleSeconds} sec`}
-                  stepperTestID="practice-run-per-puzzle-stepper"
-                  options={PRACTICE_RUN_PER_PUZZLE_OPTIONS.map((option) => ({
-                    value: option,
-                    label: `${option}s`,
-                    testID: `practice-run-per-puzzle-${option}`
-                  }))}
-                  selected={draft.perPuzzleSeconds as (typeof PRACTICE_RUN_PER_PUZZLE_OPTIONS)[number]}
-                  onChange={(perPuzzleSeconds) => presentation.onIntent({ type: "change-per-puzzle", perPuzzleSeconds })}
-                />
-              </>
-            ) : (
-              <CustomValueRow
-                label="Format"
-                testID="practice-run-fixed-format"
-                value={draft.kind === "arrow_duel" ? "Arrow Duel" : "Standard puzzles"}
-              />
-            )}
-
-            <PracticeRunEloRow
-              directEntry={directRunEditing}
-              error={presentation.eloError ?? null}
-              inputValue={presentation.eloInput ?? String(draft.elo)}
-              isCreate
-              value={draft.elo}
-              onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
-              onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
-              onInputStep={(direction) => presentation.onIntent({ type: "step-elo-input", direction })}
-            />
-          </>
-        ) : (
-          <>
-            {directRunEditing ? (
-              <CustomValueRow
-                detail="Cannot be changed after creation"
-                label="Format"
-                testID="practice-run-fixed-format"
-                value={draft.mode === "arrow_duel"
-                  ? "Arrow Duel"
-                  : draft.kind === "standard" ? "Standard puzzles" : "Regular puzzles"}
-              />
-            ) : null}
-            <PracticeRunEloRow
-              directEntry={directRunEditing}
-              error={presentation.eloError ?? null}
-              inputValue={presentation.eloInput ?? String(draft.elo)}
-              isCreate={false}
-              value={draft.elo}
-              onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
-              onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
-              onInputStep={(direction) => presentation.onIntent({ type: "step-elo-input", direction })}
-            />
-          </>
-        )}
-      </View>
+      <Section
+        header={!isCreate && directRunEditing ? "Run details" : undefined}
+        headerTestID="practice-run-details-section"
+        rows
+        testID="practice-run-editor-fields"
+      >
+        {fieldRows}
+      </Section>
 
       {showSprintRulesSummary ? (
         <SprintPassRulesSummary config={sprintRules} />
@@ -8625,8 +8644,7 @@ function PracticeRunEditor({
       ) : null}
 
       {isCreate && isCustom && previousRows.length > 0 ? (
-        <View style={styles.previousConfigList} testID="custom-previous-configs">
-          <Text style={styles.sectionLabel}>Previous configs</Text>
+        <Section header="Previous configs" rows testID="custom-previous-configs">
           {previousRows.map(({ config, row }) => (
             <PreviousCustomConfigRow
               key={config.id}
@@ -8637,11 +8655,85 @@ function PracticeRunEditor({
               })}
             />
           ))}
-        </View>
+        </Section>
       ) : null}
     </View>
   );
 }
+
+// A grouped-row switch (51 x 31 pt track) with a 44 pt tall hit target.
+function EditorSwitch({
+  accessibilityLabel,
+  enabled,
+  testID,
+  onPress
+}: {
+  accessibilityLabel: string;
+  enabled: boolean;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: enabled }}
+      accessibilityValue={{ text: enabled ? "On" : "Off" }}
+      style={styles.runTimingToggle}
+      testID={testID}
+      onPress={onPress}
+    >
+      <View style={[styles.historyToggleTrack, enabled ? styles.historyToggleTrackActive : null]}>
+        <View style={[styles.historyToggleThumb, enabled ? styles.historyToggleThumbActive : null]} />
+      </View>
+    </Pressable>
+  );
+}
+
+// One half of a stepper: a filled 36 x 32 pt button whose hit area reaches 44 pt.
+function StepperButton({
+  accessibilityLabel,
+  direction,
+  disabled,
+  testID,
+  onPress
+}: {
+  accessibilityLabel: string;
+  direction: "decrease" | "increase";
+  disabled: boolean;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={STEPPER_HIT_SLOP}
+      style={({ pressed }) => [
+        styles.customStepperButton,
+        pressed && !disabled ? styles.customStepperButtonPressed : null,
+        disabled ? styles.disabledButton : null
+      ]}
+      testID={testID}
+      onPress={onPress}
+    >
+      <Icon
+        color={appTheme.colors.text.primary}
+        name={direction === "decrease" ? "remove" : "add"}
+        size={17}
+        testID={direction === "decrease" ? "minus-glyph" : "plus-glyph"}
+        weight="semibold"
+      />
+    </Pressable>
+  );
+}
+
+const STEPPER_HIT_SLOP = { bottom: 6, left: 4, right: 4, top: 6 };
 
 function ArrowDuelReplyChallengeSetting({
   enabled,
@@ -8660,106 +8752,98 @@ function ArrowDuelReplyChallengeSetting({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   return (
-    <View style={styles.settingsSection} testID="practice-run-arrow-duel-reply-setting">
-      <View style={styles.runTimingSectionCopy}>
-        <Text style={styles.sectionLabel}>Arrow Duel</Text>
-      </View>
-      <View style={styles.customConfigCard}>
-        <View style={styles.runTimingRow}>
-          <View style={styles.runTimingRowCopy}>
-            <Text style={styles.listText}>
-              Find the opponent’s best reply
-            </Text>
-            <Text style={styles.helperText}>
-              {individualRunCopy
-                ? "After you choose the better arrow, we play the other move so you can find the opponent’s best reply."
-                : "After you choose the better arrow, find the opponent’s best reply."}
-            </Text>
-            {individualRunCopy ? (
-              <Text style={styles.helperText}>
-                This setting only changes this Run. Turn it off to go straight to the next puzzle.
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.arrowDuelReplySettingControl}>
-            <Text
-              style={styles.arrowDuelReplySettingValue}
-              testID="practice-run-arrow-duel-reply-value"
-            >
-              {enabled ? "On" : "Off"}
-            </Text>
-            <Pressable
-              accessibilityLabel="Find the opponent’s best reply"
-              accessibilityRole="switch"
-              accessibilityState={{ checked: enabled }}
-              accessibilityValue={{ text: enabled ? "On" : "Off" }}
-              style={styles.runTimingToggle}
-              testID="practice-run-arrow-duel-reply-toggle"
-              onPress={onToggle}
-            >
-              <View style={[styles.historyToggleTrack, enabled ? styles.historyToggleTrackActive : null]}>
-                <View style={[styles.historyToggleThumb, enabled ? styles.historyToggleThumbActive : null]} />
-              </View>
-            </Pressable>
-          </View>
+    <Section header="Arrow Duel" rows testID="practice-run-arrow-duel-reply-setting">
+      <View style={[rowStyle, styles.editorWrapRow]}>
+        <View style={styles.editorWrapCopy}>
+          <AppText variant="body">
+            Find the opponent’s best reply
+          </AppText>
+          <AppText tone="secondary" variant="footnote">
+            {individualRunCopy
+              ? "After you choose the better arrow, we play the other move so you can find the opponent’s best reply."
+              : "After you choose the better arrow, find the opponent’s best reply."}
+          </AppText>
+          {individualRunCopy ? (
+            <AppText tone="secondary" variant="footnote">
+              This setting only changes this Run. Turn it off to go straight to the next puzzle.
+            </AppText>
+          ) : null}
         </View>
-        <View style={styles.runTimingRow} testID="practice-run-arrow-duel-reply-time-row">
-          <View style={styles.runTimingRowCopy}>
-            <Text style={styles.listText}>Time to find the reply</Text>
-            <Text style={styles.helperText}>
-              You’ll have {DEFAULT_OPPONENT_REPLY_SECONDS} seconds by default. Choose up to {OPPONENT_REPLY_MAX_SECONDS} seconds.
-            </Text>
-            <Text style={styles.helperText}>
-              Your Sprint and puzzle timers pause while you find the reply.
-            </Text>
-            {individualRunCopy ? (
-              <Text style={styles.helperText}>
-                To turn this extra challenge off for every Run, go to Settings.
-              </Text>
-            ) : null}
-            {replySecondsError ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                style={styles.runNameErrorText}
-                testID="practice-run-arrow-duel-reply-seconds-error"
-              >
-                {replySecondsError}
-              </Text>
-            ) : null}
-          </View>
+        <View style={styles.editorWrapControls}>
+          <AppText
+            numberOfLines={1}
+            testID="practice-run-arrow-duel-reply-value"
+            tone="secondary"
+            variant="body"
+          >
+            {enabled ? "On" : "Off"}
+          </AppText>
+          <EditorSwitch
+            accessibilityLabel="Find the opponent’s best reply"
+            enabled={enabled}
+            testID="practice-run-arrow-duel-reply-toggle"
+            onPress={onToggle}
+          />
+        </View>
+      </View>
+      <View style={[rowStyle, styles.editorWrapRow]} testID="practice-run-arrow-duel-reply-time-row">
+        <View style={styles.editorWrapCopy}>
+          <AppText variant="body">Time to find the reply</AppText>
+          <AppText tone="secondary" variant="footnote">
+            You’ll have {DEFAULT_OPPONENT_REPLY_SECONDS} seconds by default. Choose up to {OPPONENT_REPLY_MAX_SECONDS} seconds.
+          </AppText>
+          <AppText tone="secondary" variant="footnote">
+            Your Sprint and puzzle timers pause while you find the reply.
+          </AppText>
+          {individualRunCopy ? (
+            <AppText tone="secondary" variant="footnote">
+              To turn this extra challenge off for every Run, go to Settings.
+            </AppText>
+          ) : null}
+          {replySecondsError ? (
+            <AppText
+              accessibilityLiveRegion="polite"
+              testID="practice-run-arrow-duel-reply-seconds-error"
+              tone="negative"
+              variant="footnote"
+            >
+              {replySecondsError}
+            </AppText>
+          ) : null}
+        </View>
+        <View
+          style={[
+            styles.editorWrapControls,
+            !enabled ? styles.runTimingControlDisabled : null
+          ]}
+        >
           <View
             style={[
-              styles.arrowDuelReplySecondsControl,
-              !enabled ? styles.runTimingControlDisabled : null
+              styles.arrowDuelReplySecondsInputShell,
+              replySecondsError ? styles.editorInputError : null
             ]}
           >
-            <View
-              style={[
-                styles.arrowDuelReplySecondsInputShell,
-                replySecondsError ? styles.runEloInputShellError : null
-              ]}
-            >
-              <TextInput
-                keyboardAppearance={appTheme.name}
-                accessibilityLabel="Time to find the opponent’s reply in seconds"
-                accessibilityState={{ disabled: !enabled }}
-                editable={enabled}
-                inputMode="numeric"
-                keyboardType="number-pad"
-                maxLength={2}
-                selectTextOnFocus
-                style={styles.arrowDuelReplySecondsInput}
-                testID="practice-run-arrow-duel-reply-seconds"
-                value={replySecondsInput}
-                onChangeText={onReplySecondsInputChange}
-              />
-            </View>
-            <Text style={styles.arrowDuelReplySecondsUnit}>sec</Text>
+            <TextInput
+              keyboardAppearance={appTheme.name}
+              accessibilityLabel="Time to find the opponent’s reply in seconds"
+              accessibilityState={{ disabled: !enabled }}
+              editable={enabled}
+              inputMode="numeric"
+              keyboardType="number-pad"
+              maxLength={2}
+              selectTextOnFocus
+              style={styles.arrowDuelReplySecondsInput}
+              testID="practice-run-arrow-duel-reply-seconds"
+              value={replySecondsInput}
+              onChangeText={onReplySecondsInputChange}
+            />
           </View>
+          <AppText numberOfLines={1} tone="secondary" variant="body">sec</AppText>
         </View>
       </View>
-    </View>
+    </Section>
   );
 }
 
@@ -8772,27 +8856,29 @@ function SprintPassRulesSummary({
   return (
     <View
       accessibilityLabel={`Pass rules. Solve ${config.targetCorrect} before ${formatSprintDurationLabel(config.durationSeconds)} ends. Mistake ${config.maxMistakes} ends the Sprint. Wrong answers count as attempts, not solved puzzles.`}
-      style={styles.sprintPassRulesCard}
       testID="practice-run-pass-rules"
     >
-      <View style={styles.sprintPassRulesHeading}>
-        <View>
-          <Text style={styles.sectionLabel}>Pass rules</Text>
-          <Text style={styles.sprintPassRulesHeadline}>
+      <Section header="Pass rules">
+        <View style={styles.sprintPassRulesHeading}>
+          <AppText style={styles.editorRowLabel} variant="headline">
             Solve {config.targetCorrect} before {formatSprintDurationLabel(config.durationSeconds)} ends
-          </Text>
+          </AppText>
+          <View style={styles.sprintPassRulesTarget}>
+            <AppText numberOfLines={1} style={styles.sprintPassRulesTargetText} tone="accent" variant="numeral">
+              {config.targetCorrect}
+            </AppText>
+            <AppText numberOfLines={1} style={styles.sprintPassRulesTargetLabel} tone="accent" variant="caption">
+              to pass
+            </AppText>
+          </View>
         </View>
-        <View style={styles.sprintPassRulesTarget}>
-          <Text style={styles.sprintPassRulesTargetValue}>{config.targetCorrect}</Text>
-          <Text style={styles.sprintPassRulesTargetLabel}>TO PASS</Text>
-        </View>
-      </View>
-      <Text style={styles.helperText}>
-        Wrong answers count as attempts, not solved puzzles. Mistake {config.maxMistakes} ends the Sprint.
-      </Text>
-      <Text style={styles.sprintPassRulesHint}>
-        The goal updates with Duration and Time per puzzle.
-      </Text>
+        <AppText tone="secondary" variant="subheadline">
+          Wrong answers count as attempts, not solved puzzles. Mistake {config.maxMistakes} ends the Sprint.
+        </AppText>
+        <AppText tone="secondary" variant="footnote">
+          The goal updates with Duration and Time per puzzle.
+        </AppText>
+      </Section>
     </View>
   );
 }
@@ -8825,12 +8911,12 @@ function PracticeRunTimingSettings({
   return (
     <View style={styles.settingsSection} testID="practice-run-puzzle-timing">
       <View style={styles.runTimingSectionCopy}>
-        <Text style={styles.sectionLabel}>Puzzle timing</Text>
-        <Text style={styles.helperText}>
+        <AppText accessibilityRole="header" variant="title">Puzzle timing</AppText>
+        <AppText tone="secondary" variant="footnote">
           {`Typical time ${formatCompactDuration(perPuzzleSeconds)} · no rating impact`}
-        </Text>
+        </AppText>
       </View>
-      <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
+      <Section rows testID="practice-run-puzzle-timing-card">
         <RunTimingSettingRow
           detail="Turns the puzzle clock yellow. A correct answer after that is marked Unclear; play continues."
           enabled={warningEnabled}
@@ -8871,7 +8957,7 @@ function PracticeRunTimingSettings({
             { type: "toggle-timeout" }
           ))}
         />
-      </View>
+      </Section>
     </View>
   );
 }
@@ -8898,51 +8984,39 @@ function RunTimingSettingRow({
   onToggle: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   return (
-    <View style={styles.runTimingRow} testID={testID}>
-      <View style={styles.runTimingRowCopy}>
-        <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{detail}</Text>
+    <View style={[rowStyle, styles.editorWrapRow]} testID={testID}>
+      <View style={styles.editorWrapCopy}>
+        <AppText variant="body">{label}</AppText>
+        <AppText tone="secondary" variant="footnote">{detail}</AppText>
       </View>
-      <View style={styles.runTimingControls}>
+      <View style={styles.editorWrapControls}>
         <View style={[styles.runTimingStepper, !enabled ? styles.runTimingControlDisabled : null]}>
-          <Pressable
-            accessibilityRole="button"
+          <StepperButton
             accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+            direction="decrease"
             disabled={!enabled || seconds <= minimumSeconds}
-            style={styles.runTimingStepButton}
             testID={`${testID}-decrease`}
             onPress={() => onChange(Math.max(minimumSeconds, seconds - 5))}
-          >
-            <Text style={styles.runTimingStepText}>−</Text>
-          </Pressable>
-          <Text style={styles.runTimingValue} testID={`${testID}-value`}>
+          />
+          <AppText numberOfLines={1} style={styles.runTimingValue} testID={`${testID}-value`} variant="numeralRow">
             {formatCompactDuration(seconds)}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
+          </AppText>
+          <StepperButton
             accessibilityLabel={`Increase ${label.toLowerCase()}`}
+            direction="increase"
             disabled={!enabled || seconds >= maximumSeconds}
-            style={styles.runTimingStepButton}
             testID={`${testID}-increase`}
             onPress={() => onChange(Math.min(maximumSeconds, seconds + 5))}
-          >
-            <Text style={styles.runTimingStepText}>+</Text>
-          </Pressable>
+          />
         </View>
-        <Pressable
-          accessibilityRole="switch"
+        <EditorSwitch
           accessibilityLabel={label}
-          accessibilityState={{ checked: enabled }}
-          accessibilityValue={{ text: enabled ? "On" : "Off" }}
-          style={styles.runTimingToggle}
+          enabled={enabled}
           testID={`${testID}-toggle`}
           onPress={onToggle}
-        >
-          <View style={[styles.historyToggleTrack, enabled ? styles.historyToggleTrackActive : null]}>
-            <View style={[styles.historyToggleThumb, enabled ? styles.historyToggleThumbActive : null]} />
-          </View>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -8969,6 +9043,7 @@ function PracticeRunEloRow({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   if (directEntry) {
     const parsedInput = Number(inputValue);
     const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
@@ -8977,30 +9052,26 @@ function PracticeRunEloRow({
     const canDecrease = Boolean(onInputStep) && stepValue > CUSTOM_INITIAL_RATING_MIN;
     const canIncrease = Boolean(onInputStep) && stepValue < CUSTOM_INITIAL_RATING_MAX;
     return (
-      <>
-        <View style={styles.customConfigRow} testID="practice-run-elo-row">
-          <View style={styles.customChoiceCopy}>
-            <Text style={styles.listText}>{isCreate ? "Starting rating" : "Current rating"}</Text>
-            <Text style={styles.requiredFieldLabel}>
+      <View style={[rowStyle, styles.editorFieldStack]}>
+        <View style={styles.editorWrapLine} testID="practice-run-elo-row">
+          <View style={styles.editorWrapCopy}>
+            <AppText variant="body">{isCreate ? "Starting rating" : "Current rating"}</AppText>
+            <AppText tone="secondary" variant="footnote">
               {isCreate
                 ? `Sets initial puzzle difficulty · ${CUSTOM_INITIAL_RATING_MIN}–${CUSTOM_INITIAL_RATING_MAX}`
                 : `${CUSTOM_INITIAL_RATING_MIN}–${CUSTOM_INITIAL_RATING_MAX} · ±100 buttons`}
-            </Text>
+            </AppText>
           </View>
           <View style={styles.runEloStepper} testID="practice-run-elo-stepper">
-            <Pressable
-              accessibilityRole="button"
+            <StepperButton
               accessibilityLabel="Decrease run rating by 100"
-              accessibilityState={{ disabled: !canDecrease }}
+              direction="decrease"
               disabled={!canDecrease}
-              style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
               testID="practice-run-elo-decrease"
               onPress={() => onInputStep?.(-1)}
-            >
-              <MinusGlyph />
-            </Pressable>
+            />
             <View
-              style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}
+              style={[styles.runEloInputShell, error ? styles.editorInputError : null]}
               testID="practice-run-elo-input-shell"
             >
               <TextInput
@@ -9016,64 +9087,55 @@ function PracticeRunEloRow({
                 onChangeText={onInputChange}
               />
             </View>
-            <Pressable
-              accessibilityRole="button"
+            <StepperButton
               accessibilityLabel="Increase run rating by 100"
-              accessibilityState={{ disabled: !canIncrease }}
+              direction="increase"
               disabled={!canIncrease}
-              style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
               testID="practice-run-elo-increase"
               onPress={() => onInputStep?.(1)}
-            >
-              <PlusGlyph />
-            </Pressable>
+            />
           </View>
         </View>
         {error ? (
-          <View
+          <AppText
             accessibilityLiveRegion="polite"
-            style={styles.runNameError}
             testID="practice-run-elo-error"
+            tone="negative"
+            variant="footnote"
           >
-            <Text style={styles.runNameErrorText}>{error}</Text>
-          </View>
+            {error}
+          </AppText>
         ) : null}
-      </>
+      </View>
     );
   }
   const canDecrease = value > RATING_FLOOR;
   return (
-    <View style={styles.customConfigRow} testID="practice-run-elo-row">
-      <View style={styles.customChoiceCopy}>
-        <Text style={styles.listText}>{isCreate ? "Starting rating" : "Current rating"}</Text>
-        <Text style={styles.requiredFieldLabel}>
+    <View style={[rowStyle, styles.editorWrapRow]} testID="practice-run-elo-row">
+      <View style={styles.editorWrapCopy}>
+        <AppText variant="body">{isCreate ? "Starting rating" : "Current rating"}</AppText>
+        <AppText tone="secondary" variant="footnote">
           {isCreate
             ? `Sets initial puzzle difficulty · minimum ${RATING_FLOOR}`
             : `Adjusts puzzle difficulty · minimum ${RATING_FLOOR}`}
-        </Text>
+        </AppText>
       </View>
-      <View style={styles.advancedRatingControls}>
-        <Pressable
-          accessibilityRole="button"
+      <View style={styles.editorWrapControls}>
+        <StepperButton
           accessibilityLabel="Decrease run rating"
-          accessibilityState={{ disabled: !canDecrease }}
+          direction="decrease"
           disabled={!canDecrease}
-          style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
           testID="practice-run-elo-decrease"
           onPress={() => onChange(stepManualRating(value, -1))}
-        >
-          <MinusGlyph />
-        </Pressable>
-        <Text style={styles.settingsRowValue} testID="practice-run-elo-value">Rating {value}</Text>
-        <Pressable
-          accessibilityRole="button"
+        />
+        <AppText numberOfLines={1} testID="practice-run-elo-value" tone="secondary" variant="numeralRow">Rating {value}</AppText>
+        <StepperButton
           accessibilityLabel="Increase run rating"
-          style={styles.customStepperButton}
+          direction="increase"
+          disabled={false}
           testID="practice-run-elo-increase"
           onPress={() => onChange(stepManualRating(value, 1))}
-        >
-          <PlusGlyph />
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -9484,7 +9546,7 @@ function CustomSprintSetup({
         onStart={onStart}
       />
 
-      <View style={styles.customConfigCard} testID="custom-config-list">
+      <Section rows testID="custom-config-list">
         <CustomModeChoiceRow
           value={customMode}
           testID="custom-mode-row"
@@ -9534,7 +9596,7 @@ function CustomSprintSetup({
           testID="custom-summary-target"
           valueTestID="custom-target-count"
         />
-      </View>
+      </Section>
 
       <CustomEligibilityNotice
         availablePuzzleCount={availablePuzzleCount}
@@ -9545,22 +9607,27 @@ function CustomSprintSetup({
       <PracticeProgressCard currentRating={initialRating} mode={customMode} progress={progress} />
 
       <View style={styles.previousConfigList} testID="custom-previous-configs">
-        <Text style={styles.sectionLabel}>Previous configs</Text>
+        <AppText accessibilityRole="header" style={styles.previousConfigHeader} variant="title">Previous configs</AppText>
         {previousRows.length === 0 ? (
-          <Text style={styles.helperText} testID="custom-previous-empty">Start a custom sprint to save this setup.</Text>
-        ) : null}
-        {previousRows.map((config) => (
-          <PreviousCustomConfigRow
-            key={config.id}
-            config={config}
-            onPress={() => {
-              onCustomModeChange(config.customMode);
-              onDurationChange(config.durationSeconds);
-              onPerPuzzleChange(config.perPuzzleSeconds);
-              onThemeIntent({ type: "replace-themes", themes: config.themes });
-            }}
-          />
-        ))}
+          <AppText style={styles.previousConfigHeader} testID="custom-previous-empty" tone="secondary" variant="footnote">
+            Start a custom sprint to save this setup.
+          </AppText>
+        ) : (
+          <Section rows>
+            {previousRows.map((config) => (
+              <PreviousCustomConfigRow
+                key={config.id}
+                config={config}
+                onPress={() => {
+                  onCustomModeChange(config.customMode);
+                  onDurationChange(config.durationSeconds);
+                  onPerPuzzleChange(config.perPuzzleSeconds);
+                  onThemeIntent({ type: "replace-themes", themes: config.themes });
+                }}
+              />
+            ))}
+          </Section>
+        )}
       </View>
     </View>
   );
@@ -9575,18 +9642,19 @@ function CustomEligibilityNotice({
   hasEnoughLocalPuzzles: boolean;
   requiredPuzzleCount: number;
 }): React.JSX.Element | null {
-  const styles = useStyles();
   if (hasEnoughLocalPuzzles) {
     return null;
   }
 
   return (
-    <View style={[styles.customEligibilityCard, styles.customEligibilityWarning]} testID="custom-pack-warning">
-      <Text style={styles.sectionLabel}>Local pack warning</Text>
-      <Text style={styles.helperText}>
-        Current offline pack has {availablePuzzleCount} eligible puzzles; this setup may need up to {requiredPuzzleCount}. Broaden theme or rating coverage before a scored release pack.
-      </Text>
-    </View>
+    <Section rows testID="custom-pack-warning">
+      <ListRow
+        icon="warning"
+        iconTone="warning"
+        subtitle={`Current offline pack has ${availablePuzzleCount} eligible puzzles; this setup may need up to ${requiredPuzzleCount}. Broaden theme or rating coverage before a scored release pack.`}
+        title="Local pack warning"
+      />
+    </Section>
   );
 }
 
@@ -9600,30 +9668,26 @@ function CustomModeChoiceRow({
   value: "custom" | "arrow_duel";
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   const options: Array<{ value: "custom" | "arrow_duel"; label: string; detail: string; testID: string }> = [
     { value: "custom", label: "Regular Puzzles", detail: "Board moves", testID: "custom-mode-regular" },
     { value: "arrow_duel", label: "Arrow Duel", detail: "Two candidates", testID: "custom-mode-arrow-duel" }
   ];
   return (
-    <View style={styles.customConfigRow} testID={testID}>
-      <View style={styles.customChoiceCopy}>
-        <Text style={styles.listText}>Mode</Text>
-      </View>
+    <View style={rowStyle} testID={testID}>
+      <AppText style={styles.customModeLabel} variant="body">Mode</AppText>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
-          <Pressable
+          <ChoiceChip
             key={option.value}
+            accessibilityLabel={`${option.label} custom sprint mode, ${option.detail}`}
             accessibilityRole="button"
             accessibilityState={{ selected: value === option.value }}
-            accessibilityLabel={`${option.label} custom sprint mode, ${option.detail}`}
+            label={option.label}
+            selected={value === option.value}
             testID={option.testID}
-            style={[styles.customMiniChip, value === option.value ? styles.customMiniChipActive : null]}
             onPress={() => onChange(option.value)}
-          >
-            <Text style={[styles.customMiniChipText, value === option.value ? styles.customMiniChipTextActive : null]}>
-              {option.label}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
     </View>
@@ -9644,51 +9708,54 @@ function CustomInitialRatingRow({
   value: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   if (!played) {
     return (
       <View
         accessibilityLabel={`Starting rating, rating ${value}. Sets the initial puzzle difficulty for this Run.`}
-        style={styles.customConfigRow}
+        style={[rowStyle, styles.editorWrapRow]}
         testID="custom-initial-rating-row"
       >
-        <View style={styles.customChoiceCopy}>
-          <Text style={styles.listText}>Starting rating</Text>
-          <Text style={styles.requiredFieldLabel}>Sets initial puzzle difficulty</Text>
+        <View style={styles.editorWrapCopy}>
+          <AppText variant="body">Starting rating</AppText>
+          <AppText tone="secondary" variant="footnote">Sets initial puzzle difficulty</AppText>
         </View>
-        <View style={styles.customStepperGroup}>
-          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">Rating {value}</Text>
+        <View style={styles.editorWrapControls}>
+          <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
           <CustomRatingStepper onChange={onChange} value={value} />
         </View>
       </View>
     );
   }
 
+  // One grouped cell: the disclosure row and, when open, its editor below a
+  // full-bleed hairline (Section separates cells, not the rows inside one).
   return (
-    <>
+    <View>
       <Pressable
         accessible
         accessibilityRole="button"
         accessibilityLabel={`Edit rating, rating ${value}`}
         accessibilityState={{ expanded: editOpen }}
-        style={styles.customConfigRow}
+        style={({ pressed }) => [rowStyle, pressed ? styles.editorRowPressed : null]}
         testID="custom-initial-rating-row"
         onPress={() => onEditOpenChange(!editOpen)}
       >
-        <View style={styles.customChoiceCopy}>
-          <Text style={styles.listText}>Edit rating</Text>
-        </View>
-        <View style={styles.customStepperGroup}>
-          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">Rating {value}</Text>
-          <ChevronGlyph direction="right" />
-        </View>
+        <AppText style={styles.editorRowLabel} variant="body">Edit rating</AppText>
+        <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
       </Pressable>
       {editOpen ? (
-        <View style={styles.customConfigRow} testID="custom-initial-rating-editor">
-          <Text style={styles.listText}>Adjustment</Text>
-          <CustomRatingStepper onChange={onChange} value={value} />
-        </View>
+        <>
+          <View style={styles.editorCellSeparator} />
+          <View style={rowStyle} testID="custom-initial-rating-editor">
+            <AppText style={styles.editorRowLabel} variant="body">Adjustment</AppText>
+            <CustomRatingStepper onChange={onChange} value={value} />
+          </View>
+        </>
       ) : null}
-    </>
+    </View>
   );
 }
 
@@ -9714,28 +9781,20 @@ function CustomRatingStepper({
   };
   return (
     <View style={styles.customStepperCompact} testID="custom-initial-rating-stepper">
-      <Pressable
-        accessibilityRole="button"
+      <StepperButton
         accessibilityLabel="Decrease rating"
-        accessibilityState={{ disabled: !canDecrease }}
+        direction="decrease"
         disabled={!canDecrease}
         testID="custom-initial-rating-stepper-decrease"
-        style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
         onPress={decrease}
-      >
-        <MinusGlyph />
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
+      />
+      <StepperButton
         accessibilityLabel="Increase rating"
-        accessibilityState={{ disabled: !canIncrease }}
+        direction="increase"
         disabled={!canIncrease}
         testID="custom-initial-rating-stepper-increase"
-        style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
         onPress={increase}
-      >
-        <PlusGlyph />
-      </Pressable>
+      />
     </View>
   );
 }
@@ -9754,15 +9813,16 @@ function CustomValueRow({
   valueTestID?: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <View
       accessibilityLabel={accessibilityLabel}
-      style={styles.customConfigRow}
+      style={rowStyle}
       testID={testID}
     >
-      <View>
-        <Text style={styles.listText}>{label}</Text>
+      <View style={styles.editorRowLabel}>
+        <AppText variant="body">{label}</AppText>
         {detail ? (
           <View
             accessibilityLabel={detail}
@@ -9770,7 +9830,7 @@ function CustomValueRow({
           />
         ) : null}
       </View>
-      <Text testID={valueTestID} style={styles.customConfigValue}>{value}</Text>
+      <AppText style={styles.customConfigValue} testID={valueTestID} tone="secondary" variant="body">{value}</AppText>
     </View>
   );
 }
@@ -9789,6 +9849,7 @@ function CustomThemeChoiceRow({
   testID: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   if (themeCatalogPresentation) {
     return (
       <ThemeCatalogChoiceRow
@@ -9802,7 +9863,7 @@ function CustomThemeChoiceRow({
   }
 
   return (
-    <View style={[styles.customConfigRow, styles.customThemeRow]} testID={testID}>
+    <View style={[rowStyle, styles.customThemeRow]} testID={testID}>
       <View style={[styles.customInlineOptions, styles.customThemeOptions]}>
         {CUSTOM_THEME_OPTIONS.map((option) => {
           return (
@@ -9861,16 +9922,17 @@ function ThemeCatalogChoiceRow({
           onPress={() => setExpanded((current) => !current)}
         >
           <View style={styles.historyThemeDisclosureCopy}>
-            <Text style={styles.themeCatalogTitle}>Themes</Text>
-            <Text
+            <AppText variant="body">Themes</AppText>
+            <AppText
               accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
               ellipsizeMode="tail"
               numberOfLines={1}
-              style={styles.historyThemeSummary}
               testID="practice-run-theme-selection-detail"
+              tone="secondary"
+              variant="footnote"
             >
               {selectedThemeDetail}
-            </Text>
+            </AppText>
           </View>
           <DisclosureChevron
             expanded={expanded}
@@ -9879,9 +9941,9 @@ function ThemeCatalogChoiceRow({
         </Pressable>
       ) : (
         <View style={styles.themeCatalogHeadingRow}>
-          <View>
-            <Text style={styles.themeCatalogTitle}>Themes</Text>
-            <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
+          <View style={styles.editorRowLabel}>
+            <AppText variant="body">Themes</AppText>
+            <AppText tone="secondary" variant="footnote">Choose one or more</AppText>
           </View>
           {allChip}
         </View>
@@ -9916,6 +9978,53 @@ function ThemeCatalogChoiceRow({
   );
 }
 
+// A capsule choice: selection is an accentSoft tint, never a check or border.
+function ChoiceChip({
+  accessibilityHint,
+  accessibilityLabel,
+  accessibilityRole,
+  accessibilityState,
+  label,
+  selected,
+  testID,
+  onPress
+}: {
+  accessibilityHint?: string;
+  accessibilityLabel: string;
+  accessibilityRole: "button" | "checkbox";
+  accessibilityState: { checked?: boolean; selected?: boolean };
+  label: string;
+  selected: boolean;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      accessibilityState={accessibilityState}
+      hitSlop={4}
+      style={({ pressed }) => [
+        styles.customMiniChip,
+        selected ? styles.customMiniChipActive : null,
+        pressed && !selected ? styles.customMiniChipPressed : null
+      ]}
+      testID={testID}
+      onPress={onPress}
+    >
+      <AppText
+        style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}
+        tone={selected ? "accent" : "primary"}
+        variant="subheadline"
+      >
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
 function ThemeChoiceChip({
   label,
   onPress,
@@ -9927,23 +10036,21 @@ function ThemeChoiceChip({
   option: CustomThemeFilter;
   selected: boolean;
 }): React.JSX.Element {
-  const styles = useStyles();
   const visibleLabel = label ?? customThemeLabel(option);
   const representsAllThemes = option === ALL_THEMES_FILTER;
   return (
-    <Pressable
+    <ChoiceChip
       accessibilityHint={representsAllThemes
         ? "Selects all themes and clears named theme selections"
         : "Adds or removes this theme"}
-      accessibilityRole={representsAllThemes ? "button" : "checkbox"}
       accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${visibleLabel} puzzle theme`}
+      accessibilityRole={representsAllThemes ? "button" : "checkbox"}
       accessibilityState={representsAllThemes ? { selected } : { checked: selected }}
+      label={visibleLabel}
+      selected={selected}
       testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(visibleLabel)}`}
-      style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
       onPress={onPress}
-    >
-      <Text style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}>{visibleLabel}</Text>
-    </Pressable>
+    />
   );
 }
 
@@ -9963,48 +10070,39 @@ function CustomOptionRow<T extends number>({
   value: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selected));
   const previousOption = options[selectedIndex - 1];
   const nextOption = options[selectedIndex + 1];
 
   return (
-    <View style={styles.customConfigRow}>
-      <View>
-        <Text style={styles.listText}>{label}</Text>
-      </View>
-      <View style={styles.customStepperGroup}>
-        <Text style={styles.customConfigValue}>{value}</Text>
+    <View style={[rowStyle, styles.editorWrapRow]}>
+      <AppText style={styles.editorWrapCopy} variant="body">{label}</AppText>
+      <View style={styles.editorWrapControls}>
+        <AppText numberOfLines={1} tone="secondary" variant="body">{value}</AppText>
         <View style={styles.customStepperCompact} testID={stepperTestID}>
-          <Pressable
-            accessibilityRole="button"
+          <StepperButton
             accessibilityLabel={`Decrease ${label.toLowerCase()}`}
-            accessibilityState={{ disabled: !previousOption }}
+            direction="decrease"
             disabled={!previousOption}
             testID={`${stepperTestID}-decrease`}
-            style={[styles.customStepperButton, !previousOption ? styles.disabledButton : null]}
             onPress={() => {
               if (previousOption) {
                 onChange(previousOption.value);
               }
             }}
-          >
-            <MinusGlyph />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
+          />
+          <StepperButton
             accessibilityLabel={`Increase ${label.toLowerCase()}`}
-            accessibilityState={{ disabled: !nextOption }}
+            direction="increase"
             disabled={!nextOption}
             testID={`${stepperTestID}-increase`}
-            style={[styles.customStepperButton, !nextOption ? styles.disabledButton : null]}
             onPress={() => {
               if (nextOption) {
                 onChange(nextOption.value);
               }
             }}
-          >
-            <PlusGlyph />
-          </Pressable>
+          />
         </View>
       </View>
     </View>
@@ -10033,6 +10131,8 @@ function PreviousCustomConfigRow({
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const ratingLabel = historyRatingKeyLabel(config.ratingKey);
   const metaLabel = `${config.themeLabel} · ${config.timing} · Last ${config.lastPlayed}`;
 
@@ -10040,30 +10140,27 @@ function PreviousCustomConfigRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Use ${ratingLabel} custom sprint, ${config.mode}, ${metaLabel}, rating ${config.rating}`}
-      style={styles.previousConfigRow}
+      style={({ pressed }) => [rowStyle, pressed ? styles.editorRowPressed : null]}
       testID={`custom-previous-${config.id}`}
       onPress={onPress}
     >
-      <View style={styles.previousConfigCopy}>
-        <View style={styles.previousConfigHeader}>
-          <Text style={styles.historyRowTitle}>{config.mode}</Text>
-        </View>
-        <Text
+      <View style={styles.editorRowLabel}>
+        <AppText variant="headline">{config.mode}</AppText>
+        <AppText
           accessibilityLabel={`${metaLabel} · ${ratingLabel}`}
-          style={styles.helperText}
           testID={`custom-previous-${config.id}-meta`}
+          tone="secondary"
+          variant="subheadline"
         >
           {metaLabel}
-        </Text>
+        </AppText>
       </View>
-      <View style={styles.previousConfigTrailing}>
-        <View style={styles.previousConfigRating}>
-          <Text style={styles.helperText}>Rating</Text>
-          <Text style={styles.practiceModeRating}>{config.rating}</Text>
-        </View>
-        <View style={styles.previousConfigChevron} testID={`custom-previous-${config.id}-chevron`}>
-          <ChevronGlyph direction="right" />
-        </View>
+      <View style={styles.previousConfigRating}>
+        <AppText numberOfLines={1} tone="secondary" variant="footnote">Rating</AppText>
+        <AppText numberOfLines={1} tone="secondary" variant="numeralRow">{config.rating}</AppText>
+      </View>
+      <View testID={`custom-previous-${config.id}-chevron`}>
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
       </View>
     </Pressable>
   );
@@ -12866,25 +12963,6 @@ function AttemptStatusTile({
       ) : (
         <ResultBadgeGlyph tone={tone} />
       )}
-    </View>
-  );
-}
-
-function PlusGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.plusGlyph} testID="plus-glyph">
-      <View style={[styles.plusGlyphLine, styles.plusGlyphHorizontal]} />
-      <View style={[styles.plusGlyphLine, styles.plusGlyphVertical]} />
-    </View>
-  );
-}
-
-function MinusGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.minusGlyph} testID="minus-glyph">
-      <View style={styles.minusGlyphLine} />
     </View>
   );
 }
@@ -18292,120 +18370,68 @@ const useStyles = makeStyles((theme) => ({
     gap: 6
   },
   runEditorIntro: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 3,
-    paddingHorizontal: 12,
-    paddingVertical: 9
-  },
-  sprintPassRulesCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 7,
-    padding: 12
+    gap: 2,
+    paddingHorizontal: 4
   },
   sprintPassRulesHeading: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 12,
+    gap: theme.spacing.row,
     justifyContent: "space-between"
-  },
-  sprintPassRulesHeadline: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 17,
-    marginTop: 2
   },
   sprintPassRulesTarget: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderRadius: 8,
-    minWidth: 58,
-    paddingHorizontal: 9,
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: theme.shape.control,
+    minWidth: 64,
+    paddingHorizontal: 10,
     paddingVertical: 6
   },
-  sprintPassRulesTargetValue: {
-    color: theme.colors.accent.s700,
-    fontFamily: "menlo",
-    fontSize: 18,
-    fontWeight: "900"
-  },
   sprintPassRulesTargetLabel: {
-    color: theme.colors.accent.s700,
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 0.6
-  },
-  sprintPassRulesHint: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "700"
-  },
-  runEditorDetailsLabel: {
-    marginBottom: -4
-  },
-  runEditorRunName: {
-    color: theme.colors.text.ink,
-    fontSize: 15,
-    fontWeight: "900",
-    lineHeight: 19
+    backgroundColor: theme.colors.accent.s100,
+    fontWeight: theme.typography.headline.fontWeight
   },
   runNameRow: {
-    alignItems: "flex-start",
+    alignItems: "center",
+    flexDirection: "row",
     gap: 16
   },
   runNameCopy: {
     flexShrink: 0,
-    gap: 2,
-    paddingTop: 2
-  },
-  requiredFieldLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "700"
+    gap: 2
   },
   runNameInput: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderColor: "transparent",
+    borderRadius: theme.shape.control,
     borderWidth: 1,
-    color: theme.colors.text.ink,
+    color: theme.colors.text.primary,
     flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: theme.typography.body.fontSize,
+    marginLeft: "auto",
     maxWidth: 200,
     minHeight: 40,
     minWidth: 160,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8
-  },
-  runNameInputError: {
-    borderColor: theme.colors.danger.s600
   },
   runEloInputShell: {
     alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderColor: "transparent",
+    borderRadius: theme.shape.control,
     borderWidth: 1,
     flexDirection: "row",
     minHeight: 40,
     overflow: "hidden",
     width: 72
   },
-  runEloInputShellError: {
-    borderColor: theme.colors.danger.s600
-  },
   runEloInput: {
-    color: theme.colors.text.ink,
+    color: theme.colors.text.primary,
     flex: 1,
-    fontSize: 15,
-    fontWeight: "800",
+    fontSize: theme.typography.body.fontSize,
+    fontVariant: ["tabular-nums"],
+    fontWeight: theme.typography.headline.fontWeight,
     minHeight: 40,
     minWidth: 64,
     paddingHorizontal: 8,
@@ -18416,29 +18442,8 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     flexShrink: 0,
-    gap: 6
-  },
-  runNameError: {
-    backgroundColor: theme.colors.danger.s50,
-    borderBottomColor: theme.colors.danger.s300,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  runNameErrorText: {
-    color: theme.colors.danger.s700,
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  runThemeLabelRow: {
-    alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 42,
-    paddingHorizontal: 12,
-    paddingVertical: 8
+    gap: 6,
+    marginLeft: "auto"
   },
   sectionHeaderRow: {
     alignItems: "center",
@@ -18492,12 +18497,6 @@ const useStyles = makeStyles((theme) => ({
     opacity: 0,
     overflow: "hidden",
     width: 0
-  },
-  practiceModeRating: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "800",
-    lineHeight: 14
   },
   pausedSessionPanel: {
     backgroundColor: theme.colors.surface,
@@ -19405,105 +19404,116 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 18,
     fontWeight: "700"
   },
+  // Run editor and custom setup rows (#609 direction A, increment 3b).
+  sprintHeaderSideSlotTrailing: {
+    alignItems: "flex-end"
+  },
+  sprintHeaderCloseButton: {
+    alignItems: "center",
+    borderRadius: theme.shape.capsule,
+    height: theme.metrics.minTarget,
+    justifyContent: "center",
+    width: theme.metrics.minTarget
+  },
+  sprintHeaderCloseButtonPressed: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  sprintPassRulesTargetText: {
+    backgroundColor: theme.colors.accent.s100
+  },
+  // A row holding a field line and an error below it.
+  editorFieldStack: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: 6
+  },
+  // Copy and controls on one line when they fit; the controls wrap below,
+  // trailing, on narrow widths and with large text.
+  editorWrapRow: {
+    flexWrap: "wrap",
+    justifyContent: "flex-end"
+  },
+  editorWrapLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.row,
+    justifyContent: "flex-end"
+  },
+  editorWrapCopy: {
+    flexBasis: 160,
+    flexGrow: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  editorWrapControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: theme.spacing.inline,
+    marginLeft: "auto"
+  },
+  editorRowLabel: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  editorRowPressed: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  editorInputError: {
+    borderColor: theme.colors.danger.s600
+  },
+  editorCellSeparator: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth
+  },
+  customModeLabel: {
+    flexShrink: 0
+  },
+  customStepperButtonPressed: {
+    backgroundColor: theme.colors.fillMuted
+  },
+  customMiniChipPressed: {
+    opacity: 0.7
+  },
+  previousConfigHeader: {
+    paddingHorizontal: 4
+  },
   customSetupPanel: {
-    gap: 12
+    alignSelf: "center",
+    gap: theme.spacing.section,
+    maxWidth: 760,
+    width: "100%"
   },
   sprintScreenHeader: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: theme.spacing.inline,
     justifyContent: "space-between",
-    minHeight: 40
+    minHeight: theme.metrics.minTarget
   },
   sprintHeaderSideSlot: {
     alignItems: "flex-start",
-    width: 64
-  },
-  sprintHeaderTitleBlock: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center"
-  },
-  sprintHeaderTitleBlockLeading: {
-    alignItems: "flex-start"
+    minWidth: 72
   },
   sprintScreenTitle: {
-    color: theme.colors.text.ink,
-    fontSize: 17,
-    fontWeight: "800",
+    flex: 1,
     textAlign: "center"
   },
   sprintScreenTitleLeading: {
     textAlign: "left"
   },
-  sprintHeaderStartButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
-    height: 40,
-    justifyContent: "center",
-    minWidth: 64,
-    paddingHorizontal: 14
-  },
-  customConfigCard: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: "hidden"
-  },
-  customConfigRow: {
-    alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
   runTimingSectionCopy: {
-    gap: 2
-  },
-  runTimingRow: {
-    alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between",
-    minHeight: 66,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  runTimingRowCopy: {
-    flex: 1,
     gap: 2,
-    minWidth: 0
-  },
-  arrowDuelReplySettingControl: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 6
-  },
-  arrowDuelReplySettingValue: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  arrowDuelReplySecondsControl: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 6
+    paddingHorizontal: 4
   },
   arrowDuelReplySecondsInputShell: {
     alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderColor: "transparent",
+    borderRadius: theme.shape.control,
     borderWidth: 1,
     flexDirection: "row",
     minHeight: 38,
@@ -19511,27 +19521,16 @@ const useStyles = makeStyles((theme) => ({
     width: 64
   },
   arrowDuelReplySecondsInput: {
-    color: theme.colors.text.ink,
+    color: theme.colors.text.primary,
     flex: 1,
-    fontFamily: "menlo",
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: theme.typography.body.fontSize,
+    fontVariant: ["tabular-nums"],
+    fontWeight: theme.typography.headline.fontWeight,
     minHeight: 38,
     minWidth: 54,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     textAlign: "center"
-  },
-  arrowDuelReplySecondsUnit: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  runTimingControls: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 6
   },
   runTimingStepper: {
     alignItems: "center",
@@ -19541,122 +19540,78 @@ const useStyles = makeStyles((theme) => ({
   runTimingControlDisabled: {
     opacity: 0.38
   },
-  runTimingStepButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 7,
-    borderWidth: 1,
-    height: 30,
-    justifyContent: "center",
-    width: 30
-  },
-  runTimingStepText: {
-    color: theme.colors.text.strong,
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 19
-  },
   runTimingValue: {
-    color: theme.colors.text.strong,
-    fontFamily: "menlo",
-    fontSize: 12,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-    minWidth: 34,
+    minWidth: 44,
     textAlign: "center"
   },
   runTimingToggle: {
     alignItems: "center",
-    height: 36,
-    justifyContent: "center"
-  },
-  customChoiceCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
-  customStepperGroup: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 10
+    justifyContent: "center",
+    minHeight: theme.metrics.minTarget
   },
   customStepperCompact: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 6
+    gap: theme.spacing.inline
   },
   customStepperButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 8,
-    borderWidth: 1,
     height: 32,
     justifyContent: "center",
     width: 36
   },
   customConfigValue: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    fontWeight: "800"
+    flexShrink: 1,
+    textAlign: "right"
   },
   customInlineOptions: {
+    flex: 1,
     flexDirection: "row",
-    flexShrink: 1,
     flexWrap: "wrap",
-    gap: 6,
+    gap: theme.spacing.inline,
     justifyContent: "flex-end"
   },
   customThemeRow: {
     justifyContent: "center"
   },
   customThemeOptions: {
-    flex: 1,
     justifyContent: "center"
   },
   customMiniChip: {
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 32,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
     justifyContent: "center",
-    paddingHorizontal: 10
+    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 6
   },
   customMiniChipActive: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600
+    backgroundColor: theme.colors.accent.s100
   },
   customMiniChipText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
+    textAlign: "center"
   },
   customMiniChipTextActive: {
-    color: theme.colors.accent.s700
+    fontWeight: theme.typography.headline.fontWeight
   },
   themeCatalogSection: {
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12
+    backgroundColor: theme.colors.surface,
+    gap: theme.spacing.inline,
+    paddingHorizontal: 16,
+    paddingVertical: 4
   },
   themeCatalogHeadingRow: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    gap: theme.spacing.row,
+    minHeight: theme.metrics.rowMinHeight - 8
   },
   themeCatalogExpandableContent: {
-    gap: 10
-  },
-  themeCatalogTitle: {
-    color: theme.colors.text.heading,
-    fontSize: 14,
-    fontWeight: "900"
+    gap: 12,
+    paddingBottom: 12
   },
   themeCatalogGroup: {
     gap: 6
@@ -19674,74 +19629,22 @@ const useStyles = makeStyles((theme) => ({
     paddingRight: 12
   },
   themeCatalogGroupGrid: {
-    gap: 8
+    gap: 16
   },
   themeCatalogGroupCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 7,
-    padding: 9
+    gap: theme.spacing.inline
   },
   themeCatalogGroupOptions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6
-  },
-  customEligibilityCard: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    padding: 12
-  },
-  customEligibilityWarning: {
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s400
+    gap: theme.spacing.inline
   },
   previousConfigList: {
-    gap: 8
-  },
-  previousConfigRow: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-    minHeight: 54,
-    paddingHorizontal: 12,
-    paddingVertical: 9
-  },
-  previousConfigCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
-  previousConfigHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6
+    gap: theme.spacing.group
   },
   previousConfigRating: {
     alignItems: "flex-end",
-    gap: 2,
     minWidth: 48
-  },
-  previousConfigTrailing: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6
-  },
-  previousConfigChevron: {
-    alignItems: "center",
-    height: 32,
-    justifyContent: "center",
-    width: 14
   },
   testPanel: {
     backgroundColor: theme.colors.surfaceRaised,
@@ -19996,16 +19899,6 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
-  },
-  analysisIconButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: "center",
-    width: 40
   },
   analysisPrimaryButton: {
     alignItems: "center",
@@ -20364,22 +20257,23 @@ const useStyles = makeStyles((theme) => ({
   },
   historyToggleTrack: {
     backgroundColor: theme.colors.fillMuted,
-    borderRadius: 12,
-    height: 24,
+    borderRadius: 15.5,
+    height: 31,
     padding: 2,
-    width: 42
+    width: 51
   },
   historyToggleTrackActive: {
     backgroundColor: theme.colors.accent.fill
   },
   historyToggleThumb: {
     backgroundColor: theme.colors.thumb,
-    borderRadius: 10,
-    height: 20,
-    width: 20
+    borderRadius: 13.5,
+    height: 27,
+    width: 27,
+    ...theme.elevation.low
   },
   historyToggleThumbActive: {
-    transform: [{ translateX: 18 }]
+    transform: [{ translateX: 20 }]
   },
   historyAdvancedFilters: {
     backgroundColor: theme.colors.surface,
@@ -20409,12 +20303,6 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     minWidth: 0,
     paddingRight: 8
-  },
-  historyThemeSummary: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 2
   },
   historyThemeAllRow: {
     alignItems: "flex-start"
@@ -21189,37 +21077,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17
-  },
-  plusGlyph: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  plusGlyphLine: {
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 999,
-    position: "absolute"
-  },
-  plusGlyphHorizontal: {
-    height: 2.5,
-    width: 15
-  },
-  plusGlyphVertical: {
-    height: 15,
-    width: 2.5
-  },
-  minusGlyph: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  minusGlyphLine: {
-    backgroundColor: theme.colors.text.ink,
-    borderRadius: 999,
-    height: 2.5,
-    width: 15
   },
   closeGlyph: {
     alignItems: "center",

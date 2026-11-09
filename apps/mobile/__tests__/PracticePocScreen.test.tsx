@@ -3588,7 +3588,7 @@ describe("PracticePocScreen", () => {
       "practice-run-arrow-duel-reply-setting"
     ))).not.toContain("On and Off keep separate ratings");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
-    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-toggle").props.accessibilityLabel)
+    expect(hostByTestId(renderer, "practice-run-arrow-duel-reply-toggle").props.accessibilityLabel)
       .toBe("Find the opponent’s best reply");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.accessibilityLabel)
       .toBe("Time to find the opponent’s reply in seconds");
@@ -4782,10 +4782,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-puzzle-timing-card"))).not.toContain(
       "Puzzle timing"
     );
-    expect(findByTestId(renderer, "practice-run-elo-decrease").props.accessibilityLabel).toBe(
+    expect(hostByTestId(renderer, "practice-run-elo-decrease").props.accessibilityLabel).toBe(
       "Decrease run rating by 100"
     );
-    expect(findByTestId(renderer, "practice-run-elo-increase").props.accessibilityLabel).toBe(
+    expect(hostByTestId(renderer, "practice-run-elo-increase").props.accessibilityLabel).toBe(
       "Increase run rating by 100"
     );
     expect(collectText(findByTestId(renderer, "practice-run-puzzle-timing"))).toContain(
@@ -5760,13 +5760,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-elo-error"))).toBe(
       "Enter a whole-number rating from 600 to 2200."
     );
-    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
+    expect(hostByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
       disabled: true
     });
-    expect(findByTestId(renderer, "practice-run-elo-decrease").props.accessibilityState).toEqual({
+    expect(hostByTestId(renderer, "practice-run-elo-decrease").props.accessibilityState).toEqual({
       disabled: false
     });
-    expect(findByTestId(renderer, "practice-run-elo-increase").props.accessibilityState).toEqual({
+    expect(hostByTestId(renderer, "practice-run-elo-increase").props.accessibilityState).toEqual({
       disabled: true
     });
   });
@@ -5888,9 +5888,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-add-run");
     expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("0:40");
     expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout-value"))).toBe("1:00");
-    expect(findByTestId(renderer, "practice-run-slow-warning-toggle").props.accessibilityState)
+    expect(hostByTestId(renderer, "practice-run-slow-warning-toggle").props.accessibilityState)
       .toEqual({ checked: true });
-    expect(findByTestId(renderer, "practice-run-puzzle-timeout-toggle").props.accessibilityState)
+    expect(hostByTestId(renderer, "practice-run-puzzle-timeout-toggle").props.accessibilityState)
       .toEqual({ checked: true });
 
     for (let step = 0; step < 5; step += 1) {
@@ -5939,7 +5939,7 @@ describe("PracticePocScreen", () => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Unavailable Run");
     });
 
-    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({ disabled: true });
+    expect(hostByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({ disabled: true });
     expect(collectText(findByTestId(renderer, "practice-run-availability-error"))).toContain(
       "Choose different themes or settings"
     );
@@ -5974,7 +5974,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-run-slow-warning-decrease");
     press(renderer, "practice-run-puzzle-timeout-toggle");
     expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("0:35");
-    expect(findByTestId(renderer, "practice-run-puzzle-timeout-toggle").props.accessibilityState)
+    expect(hostByTestId(renderer, "practice-run-puzzle-timeout-toggle").props.accessibilityState)
       .toEqual({ checked: false });
     act(() => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Morning Warm-up");
@@ -6025,7 +6025,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-elo-error"))).toBe(
       "Enter a whole-number rating from 600 to 2200."
     );
-    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
+    expect(hostByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
       disabled: true
     });
     expect(service.getActivePracticeRun("standard").name).toBe("Standard");
@@ -6486,7 +6486,7 @@ describe("PracticePocScreen", () => {
 
     expect(countEligible).not.toHaveBeenCalled();
     expect(() => findByTestId(renderer, "custom-pack-warning")).toThrow();
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
   });
 
   it.each([
@@ -7897,9 +7897,9 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "rating-label")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-close"))).toBe("");
     expectText(renderer, "Custom Sprint");
-    expect(flattenTestStyle(findByTestId(renderer, "custom-action-header").props.style).minHeight).toBe(40);
-    expect(flattenTestStyle(findByTestId(renderer, "custom-header-title").props.style).fontSize).toBe(17);
-    expect(flattenTestStyle(findByTestId(renderer, "start-sprint-button").props.style).height).toBe(40);
+    expect(flattenTestStyle(findByTestId(renderer, "custom-action-header").props.style).minHeight).toBe(44);
+    expect(flattenTestStyle(hostByTestId(renderer, "custom-header-title").props.style).fontSize).toBe(16);
+    expect(flattenTestStyle(hostByTestId(renderer, "start-sprint-button").props.style({ pressed: false })).minHeight).toBe(44);
     expect(collectText(findByTestId(renderer, "custom-sprint-setup"))).not.toContain("Time, theme, rating");
   });
 
@@ -11083,12 +11083,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("15 eligible puzzles");
     expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("up to 18");
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
     expect(findByTestId(renderer, "start-sprint-button").props.disabled).toBe(false);
     expect(findByTestId(renderer, "custom-mode-row")).toBeTruthy();
-    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
-    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
-    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityLabel).toBe("Regular Puzzles custom sprint mode, Board moves");
+    expect(hostByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
+    expect(hostByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
+    expect(hostByTestId(renderer, "custom-mode-regular").props.accessibilityLabel).toBe("Regular Puzzles custom sprint mode, Board moves");
     expect(collectText(findByTestId(renderer, "custom-mode-row"))).not.toContain("Board moves");
     expect(collectText(findByTestId(renderer, "custom-mode-row"))).not.toContain("Two candidates");
     expect(findByTestId(renderer, "custom-theme-row")).toBeTruthy();
@@ -11110,8 +11110,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-summary-target"))).toBe("Estimated puzzles~15");
     expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("Rating 600");
-    expect(findByTestId(renderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
-    expect(findByTestId(renderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
+    expect(hostByTestId(renderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: false });
     expect(() => findByTestId(renderer, "custom-summary-rating-range")).toThrow();
     expect(() => findByTestId(renderer, "custom-mode-summary")).toThrow();
     expect(() => findByTestId(renderer, "custom-mistake-limit")).toThrow();
@@ -11153,21 +11153,21 @@ describe("PracticePocScreen", () => {
     expect(themeSelected(renderer, "fork")).toBe(false);
     press(renderer, "custom-theme-mate-in-2");
     press(renderer, "custom-mode-arrow-duel");
-    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
-    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
+    expect(hostByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
+    expect(hostByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
     press(renderer, "custom-mode-regular");
-    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
-    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
+    expect(hostByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
+    expect(hostByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
 
     press(renderer, "custom-duration-stepper-decrease");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~9");
-    expect(findByTestId(renderer, "custom-duration-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
+    expect(hostByTestId(renderer, "custom-duration-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
     press(renderer, "custom-per-puzzle-stepper-increase");
 
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("custom 3/30");
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
     press(renderer, "start-sprint-button");
 
@@ -11445,8 +11445,8 @@ describe("PracticePocScreen", () => {
     press(playedRenderer, "custom-initial-rating-row");
     expect(findByTestId(playedRenderer, "custom-initial-rating-row").props.accessibilityState).toEqual({ expanded: true });
     expect(findByTestId(playedRenderer, "custom-initial-rating-editor")).toBeTruthy();
-    expect(findByTestId(playedRenderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: false });
-    expect(findByTestId(playedRenderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(playedRenderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(playedRenderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: false });
     press(playedRenderer, "custom-initial-rating-stepper-decrease");
     expect(collectText(findByTestId(playedRenderer, "custom-initial-rating-value"))).toBe("Rating 800");
     expect(playedService.getRating("custom 5/20")).toMatchObject({
@@ -11464,7 +11464,7 @@ describe("PracticePocScreen", () => {
 
     expect(() => findByTestId(renderer, "custom-eligibility-ready")).toThrow();
     expect(() => findByTestId(renderer, "custom-pack-warning")).toThrow();
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
   });
 
   it("prevents an impossible Custom start and explains the empty local selection", () => {
@@ -11477,7 +11477,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-custom");
 
     expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("0 eligible puzzles");
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: true });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: true });
     expect(findByTestId(renderer, "start-sprint-button").props.disabled).toBe(true);
   });
 
@@ -11488,7 +11488,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-custom");
 
     expect(findByTestId(renderer, "custom-pack-warning")).toBeTruthy();
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
     press(renderer, "start-sprint-button");
 
@@ -11516,12 +11516,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-custom");
     press(renderer, "custom-mode-arrow-duel");
 
-    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
-    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
+    expect(hostByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
+    expect(hostByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
     expect(() => findByTestId(renderer, "custom-mode-summary")).toThrow();
     expect(() => findByTestId(renderer, "custom-separate-scoring")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("arrow_duel 5/20");
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(hostByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
     press(renderer, "start-sprint-button");
 
