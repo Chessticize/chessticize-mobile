@@ -289,9 +289,7 @@ async function expectRegularLandscapeSessionCentered(orientation) {
   const bottomGap = screenFrame.y + screenFrame.height - (boardFrame.y + boardFrame.height);
   // Test builds render the hidden puzzle-ID text above the board, and the
   // board wrapper's 3-point gap shifts the board by that much in test runs.
-  // Android's physical-display rotation can add up to another 3 px of rounded
-  // safe-area geometry on the API 36 tablet profile.
-  if (Math.abs(topGap - bottomGap) > 8) {
+  if (Math.abs(topGap - bottomGap) > 4) {
     throw new Error(
       `${deviceLabel} ${orientation} session board is not vertically centred: `
       + `top=${topGap} bottom=${bottomGap} board=${JSON.stringify(boardFrame)}`
