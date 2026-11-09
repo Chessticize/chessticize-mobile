@@ -50,3 +50,23 @@ export function formatDurationLabel(seconds: number): string {
   }
   return `${seconds}s`;
 }
+
+type SessionFeedback = PuzzleFeedback | null;
+
+function replyPreparationInstruction(seconds: number): string {
+  return `You’ll have ${seconds} ${seconds === 1 ? "second" : "seconds"} to play the best reply.`;
+}
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = (seconds % 60).toString().padStart(2, "0");
+  return `${mins}:${secs}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}

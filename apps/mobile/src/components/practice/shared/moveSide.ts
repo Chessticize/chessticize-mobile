@@ -15,3 +15,7 @@ function sideToMoveLabel(side: MoveSide): "White" | "Black" {
 export function sideToMoveAccessibilityLabel(side: MoveSide): string {
   return `${sideToMoveLabel(side)} to move`;
 }
+
+function oppositeMoveSide(side: MoveSide): MoveSide {
+  return side === "b" ? "w" : "b";
+}
