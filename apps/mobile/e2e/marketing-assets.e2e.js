@@ -202,7 +202,9 @@ async function prepareFrame(frame) {
       // Keep both approved Home controls wholly above the native tab bar. On
       // the calibrated iPhone viewport, 53–74 points is the feasible interval:
       // 64 clears the bar while preserving Start below the app safe-area top.
-      await element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5);
+      if (target.deviceFamily === 'iphone') {
+        await element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5);
+      }
       return;
     case 'dark-arrow-duel':
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
@@ -221,7 +223,9 @@ async function prepareFrame(frame) {
       // The initial reachable Survival hub places Start at y=988..1038 on
       // this 62..922 capture viewport. This public scroll moves it to
       // y=863..913 while retaining the required type selector in-frame.
-      await element(by.id('practice-main-scroll')).scroll(125, 'down', 0.5, 0.5);
+      if (target.deviceFamily === 'iphone') {
+        await element(by.id('practice-main-scroll')).scroll(125, 'down', 0.5, 0.5);
+      }
       return;
     case 'review':
       await openTab('review-tab', 'review-due-card');
@@ -650,7 +654,11 @@ async function assertRequiredFrameGeometry(frame) {
     });
   }
 
-  if (frame.id === 'practice-home' && device.getPlatform() === 'ios') {
+  if (
+    frame.id === 'practice-home'
+    && device.getPlatform() === 'ios'
+    && !isWideTabletTarget()
+  ) {
     const tabFrame = await frameFor(topLevelTab('practice-tab'));
     assertPositiveFrame(tabFrame, `${frame.id} native tab bar item`);
     for (const required of requiredFrames) {
