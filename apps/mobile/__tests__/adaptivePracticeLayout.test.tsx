@@ -109,6 +109,35 @@ describe("buildPracticeAdaptiveLayout", () => {
     expect(stackedHeight).toBeLessThanOrEqual(layout.contentHeight);
   });
 
+  // At large text the iPad portrait session reserves the same measured rows,
+  // so the post-answer feedback row stays on screen (#652).
+  it.each([
+    { label: "iPad Pro 11-inch", width: 834, height: 1210, fontScale: 1.786 },
+    { label: "iPad Pro 11-inch", width: 834, height: 1210, fontScale: 3.571 },
+    { label: "iPad Pro 13-inch", width: 1032, height: 1376, fontScale: 3.571 }
+  ])("fits the whole live session on $label portrait at text scale $fontScale", ({
+    fontScale,
+    height,
+    width
+  }) => {
+    const insets = { top: 32, right: 0, bottom: 20, left: 0 };
+    const layout = buildPracticeAdaptiveLayout({ fontScale, height, insets, width });
+    const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
+    const stackedHeight = PRACTICE_UI_PADDING
+      + compactPortraitStatusHeight(fontScale)
+      + chrome.stackGap
+      + layout.promptFrameHeight
+      + chrome.stackGap
+      + layout.boardSize
+      + compactPortraitBoardDetailsHeight(fontScale)
+      + chrome.stackGap
+      + compactPortraitFeedbackHeight(layout.sessionColumnWidth, fontScale)
+      + PRACTICE_UI_PADDING;
+
+    expect(layout.className).toBe("regularPortrait");
+    expect(stackedHeight).toBeLessThanOrEqual(layout.contentHeight);
+  });
+
   it("grows the compact-portrait chrome only up to each text cap", () => {
     expect(compactPortraitStatusHeight(1)).toBe(COMPACT_PORTRAIT_SESSION_CHROME.status);
     expect(compactPortraitStatusHeight(2)).toBe(compactPortraitStatusHeight(3.571));

@@ -204,10 +204,11 @@ export function buildPracticeAdaptiveLayout({
     if (isLandscape) {
       return portraitBoardSlotWidth;
     }
-    const reservedControlsHeight = isRegularWidth
-      ? REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT + (
-        isLargeText ? Math.min(120, Math.round((fontScale - 1) * 120)) : 0
-      )
+    // Regular portrait (iPad) stacks the same rows with the board. At large
+    // text it reserves their measured heights too; its rows are at least as
+    // wide as a phone's, so the phone budget covers them (#652).
+    const reservedControlsHeight = isRegularWidth && !isLargeText
+      ? REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT
       : compactPortraitSessionChromeHeight(
         promptFrameHeightFor(compactPortraitColumnWidth, fontScale),
         compactPortraitColumnWidth,
