@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import androidPracticeFixture from "../../../fixtures/puzzles/android-standard-practice.fixture.json";
 import { AppState } from "react-native";
 import * as ReactNative from "react-native";
+import { HEADLINE_MAX_FONT_SCALE, TITLE_MAX_FONT_SCALE } from "../src/theme/scales";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
 import { darkTheme, lightTheme, ThemeProvider } from "../src/theme";
@@ -2913,6 +2914,25 @@ describe("PracticePocScreen", () => {
     expect(large.button.alignSelf).toBe("flex-start");
   });
 
+  it("keeps the first Sprint heading under the page title cap and wraps Edit and Add Run under large text", () => {
+    const renderer = renderLabScenario("practice-first-sprint-guide");
+    const heading = renderer.root
+      .findAllByType(ReactNative.Text)
+      .find((text) => collectText(text).startsWith("Solve"));
+    expect(heading?.props.maxFontSizeMultiplier).toBe(TITLE_MAX_FONT_SCALE);
+    const dismissText = renderer.root
+      .findAllByType(ReactNative.Text)
+      .find((text) => collectText(text) === "Got it");
+    expect(dismissText?.props.maxFontSizeMultiplier).toBe(HEADLINE_MAX_FONT_SCALE);
+    // The nearest row above Add Run is the actions row (Edit and Add Run).
+    let row: TestRenderer.ReactTestInstance | null = hostByTestId(renderer, "practice-add-run").parent;
+    while (row && flattenTestStyle(row.props.style).flexDirection !== "row") {
+      row = row.parent;
+    }
+    const actions = flattenTestStyle(row?.props.style);
+    expect(actions.flexWrap).toBe("wrap");
+  });
+
   it("uses the selected saved Run to calculate the first Sprint pass target", () => {
     const renderer = renderScreen({
       runManagementEnabled: true,
@@ -5397,7 +5417,7 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
 
     pressHistoryTab(renderer);
-    expect(findByTestId(renderer, "history-attention-filter").props.role).toBe("radiogroup");
+    expect(hostByTestId(renderer, "history-attention-filter").props.role).toBe("radiogroup");
     expect(findByTestId(renderer, "history-attention-filter").props.accessibilityLabel).toBe(
       "History view"
     );

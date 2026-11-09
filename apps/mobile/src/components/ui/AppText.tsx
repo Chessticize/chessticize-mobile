@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, type TextProps } from "react-native";
 import { makeStyles } from "../../theme/makeStyles.ts";
-import { LARGE_TITLE_MAX_FONT_SCALE } from "../../theme/scales.ts";
+import { TYPE_ROLE_MAX_FONT_SCALE } from "../../theme/scales.ts";
 import type { TypeRole } from "../../theme/themeTypes.ts";
 
 // Text in one of direction A's type roles and color roles. Sizes are Dynamic Type
@@ -26,7 +26,7 @@ export function AppText({
   const styles = useStyles();
   return (
     <Text
-      maxFontSizeMultiplier={variant === "largeTitle" ? LARGE_TITLE_MAX_FONT_SCALE : undefined}
+      maxFontSizeMultiplier={TYPE_ROLE_MAX_FONT_SCALE[variant]}
       {...props}
       style={[styles[variant], styles[tone], style]}
     />

@@ -15,6 +15,7 @@ import { Gesture, GestureDetector, type GestureType } from "react-native-gesture
 import { defaultSprintConfig, type SprintConfig, type SprintMode, type SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
+import { HEADLINE_MAX_FONT_SCALE, TITLE_MAX_FONT_SCALE } from "../../../theme/scales.ts";
 import {
   type PersonalBestChallengeDesignPreview,
   PersonalBestHomeCard,
@@ -737,7 +738,7 @@ function SprintRulesGuide({
       >
         <View style={[styles.sprintRulesGuideTitleBlock, dismissStacked ? styles.sprintRulesGuideTitleBlockStacked : null]}>
           <Text style={styles.sprintRulesEyebrow}>YOUR FIRST SPRINT</Text>
-          <Text style={styles.sprintRulesGuideTitle}>
+          <Text maxFontSizeMultiplier={TITLE_MAX_FONT_SCALE} style={styles.sprintRulesGuideTitle}>
             Solve {presentation.targetCorrect} puzzles to pass
           </Text>
         </View>
@@ -748,7 +749,7 @@ function SprintRulesGuide({
           testID="practice-sprint-rules-dismiss"
           onPress={onDismiss}
         >
-          <Text numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
+          <Text maxFontSizeMultiplier={HEADLINE_MAX_FONT_SCALE} numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
         </Pressable>
       </View>
 
@@ -2312,9 +2313,14 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     justifyContent: "space-between"
   },
+  // Edit and Add Run wrap onto a second line when large text makes them wider
+  // than the screen, instead of running off its edge.
   runManagementToolbarActions: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 1,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
     marginLeft: "auto"
   },
   sprintRulesGuide: {

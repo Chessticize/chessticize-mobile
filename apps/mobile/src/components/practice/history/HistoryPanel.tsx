@@ -27,7 +27,7 @@ import {
 } from "../../../../../../packages/core/src/index.ts";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
-import { AppText, Badge, Button, Icon, useListRowStyle } from "../../ui/index.tsx";
+import { AppText, Badge, Button, Icon, SegmentedControl, useListRowStyle, type SegmentOption } from "../../ui/index.tsx";
 import { HistoryProgressEntryButton } from "../../HistoryProgressSection.tsx";
 import { ToolbarIconButton } from "../shared/ToolbarIconButton.tsx";
 import { FilterGlyph } from "../shared/Glyphs.tsx";
@@ -609,59 +609,27 @@ function HistoryAttentionFilter({
   attentionOnly: boolean;
   onChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
-  const styles = useStyles();
   return (
-    <View
+    <SegmentedControl
       accessibilityLabel="History view"
-      role="radiogroup"
-      style={styles.historyAttentionFilter}
+      options={HISTORY_ATTENTION_OPTIONS}
+      semantics="radio"
       testID="history-attention-filter"
-    >
-      <Pressable
-        accessibilityLabel="Needs attention: Sprint attempts that are Incomplete, unclear, or in Review"
-        accessibilityRole="radio"
-        accessibilityState={{ checked: attentionOnly }}
-        aria-checked={attentionOnly}
-        onPress={() => onChange(true)}
-        style={[
-          styles.historyAttentionOption,
-          attentionOnly ? styles.historyAttentionOptionActive : null
-        ]}
-        testID="history-attention-needs-attention"
-      >
-        <Text
-          style={[
-            styles.historyAttentionOptionText,
-            attentionOnly ? styles.historyAttentionOptionTextActive : null
-          ]}
-        >
-          Needs attention
-        </Text>
-      </Pressable>
-      <Pressable
-        accessibilityLabel="All attempts"
-        accessibilityRole="radio"
-        accessibilityState={{ checked: !attentionOnly }}
-        aria-checked={!attentionOnly}
-        onPress={() => onChange(false)}
-        style={[
-          styles.historyAttentionOption,
-          !attentionOnly ? styles.historyAttentionOptionActive : null
-        ]}
-        testID="history-attention-all"
-      >
-        <Text
-          style={[
-            styles.historyAttentionOptionText,
-            !attentionOnly ? styles.historyAttentionOptionTextActive : null
-          ]}
-        >
-          All
-        </Text>
-      </Pressable>
-    </View>
+      value={attentionOnly ? "needs-attention" : "all"}
+      onChange={(next) => onChange(next === "needs-attention")}
+    />
   );
 }
+
+const HISTORY_ATTENTION_OPTIONS: readonly SegmentOption<"needs-attention" | "all">[] = [
+  {
+    accessibilityLabel: "Needs attention: Sprint attempts that are Incomplete, unclear, or in Review",
+    label: "Needs attention",
+    testID: "history-attention-needs-attention",
+    value: "needs-attention"
+  },
+  { accessibilityLabel: "All attempts", label: "All", testID: "history-attention-all", value: "all" }
+];
 
 function HistoryAttemptRow({
   attempt,
@@ -963,34 +931,6 @@ const useStyles = makeStyles((theme) => ({
   },
   historyTopFilterStack: {
     gap: theme.spacing.group
-  },
-  historyAttentionFilter: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: theme.shape.capsule,
-    flexDirection: "row",
-    padding: 3
-  },
-  historyAttentionOption: {
-    alignItems: "center",
-    borderRadius: theme.shape.capsule,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: theme.metrics.minTarget - 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6
-  },
-  historyAttentionOptionActive: {
-    backgroundColor: theme.name === "dark" ? theme.colors.fillMuted : theme.colors.surface,
-    ...theme.elevation.low,
-    shadowOpacity: theme.name === "dark" ? 0 : 0.12
-  },
-  historyAttentionOptionText: {
-    ...theme.typography.subheadline,
-    color: theme.colors.text.primary,
-    textAlign: "center"
-  },
-  historyAttentionOptionTextActive: {
-    fontWeight: theme.typography.headline.fontWeight
   },
   historyAdvancedFilters: {
     backgroundColor: theme.colors.surface,

@@ -9,7 +9,8 @@ import type {
   ThemeShape,
   ThemeSpace,
   ThemeSpacing,
-  ThemeTypography
+  ThemeTypography,
+  TypeRole
 } from "./themeTypes.ts";
 
 // Non-color scales shared by every palette.
@@ -19,13 +20,26 @@ import type {
 // migrated components use only these. Sizes are Dynamic Type points at the
 // default Large size; React Native Text scales them with the user's text size.
 
-// Large titles (`largeTitle`: Practice, Review, History, Settings, sheet and
-// hub titles) grow at most 2x with Dynamic Type. At the largest accessibility
-// size (3.57x) a 30 pt title would be 107 pt and "Practice" no longer fits
-// an iPhone SE, so it broke inside the word. 2x is 60 pt, still larger than
-// body text at that size (53 pt), and keeps every title word on one line.
-// AppText applies it to the variant; raw Text that uses the role passes it too.
+// Dynamic Type caps that keep the hierarchy body <= headline <= title <=
+// large title at every text size. At the largest iOS accessibility size (3.57x)
+// body is 15 pt x 3.57 = 54 pt, so each heading role stops growing at a size
+// that stays between its neighbours:
+// - `largeTitle` (Practice, Review, History, Settings, sheet and hub titles)
+//   grows at most 2x = 60 pt. Uncapped it would be 107 pt and "Practice" no
+//   longer fits an iPhone SE, so it broke inside the word.
+// - `title` (section titles, result headlines) grows at most 2.8x = 56 pt.
+// - `headline` (row titles, button labels) grows at most 3.5x = 56 pt, so it
+//   never passes the capped title (16 pt x 3.57 would be 57 pt).
+// AppText applies these to its variants; raw Text that uses a role passes the
+// same constant.
 export const LARGE_TITLE_MAX_FONT_SCALE = 2;
+export const TITLE_MAX_FONT_SCALE = 2.8;
+export const HEADLINE_MAX_FONT_SCALE = 3.5;
+export const TYPE_ROLE_MAX_FONT_SCALE: Partial<Record<TypeRole, number>> = {
+  largeTitle: LARGE_TITLE_MAX_FONT_SCALE,
+  title: TITLE_MAX_FONT_SCALE,
+  headline: HEADLINE_MAX_FONT_SCALE
+};
 
 export const typography: ThemeTypography = {
   largeTitle: { fontSize: 30, lineHeight: 36, fontWeight: "700" },
