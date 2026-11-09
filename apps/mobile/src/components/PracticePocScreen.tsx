@@ -8485,9 +8485,9 @@ function PracticeRunEditor({
       );
       if (!themeCatalogPresentation) {
         fieldRows.push(
-          <View key="theme-label" style={rowStyle}>
-            <AppText style={styles.editorRowLabel} variant="body">Themes</AppText>
-            <AppText tone="secondary" variant="footnote">Choose one or more</AppText>
+          <View key="theme-label" style={[rowStyle, styles.editorWrapRow]}>
+            <AppText style={styles.editorWrapCopy} variant="body">Themes</AppText>
+            <AppText style={styles.customConfigValue} tone="secondary" variant="footnote">Choose one or more</AppText>
           </View>
         );
       }
@@ -9764,13 +9764,15 @@ function CustomInitialRatingRow({
         accessibilityRole="button"
         accessibilityLabel={`Edit rating, rating ${value}`}
         accessibilityState={{ expanded: editOpen }}
-        style={({ pressed }) => [rowStyle, pressed ? styles.editorRowPressed : null]}
+        style={({ pressed }) => [rowStyle, styles.editorWrapRow, pressed ? styles.editorRowPressed : null]}
         testID="custom-initial-rating-row"
         onPress={() => onEditOpenChange(!editOpen)}
       >
-        <AppText style={styles.editorRowLabel} variant="body">Edit rating</AppText>
-        <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
-        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
+        <AppText style={styles.editorWrapCopy} variant="body">Edit rating</AppText>
+        <View style={styles.editorWrapControls}>
+          <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
+          <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
+        </View>
       </Pressable>
       {editOpen ? (
         <>
@@ -9844,10 +9846,10 @@ function CustomValueRow({
   return (
     <View
       accessibilityLabel={accessibilityLabel}
-      style={rowStyle}
+      style={[rowStyle, styles.editorWrapRow]}
       testID={testID}
     >
-      <View style={styles.editorRowLabel}>
+      <View style={styles.editorWrapCopy}>
         <AppText variant="body">{label}</AppText>
         {detail ? (
           <View
@@ -19591,6 +19593,7 @@ const useStyles = makeStyles((theme) => ({
   },
   customConfigValue: {
     flexShrink: 1,
+    marginLeft: "auto",
     textAlign: "right"
   },
   customInlineOptions: {
