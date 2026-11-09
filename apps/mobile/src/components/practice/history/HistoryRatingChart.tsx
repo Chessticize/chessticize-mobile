@@ -7,6 +7,7 @@ import {
 } from "../../../../../../packages/core/src/index.ts";
 import { ratingLabelFromKey } from "../settings/SettingsPanel.tsx";
 import { makeStyles } from "../../../theme/index.ts";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 // Cap the rendered points so long ranges stay smooth without stacking
 // hundreds of segment Views; downsampling always keeps first and last.
@@ -275,11 +276,7 @@ export function historyRatingKeyLabel(
 }
 
 const useStyles = makeStyles((theme) => ({
-  helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
-  },
+  ...pickPracticeStyles(theme, ["helperText"]),
   historyChartEmpty: {
     alignItems: "center",
     backgroundColor: theme.colors.surfaceRaised,

@@ -37,6 +37,7 @@ import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
 import { AttemptStatusTile } from "../shared/AttemptStatusTile.tsx";
 import { ALL_THEMES_FILTER, customThemeLabel, type ThemeCatalogPresentation } from "../shared/themeCatalog.ts";
 import { historyRatingKeyLabel, HistoryRatingTrendChart } from "./HistoryRatingChart.tsx";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 export function HistoryPanel({
   adaptiveLayout,
@@ -836,15 +837,7 @@ function historyRangeLabel(range: HistoryTimeRange): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  historyHeaderRow: {
-    alignItems: "center",
-    columnGap: theme.spacing.row,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    minHeight: theme.metrics.minTarget,
-    rowGap: theme.spacing.inline
-  },
+  ...pickPracticeStyles(theme, ["historyHeaderRow", "historyPanel", "historyPanelWide", "historyThemeAllRow", "historyThemeDisclosure", "historyThemeDisclosureCopy", "settingsRowCopy", "settingsRowPressed", "themeCatalogGroupLabel"]),
   historyHeaderActions: {
     alignItems: "center",
     flexDirection: "row",
@@ -855,13 +848,6 @@ const useStyles = makeStyles((theme) => ({
   },
   themeCatalogGroup: {
     gap: 6
-  },
-  themeCatalogGroupLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    textTransform: "uppercase"
   },
   themeCatalogRailContent: {
     flexDirection: "row",
@@ -921,14 +907,6 @@ const useStyles = makeStyles((theme) => ({
   attemptRowChevron: {
     alignSelf: "center"
   },
-  historyPanel: {
-    gap: theme.spacing.row
-  },
-  historyPanelWide: {
-    alignSelf: "center",
-    maxWidth: 980,
-    width: "100%"
-  },
   historyTopFilterStack: {
     gap: theme.spacing.group
   },
@@ -949,20 +927,6 @@ const useStyles = makeStyles((theme) => ({
   },
   historyThemeCatalogContent: {
     gap: 8
-  },
-  historyThemeDisclosure: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 44
-  },
-  historyThemeDisclosureCopy: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 8
-  },
-  historyThemeAllRow: {
-    alignItems: "flex-start"
   },
   historyPerformanceCard: {
     backgroundColor: theme.colors.surface,
@@ -1088,14 +1052,5 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingLeft: 4
-  },
-  settingsRowPressed: {
-    backgroundColor: theme.colors.surfaceStrong
-  },
-  settingsRowCopy: {
-    flex: 1,
-    flexShrink: 1,
-    gap: 2,
-    minWidth: 0
   },
 }));

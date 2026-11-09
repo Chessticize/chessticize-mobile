@@ -24,6 +24,7 @@ import { normalizeStoredThemeChoiceSelection } from "../../useThemeChoiceSelecti
 import { SprintStartHeader } from "../shared/SprintStartHeader.tsx";
 import { PracticeProgressCard } from "../shared/PracticeProgressCard.tsx";
 import { StepperButton, useEditorRowLayout } from "../shared/editorControls.tsx";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 
@@ -782,11 +783,7 @@ function formatConfigLastPlayed(lastStartedAt: string): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  editorRowLabel: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
+  ...pickPracticeStyles(theme, ["customConfigValue", "customSetupPanel", "editorRowLabel", "historyThemeAllRow", "historyThemeDisclosure", "historyThemeDisclosureCopy", "themeCatalogGroupLabel"]),
   editorRowPressed: {
     backgroundColor: theme.colors.surfaceStrong
   },
@@ -803,21 +800,10 @@ const useStyles = makeStyles((theme) => ({
   previousConfigHeader: {
     paddingHorizontal: 4
   },
-  customSetupPanel: {
-    alignSelf: "center",
-    gap: theme.spacing.section,
-    maxWidth: 760,
-    width: "100%"
-  },
   customStepperCompact: {
     alignItems: "center",
     flexDirection: "row",
     gap: theme.spacing.inline
-  },
-  customConfigValue: {
-    flexShrink: 1,
-    marginLeft: "auto",
-    textAlign: "right"
   },
   customInlineOptions: {
     flex: 1,
@@ -866,13 +852,6 @@ const useStyles = makeStyles((theme) => ({
     gap: 12,
     paddingBottom: 12
   },
-  themeCatalogGroupLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    textTransform: "uppercase"
-  },
   themeCatalogGroupGrid: {
     gap: 16
   },
@@ -890,19 +869,5 @@ const useStyles = makeStyles((theme) => ({
   previousConfigRating: {
     alignItems: "flex-end",
     minWidth: 48
-  },
-  historyThemeDisclosure: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 44
-  },
-  historyThemeDisclosureCopy: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 8
-  },
-  historyThemeAllRow: {
-    alignItems: "flex-start"
   },
 }));

@@ -9,6 +9,7 @@ import { SessionMistakeIndicator } from "../../SessionMistakeIndicator.tsx";
 import { CloseGlyph, MoreGlyph, PauseGlyph, PlayGlyph, SessionScoreGlyph } from "../shared/Glyphs.tsx";
 import { PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE, PRACTICE_SESSION_HUD_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
 import { makeStyles } from "../../../theme/index.ts";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 export type SessionTimingState = {
   elapsedSeconds: number;
@@ -635,6 +636,7 @@ const SCORE_LABEL_MAX_TEXT_SCALE = 1;
 const SCORE_VALUE_MAX_TEXT_SCALE = 1.15;
 
 const useStyles = makeStyles((theme) => ({
+  ...pickPracticeStyles(theme, ["helperText", "listText", "primaryButton", "primaryButtonText", "secondaryButton", "secondaryButtonText"]),
   activeSessionShell: {
     gap: 8
   },
@@ -917,34 +919,6 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: "900",
     lineHeight: 17
   },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
-    flex: 1,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  primaryButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  secondaryButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  secondaryButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "700"
-  },
   destructiveButton: {
     alignItems: "center",
     backgroundColor: theme.colors.danger.s600,
@@ -957,15 +931,5 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.onTone,
     fontSize: 13,
     fontWeight: "800"
-  },
-  listText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "600"
-  },
-  helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
   },
 }));

@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable } from "react-native";
 import { makeStyles } from "../../../theme/index.ts";
+import { pickPracticeStyles } from "./practiceStyles.tsx";
 
 // A 44-pt circular toolbar button for a destination header (filters, paging).
 export function ToolbarIconButton({
@@ -42,9 +43,7 @@ export function ToolbarIconButton({
 }
 
 const useStyles = makeStyles((theme) => ({
-  disabledButton: {
-    opacity: 0.36
-  },
+  ...pickPracticeStyles(theme, ["disabledButton"]),
   toolbarIconButton: {
     alignItems: "center",
     backgroundColor: theme.colors.surface,
