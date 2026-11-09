@@ -461,7 +461,10 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('sprint-unclear-question', 'previous puzzle', 10000);
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(5000);
-    await waitFor(element(by.id('session-abandon-confirm'))).toBeVisible(100).withTimeout(5000);
+    const abandonFrame = await frameFor(element(by.id('session-abandon-confirm')));
+    const abandonScreenFrame = await frameFor(element(by.id('safe-area-shell')));
+    expectFrameContained(abandonFrame, abandonScreenFrame, 'Sprint abandon action');
+    console.log('[review-setup-abandon-frame]', abandonFrame);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.label('Sprint abandoned'))).toBeVisible().withTimeout(10000);
 
