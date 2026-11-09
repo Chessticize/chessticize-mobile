@@ -8392,7 +8392,8 @@ function PracticeRunEditor({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
-  const stackNameField = useEditorTextScale() >= STACKED_NAME_FIELD_TEXT_SCALE;
+  const editorLayout = useEditorRowLayout();
+  const stackNameField = editorLayout.stacked;
   const draft = presentation.draft;
   if (!draft) {
     return null;
@@ -8490,8 +8491,8 @@ function PracticeRunEditor({
       );
       if (!themeCatalogPresentation) {
         fieldRows.push(
-          <View key="theme-label" style={[rowStyle, styles.editorWrapRow]}>
-            <AppText style={styles.editorWrapCopy} variant="body">Themes</AppText>
+          <View key="theme-label" style={[rowStyle, editorLayout.row]}>
+            <AppText style={editorLayout.copy} variant="body">Themes</AppText>
             <AppText style={styles.customConfigValue} tone="secondary" variant="footnote">Choose one or more</AppText>
           </View>
         );
@@ -8744,8 +8745,9 @@ const STEPPER_HIT_SLOP = { bottom: 6, left: 4, right: 4, top: 6 };
 // text there, so four digits never clip inside a fixed-width field.
 const NUMERIC_FIELD_MAX_TEXT_SCALE = 1.5;
 
-// Above this text scale the Run name field moves below its label and spans the row.
-const STACKED_NAME_FIELD_TEXT_SCALE = 1.35;
+// Above this text scale an editor row stacks: its label spans the row and the
+// control (field, stepper or switch) sits below it, trailing.
+const STACKED_EDITOR_TEXT_SCALE = 1.35;
 
 // The user's text scale: the system font scale on a device, or the theme's
 // scaled type roles in the Interaction Lab.
@@ -8754,6 +8756,32 @@ function useEditorTextScale(): number {
   const { fontScale } = useWindowDimensions();
   const themeScale = appTheme.typography.body.fontSize / baseTypography.body.fontSize;
   return Math.max(1, fontScale, themeScale);
+}
+
+function useEditorRowLayout(): {
+  controls: ViewStyle;
+  copy: ViewStyle;
+  line: ViewStyle;
+  row: ViewStyle;
+  stacked: boolean;
+} {
+  const styles = useStyles();
+  const stacked = useEditorTextScale() >= STACKED_EDITOR_TEXT_SCALE;
+  return stacked
+    ? {
+        controls: styles.editorStackedControls,
+        copy: styles.editorStackedCopy,
+        line: styles.editorStackedLine,
+        row: styles.editorStackedLine,
+        stacked
+      }
+    : {
+        controls: styles.editorInlineControls,
+        copy: styles.editorInlineCopy,
+        line: styles.editorInlineLine,
+        row: styles.editorInlineRow,
+        stacked
+      };
 }
 
 function useNumericFieldScale(): number {
@@ -8776,13 +8804,14 @@ function ArrowDuelReplyChallengeSetting({
   onToggle: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const editorLayout = useEditorRowLayout();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
   const fieldScale = useNumericFieldScale();
   return (
     <Section header="Arrow Duel" rows testID="practice-run-arrow-duel-reply-setting">
-      <View style={[rowStyle, styles.editorWrapRow]}>
-        <View style={styles.editorWrapCopy}>
+      <View style={[rowStyle, editorLayout.row]}>
+        <View style={editorLayout.copy}>
           <AppText variant="body">
             Find the opponent’s best reply
           </AppText>
@@ -8797,7 +8826,7 @@ function ArrowDuelReplyChallengeSetting({
             </AppText>
           ) : null}
         </View>
-        <View style={styles.editorWrapControls}>
+        <View style={editorLayout.controls}>
           <AppText
             numberOfLines={1}
             testID="practice-run-arrow-duel-reply-value"
@@ -8814,8 +8843,8 @@ function ArrowDuelReplyChallengeSetting({
           />
         </View>
       </View>
-      <View style={[rowStyle, styles.editorWrapRow]} testID="practice-run-arrow-duel-reply-time-row">
-        <View style={styles.editorWrapCopy}>
+      <View style={[rowStyle, editorLayout.row]} testID="practice-run-arrow-duel-reply-time-row">
+        <View style={editorLayout.copy}>
           <AppText variant="body">Time to find the reply</AppText>
           <AppText tone="secondary" variant="footnote">
             You’ll have {DEFAULT_OPPONENT_REPLY_SECONDS} seconds by default. Choose up to {OPPONENT_REPLY_MAX_SECONDS} seconds.
@@ -8841,7 +8870,7 @@ function ArrowDuelReplyChallengeSetting({
         </View>
         <View
           style={[
-            styles.editorWrapControls,
+            editorLayout.controls,
             !enabled ? styles.runTimingControlDisabled : null
           ]}
         >
@@ -9015,14 +9044,15 @@ function RunTimingSettingRow({
   onToggle: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const editorLayout = useEditorRowLayout();
   const rowStyle = useListRowStyle();
   return (
-    <View style={[rowStyle, styles.editorWrapRow]} testID={testID}>
-      <View style={styles.editorWrapCopy}>
+    <View style={[rowStyle, editorLayout.row]} testID={testID}>
+      <View style={editorLayout.copy}>
         <AppText variant="body">{label}</AppText>
         <AppText tone="secondary" variant="footnote">{detail}</AppText>
       </View>
-      <View style={styles.editorWrapControls}>
+      <View style={editorLayout.controls}>
         <View style={[styles.runTimingStepper, !enabled ? styles.runTimingControlDisabled : null]}>
           <StepperButton
             accessibilityLabel={`Decrease ${label.toLowerCase()}`}
@@ -9073,6 +9103,7 @@ function PracticeRunEloRow({
   value: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const editorLayout = useEditorRowLayout();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
   const fieldScale = useNumericFieldScale();
@@ -9085,8 +9116,8 @@ function PracticeRunEloRow({
     const canIncrease = Boolean(onInputStep) && stepValue < CUSTOM_INITIAL_RATING_MAX;
     return (
       <View style={[rowStyle, styles.editorFieldStack]}>
-        <View style={styles.editorWrapLine} testID="practice-run-elo-row">
-          <View style={styles.editorWrapCopy}>
+        <View style={editorLayout.line} testID="practice-run-elo-row">
+          <View style={editorLayout.copy}>
             <AppText variant="body">{isCreate ? "Starting rating" : "Current rating"}</AppText>
             <AppText tone="secondary" variant="footnote">
               {isCreate
@@ -9151,8 +9182,8 @@ function PracticeRunEloRow({
   }
   const canDecrease = value > RATING_FLOOR;
   return (
-    <View style={[rowStyle, styles.editorWrapRow]} testID="practice-run-elo-row">
-      <View style={styles.editorWrapCopy}>
+    <View style={[rowStyle, editorLayout.row]} testID="practice-run-elo-row">
+      <View style={editorLayout.copy}>
         <AppText variant="body">{isCreate ? "Starting rating" : "Current rating"}</AppText>
         <AppText tone="secondary" variant="footnote">
           {isCreate
@@ -9160,7 +9191,7 @@ function PracticeRunEloRow({
             : `Adjusts puzzle difficulty · minimum ${RATING_FLOOR}`}
         </AppText>
       </View>
-      <View style={styles.editorWrapControls}>
+      <View style={editorLayout.controls}>
         <StepperButton
           accessibilityLabel="Decrease run rating"
           direction="decrease"
@@ -9748,20 +9779,21 @@ function CustomInitialRatingRow({
   value: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const editorLayout = useEditorRowLayout();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
   if (!played) {
     return (
       <View
         accessibilityLabel={`Starting rating, rating ${value}. Sets the initial puzzle difficulty for this Run.`}
-        style={[rowStyle, styles.editorWrapRow]}
+        style={[rowStyle, editorLayout.row]}
         testID="custom-initial-rating-row"
       >
-        <View style={styles.editorWrapCopy}>
+        <View style={editorLayout.copy}>
           <AppText variant="body">Starting rating</AppText>
           <AppText tone="secondary" variant="footnote">Sets initial puzzle difficulty</AppText>
         </View>
-        <View style={styles.editorWrapControls}>
+        <View style={editorLayout.controls}>
           <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
           <CustomRatingStepper onChange={onChange} value={value} />
         </View>
@@ -9778,12 +9810,12 @@ function CustomInitialRatingRow({
         accessibilityRole="button"
         accessibilityLabel={`Edit rating, rating ${value}`}
         accessibilityState={{ expanded: editOpen }}
-        style={({ pressed }) => [rowStyle, styles.editorWrapRow, pressed ? styles.editorRowPressed : null]}
+        style={({ pressed }) => [rowStyle, editorLayout.row, pressed ? styles.editorRowPressed : null]}
         testID="custom-initial-rating-row"
         onPress={() => onEditOpenChange(!editOpen)}
       >
-        <AppText style={styles.editorWrapCopy} variant="body">Edit rating</AppText>
-        <View style={styles.editorWrapControls}>
+        <AppText style={editorLayout.copy} variant="body">Edit rating</AppText>
+        <View style={editorLayout.controls}>
           <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
           <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
         </View>
@@ -9855,15 +9887,16 @@ function CustomValueRow({
   valueTestID?: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const editorLayout = useEditorRowLayout();
   const rowStyle = useListRowStyle();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <View
       accessibilityLabel={accessibilityLabel}
-      style={[rowStyle, styles.editorWrapRow]}
+      style={[rowStyle, editorLayout.row]}
       testID={testID}
     >
-      <View style={styles.editorWrapCopy}>
+      <View style={editorLayout.copy}>
         <AppText variant="body">{label}</AppText>
         {detail ? (
           <View
@@ -10112,15 +10145,16 @@ function CustomOptionRow<T extends number>({
   value: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const editorLayout = useEditorRowLayout();
   const rowStyle = useListRowStyle();
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selected));
   const previousOption = options[selectedIndex - 1];
   const nextOption = options[selectedIndex + 1];
 
   return (
-    <View style={[rowStyle, styles.editorWrapRow]}>
-      <AppText style={styles.editorWrapCopy} variant="body">{label}</AppText>
-      <View style={styles.editorWrapControls}>
+    <View style={[rowStyle, editorLayout.row]}>
+      <AppText style={editorLayout.copy} variant="body">{label}</AppText>
+      <View style={editorLayout.controls}>
         <AppText numberOfLines={1} tone="secondary" variant="body">{value}</AppText>
         <View style={styles.customStepperCompact} testID={stepperTestID}>
           <StepperButton
@@ -19481,32 +19515,41 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     gap: 6
   },
-  // Copy and controls on one line when they fit; the controls wrap below,
-  // trailing, on narrow widths and with large text.
-  editorWrapRow: {
-    flexWrap: "wrap",
-    justifyContent: "flex-end"
+  // Editor rows keep the copy and its control on one line; with large text
+  // they stack, the copy spanning the row and the control trailing below it.
+  editorInlineRow: {
+    justifyContent: "space-between"
   },
-  editorWrapLine: {
+  editorInlineLine: {
     alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.row,
-    justifyContent: "flex-end"
+    gap: theme.spacing.row
   },
-  editorWrapCopy: {
-    flexBasis: 160,
-    flexGrow: 1,
+  editorInlineCopy: {
+    flex: 1,
     flexShrink: 1,
     gap: 2,
     minWidth: 0
   },
-  editorWrapControls: {
+  editorInlineControls: {
     alignItems: "center",
     flexDirection: "row",
     flexShrink: 0,
-    gap: theme.spacing.inline,
-    marginLeft: "auto"
+    gap: theme.spacing.inline
+  },
+  editorStackedLine: {
+    alignItems: "flex-end",
+    flexDirection: "column",
+    gap: theme.spacing.inline
+  },
+  editorStackedCopy: {
+    alignSelf: "stretch",
+    gap: 2
+  },
+  editorStackedControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.inline
   },
   editorRowLabel: {
     flex: 1,
