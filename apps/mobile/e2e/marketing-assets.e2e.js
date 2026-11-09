@@ -480,7 +480,10 @@ async function assertForbiddenState(frame) {
     'settings-stockfish-diagnostics',
   ]);
   for (const testID of forbiddenTestIDs) {
-    if ((frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []).includes(testID)) {
+    if (
+      (frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []).includes(testID)
+      || frame.captureAnchorTestId === testID
+    ) {
       continue;
     }
     await expect(element(by.id(testID))).not.toExist();

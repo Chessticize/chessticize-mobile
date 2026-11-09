@@ -1935,6 +1935,7 @@ describe('Detox suite configuration', () => {
       "element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5)"
     );
     expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
+    expect(spec).toContain('frame.captureAnchorTestId === testID');
 
     const customRunHelperStart = spec.indexOf('async function prepareCustomRun');
     const customRunHelperEnd = spec.indexOf(
