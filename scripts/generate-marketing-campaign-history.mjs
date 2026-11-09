@@ -10,6 +10,7 @@ import { createSimulationClock } from '../packages/storage/src/simulation/simula
 // history without importing the Dev-only simulated-player implementation.
 const puzzleBytes = readFileSync(new URL('../fixtures/puzzles/bundled-core-pack.json', import.meta.url));
 const story = JSON.parse(readFileSync(new URL('../config/app-store-marketing-story-v1.json', import.meta.url), 'utf8'));
+process.env.TZ = story.captureClock.timeZone;
 const scenario = 'slow-fork-speed';
 const seed = 'marketing-1.6-release-campaign';
 const startedAtMs = Date.parse(story.captureClock.instant) - 7 * 24 * 60 * 60 * 1000;
