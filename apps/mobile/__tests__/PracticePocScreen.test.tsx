@@ -10147,6 +10147,16 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-board")).toThrow();
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
 
+    press(renderer, "paused-session-abandon");
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    // The absolute confirmation owns the paused card's slot. Rendering both
+    // leaves the paused card's border exposed beneath the confirmation.
+    expect(() => findByTestId(renderer, "paused-session-panel")).toThrow();
+    expectText(renderer, "This ends the Sprint and records it as abandoned.");
+
+    press(renderer, "session-abandon-cancel");
+    expect(findByTestId(renderer, "paused-session-panel")).toBeTruthy();
+
     press(renderer, "paused-session-resume");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);

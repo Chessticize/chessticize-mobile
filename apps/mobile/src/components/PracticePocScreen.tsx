@@ -4423,7 +4423,11 @@ export function PracticePocScreen({
       <SessionScoreStrip compact={sessionUsesRail || adaptiveLayout.isLargeText} state={state} />
     )
   ) : null;
-  const pausedSessionNode = isPaused && state && !personalBestActivePresentation ? (
+  // The inline abandon confirmation occupies the paused card's slot below the
+  // HUD. Keeping the card mounted behind its absolute sheet leaves its border
+  // exposed below the sheet.
+  const pausedSessionNode = isPaused && state && !personalBestActivePresentation
+    && !practiceExitConfirmationVisible ? (
     <PausedSessionPanel
       state={state}
       onAbandon={() => setPracticeExitConfirmationVisible(true)}
