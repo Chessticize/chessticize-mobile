@@ -7,7 +7,7 @@ import {
   View
 } from "react-native";
 import { makeStyles, useTheme } from "../theme/index.ts";
-import { AppText, Icon, Section } from "./ui/index.tsx";
+import { AppText, Badge, Button, Icon, ListRow, Section, useListRowStyle } from "./ui/index.tsx";
 import {
   TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT,
   type TacticalProfileTaskFamily
@@ -130,9 +130,10 @@ function TacticalProfileScreen({
 
   return (
     <View style={styles.flow} testID="tactical-profile-screen">
-      <FlowHeader
+      <FlowTopBar
         backLabel="Back to Practice"
-        eyebrow="TRAINING FOCUS"
+        subtitle={taskFamilyLabel(activeTaskFamily)}
+        subtitleTestID="tactical-profile-active-mode"
         title="Tactical profile"
         onBack={() => presentation.onIntent({ type: "close-profile" })}
       />
@@ -144,81 +145,71 @@ function TacticalProfileScreen({
             presentation.onIntent({ type: "select-task-family", taskFamily })}
         />
       ) : null}
-      <View style={styles.contextCard}>
-        <Text style={styles.modeLabel} testID="tactical-profile-active-mode">
-          {taskFamilyLabel(activeTaskFamily)}
-        </Text>
-        <Text style={styles.contextTitle}>{profileHeadingFor(presentation, familySignals)}</Text>
-        <Text style={styles.body}>{profileBodyFor(presentation)}</Text>
-        <Text style={styles.contextFoot}>
-          {profileContextFor(presentation)}
-        </Text>
+      <View style={styles.intro}>
+        <AppText accessibilityRole="header" variant="title">
+          {profileHeadingFor(presentation, familySignals)}
+        </AppText>
+        <AppText tone="secondary" variant="subheadline">{profileBodyFor(presentation)}</AppText>
+        <AppText tone="secondary" variant="footnote">{profileContextFor(presentation)}</AppText>
       </View>
 
       {recommendedSignals.length > 0 ? (
-        <View style={styles.signalSection} testID="tactical-profile-recommendations">
-          <Text style={styles.sectionLabel}>
-            {recommendedSignals.length === 1 ? "Recommended focus" : "Ranked focus"}
-          </Text>
+        <Section
+          header={recommendedSignals.length === 1 ? "Recommended focus" : "Ranked focus"}
+          rows
+          testID="tactical-profile-recommendations"
+        >
           {recommendedSignals.map((signal, index) => (
-            <SignalCard
+            <SignalRow
               key={signal.id}
               rank={recommendedSignals.length > 1 ? index + 1 : undefined}
               signal={signal}
               onExplain={() => presentation.onIntent({ type: "explain-signal", signalId: signal.id })}
             />
           ))}
-        </View>
+        </Section>
       ) : null}
 
       {watchSignals.length > 0 ? (
-        <View style={styles.signalSection} testID="tactical-profile-watch-signals">
-          <Text style={styles.sectionLabel}>Collecting evidence</Text>
+        <Section header="Collecting evidence" rows testID="tactical-profile-watch-signals">
           {watchSignals.map((signal) => (
-            <SignalCard
+            <SignalRow
               key={signal.id}
               signal={signal}
               onExplain={() => presentation.onIntent({ type: "explain-signal", signalId: signal.id })}
             />
           ))}
-        </View>
+        </Section>
       ) : null}
 
       {hiddenSignalCount > 0 ? (
-        <Text style={styles.monitoringNote} testID="tactical-profile-more-signals">
+        <AppText style={styles.note} testID="tactical-profile-more-signals" tone="secondary" variant="footnote">
           {hiddenSignalCount === 1
             ? "1 more pattern is being monitored in the background."
             : `${hiddenSignalCount} more patterns are being monitored in the background.`}
-        </Text>
+        </AppText>
       ) : null}
 
       {recommendedSignals.length > 0 && presentation.focusedRunUnavailable ? (
-        <View style={styles.unavailableCard} testID="focused-run-unavailable">
-          <Text style={styles.sectionLabel}>Focused Run availability</Text>
-          <Text style={styles.contextTitle}>{presentation.focusedRunUnavailable.title}</Text>
-          <Text style={styles.body}>{presentation.focusedRunUnavailable.body}</Text>
-        </View>
+        <Section header="Focused Run availability" rows testID="focused-run-unavailable">
+          <ListRow
+            icon="warning"
+            iconTone="warning"
+            subtitle={presentation.focusedRunUnavailable.body}
+            title={presentation.focusedRunUnavailable.title}
+          />
+        </Section>
       ) : null}
 
       {canPreview ? (
-        <View style={styles.flowActions}>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.primaryButton}
-            testID="tactical-profile-preview-run"
-            onPress={() => presentation.onIntent({ type: "preview-focused-run" })}
-          >
-            <Text style={styles.primaryButtonText}>Preview focused Run</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondaryButton}
-            testID="tactical-profile-not-now"
-            onPress={() => presentation.onIntent({ type: "suppress-recommendation" })}
-          >
-            <Text style={styles.secondaryButtonText}>Not now</Text>
-          </Pressable>
-        </View>
+        <FlowActions
+          primaryLabel="Preview focused Run"
+          primaryTestID="tactical-profile-preview-run"
+          secondaryLabel="Not now"
+          secondaryTestID="tactical-profile-not-now"
+          onPrimary={() => presentation.onIntent({ type: "preview-focused-run" })}
+          onSecondary={() => presentation.onIntent({ type: "suppress-recommendation" })}
+        />
       ) : null}
     </View>
   );
@@ -230,6 +221,7 @@ function RecommendationExplanation({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   const signal = selectedSignalFor(presentation);
   if (!signal) {
     return <TacticalProfileScreen presentation={presentation} />;
@@ -240,58 +232,56 @@ function RecommendationExplanation({
       presentation.focusedRun === undefined
       || presentation.focusedRun.taskFamily === signal.taskFamily
     );
+  const reasons = [
+    {
+      title: "What we compared",
+      body: `Your results on this theme were compared with similar-difficulty ${taskFamilyComparisonLabel(signal.taskFamily)} in ordinary mixed Runs.`
+    },
+    {
+      title: "Why this is actionable",
+      body: "The pattern repeats across different puzzles and sessions, and it is large enough to matter in training."
+    },
+    {
+      title: "What does not decide this",
+      body: "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof of a theme weakness."
+    }
+  ];
 
   return (
     <View style={styles.flow} testID="tactical-profile-explanation">
-      <FlowHeader
+      <FlowTopBar
         backLabel="Back to Tactical Profile"
-        eyebrow={`${taskFamilyLabel(signal.taskFamily).toUpperCase()} · WHY THIS FOCUS`}
         title={signal.themeLabel}
         onBack={() => presentation.onIntent({ type: "open-profile" })}
       />
       <EarlyEstimateNotice presentation={presentation} />
-      <View style={styles.explanationHero}>
-        <SignalKindPill kind={signal.kind} />
-        <Text style={styles.explanationTitle}>{signalSummary(signal)}</Text>
-        <EvidenceLine signal={signal} />
-      </View>
-      <View style={styles.explanationSection}>
-        <Text style={styles.sectionTitle}>What we compared</Text>
-        <Text style={styles.body}>
-          Your results on this theme were compared with similar-difficulty {taskFamilyComparisonLabel(signal.taskFamily)} in ordinary mixed Runs.
-        </Text>
-      </View>
-      <View style={styles.explanationSection}>
-        <Text style={styles.sectionTitle}>Why this is actionable</Text>
-        <Text style={styles.body}>
-          The pattern repeats across different puzzles and sessions, and it is large enough to matter in training.
-        </Text>
-      </View>
-      <View style={styles.explanationSection}>
-        <Text style={styles.sectionTitle}>What does not decide this</Text>
-        <Text style={styles.body}>
-          Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof of a theme weakness.
-        </Text>
-      </View>
-      {canPreview ? (
-        <View style={styles.flowActions}>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.primaryButton}
-            testID="tactical-profile-explanation-preview"
-            onPress={() => presentation.onIntent({ type: "preview-focused-run" })}
-          >
-            <Text style={styles.primaryButtonText}>Preview focused Run</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondaryButton}
-            testID="tactical-profile-explanation-not-now"
-            onPress={() => presentation.onIntent({ type: "suppress-recommendation" })}
-          >
-            <Text style={styles.secondaryButtonText}>Not now</Text>
-          </Pressable>
+      <Section>
+        <View style={styles.metaLine}>
+          <SignalKindBadge kind={signal.kind} />
+          <AppText tone="secondary" variant="footnote">{taskFamilyLabel(signal.taskFamily)}</AppText>
         </View>
+        <AppText accessibilityRole="header" variant="title">{signalSummary(signal)}</AppText>
+        <EvidenceLine signal={signal} variant="flow" />
+      </Section>
+      <Section rows>
+        {reasons.map((reason) => (
+          <View key={reason.title} style={[rowStyle, styles.textRow]}>
+            <View style={styles.rowCopy}>
+              <AppText variant="headline">{reason.title}</AppText>
+              <AppText tone="secondary" variant="subheadline">{reason.body}</AppText>
+            </View>
+          </View>
+        ))}
+      </Section>
+      {canPreview ? (
+        <FlowActions
+          primaryLabel="Preview focused Run"
+          primaryTestID="tactical-profile-explanation-preview"
+          secondaryLabel="Not now"
+          secondaryTestID="tactical-profile-explanation-not-now"
+          onPrimary={() => presentation.onIntent({ type: "preview-focused-run" })}
+          onSecondary={() => presentation.onIntent({ type: "suppress-recommendation" })}
+        />
       ) : null}
     </View>
   );
@@ -303,31 +293,38 @@ function FocusedRunPreviewScreen({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   const preview = presentation.focusedRun;
   if (!preview || preview.taskFamily !== activeTaskFamilyFor(presentation)) {
     return <TacticalProfileScreen presentation={presentation} />;
   }
+  const guardrails = [
+    focusedRunRatingGuardrail(preview.taskFamily),
+    "Recently seen and scheduled Review puzzles avoided",
+    "The mix stays fixed after the Run starts",
+    "Mixed practice keeps the session broad"
+  ];
 
   return (
     <View style={styles.flow} testID="focused-run-preview">
-      <FlowHeader
+      <FlowTopBar
         backLabel="Back to Tactical Profile"
-        eyebrow="PREVIEW"
         title={preview.title}
         onBack={() => presentation.onIntent({ type: "open-profile" })}
       />
       <EarlyEstimateNotice presentation={presentation} />
-      <Text style={styles.previewSummary}>
-        {preview.totalPuzzleCount} puzzles · {preview.durationLabel}
-      </Text>
-      <Text style={styles.ratingAnchor} testID="focused-run-rating-anchor">
-        {preview.ratingLabel}
-      </Text>
-      <View style={styles.allocationCard}>
-        <Text style={styles.sectionTitle}>Training mix</Text>
-        <Text style={styles.body}>
+      <View style={styles.intro}>
+        <AppText accessibilityRole="header" variant="title">
+          {preview.totalPuzzleCount} puzzles · {preview.durationLabel}
+        </AppText>
+        <AppText style={styles.semibold} testID="focused-run-rating-anchor" tone="accent" variant="subheadline">
+          {preview.ratingLabel}
+        </AppText>
+      </View>
+      <Section header="Training mix">
+        <AppText tone="secondary" variant="subheadline">
           Explicit quotas keep one theme from taking over. Only the two clearest focuses can enter one Run.
-        </Text>
+        </AppText>
         <View style={styles.allocationBar} testID="focused-run-allocation-bar">
           {preview.allocations.map((allocation) => (
             <View
@@ -344,42 +341,32 @@ function FocusedRunPreviewScreen({
           {preview.allocations.map((allocation) => (
             <View key={allocation.id} style={styles.allocationRow}>
               <View style={[styles.allocationDot, allocationToneStyle(styles, allocation)]} />
-              <Text style={styles.allocationLabel}>{allocation.label}</Text>
-              <Text style={styles.allocationCount}>
+              <AppText style={styles.allocationLabel} variant="body">{allocation.label}</AppText>
+              <AppText numberOfLines={1} tone="secondary" variant="numeralRow">
                 {allocation.puzzleCount} · {Math.round(allocation.puzzleCount / preview.totalPuzzleCount * 100)}%
-              </Text>
+              </AppText>
             </View>
           ))}
         </View>
-      </View>
-      <View style={styles.previewGuardrails}>
-        <Text style={styles.sectionTitle}>How puzzles are chosen</Text>
-        <Text style={styles.guardrailItem}>{focusedRunRatingGuardrail(preview.taskFamily)}</Text>
-        <Text style={styles.guardrailItem}>• Recently seen and scheduled Review puzzles avoided</Text>
-        <Text style={styles.guardrailItem}>• The mix stays fixed after the Run starts</Text>
-        <Text style={styles.guardrailItem}>• Mixed practice keeps the session broad</Text>
-      </View>
-      <Text style={styles.previewFoot}>
+      </Section>
+      <Section header="How puzzles are chosen" rows>
+        {guardrails.map((guardrail) => (
+          <View key={guardrail} style={rowStyle}>
+            <AppText style={styles.rowCopy} variant="body">{guardrail}</AppText>
+          </View>
+        ))}
+      </Section>
+      <AppText style={[styles.note, styles.centeredText]} tone="secondary" variant="footnote">
         Later ordinary mixed Runs decide whether this focus still applies. This preview does not change your saved Runs.
-      </Text>
-      <View style={styles.flowActions}>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.primaryButton}
-          testID="focused-run-start"
-          onPress={() => presentation.onIntent({ type: "start-focused-run" })}
-        >
-          <Text style={styles.primaryButtonText}>Start focused Run</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.secondaryButton}
-          testID="focused-run-not-now"
-          onPress={() => presentation.onIntent({ type: "suppress-recommendation" })}
-        >
-          <Text style={styles.secondaryButtonText}>Not now</Text>
-        </Pressable>
-      </View>
+      </AppText>
+      <FlowActions
+        primaryLabel="Start focused Run"
+        primaryTestID="focused-run-start"
+        secondaryLabel="Not now"
+        secondaryTestID="focused-run-not-now"
+        onPrimary={() => presentation.onIntent({ type: "start-focused-run" })}
+        onSecondary={() => presentation.onIntent({ type: "suppress-recommendation" })}
+      />
     </View>
   );
 }
@@ -390,37 +377,34 @@ function SuppressedRecommendation({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
   return (
     <View style={[styles.flow, styles.suppressedFlow]} testID="tactical-profile-suppressed">
-      <View style={styles.suppressedIcon}>
-        <Text style={styles.suppressedIconText}>✓</Text>
+      <View style={styles.suppressedHero}>
+        <View style={styles.suppressedIcon}>
+          <Icon color={theme.colors.text.tertiary} name="check" size={28} weight="semibold" />
+        </View>
+        <AppText accessibilityRole="header" style={styles.centeredText} variant="title">
+          Focus hidden for now
+        </AppText>
+        <AppText style={styles.centeredText} tone="secondary" variant="body">
+          We will keep gathering evidence in mixed Runs without emphasizing this recommendation.
+        </AppText>
       </View>
-      <Text style={styles.suppressedTitle}>Focus hidden for now</Text>
-      <Text style={styles.suppressedBody}>
-        We will keep gathering evidence in mixed Runs without emphasizing this recommendation.
-      </Text>
       <EarlyEstimateNotice presentation={presentation} />
-      <Pressable
-        accessibilityRole="button"
-        style={styles.primaryButton}
-        testID="tactical-profile-restore"
-        onPress={() => presentation.onIntent({ type: "restore-recommendation" })}
-      >
-        <Text style={styles.primaryButtonText}>Show recommendation again</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        style={styles.secondaryButton}
-        testID="tactical-profile-back-home"
-        onPress={() => presentation.onIntent({ type: "close-profile" })}
-      >
-        <Text style={styles.secondaryButtonText}>Back to Practice</Text>
-      </Pressable>
+      <FlowActions
+        primaryLabel="Show recommendation again"
+        primaryTestID="tactical-profile-restore"
+        secondaryLabel="Back to Practice"
+        secondaryTestID="tactical-profile-back-home"
+        onPrimary={() => presentation.onIntent({ type: "restore-recommendation" })}
+        onSecondary={() => presentation.onIntent({ type: "close-profile" })}
+      />
     </View>
   );
 }
 
-function SignalCard({
+function SignalRow({
   rank,
   signal,
   onExplain
@@ -430,28 +414,35 @@ function SignalCard({
   onExplain: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   return (
-    <View style={styles.signalCard} testID={`tactical-profile-signal-${signal.id}`}>
-      <View style={styles.signalHeader}>
+    <View style={[rowStyle, styles.textRow]} testID={`tactical-profile-signal-${signal.id}`}>
+      <View style={styles.signalCopy}>
+        {/* The rank sits beside the name it ranks, centered on the name and
+            priority lines, rather than on the whole multi-line item. */}
         <View style={styles.signalTitleRow}>
-          {rank ? <Text style={styles.rank}>{rank}</Text> : null}
-          <View style={styles.signalTitleCopy}>
-            <Text style={styles.signalTitle}>{signal.themeLabel}</Text>
-            <Text style={styles.priorityLabel}>{signal.priorityLabel}</Text>
+          {rank ? (
+            <View style={styles.rankTile}>
+              <AppText numberOfLines={1} style={styles.semibold} tone="accent" variant="subheadline">{rank}</AppText>
+            </View>
+          ) : null}
+          <View style={styles.rowCopy}>
+            <AppText variant="headline">{signal.themeLabel}</AppText>
+            <AppText tone="secondary" variant="subheadline">{signal.priorityLabel}</AppText>
           </View>
         </View>
-        <SignalKindPill kind={signal.kind} />
+        <SignalKindBadge kind={signal.kind} />
+        <AppText variant="body">{signalSummary(signal)}</AppText>
+        <EvidenceLine signal={signal} variant="flow" />
+        <Button
+          label="Why this focus?"
+          size="compact"
+          style={styles.inlineAction}
+          testID={`tactical-profile-explain-${signal.id}`}
+          variant="plain"
+          onPress={onExplain}
+        />
       </View>
-      <Text style={styles.signalSummary}>{signalSummary(signal)}</Text>
-      <EvidenceLine signal={signal} />
-      <Pressable
-        accessibilityRole="button"
-        style={styles.explainButton}
-        testID={`tactical-profile-explain-${signal.id}`}
-        onPress={onExplain}
-      >
-        <Text style={styles.explainButtonText}>Why this focus?</Text>
-      </Pressable>
     </View>
   );
 }
@@ -479,16 +470,20 @@ function TaskFamilySelector({
             key={taskFamily}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            style={[styles.taskFamilyTab, selected ? styles.taskFamilyTabSelected : null]}
+            style={({ pressed }) => [
+              styles.taskFamilyTab,
+              selected ? styles.selectedFill : null,
+              pressed && !selected ? styles.pressed : null
+            ]}
             testID={`tactical-profile-task-family-${taskFamily}`}
             onPress={() => onSelect(taskFamily)}
           >
-            <Text style={[styles.taskFamilyTabTitle, selected ? styles.taskFamilyTabTitleSelected : null]}>
+            <AppText tone={selected ? "accent" : "primary"} variant="headline">
               {taskFamilyLabel(taskFamily)}
-            </Text>
-            <Text style={[styles.taskFamilyTabBody, selected ? styles.taskFamilyTabBodySelected : null]}>
+            </AppText>
+            <AppText tone="secondary" variant="footnote">
               {TASK_FAMILY_COPY[taskFamily].selectorBody}
-            </Text>
+            </AppText>
           </Pressable>
         );
       })}
@@ -496,63 +491,112 @@ function TaskFamilySelector({
   );
 }
 
-function EvidenceLine({ signal }: { signal: TacticalProfileSignal }): React.JSX.Element {
+function EvidenceLine({
+  signal,
+  variant = "home"
+}: {
+  signal: TacticalProfileSignal;
+  variant?: "home" | "flow";
+}): React.JSX.Element {
   const styles = useStyles();
+  const text = `${formatCount(signal.distinctPuzzleCount, "different puzzle", "different puzzles")} · ${formatCount(signal.distinctSessionCount, "session", "sessions")}`;
+  if (variant === "flow") {
+    return (
+      <AppText
+        style={styles.semibold}
+        testID={`tactical-profile-evidence-${signal.id}`}
+        tone="secondary"
+        variant="subheadline"
+      >
+        {text}
+      </AppText>
+    );
+  }
   return (
     <Text style={styles.evidence} testID={`tactical-profile-evidence-${signal.id}`}>
-      {formatCount(signal.distinctPuzzleCount, "different puzzle", "different puzzles")}
-      {" · "}
-      {formatCount(signal.distinctSessionCount, "session", "sessions")}
+      {text}
     </Text>
   );
 }
 
-function SignalKindPill({
+function SignalKindBadge({
   kind
 }: {
   kind: TacticalProfileSignal["kind"];
 }): React.JSX.Element {
-  const styles = useStyles();
   return (
-    <View style={[styles.kindPill, kind === "speed" ? styles.kindPillSpeed : styles.kindPillSolve]}>
-      <Text style={[styles.kindPillText, kind === "speed" ? styles.kindPillTextSpeed : styles.kindPillTextSolve]}>
-        {kind === "speed"
-          ? "Completed-puzzle speed"
-          : kind === "both"
-            ? "Reliability & speed"
-            : "Solve reliability"}
-      </Text>
-    </View>
+    <Badge
+      label={kind === "speed"
+        ? "Completed-puzzle speed"
+        : kind === "both"
+          ? "Reliability & speed"
+          : "Solve reliability"}
+      tone={kind === "speed" ? "warning" : "accent"}
+    />
   );
 }
 
-function FlowHeader({
+// Back chevron and centered title, matching the other direction A sub-screens (#609).
+function FlowTopBar({
   backLabel,
-  eyebrow,
+  subtitle,
+  subtitleTestID,
   title,
   onBack
 }: {
   backLabel: string;
-  eyebrow: string;
+  subtitle?: string;
+  subtitleTestID?: string;
   title: string;
   onBack: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
   return (
-    <View style={styles.flowHeader}>
+    <View style={styles.topBar}>
       <Pressable
         accessibilityLabel={backLabel}
         accessibilityRole="button"
-        style={styles.backButton}
+        hitSlop={4}
+        style={({ pressed }) => [styles.topBarButton, pressed ? styles.pressed : null]}
         testID="tactical-profile-back"
         onPress={onBack}
       >
-        <Text style={styles.backButtonText}>‹</Text>
+        <Icon color={theme.colors.accent.s600} name="chevronLeft" size={20} weight="semibold" />
       </Pressable>
-      <View style={styles.flowHeaderCopy}>
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.flowTitle}>{title}</Text>
+      <View style={styles.topBarTitleBlock}>
+        <AppText accessibilityRole="header" style={styles.centeredText} variant="headline">{title}</AppText>
+        {subtitle ? (
+          <AppText style={styles.centeredText} testID={subtitleTestID} tone="secondary" variant="footnote">
+            {subtitle}
+          </AppText>
+        ) : null}
       </View>
+      <View style={styles.topBarButton} />
+    </View>
+  );
+}
+
+function FlowActions({
+  primaryLabel,
+  primaryTestID,
+  secondaryLabel,
+  secondaryTestID,
+  onPrimary,
+  onSecondary
+}: {
+  primaryLabel: string;
+  primaryTestID: string;
+  secondaryLabel: string;
+  secondaryTestID: string;
+  onPrimary: () => void;
+  onSecondary: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View style={styles.flowActions}>
+      <Button label={primaryLabel} stretch testID={primaryTestID} onPress={onPrimary} />
+      <Button label={secondaryLabel} stretch testID={secondaryTestID} variant="secondary" onPress={onSecondary} />
     </View>
   );
 }
@@ -699,17 +743,19 @@ function EarlyEstimateNotice({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element | null {
-  const styles = useStyles();
   if (presentation.assurance !== "provisional") {
     return null;
   }
   return (
-    <View style={styles.earlyEstimateNotice} testID="tactical-profile-early-estimate">
-      <Text style={styles.earlyEstimateNoticeTitle}>Early estimate</Text>
-      <Text style={styles.earlyEstimateNoticeBody}>
-        Use this as a training suggestion while we validate the model with more players.
-      </Text>
-    </View>
+    <Section rows>
+      <ListRow
+        icon="warning"
+        iconTone="warning"
+        subtitle="Use this as a training suggestion while we validate the model with more players."
+        testID="tactical-profile-early-estimate"
+        title="Early estimate"
+      />
+    </Section>
   );
 }
 
@@ -822,14 +868,14 @@ const TASK_FAMILY_COPY = {
     selectorBody: "Standard, Blitz & Custom",
     runLabel: "puzzle-solving",
     comparisonLabel: "puzzles",
-    ratingGuardrail: "• Rebuilt for your current Rating before each new Run"
+    ratingGuardrail: "Rebuilt for your current Rating before each new Run"
   },
   arrow_duel: {
     label: "Arrow Duel",
     selectorBody: "Choose between two moves",
     runLabel: "Arrow Duel",
     comparisonLabel: "Arrow Duel choices",
-    ratingGuardrail: "• Rebuilt for your current Arrow Duel Rating before each new Run"
+    ratingGuardrail: "Rebuilt for your current Arrow Duel Rating before each new Run"
   }
 } satisfies Record<TacticalProfileTaskFamily, {
   label: string;
@@ -887,14 +933,7 @@ function allocationToneStyle(styles: Styles, allocation: FocusedRunAllocation) {
 }
 
 const useStyles = makeStyles((theme) => ({
-  sectionLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    textTransform: "uppercase"
-  },
+  // Practice Home Training focus card.
   homeCard: {
     gap: theme.spacing.group,
     padding: 16
@@ -957,11 +996,6 @@ const useStyles = makeStyles((theme) => ({
     letterSpacing: 0.8,
     textTransform: "uppercase"
   },
-  body: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    lineHeight: 21
-  },
   evidence: {
     color: theme.colors.text.strong,
     fontSize: 13,
@@ -991,316 +1025,6 @@ const useStyles = makeStyles((theme) => ({
     gap: 0,
     padding: 0
   },
-  flow: {
-    alignSelf: "center",
-    gap: 16,
-    maxWidth: 760,
-    paddingBottom: 20,
-    width: "100%"
-  },
-  flowHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12
-  },
-  backButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44
-  },
-  backButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 30,
-    lineHeight: 30,
-    marginTop: -2
-  },
-  flowHeaderCopy: {
-    flex: 1
-  },
-  eyebrow: {
-    color: theme.colors.accent.s600,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.2
-  },
-  flowTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 25,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-    lineHeight: 31
-  },
-  contextCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-    padding: 18
-  },
-  contextTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 19,
-    fontWeight: "800",
-    lineHeight: 25
-  },
-  contextFoot: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    lineHeight: 18
-  },
-  earlyEstimateNotice: {
-    backgroundColor: theme.colors.caution.s50,
-    borderColor: theme.colors.caution.s200,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 3,
-    paddingHorizontal: 14,
-    paddingVertical: 11
-  },
-  earlyEstimateNoticeTitle: {
-    color: theme.colors.caution.s800,
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    textTransform: "uppercase"
-  },
-  earlyEstimateNoticeBody: {
-    color: theme.colors.caution.s900,
-    fontSize: 13,
-    lineHeight: 18
-  },
-  taskFamilySelector: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: 16,
-    flexDirection: "row",
-    gap: 4,
-    padding: 4
-  },
-  taskFamilyTab: {
-    borderRadius: 12,
-    flex: 1,
-    gap: 2,
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 9
-  },
-  taskFamilyTabSelected: {
-    backgroundColor: theme.colors.surface
-  },
-  taskFamilyTabTitle: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  taskFamilyTabTitleSelected: {
-    color: theme.colors.text.primary
-  },
-  taskFamilyTabBody: {
-    color: theme.colors.text.faint,
-    fontSize: 10,
-    lineHeight: 14
-  },
-  taskFamilyTabBodySelected: {
-    color: theme.colors.text.tertiary
-  },
-  monitoringNote: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    lineHeight: 19,
-    paddingHorizontal: 4
-  },
-  unavailableCard: {
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s200,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-    padding: 18
-  },
-  signalSection: {
-    gap: 10
-  },
-  signalCard: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-    padding: 16
-  },
-  signalHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    justifyContent: "space-between"
-  },
-  signalTitleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 1,
-    gap: 10
-  },
-  rank: {
-    backgroundColor: theme.colors.surfaceInverse,
-    borderRadius: 16,
-    color: theme.colors.text.onTone,
-    fontSize: 13,
-    fontWeight: "900",
-    height: 30,
-    lineHeight: 30,
-    textAlign: "center",
-    width: 30
-  },
-  signalTitleCopy: {
-    flexShrink: 1
-  },
-  signalTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 18,
-    fontWeight: "800",
-    lineHeight: 23
-  },
-  priorityLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2
-  },
-  kindPill: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5
-  },
-  kindPillSolve: {
-    backgroundColor: theme.colors.accent.s100
-  },
-  kindPillSpeed: {
-    backgroundColor: theme.colors.warning.s100
-  },
-  kindPillText: {
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  kindPillTextSolve: {
-    color: theme.colors.accent.s700
-  },
-  kindPillTextSpeed: {
-    color: theme.colors.warning.s800
-  },
-  signalSummary: {
-    color: theme.colors.text.strong,
-    fontSize: 15,
-    fontWeight: "600",
-    lineHeight: 22
-  },
-  explainButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    justifyContent: "center",
-    minHeight: 44,
-    paddingRight: 10
-  },
-  explainButtonText: {
-    color: theme.colors.accent.s600,
-    fontSize: 14,
-    fontWeight: "800"
-  },
-  flowActions: {
-    gap: 10
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 12,
-    justifyContent: "center",
-    minHeight: 48,
-    paddingHorizontal: 18,
-    paddingVertical: 12
-  },
-  primaryButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  secondaryButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 48,
-    paddingHorizontal: 18,
-    paddingVertical: 12
-  },
-  secondaryButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  explanationHero: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-    padding: 18
-  },
-  explanationTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 20,
-    fontWeight: "800",
-    lineHeight: 27
-  },
-  explanationSection: {
-    backgroundColor: theme.colors.surface,
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: 1,
-    gap: 6,
-    paddingBottom: 14
-  },
-  sectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 16,
-    fontWeight: "800",
-    lineHeight: 22
-  },
-  previewSummary: {
-    color: theme.colors.text.secondary,
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  ratingAnchor: {
-    color: theme.colors.accent.s600,
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: -8
-  },
-  allocationCard: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-    padding: 18
-  },
-  allocationBar: {
-    borderRadius: 999,
-    flexDirection: "row",
-    gap: 3,
-    height: 12,
-    overflow: "hidden"
-  },
-  allocationSegment: {
-    flexBasis: 0
-  },
   allocationPrimary: {
     backgroundColor: theme.colors.accent.fill
   },
@@ -1310,14 +1034,126 @@ const useStyles = makeStyles((theme) => ({
   allocationMixed: {
     backgroundColor: theme.colors.fillStrong
   },
+  // Tactical Profile flow (#609 direction A).
+  flow: {
+    alignSelf: "center",
+    gap: theme.spacing.section,
+    maxWidth: 760,
+    paddingBottom: 20,
+    width: "100%"
+  },
+  topBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.inline,
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget
+  },
+  topBarButton: {
+    alignItems: "center",
+    borderRadius: theme.shape.capsule,
+    height: theme.metrics.minTarget,
+    justifyContent: "center",
+    width: theme.metrics.minTarget
+  },
+  topBarTitleBlock: {
+    flex: 1,
+    minWidth: 0
+  },
+  pressed: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  selectedFill: {
+    backgroundColor: theme.colors.accent.s100
+  },
+  semibold: {
+    fontWeight: theme.typography.headline.fontWeight
+  },
+  centeredText: {
+    textAlign: "center"
+  },
+  intro: {
+    gap: 4,
+    paddingHorizontal: 4
+  },
+  note: {
+    paddingHorizontal: 16
+  },
+  taskFamilySelector: {
+    flexDirection: "row",
+    gap: theme.spacing.group
+  },
+  taskFamilyTab: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.control,
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minHeight: theme.metrics.rowMinHeight,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  textRow: {
+    paddingVertical: 12
+  },
+  rowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  signalCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 6,
+    minWidth: 0
+  },
+  signalTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.row
+  },
+  rankTile: {
+    alignItems: "center",
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: theme.shape.tile,
+    height: theme.metrics.iconTile,
+    justifyContent: "center",
+    minWidth: theme.metrics.iconTile,
+    paddingHorizontal: 4
+  },
+  // A plain text action aligned with the row copy (the button pads its label by 8).
+  inlineAction: {
+    marginLeft: -8
+  },
+  metaLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.inline
+  },
+  flowActions: {
+    gap: theme.spacing.group
+  },
+  allocationBar: {
+    borderRadius: theme.shape.capsule,
+    flexDirection: "row",
+    gap: 3,
+    height: 12,
+    marginVertical: 4,
+    overflow: "hidden"
+  },
+  allocationSegment: {
+    flexBasis: 0
+  },
   allocationList: {
-    gap: 10
+    gap: 4
   },
   allocationRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 9,
-    minHeight: 28
+    gap: theme.spacing.row,
+    minHeight: theme.metrics.minTarget
   },
   allocationDot: {
     borderRadius: 5,
@@ -1325,40 +1161,18 @@ const useStyles = makeStyles((theme) => ({
     width: 10
   },
   allocationLabel: {
-    color: theme.colors.text.strong,
     flex: 1,
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  allocationCount: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  previewGuardrails: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-    padding: 18
-  },
-  guardrailItem: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    lineHeight: 21
-  },
-  previewFoot: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center"
+    minWidth: 0
   },
   suppressedFlow: {
-    alignItems: "center",
+    alignSelf: "center",
     justifyContent: "center",
-    minHeight: 360,
-    paddingHorizontal: 18
+    maxWidth: 460,
+    minHeight: 360
+  },
+  suppressedHero: {
+    alignItems: "center",
+    gap: theme.spacing.inline
   },
   suppressedIcon: {
     alignItems: "center",
@@ -1366,24 +1180,7 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 28,
     height: 56,
     justifyContent: "center",
+    marginBottom: 4,
     width: 56
-  },
-  suppressedIconText: {
-    color: theme.colors.text.secondary,
-    fontSize: 26,
-    fontWeight: "900"
-  },
-  suppressedTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 23,
-    fontWeight: "900",
-    textAlign: "center"
-  },
-  suppressedBody: {
-    color: theme.colors.text.secondary,
-    fontSize: 15,
-    lineHeight: 22,
-    maxWidth: 460,
-    textAlign: "center"
   }
 }));
