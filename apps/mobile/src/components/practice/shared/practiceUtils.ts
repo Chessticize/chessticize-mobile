@@ -24,3 +24,29 @@ export function modeLabel(mode: SprintMode): string {
   }
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
+
+const CUSTOM_INITIAL_RATING_MIN = 600;
+
+const CUSTOM_INITIAL_RATING_MAX = 2200;
+
+function formatSprintTimingLabel(config: SprintConfig): string {
+  return `${formatSprintDurationLabel(config.durationSeconds)} · ${config.perPuzzleSeconds}s pace`;
+}
+
+function formatSprintDurationLabel(seconds: number): string {
+  if (seconds % 60 === 0) {
+    return `${seconds / 60} min`;
+  }
+  return `${seconds}s`;
+}
+
+function formatCompactDuration(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+function formatDurationLabel(seconds: number): string {
+  if (seconds % 60 === 0) {
+    return `${seconds / 60}m`;
+  }
+  return `${seconds}s`;
+}
