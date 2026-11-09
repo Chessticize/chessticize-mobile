@@ -1197,6 +1197,7 @@ export const ActiveExitConfirmation: Story = {
   name: "Active session · exit confirmation",
   args: { scenarioId: "practice-active" },
   play: async ({ canvasElement }) => {
+    await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-abandon");
     await clickTestId(canvasElement, "session-abandon");
     await waitForTestId(canvasElement, "session-abandon-scroll");
