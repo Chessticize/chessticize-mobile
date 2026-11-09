@@ -18473,9 +18473,11 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     gap: 16
   },
+  // No wrap: in a wrapping column, stretch would size the field to its line.
   runNameRowStacked: {
     alignItems: "stretch",
     flexDirection: "column",
+    flexWrap: "nowrap",
     gap: theme.spacing.inline
   },
   runNameInputStacked: {
