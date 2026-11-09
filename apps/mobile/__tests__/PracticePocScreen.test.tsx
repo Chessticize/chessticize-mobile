@@ -7016,10 +7016,10 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", width: 430 },
-    { actionContainer: "review-context-actions-rail", height: 390, label: "compact wide-short window", width: 844 },
-    { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", width: 1180 }
-  ])("places History Review actions in the available $label layout", ({ actionContainer, height, width }) => {
+    { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", pairedHeader: true, width: 430 },
+    { actionContainer: "review-context-actions-rail", height: 390, label: "compact wide-short window", pairedHeader: false, width: 844 },
+    { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", pairedHeader: true, width: 1180 }
+  ])("places History Review actions in the available $label layout", ({ actionContainer, height, pairedHeader, width }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width, height, scale: 2, fontScale: 1 });
@@ -7034,6 +7034,32 @@ describe("PracticePocScreen", () => {
     const actions = findByTestId(renderer, actionContainer);
     expect(actions.findByProps({ testID: "review-schedule-control" })).toBeTruthy();
     expect(actions.findByProps({ testID: "history-attempt-unclear" })).toBeTruthy();
+    // The close button's side matches the previous and next pair, centering the
+    // title, unless a narrow rail needs that width for the title.
+    const leadingWidth = flattenTestStyle(findByTestId(renderer, "review-header-leading").props.style).width;
+    const trailingWidth = flattenTestStyle(findByTestId(renderer, "review-header-actions").props.style).width;
+    expect(leadingWidth === trailingWidth).toBe(pairedHeader);
+  });
+
+  it.each([
+    { fontScale: 1, stacked: false },
+    { fontScale: 2, stacked: true }
+  ])("puts the Replay row actions below their copy only at large text ($fontScale)", ({ fontScale, stacked }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 430, height: 932, scale: 3, fontScale });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      practiceService: createUnclearHistoryReviewService()
+    });
+    pressHistoryTab(renderer);
+    press(renderer, "history-attempt-responsive-unclear-attempt");
+
+    for (const row of ["review-schedule-control", "history-attempt-unclear"]) {
+      const content = flattenTestStyle(findByTestId(renderer, `${row}-content`).props.style);
+      expect(content.flexDirection).toBe(stacked ? "column" : "row");
+    }
   });
 
   it("preserves the active sprint across a live resize", () => {
@@ -12049,7 +12075,9 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
-    expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("↺");
+    // Reset draws a symbol, not a text glyph.
+    expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("");
+    expect(findByTestId(renderer, "review-reset-puzzle").findAllByProps({ name: "reset" })).toHaveLength(1);
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
@@ -12285,6 +12313,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
     press(renderer, "history-attempt-unclear-history-attempt");
     press(renderer, "review-schedule-remove");
+    // The confirmation keeps a landscape window in landscape instead of
+    // forcing React Native's portrait-only Modal default.
+    const removalModal = renderer.root.find(
+      (node) => node.props.visible === true
+        && Array.isArray(node.props.supportedOrientations)
+        && node.findAll((child) => child.props.testID === "review-schedule-removal-confirmation").length > 0
+    );
+    expect(removalModal.props.supportedOrientations).toEqual(
+      expect.arrayContaining(["portrait", "landscape-left", "landscape-right"])
+    );
     press(renderer, "review-schedule-removal-confirm");
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
 
@@ -13768,7 +13806,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-panel")).toThrow();
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
-    expect(styleEntryMatches(findByTestId(renderer, "review-timer").props.style, "fontSize", 21)).toBe(true);
+    // The countdown uses the session HUD's Numeral L role.
+    expect(styleEntryMatches(findByTestId(renderer, "review-timer").props.style, "fontSize", 22)).toBe(true);
     expect(() => findByTestId(renderer, "review-next")).toThrow();
     expect(() => findByTestId(renderer, "review-previous")).toThrow();
     expect(() => findByTestId(renderer, "review-start-session-mistakes")).toThrow();
@@ -14115,7 +14154,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-schedule-remove")).toThrow();
     expect(() => findByTestId(renderer, "review-context-actions-bottom")).toThrow();
     expect(flattenTestStyle(findByTestId(renderer, "review-header-actions").props.style).width).toBe(
-      flattenTestStyle(findByTestId(renderer, "review-exit").props.style).width
+      flattenTestStyle(hostByTestId(renderer, "review-exit").props.style({ pressed: false })).width
     );
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
     expect(service.listReviewQueue()).toHaveLength(2);
@@ -14507,13 +14546,23 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-close-analysis"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-back"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-forward"))).toBe("");
-    expect(collectText(findByTestId(renderer, "review-analysis-reset"))).toBe("↺");
+    expect(collectText(findByTestId(renderer, "review-analysis-reset"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-flip"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("×");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("‹");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("›");
-    expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).toContain("↺");
+    expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("↺");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("⇄");
+    // Every analysis tool draws a symbol instead of a text glyph.
+    for (const [testID, icon] of [
+      ["review-close-analysis", "close"],
+      ["review-analysis-back", "chevronLeft"],
+      ["review-analysis-forward", "chevronRight"],
+      ["review-analysis-reset", "reset"],
+      ["review-analysis-flip", "flip"]
+    ] as const) {
+      expect(findByTestId(renderer, testID).findAllByProps({ name: icon })).toHaveLength(1);
+    }
     expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("Local hint");
     expect(findByTestId(renderer, "analysis-arrow-overlay")).toBeTruthy();
     expect(collectText(renderer.root)).toContain("Qxe6+");

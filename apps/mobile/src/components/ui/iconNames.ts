@@ -28,6 +28,8 @@ export const ICONS = {
   design: { sf: "paintbrush", material: "brush", codepoint: 0xe3ae },
   edit: { sf: "pencil", material: "edit", codepoint: 0xf097 },
   external: { sf: "arrow.up.right.square", material: "open_in_new", codepoint: 0xe89e },
+  // Turns the board over (Review and Replay analysis).
+  flip: { sf: "arrow.up.arrow.down", material: "swap_vert", codepoint: 0xe8d5 },
   filter: { sf: "line.3.horizontal.decrease", material: "filter_list", codepoint: 0xe152 },
   focus: { sf: "scope", material: "my_location", codepoint: 0xe55c },
   help: { sf: "questionmark.circle", material: "help", codepoint: 0xe8fd },
@@ -36,8 +38,11 @@ export const ICONS = {
   play: { sf: "play.fill", material: "play_arrow", codepoint: 0xe037 },
   profile: { sf: "chart.bar", material: "bar_chart", codepoint: 0xe26b },
   remove: { sf: "minus", material: "remove", codepoint: 0xe15b },
+  // Returns a puzzle or analysis board to its starting position.
+  reset: { sf: "arrow.counterclockwise", material: "replay", codepoint: 0xe042 },
   restore: { sf: "arrow.uturn.backward", material: "undo", codepoint: 0xe166 },
   review: { sf: "arrow.counterclockwise", material: "replay", codepoint: 0xe042 },
+  search: { sf: "magnifyingglass", material: "search", codepoint: 0xef7a },
   share: { sf: "square.and.arrow.up", material: "ios_share", codepoint: 0xe6b8 },
   standard: { sf: "target", material: "target", codepoint: 0xe719 },
   survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 },

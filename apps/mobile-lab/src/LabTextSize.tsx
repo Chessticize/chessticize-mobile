@@ -15,6 +15,8 @@ import type { Theme } from "../../mobile/src/theme/index.ts";
 
 // React Native's iOS multiplier at the largest accessibility size (AX5).
 export const LARGEST_ACCESSIBILITY_FONT_SCALE = 3.571;
+// React Native's iOS multiplier at Accessibility Large (AX3).
+export const ACCESSIBILITY_LARGE_FONT_SCALE = 2.353;
 // Mirrors maxFontSizeMultiplier on device: the hero score caps at 1.5x and
 // numerals (HUD values, stat values) at 2x; large titles, titles and
 // headlines follow the shared caps that keep the heading hierarchy.

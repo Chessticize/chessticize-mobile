@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
+import { LabTextSize, ACCESSIBILITY_LARGE_FONT_SCALE } from "./LabTextSize.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
@@ -161,6 +162,22 @@ export const Filters: Story = {
 export const ReviewSession: Story = {
   name: "Review session",
   args: { scenarioId: "review-session" },
+  play: async ({ canvasElement }) => {
+    await openReviewQueue(canvasElement);
+    await clickTestId(canvasElement, "review-start-due");
+    await waitForTestId(canvasElement, "review-session");
+    await waitForTestId(canvasElement, "lab-board-placeholder");
+  }
+};
+
+export const ReviewSessionAccessibilityLarge: Story = {
+  name: "Review session · accessibility large text",
+  args: { scenarioId: "review-session" },
+  render: (args) => (
+    <LabTextSize fontScale={ACCESSIBILITY_LARGE_FONT_SCALE}>
+      <LabScenario {...args} />
+    </LabTextSize>
+  ),
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
     await clickTestId(canvasElement, "review-start-due");

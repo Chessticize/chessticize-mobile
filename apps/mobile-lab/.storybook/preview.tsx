@@ -176,6 +176,46 @@ const preview: Preview = {
           },
           type: "desktop"
         },
+        ipad11Portrait: {
+          name: "iPad Pro 11-inch portrait",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.ipad11Portrait.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.ipad11Portrait.height}px`
+          },
+          type: "tablet"
+        },
+        ipad11Landscape: {
+          name: "iPad Pro 11-inch landscape",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.ipad11Landscape.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.ipad11Landscape.height}px`
+          },
+          type: "desktop"
+        },
+        ipad13Portrait: {
+          name: "iPad Pro 13-inch portrait",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.ipad13Portrait.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.ipad13Portrait.height}px`
+          },
+          type: "tablet"
+        },
+        ipad13Landscape: {
+          name: "iPad Pro 13-inch landscape",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.ipad13Landscape.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.ipad13Landscape.height}px`
+          },
+          type: "desktop"
+        },
+        duoOuter: {
+          name: "iPhone Duo outer display",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.duoOuter.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.duoOuter.height}px`
+          },
+          type: "mobile"
+        },
         splitViewHalf: {
           name: "iPad 13-inch Split View · half",
           styles: {

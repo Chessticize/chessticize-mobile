@@ -100,6 +100,28 @@ test("the Duo inner landscape preset centres a height-filling session row", () =
   assert.equal(layout.sessionRailWidth, 296);
 });
 
+test("the full-screen iPad and Duo outer presets keep their sizes and layout classes", () => {
+  const expected = {
+    ipad11Portrait: { size: "834x1194", className: "regularPortrait" },
+    ipad11Landscape: { size: "1194x834", className: "regularLandscape" },
+    ipad13Portrait: { size: "1032x1376", className: "regularPortrait" },
+    ipad13Landscape: { size: "1376x1032", className: "regularLandscape" },
+    duoOuter: { size: "466x678", className: "compactPortrait" }
+  } as const;
+  for (const [key, { className, size }] of Object.entries(expected)) {
+    const viewport = LAB_DEVICE_VIEWPORTS[key as keyof typeof expected];
+    assert.equal(`${viewport.width}x${viewport.height}`, size);
+    assert.deepEqual(labSafeAreaMetricsForViewport(viewport.width, viewport.height).insets, viewport.insets);
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: viewport.height,
+      insets: viewport.insets,
+      width: viewport.width
+    });
+    assert.equal(layout.className, className, key);
+  }
+});
+
 test("the Duo inner portrait and Split View presets keep their sizes and lay out the session", () => {
   const expected = {
     duoInnerPortrait: { size: "669x951", className: "compactPortrait" },
