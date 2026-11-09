@@ -1,9 +1,13 @@
+import React from "react";
+import Chessboard from "react-native-chessboard";
+import type { Theme } from "../../../theme/index.ts";
+
 type ChessboardColors = NonNullable<React.ComponentProps<typeof Chessboard>["colors"]>;
 
 const chessboardColorCache = new WeakMap<Theme, ChessboardColors>();
 
 // Stable per theme so the board does not see a new colors prop on every render.
-function chessboardColorsFor(theme: Theme): ChessboardColors {
+export function chessboardColorsFor(theme: Theme): ChessboardColors {
   let colors = chessboardColorCache.get(theme);
   if (colors === undefined) {
     const { board } = theme.colors;

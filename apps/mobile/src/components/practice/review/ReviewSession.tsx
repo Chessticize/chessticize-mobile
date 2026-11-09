@@ -1,18 +1,121 @@
+import React, { useEffect, useRef, useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { GestureType } from "react-native-gesture-handler";
+import Chessboard, { type ChessboardRef, type MoveResult } from "react-native-chessboard";
+import { Chess, type PieceSymbol, type Square } from "chess.js";
+import {
+  analyzeFenWithUciEngine,
+  applyMovesToFen,
+  type ArrowDuelState,
+  type AttemptEvent,
+  beginArrowDuelPuzzle,
+  beginLinePuzzle,
+  buildCurrentPositionEvaluationLine,
+  buildPuzzleGuidedAnalysisLines,
+  continueArrowDuelReplyLine,
+  currentExpectedMove,
+  type CurrentPuzzleState,
+  DEFAULT_OPPONENT_REPLY_SECONDS,
+  defaultSprintConfig,
+  type EngineAnalysisLine,
+  type HistoryAttemptReplayAvailability,
+  type HistoryAttemptView,
+  normalizeHistoryAttemptDetail,
+  type Puzzle,
+  type PuzzleFeedback,
+  type PuzzleLineState,
+  type ReviewAnalysisLine,
+  reviewAnalysisStartingFen,
+  type ReviewContext,
+  reviewDueLabel,
+  type ReviewQueueState,
+  submitArrowDuelChoice,
+  submitArrowDuelFollowUpMove,
+  submitArrowDuelReply,
+  submitLineMove
+} from "../../../../../../packages/core/src/index.ts";
+import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
+import { buildReviewEntry, type ReviewEntry } from "../../../backend/reviewEntry.ts";
+import { type AdaptiveLayout, PRACTICE_UI_PADDING as UI_PADDING } from "../../adaptivePracticeLayout.ts";
+import {
+  emitCommittedMoveFeedback,
+  type MoveFeedbackActor,
+  type MoveFeedbackClient,
+  moveFeedbackCueForMove
+} from "../../../platform/moveFeedback.ts";
+import type { MobileStockfishCapabilities } from "../../../platform/mobilePlatformCapabilities.ts";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import {
+  arrowFromTo,
+  type BoardMove,
+  formatUci,
+  isArrowDuelCandidate,
+  moveResultMatchesExpectedFen
+} from "../shared/boardMove.ts";
+import type { ArrowDuelReplyChallengePhase } from "../../arrowDuelReplyChallengePreview.ts";
+import { usePuzzleEntryPreview } from "../../usePuzzleEntryPreview.ts";
+import {
+  moveSideDisplayName,
+  oppositeMoveSide,
+  sideToMove,
+  sideToMoveAccessibilityLabel
+} from "../shared/moveSide.ts";
+import {
+  ArrowCandidateOverlay,
+  ArrowDuelWhatIfOverlay,
+  ArrowHint,
+  BoardCoordinateOverlay,
+  BoardInputBlocker,
+  kingGlyphSizeForBoard,
+  LastMoveOverlay,
+  MoveFeedbackOverlay,
+  moveFeedbackTint,
+  sessionBoardAccessibilityLabel,
+  useBoardMoveSquareTints
+} from "../session/boardOverlays.tsx";
+import {
+  ANALYSIS_DEPTH,
+  FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  formatDuration,
+  modeLabel,
+  replyPreparationInstruction,
+  type SessionFeedback,
+  sleep
+} from "../shared/practiceUtils.ts";
+import { boardMoveToUci, consumeSuppressedBoardMove } from "../../boardMoveSuppression.ts";
+import { fenAfterMove, fenAfterMoves, normalizeUci } from "../../../backend/premove.ts";
+import { ArrowDuelReplyChallengePrompt, PracticePrompt } from "../session/PracticePrompt.tsx";
+import { ChevronGlyph, CloseGlyph, FlipGlyph, SearchGlyph } from "../shared/Glyphs.tsx";
+import { arePracticeTestControlsEnabled } from "../../../releaseConfig.ts";
+import { isStoreAssetCaptureEnabled } from "../../../platform/testLaunchConfig.ts";
+import { CHESS_PIECE_SPRITE } from "../shared/chessPieceSprite.ts";
+import { ThemeTagRail } from "../history/HistoryPanel.tsx";
+import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+import {
+  ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS,
+  ARROW_DUEL_REPLY_PREPARATION_MS,
+  ARROW_DUEL_UNDO_ANIMATION_MS,
+  BOARD_MOVE_ANIMATION_MS,
+  FEEDBACK_SNAPSHOT_MS,
+  USER_FEEDBACK_BEFORE_AUTO_MS
+} from "../shared/sessionTiming.ts";
+import { chessboardColorsFor } from "../shared/chessboardColors.ts";
+
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 
-type ReviewBackCommand = {
+export type ReviewBackCommand = {
   id: number;
   kind: "close-analysis" | "return-to-owner";
 };
 
-type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
+export type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
-type HistoryUnavailableAttempt = {
+export type HistoryUnavailableAttempt = {
   attempt: HistoryAttemptView;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
 };
 
-function withAttemptClarity<T extends AttemptEvent | HistoryAttemptView>(
+export function withAttemptClarity<T extends AttemptEvent | HistoryAttemptView>(
   attempt: T,
   clarity: Pick<AttemptEvent, "unclear" | "unclearUpdatedAt">
 ): T {
@@ -34,7 +137,7 @@ type ReviewPuzzleState =
     }
   | { kind: "arrow_duel"; duel: ArrowDuelState };
 
-function buildServiceReviewEntry(
+export function buildServiceReviewEntry(
   service: PracticeService,
   input: Omit<ReviewEntry, "curatedThemes" | "opponentReply">
 ): ReviewEntry {
@@ -56,7 +159,7 @@ function buildServiceReviewEntry(
   });
 }
 
-function ReviewSession({
+export function ReviewSession({
   adaptiveLayout,
   boardBlocksExternalGesture,
   boardSize,
@@ -1723,7 +1826,7 @@ function ReviewScheduleControl({
   );
 }
 
-function HistoryAttemptReplayUnavailable({
+export function HistoryAttemptReplayUnavailable({
   adaptiveLayout,
   attempt,
   currentTimeMs,
@@ -1998,12 +2101,73 @@ function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
   return defaultSprintConfig(entry.mode).perPuzzleSeconds * 2;
 }
 
+const useStyles = makeStyles((theme) => ({
+  accessibilityAnnouncement: {
+    height: 1,
+    left: -10000,
+    opacity: 0.01,
+    position: "absolute",
+    top: 0,
+    width: 1
+  },
   accessibleMoveModalBackdrop: {
     alignItems: "center",
     backgroundColor: theme.colors.scrimSoft,
     flex: 1,
     justifyContent: "center",
     padding: 20
+  },
+  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  activeSessionAdaptiveLayout: {
+    alignSelf: "center",
+    alignItems: "center",
+    flexDirection: "row"
+  },
+  activeSessionBoardLane: {
+    alignItems: "center",
+    flexGrow: 0,
+    flexShrink: 0,
+    gap: 12,
+    justifyContent: "center",
+    minWidth: 0
+  },
+  activeSessionControlRailScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: "100%"
+  },
+  activeSessionControlRailScrollContent: {
+    paddingBottom: 4
+  },
+  activeSessionControlRail: {
+    flexGrow: 1,
+    gap: 10
+  },
+  activeSessionControlRailCentered: {
+    justifyContent: "center"
+  },
+  puzzleTimeoutOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    backgroundColor: theme.colors.scrimStrong,
+    justifyContent: "center",
+    zIndex: 60
+  },
+  puzzleTimeoutOverlayTitle: {
+    color: theme.colors.text.onAccent,
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  boardSurface: {
+    borderColor: theme.colors.border.default,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: "hidden",
+    position: "relative"
+  },
+  practicePromptStack: {
+    alignSelf: "center",
+    gap: 6
   },
   secondaryButton: {
     alignItems: "center",
@@ -2329,3 +2493,4 @@ function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
     top: 0,
     left: 0
   },
+}));

@@ -1,4 +1,4 @@
-import type { SprintConfig, SprintMode } from "../../../../../../packages/core/src/index.ts";
+import type { PuzzleFeedback, SprintConfig, SprintMode } from "../../../../../../packages/core/src/index.ts";
 
 export const ANALYSIS_DEPTH = 20;
 
@@ -51,13 +51,13 @@ export function formatDurationLabel(seconds: number): string {
   return `${seconds}s`;
 }
 
-type SessionFeedback = PuzzleFeedback | null;
+export type SessionFeedback = PuzzleFeedback | null;
 
-function replyPreparationInstruction(seconds: number): string {
+export function replyPreparationInstruction(seconds: number): string {
   return `You’ll have ${seconds} ${seconds === 1 ? "second" : "seconds"} to play the best reply.`;
 }
 
-function formatDuration(seconds: number): string {
+export function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)
     .toString()
     .padStart(2, "0");
@@ -65,7 +65,7 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs}`;
 }
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });

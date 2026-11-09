@@ -1,3 +1,6 @@
+import type { MoveResult } from "react-native-chessboard";
+import { canonicalFen } from "../../../backend/premove.ts";
+
 export type BoardMove = {
   from: string;
   to: string;
@@ -16,17 +19,17 @@ export function arrowFromTo(move: string): BoardMove | null {
   };
 }
 
-function formatUci(move: MoveResult["move"]): string {
+export function formatUci(move: MoveResult["move"]): string {
   const promotion = move.promotion ? move.promotion.toLowerCase() : "";
   return `${move.from}${move.to}${promotion}`;
 }
 
-function isArrowDuelCandidate(candidates: string[], move: string): boolean {
+export function isArrowDuelCandidate(candidates: string[], move: string): boolean {
   const normalizedMove = move.trim().toLowerCase();
   return candidates.some((candidate) => candidate.trim().toLowerCase() === normalizedMove);
 }
 
-function moveResultMatchesExpectedFen(result: MoveResult, expectedFen: string | null): boolean {
+export function moveResultMatchesExpectedFen(result: MoveResult, expectedFen: string | null): boolean {
   if (!expectedFen || !result.state?.fen) {
     return true;
   }

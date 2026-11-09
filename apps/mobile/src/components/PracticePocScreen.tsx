@@ -3,14 +3,11 @@ import {
   ActivityIndicator,
   AppState,
   Linking,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View
 } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
@@ -21,43 +18,25 @@ import {
   type GestureType
 } from "react-native-gesture-handler";
 import {
-  analyzeFenWithUciEngine,
   canPresentWhatsNew,
-  applyMovesToFen,
   arrowDuelReplyCuePresentationFor,
-  beginArrowDuelPuzzle,
-  beginLinePuzzle,
-  buildCurrentPositionEvaluationLine,
-  buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
   collectHistoryRatingKeys,
-  continueArrowDuelReplyLine,
-  currentExpectedMove,
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
-  formatLocalCalendarDate,
-  formatReviewDay,
   historyAttemptReplayAvailability,
   selectMistakeReplayItems,
   isUnclearAttemptEligible,
   isReviewOverdue,
   markSprintGuideSeen,
   markSprintSessionGuidePlanSeen,
-  normalizeHistoryAttemptDetail,
   OPPONENT_REPLY_MAX_SECONDS,
   OPPONENT_REPLY_MIN_SECONDS,
   pauseSprint as pauseSprintState,
   RATING_FLOOR,
   resetSprintGuideProgress,
   resolvePuzzleTimingPolicy,
-  reviewAnalysisStartingFen,
-  reviewDueLabel,
-  reviewQueueForecast,
   resumeSprint as resumeSprintState,
-  submitArrowDuelChoice,
-  submitArrowDuelFollowUpMove,
-  submitArrowDuelReply,
-  submitLineMove,
   SERVER_CURATED_THEME_PRESENTATION,
   sprintHasRunDeadline,
   sprintSessionGuidePlanFor
@@ -67,21 +46,14 @@ import type {
   AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
-  EngineAnalysisLine,
-  HistoryAttemptView,
-  HistoryAttemptReplayAvailability,
   HistoryAttentionReason,
   HistoryTimeRange,
   PuzzleSide,
-  Puzzle,
   PuzzleFeedback,
-  PuzzleLineState,
   PracticeRunRecord,
-  ReviewAnalysisLine,
   ReviewReminderDecision,
   ReviewQueueItem,
   ReviewQueueState,
-  ReviewContext,
   SessionReplayItem,
   SprintConfig,
   SprintGuideKey,
@@ -97,13 +69,6 @@ import {
   FocusedRunUnavailableError,
   type PracticeService
 } from "../../../../packages/storage/src/practice-service.ts";
-import {
-  filterReviewTodayPresentation,
-  type CompletedReviewItem,
-  type ReviewTodayDueItemPresentation,
-  type ReviewTodayFilter,
-  type ReviewTodayHistoryPresentation
-} from "../../../../packages/storage/src/review-today.ts";
 import type {
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
@@ -143,8 +108,7 @@ import {
   type SupportDiagnosticMetadata
 } from "../platform/iCloudSyncDiagnostics.ts";
 import type {
-  MobilePlatformCapabilities,
-  MobileStockfishCapabilities
+  MobilePlatformCapabilities
 } from "../platform/mobilePlatformCapabilities.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../platform/testLaunchConfig.ts";
@@ -157,13 +121,10 @@ import type {
   ArrowDuelReplyChallengePhase,
   ArrowDuelReplyChallengePreviewTransition
 } from "./arrowDuelReplyChallengePreview.ts";
-import { buildReviewEntry, type ReviewEntry } from "../backend/reviewEntry.ts";
+import type { ReviewEntry } from "../backend/reviewEntry.ts";
 import {
-  canonicalFen,
   decidePremoveQueue,
   fenAfterMove,
-  fenAfterMoves,
-  normalizeUci,
   planPremoveReplay,
   type BoardInputLockMode
 } from "../backend/premove.ts";
@@ -190,11 +151,10 @@ import {
   emitCommittedMoveFeedback,
   emitRunReorderPickupFeedback,
   moveFeedbackCueForMove,
-  type MoveFeedbackActor,
-  type MoveFeedbackClient
+  type MoveFeedbackActor
 } from "../platform/moveFeedback.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
+import type { Move, PieceSymbol, Square } from "chess.js";
 import type {
   PracticeRunManagementPresentation
 } from "./practiceRunPresentation.ts";
@@ -210,7 +170,6 @@ import {
   topLevelTabIntent,
   type TopLevelTab
 } from "../navigation/topLevelNavigation.ts";
-import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
 import { WhatsNewSheet } from "./WhatsNewSheet.tsx";
 import { useWhatsNew } from "../whatsNew/useWhatsNew.ts";
@@ -290,28 +249,17 @@ export type {
   SprintRulesGuidePresentation
 } from "./practice/home/PracticeHome.tsx";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
-import { AppText, Button, Icon, IconTile, useListRowStyle } from "./ui/index.tsx";
-import type { MoveSide } from "./practice/shared/moveSide.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
 import {
-  ChevronGlyph,
-  CloseGlyph,
-  FilterGlyph,
-  FlipGlyph,
-  SearchGlyph
-} from "./practice/shared/Glyphs.tsx";
-import { CollapsibleRegion, DisclosureChevron } from "./practice/shared/CollapsibleRegion.tsx";
-import { ToolbarIconButton } from "./practice/shared/ToolbarIconButton.tsx";
-import { FilterButton } from "./practice/shared/FilterButton.tsx";
-import { AttemptStatusTile } from "./practice/shared/AttemptStatusTile.tsx";
-import {
-  ANALYSIS_DEPTH,
   CUSTOM_INITIAL_RATING_MIN,
   errorMessage,
   FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  formatDuration,
   formatSprintDurationLabel,
   modeLabel,
-  safeTestId
+  replyPreparationInstruction,
+  type SessionFeedback,
+  sleep
 } from "./practice/shared/practiceUtils.ts";
 import {
   iCloudAccountStatusMessage,
@@ -332,8 +280,7 @@ import {
   HistoryPanel,
   type HistoryRatingRangeFilter,
   historyRatingRangeFilterToQuery,
-  type HistoryResultFilter,
-  ThemeTagRail
+  type HistoryResultFilter
 } from "./practice/history/HistoryPanel.tsx";
 import { emptyHistoryPerformance } from "./practice/history/HistoryRatingChart.tsx";
 import { CustomSprintSetup } from "./practice/customSetup/CustomSprintSetup.tsx";
@@ -351,12 +298,22 @@ import {
   StartConflictPrompt
 } from "./practice/home/PracticeHome.tsx";
 import { SIMULATED_HISTORY_SCENARIOS, TestPuzzleSourceControl } from "./practice/home/TestPuzzleSourceControl.tsx";
-import { moveSideDisplayName, sideToMove, sideToMoveAccessibilityLabel } from "./practice/shared/moveSide.ts";
-import { arrowFromTo, type BoardMove } from "./practice/shared/boardMove.ts";
+import {
+  moveSideDisplayName,
+  oppositeMoveSide,
+  sideToMove,
+  sideToMoveAccessibilityLabel
+} from "./practice/shared/moveSide.ts";
+import {
+  arrowFromTo,
+  type BoardMove,
+  formatUci,
+  isArrowDuelCandidate,
+  moveResultMatchesExpectedFen
+} from "./practice/shared/boardMove.ts";
 import {
   ArrowCandidateOverlay,
   ArrowDuelWhatIfOverlay,
-  ArrowHint,
   BoardCoordinateOverlay,
   BoardInputBlocker,
   boardMoveSquareTints,
@@ -381,6 +338,24 @@ import {
   type PreviousAttemptNoticeReason,
   UnclearAttemptPrompt
 } from "./practice/session/PracticePrompt.tsx";
+import {
+  ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS,
+  ARROW_DUEL_REPLY_PREPARATION_MS,
+  ARROW_DUEL_UNDO_ANIMATION_MS,
+  BOARD_MOVE_ANIMATION_MS,
+  FEEDBACK_SNAPSHOT_MS,
+  USER_FEEDBACK_BEFORE_AUTO_MS
+} from "./practice/shared/sessionTiming.ts";
+import { chessboardColorsFor } from "./practice/shared/chessboardColors.ts";
+import {
+  buildServiceReviewEntry,
+  HistoryAttemptReplayUnavailable,
+  type HistoryUnavailableAttempt,
+  type ReviewBackCommand,
+  ReviewSession,
+  withAttemptClarity
+} from "./practice/review/ReviewSession.tsx";
+import { reviewCountLabel, ReviewPanel } from "./practice/review/ReviewPanel.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

@@ -1,3 +1,46 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import type { GestureType } from "react-native-gesture-handler";
+import {
+  type AttemptEvent,
+  formatLocalCalendarDate,
+  formatReviewDay,
+  isReviewOverdue,
+  reviewQueueForecast,
+  type ReviewQueueItem,
+  type ReviewQueueState,
+  type SessionReplayItem
+} from "../../../../../../packages/core/src/index.ts";
+import { FABRIC_SAFE_HIDDEN_TEXT_STYLE, modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import {
+  type CompletedReviewItem,
+  filterReviewTodayPresentation,
+  type ReviewTodayDueItemPresentation,
+  type ReviewTodayFilter,
+  type ReviewTodayHistoryPresentation
+} from "../../../../../../packages/storage/src/review-today.ts";
+import { type AdaptiveLayout, PRACTICE_UI_PADDING as UI_PADDING } from "../../adaptivePracticeLayout.ts";
+import type { MoveFeedbackClient } from "../../../platform/moveFeedback.ts";
+import type { ReviewQueueDuePromotionResult } from "../../../../../../packages/storage/src/practice-store.ts";
+import type { ReviewEntry } from "../../../backend/reviewEntry.ts";
+import type { ReviewReminderScheduleResult } from "../../../platform/reviewReminderScheduler.ts";
+import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
+import type { MobileStockfishCapabilities } from "../../../platform/mobilePlatformCapabilities.ts";
+import { FilterButton } from "../shared/FilterButton.tsx";
+import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegion.tsx";
+import { AppText, Button, Icon, IconTile, useListRowStyle } from "../../ui/index.tsx";
+import { ToolbarIconButton } from "../shared/ToolbarIconButton.tsx";
+import { FilterGlyph } from "../shared/Glyphs.tsx";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { AttemptStatusTile } from "../shared/AttemptStatusTile.tsx";
+import {
+  buildServiceReviewEntry,
+  type DeferBackRelevantTransition,
+  type ReviewBackCommand,
+  ReviewSession,
+  withAttemptClarity
+} from "./ReviewSession.tsx";
+
 function reviewItemSpeedSeconds(
   review: Pick<ReviewQueueState, "ratingKey">
 ): number | null {
@@ -73,7 +116,7 @@ function reviewQuickFilterTestID(filter: ReviewTodayFilter): string {
   return `review-filter-${filter}`;
 }
 
-function ReviewPanel({
+export function ReviewPanel({
   adaptiveLayout,
   boardBlocksExternalGesture,
   boardSize,
@@ -761,10 +804,11 @@ function ReviewForecastMetric({
   );
 }
 
-function reviewCountLabel(count: number): string {
+export function reviewCountLabel(count: number): string {
   return `${count} ${count === 1 ? "review" : "reviews"}`;
 }
 
+const useStyles = makeStyles((theme) => ({
   historyHeaderRow: {
     alignItems: "center",
     columnGap: theme.spacing.row,
@@ -800,6 +844,7 @@ function reviewCountLabel(count: number): string {
     alignItems: "flex-end",
     flexShrink: 0
   },
+  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
   },
@@ -942,3 +987,4 @@ function reviewCountLabel(count: number): string {
   settingsRowPressed: {
     backgroundColor: theme.colors.surfaceStrong
   },
+}));
