@@ -4915,6 +4915,13 @@ export function PracticePocScreen({
         ? "Open Survival leave options"
         : "Abandon sprint"}
       compactMetrics={sessionUsesRail}
+      // The overlay starts 8 points below the HUD; the prompt card follows the
+      // HUD after the 10-point rail or 12-point stack gap. Four extra points
+      // cover the card to its bottom edge in either layout.
+      leaveConfirmationMinHeight={adaptiveLayout.promptFrameHeight + 4}
+      // Beside its buttons, the copy wraps to a word per line in a narrow
+      // rail or column; stacked, it reads as two short lines.
+      stackLeaveConfirmation={adaptiveLayout.sessionColumnWidth < 320}
       mode={mode}
       personalBest={personalBestActivePresentation}
       state={state}
@@ -5186,6 +5193,7 @@ export function PracticePocScreen({
       })
     : null;
   const sessionLayoutUsesRail = sessionUsesRail || sessionGuideUsesRail;
+  const reviewUsesRail = adaptiveLayout.usesSessionRail && reviewBoardVisible;
   const sessionLayout: SessionLayoutNodes = sessionGuideStageNodes ?? {
     board: sessionBoardNode,
     bottomFeedback: sessionBottomFeedbackNode,
@@ -5398,7 +5406,9 @@ export function PracticePocScreen({
             }}
             contentContainerStyle={[
               styles.content,
-              adaptiveLayout.usesWideContent && !sessionLayoutUsesRail
+              // Rail layouts (live session, guide, Review and Replay) pack a
+              // row wider than the 1120-point cap on the 13-inch iPad.
+              adaptiveLayout.usesWideContent && !sessionLayoutUsesRail && !reviewUsesRail
                 ? styles.contentWide
                 : null,
               appChromeVisible
@@ -10297,8 +10307,10 @@ function SessionStatusBar({
   closeAccessibilityLabel = "Abandon sprint",
   compactMetrics = false,
   confirmAbandon,
+  leaveConfirmationMinHeight,
   metricsRef,
   mode,
+  stackLeaveConfirmation = false,
   personalBest,
   state,
   timerText,
@@ -10313,7 +10325,11 @@ function SessionStatusBar({
   closeAccessibilityLabel?: string;
   compactMetrics?: boolean;
   confirmAbandon: boolean;
+  // The confirmation floats in the prompt card's slot; at least that tall, it
+  // covers the card instead of leaving a sliver of it showing beneath.
+  leaveConfirmationMinHeight?: number;
   metricsRef?: React.RefObject<View | null>;
+  stackLeaveConfirmation?: boolean;
   mode: SprintMode;
   personalBest?: PersonalBestChallengeDesignPreview;
   state: SprintState;
@@ -10466,7 +10482,13 @@ function SessionStatusBar({
     </View>
   );
   return (
-    <View style={styles.activeSessionShell} testID="active-session-shell">
+    <View
+      style={[
+        styles.activeSessionShell,
+        confirmAbandon ? styles.activeSessionShellRaised : null
+      ]}
+      testID="active-session-shell"
+    >
       <View style={styles.sessionNavRow} testID="session-shell-nav">
         {showsSessionHeaderAction ? (
           <Pressable
@@ -10556,8 +10578,14 @@ function SessionStatusBar({
         )}
       </View>
 
+      {/* The leave confirmation floats over the prompt card below the HUD
+          instead of growing the session stack, so the counts and board never
+          move into the bottom inset while it is open, at any width. */}
       {confirmAbandon && isPersonalBest ? (
-        <View style={styles.survivalExitSheet} testID="session-abandon-confirmation">
+        <View
+          style={[styles.sessionLeaveConfirmationOverlay, styles.survivalExitSheet]}
+          testID="session-abandon-confirmation"
+        >
           <View style={styles.sessionAbandonCopy}>
             <Text style={styles.survivalExitTitle}>Survival paused</Text>
             <Text style={styles.survivalExitBest} testID="personal-best-exit-best">
@@ -10599,8 +10627,23 @@ function SessionStatusBar({
           </View>
         </View>
       ) : confirmAbandon ? (
-        <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
-          <View style={styles.sessionAbandonCopy}>
+        <View
+          style={[
+            styles.sessionLeaveConfirmationOverlay,
+            styles.sessionAbandonConfirm,
+            stackLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
+            leaveConfirmationMinHeight === undefined
+              ? null
+              : { minHeight: leaveConfirmationMinHeight }
+          ]}
+          testID="session-abandon-confirmation"
+        >
+          <View
+            style={[
+              styles.sessionAbandonCopy,
+              stackLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
+            ]}
+          >
             <Text style={styles.listText}>
               {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
             </Text>
@@ -10610,7 +10653,12 @@ function SessionStatusBar({
                 : "This ends the run and records a failed sprint."}
             </Text>
           </View>
-          <View style={styles.sessionAbandonActions}>
+          <View
+            style={[
+              styles.sessionAbandonActions,
+              stackLeaveConfirmation ? styles.sessionAbandonActionsStacked : null
+            ]}
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isTacticalFocus
@@ -15269,9 +15317,26 @@ function ReviewSession({
         ) : null}
       </View>
     ) : null;
+  const reviewCentersRow = adaptiveLayout.usesSessionRail && adaptiveLayout.sessionCentersRow;
 
   return (
-    <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
+    <View
+      style={[
+        styles.reviewSessionPanel,
+        adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null,
+        // Regular landscape Review and Replay centre their board and rail row
+        // in the content height, as the live session does. The panel spans
+        // the height between the content padding; the row is its only
+        // in-flow child in the rail layout.
+        reviewCentersRow
+          ? {
+              justifyContent: "center",
+              minHeight: Math.max(0, adaptiveLayout.contentHeight - UI_PADDING * 2)
+            }
+          : null
+      ]}
+      testID="review-session"
+    >
       <View
         accessible
         accessibilityLabel={feedback
@@ -15447,6 +15512,7 @@ function ReviewSession({
             <View
               style={[
                 styles.activeSessionControlRail,
+                reviewCentersRow ? styles.activeSessionControlRailCentered : null,
                 {
                   minHeight: boardSize,
                   width: adaptiveLayout.sessionRailWidth
@@ -18729,6 +18795,25 @@ const useStyles = makeStyles((theme) => ({
   activeSessionShell: {
     gap: 8
   },
+  // Lifts the HUD above the prompt, board and rail rows that follow it, so the
+  // leave confirmation it anchors draws on top of them.
+  activeSessionShellRaised: {
+    elevation: 12,
+    zIndex: 12
+  },
+  sessionLeaveConfirmationOverlay: {
+    elevation: 12,
+    left: 0,
+    marginTop: 8,
+    position: "absolute",
+    right: 0,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: theme.name === "dark" ? 0.5 : 0.16,
+    shadowRadius: 14,
+    top: "100%",
+    zIndex: 12
+  },
   sessionNavRow: {
     alignItems: "center",
     borderBottomColor: theme.colors.border.default,
@@ -18832,6 +18917,17 @@ const useStyles = makeStyles((theme) => ({
   sessionAbandonCopy: {
     flex: 1,
     gap: 2
+  },
+  sessionAbandonConfirmStacked: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    justifyContent: "center"
+  },
+  sessionAbandonCopyStacked: {
+    flex: 0
+  },
+  sessionAbandonActionsStacked: {
+    justifyContent: "flex-end"
   },
   sessionAbandonActions: {
     flexDirection: "row",
