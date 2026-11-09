@@ -1936,6 +1936,8 @@ describe('Detox suite configuration', () => {
     );
     expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
     expect(spec).toContain('frame.captureAnchorTestId === testID');
+    expect(spec).toContain('TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE');
+    expect(spec).toContain("by.text(TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE)");
 
     const customRunHelperStart = spec.indexOf('async function prepareCustomRun');
     const customRunHelperEnd = spec.indexOf(

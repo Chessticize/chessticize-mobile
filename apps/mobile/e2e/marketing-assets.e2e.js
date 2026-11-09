@@ -53,7 +53,6 @@ const CAMPAIGN_CAPTURE_CONTROLS = {
   'tactical-profile': [
     'tactical-profile-active-mode',
     'tactical-profile-recommendations',
-    'tactical-profile-early-estimate',
   ],
   'focused-run': [
     'focused-run-rating-anchor',
@@ -63,6 +62,11 @@ const CAMPAIGN_CAPTURE_CONTROLS = {
   survival: ['personal-best-type-selector', 'personal-best-hub-start'],
   review: ['review-due-card', 'review-start-due', 'review-forecast'],
 };
+const TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE = [
+  'This is an early estimate based on ordinary mixed puzzle-solving Runs.',
+  'It may change as the model is validated with more players.',
+  'Review and focused Runs do not shape discovery.',
+].join(' ');
 const capturePlatform =
   process.env.CHESSTICIZE_MARKETING_PLATFORM ?? 'app-store';
 const isGooglePlayCapture = capturePlatform === 'google-play';
@@ -308,10 +312,10 @@ async function prepareCustomRun() {
 async function assertCompositionViewport(frame) {
   if (frame.id === 'tactical-profile') {
     await waitFor(element(by.id('tactical-profile-recommendations')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(10000);
-    await waitFor(element(by.id('tactical-profile-early-estimate')))
-      .toBeVisible()
+    await waitFor(element(by.text(TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE)))
+      .toExist()
       .withTimeout(10000);
     return;
   }
@@ -607,13 +611,33 @@ async function assertRequiredFrameGeometry(frame) {
 
   for (const testID of captureControlTestIDs) {
     const control = element(by.id(testID));
-    await waitFor(control).toBeVisible().withTimeout(10000);
+    // Some native grouped Section wrappers report incomplete Detox coverage
+    // even when their measured bounds are wholly in the screenshot viewport.
+    // Existence plus the containment proof below checks the actual capture
+    // condition without accepting a partially off-screen control.
+    await waitFor(control).toExist().withTimeout(10000);
     const controlFrame = await frameFor(control);
     assertPositiveFrame(controlFrame, `${frame.id} ${testID}`);
     expectFrameContained(controlFrame, screenFrame, `${frame.id} ${testID}`);
     if (!requiredFrames.some((required) => required.testID === testID)) {
       requiredFrames.push({testID, frame: controlFrame});
     }
+  }
+
+  if (frame.id === 'tactical-profile') {
+    const disclosure = element(by.text(TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE));
+    await waitFor(disclosure).toExist().withTimeout(10000);
+    const disclosureFrame = await frameFor(disclosure);
+    assertPositiveFrame(disclosureFrame, `${frame.id} early-estimate disclosure`);
+    expectFrameContained(
+      disclosureFrame,
+      screenFrame,
+      `${frame.id} early-estimate disclosure`
+    );
+    requiredFrames.push({
+      testID: 'tactical-profile-early-estimate-disclosure',
+      frame: disclosureFrame,
+    });
   }
 
   if (frame.id === 'practice-home' && device.getPlatform() === 'ios') {
