@@ -1269,7 +1269,7 @@ describe('Detox suite configuration', () => {
     expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
   });
 
-  it('uses a bounded public swipe for compact History review actions', () => {
+  it('requires full Review action visibility with bounded scrolls outside the board', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const caseStart = practiceSpec.indexOf(
       "it('persists Unclear, places its History actions responsively"
@@ -1280,18 +1280,16 @@ describe('Detox suite configuration', () => {
     );
     const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
     const compactBranch = responsiveHistoryCase.indexOf("'compactPortrait'");
-    const boundedSwipe = responsiveHistoryCase.indexOf(
-      "element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9)",
+    const requireUnclearVisible = responsiveHistoryCase.indexOf(
+      "await waitForReviewAction('history-attempt-clear-unclear')",
       compactBranch
     );
-    const requireUnclearVisible = responsiveHistoryCase.indexOf(
-      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()",
-      boundedSwipe
-    );
-
     expect(compactBranch).toBeGreaterThan(0);
-    expect(boundedSwipe).toBeGreaterThan(compactBranch);
-    expect(requireUnclearVisible).toBeGreaterThan(boundedSwipe);
+    expect(requireUnclearVisible).toBeGreaterThan(compactBranch);
+    expect(responsiveHistoryCase).toContain("'review-session-control-rail' : 'practice-main-scroll',\n      0.99");
+    expect(practiceSpec).toContain("toBeVisible(100)");
+    expect(practiceSpec).toContain(".scroll(100, 'down', startX, 0.5)");
+    expect(practiceSpec).toContain(".scroll(100, 'up', startX, 0.5)");
   });
 
   it('checks the visible Sprint result boundary after first-use guidance', () => {

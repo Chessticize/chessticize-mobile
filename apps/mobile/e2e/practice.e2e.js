@@ -440,6 +440,11 @@ describe('Practice POC', () => {
 
   it('persists Unclear, places its History actions responsively, and manages Review Schedule there', async () => {
     const expectsRegularLayout = process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1';
+    const waitForReviewAction = (testID) => waitForVisibleInScroll(
+      testID,
+      expectsRegularLayout ? 'review-session-control-rail' : 'practice-main-scroll',
+      0.99
+    );
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -492,8 +497,8 @@ describe('Practice POC', () => {
     }
 
     if (expectsRegularLayout) {
-      await waitForVisibleInPracticeScroll('review-schedule-add');
-      await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
+      await waitForReviewAction('review-schedule-add');
+      await waitForReviewAction('history-attempt-clear-unclear');
       await waitForElementAccessibilityLabelContaining(
         'adaptive-layout',
         'regularLandscape',
@@ -533,43 +538,26 @@ describe('Practice POC', () => {
         10000
       );
       await waitFor(element(by.id('review-context-actions-bottom'))).toExist().withTimeout(10000);
-      try {
-        await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
-      } catch {
-        if (device.getPlatform() === 'android') {
-          // On compact Android the trailing action can sit only a few pixels
-          // below the viewport. A bounded public swipe reaches it reliably;
-          // Detox's stale-at-edge auto-scroll can otherwise wait indefinitely.
-          await element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9);
-          await sleep(500);
-        } else {
-          // On iOS the hidden tab bar's container stays over the bottom of
-          // the screen (touches pass through, but Detox counts it as covering
-          // the view). Scroll the action clear of it without a fling, so the
-          // next tap does not land on a still-moving list (#612).
-          await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
-        }
-      }
-      await expect(element(by.id('review-schedule-control'))).toBeVisible();
-      await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
     }
-    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear', 100);
+    await waitForReviewAction('history-attempt-clear-unclear');
     console.log('[review-action-frame] Clear', await frameFor(element(by.id('history-attempt-clear-unclear'))));
     await device.takeScreenshot('review-clear-unclear-visible');
-    await waitForVisibleInPracticeScroll('review-schedule-add', 100);
+    await waitForReviewAction('review-schedule-add');
     console.log('[review-action-frame] Add', await frameFor(element(by.id('review-schedule-add'))));
     await device.takeScreenshot('review-schedule-add-visible');
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
     await waitFor(element(by.id('history-attempt-clear-unclear'))).not.toExist().withTimeout(10000);
 
-    await waitForVisibleInPracticeScroll('review-schedule-remove', 100);
+    await waitForReviewAction('review-schedule-remove');
     console.log('[review-action-frame] Remove', await frameFor(element(by.id('review-schedule-remove'))));
     await device.takeScreenshot('review-schedule-remove-visible');
     await element(by.id('review-schedule-remove')).tap();
-    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toExist().withTimeout(10000);
     await sleep(500);
+    await waitForVisibleInScroll('review-schedule-removal-cancel', 'review-schedule-removal-confirmation');
     await device.takeScreenshot('review-schedule-removal-confirmation');
+    await waitForVisibleInScroll('review-schedule-removal-confirm', 'review-schedule-removal-confirmation');
     await element(by.id('review-schedule-removal-confirm')).tap();
     await waitFor(element(by.id('review-schedule-state')))
       .toHaveText('Not scheduled for Review')
@@ -701,6 +689,25 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
+
+async function waitForVisibleInScroll(testID, scrollID, startX = 0.5) {
+  const target = element(by.id(testID));
+  await waitFor(target).toExist().withTimeout(10000);
+  try {
+    await expect(target).toBeVisible(100);
+    return;
+  } catch {
+    // Review's board locks its parent scroll while touched. Use the outside
+    // content gutter for that scroll, and the modal's own viewport for sheets.
+  }
+  try {
+    await waitFor(target).toBeVisible(100)
+      .whileElement(by.id(scrollID)).scroll(100, 'down', startX, 0.5);
+  } catch {
+    await waitFor(target).toBeVisible(100)
+      .whileElement(by.id(scrollID)).scroll(100, 'up', startX, 0.5);
+  }
+}
 
 async function injectMateIn2FocusedRun() {
   await waitForVisibleInPracticeScroll('test-focused-run-inject-mate-in-2');
