@@ -6644,6 +6644,8 @@ describe("PracticePocScreen", () => {
     // In a column or rail under 320 points the copy sits above the buttons
     // instead of wrapping to a word per line beside them.
     expect(flattenTestStyle(confirmation.props.style).flexDirection).toBe(stacked ? "column" : "row");
+    // The covered prompt card leaves the accessibility tree while covered.
+    expect(findByTestId(renderer, "practice-prompt-stack").props.accessibilityElementsHidden).toBe(true);
     expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
     expect(findByTestId(renderer, "session-abandon-confirm")).toBeTruthy();
 
@@ -6651,6 +6653,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-abandon-confirmation")).toThrow();
     expect(flattenTestStyle(findByTestId(renderer, "active-session-shell").props.style).zIndex)
       .toBeUndefined();
+    expect(findByTestId(renderer, "practice-prompt-stack").props.accessibilityElementsHidden).toBe(false);
   });
 
   it("keeps Home in two columns inside the maintained phone landscape Safe Area", () => {

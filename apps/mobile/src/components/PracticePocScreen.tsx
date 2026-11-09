@@ -5116,6 +5116,9 @@ export function PracticePocScreen({
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
     <View
+      // The leave confirmation covers this card while it is open.
+      accessibilityElementsHidden={practiceExitConfirmationVisible}
+      importantForAccessibility={practiceExitConfirmationVisible ? "no-hide-descendants" : "auto"}
       style={[
         styles.practicePromptStack,
         { width: adaptiveLayout.sessionColumnWidth }
@@ -18808,9 +18811,9 @@ const useStyles = makeStyles((theme) => ({
     position: "absolute",
     right: 0,
     shadowColor: theme.colors.shadow,
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: theme.name === "dark" ? 0.5 : 0.16,
-    shadowRadius: 14,
+    shadowOffset: { height: 3, width: 0 },
+    shadowOpacity: theme.name === "dark" ? 0.4 : 0.14,
+    shadowRadius: 8,
     top: "100%",
     zIndex: 12
   },
