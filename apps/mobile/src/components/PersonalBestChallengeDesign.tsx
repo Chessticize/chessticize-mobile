@@ -3,15 +3,13 @@ import {
   Animated,
   Easing,
   Pressable,
-  Text,
   useWindowDimensions,
   View
 } from "react-native";
 import { makeStyles } from "../theme/index.ts";
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
-import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
-import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
+import { formatActiveTime } from "./survivalResultPresentation.ts";
 import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, useListRowStyle } from "./ui/index.tsx";
 import { useTheme } from "../theme/ThemeProvider.ts";
 
@@ -502,7 +500,7 @@ export function PersonalBestChallengeHub({
                       {run.score} solved · {run.mistakeCount} of 3 mistakes · {run.phaseLabel ?? "Puzzle saved"}
                     </AppText>
                     <AppText tone="secondary" variant="footnote">
-                      {formatElapsed(run.activeElapsedMs)} active · {run.sittings} sittings · {run.lastTouchedLabel}
+                      {formatActiveTime(run.activeElapsedMs)} active · {run.sittings} sittings · {run.lastTouchedLabel}
                     </AppText>
                   </View>
                   <Button
@@ -880,169 +878,6 @@ export function PersonalBestProgressBanner({
   );
 }
 
-export function PersonalBestResult({
-  activeElapsedMs,
-  band,
-  bestStreak,
-  challengeType,
-  endReason = "max_mistakes",
-  isNewBest,
-  mistakeCount,
-  onDone,
-  onReplayMistakes,
-  onTryAgain,
-  previousBestScore,
-  score,
-  sittings
-}: {
-  activeElapsedMs: number;
-  band: PersonalBestRatingBandPresentation;
-  bestStreak: number;
-  challengeType: PersonalBestChallengeType;
-  endReason?: "max_mistakes" | "pool_cleared";
-  isNewBest: boolean;
-  mistakeCount: number;
-  onDone: () => void;
-  onReplayMistakes?: () => void;
-  onTryAgain: () => void;
-  previousBestScore: number | null;
-  score: number;
-  sittings: number;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const attemptCount = score + mistakeCount;
-  const accuracy = Math.round((score / Math.max(1, attemptCount)) * 100);
-  const isPerfectClear = endReason === "pool_cleared";
-  const resultTitle = isPerfectClear
-    ? `Perfect clear at ${levelLabel(band)}`
-    : isNewBest
-      ? `New best at ${levelLabel(band)}`
-      : "Run complete";
-  const comparison = previousBestScore === null
-    ? "First score at this level"
-    : isNewBest
-      ? `Previous best ${previousBestScore}`
-      : `${Math.max(0, previousBestScore - score)} short of best ${previousBestScore}`;
-  return (
-    <View style={styles.resultPanel} testID="personal-best-result">
-      <View style={styles.resultTopBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to Practice"
-          style={styles.resultDoneButton}
-          testID="personal-best-result-back"
-          onPress={onDone}
-        >
-          <Text style={styles.recordsBackText}>‹</Text>
-        </Pressable>
-        <Text style={styles.resultTopBarTitle}>{challengeTypeLabel(challengeType)} Result</Text>
-        <View style={styles.resultDoneButton} />
-      </View>
-
-      <View
-        style={[styles.resultHero, isNewBest ? styles.resultHeroBest : null]}
-        testID="personal-best-result-hero"
-      >
-        <View
-          style={[styles.resultBadge, isNewBest ? styles.resultBadgeBest : null]}
-          testID="personal-best-result-badge"
-        >
-          {isNewBest ? (
-            <ResultTrophyGlyph size={14} testID="personal-best-result-trophy" />
-          ) : null}
-          <Text
-            style={[styles.resultBadgeText, isNewBest ? styles.resultBadgeTextBest : null]}
-            testID="personal-best-result-badge-text"
-          >
-            {isPerfectClear ? "PERFECT CLEAR" : isNewBest ? "NEW BEST" : "COMPLETE"}
-          </Text>
-        </View>
-        <Text style={styles.resultTitle}>{resultTitle}</Text>
-        <View style={styles.resultScoreRow}>
-          <Text
-            style={[styles.resultScore, isNewBest ? styles.resultScoreBest : null]}
-            testID="personal-best-result-score"
-          >
-            {isPerfectClear ? score.toLocaleString("en-US") : score}
-          </Text>
-          <Text style={styles.resultScoreLabel}>solved</Text>
-        </View>
-        <Text
-          style={[styles.resultComparison, isNewBest ? styles.resultComparisonBest : null]}
-          testID="personal-best-result-comparison"
-        >
-          {comparison}
-        </Text>
-        <Text style={styles.resultEndReason}>
-          {isPerfectClear ? `All ${score.toLocaleString("en-US")}` : score} solved · {formatElapsed(activeElapsedMs)} active · {sittings} sittings
-        </Text>
-        {isPerfectClear ? (
-          <>
-            <Text style={styles.resultEndReason}>
-              You cleared every available {challengeTypeLabel(challengeType)} in this level.
-            </Text>
-            <Text style={styles.resultEndReason}>Loading and selection errors never count as a clear.</Text>
-          </>
-        ) : (
-          <Text style={styles.resultEndReason}>The Run ended normally after {mistakeCount} mistakes.</Text>
-        )}
-      </View>
-
-      <View style={styles.resultBandCard}>
-        <View>
-          <Text style={styles.resultBandTitle}>{challengeTypeLabel(challengeType)} · {levelLabel(band)}</Text>
-          <Text style={styles.resultBandDetail}>This level keeps its own best</Text>
-        </View>
-      </View>
-
-      <View style={styles.resultMetrics}>
-        <ResultMetric label="Accuracy" value={`${accuracy}%`} />
-        <ResultMetric label="Active time" value={formatElapsed(activeElapsedMs)} />
-        <ResultMetric label="Best streak" value={String(bestStreak)} />
-      </View>
-
-      <ResultReviewImpactCard
-        count={mistakeCount}
-        countTestID="personal-best-result-review-count"
-        detail={`${mistakeCount} mistakes · Included in replay`}
-        detailTestID="personal-best-result-review-detail"
-        style={styles.resultReviewCard}
-        testID="personal-best-result-review"
-      />
-
-      {onReplayMistakes ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Replay ${mistakeCount} mistakes`}
-          style={styles.resultPrimaryAction}
-          testID="personal-best-result-replay"
-          onPress={onReplayMistakes}
-        >
-          <Text style={styles.primaryActionText}>Replay {mistakeCount} mistakes</Text>
-        </Pressable>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Play the same Survival Run again"
-        style={styles.resultSecondaryAction}
-        testID="personal-best-result-try-again"
-        onPress={onTryAgain}
-      >
-        <Text style={styles.secondaryActionText}>Play again</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Done"
-        style={styles.resultSecondaryAction}
-        testID="personal-best-result-done"
-        onPress={onDone}
-      >
-        <Text style={styles.secondaryActionText}>Done</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 export function PersonalBestRecordsScreen({
   onBack,
   presentation
@@ -1279,26 +1114,6 @@ function SurvivalDisclosureChevron({
   );
 }
 
-function ResultMetric({ label, value }: { label: string; value: string }): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.resultMetric}>
-      <Text style={styles.resultMetricValue}>{value}</Text>
-      <Text style={styles.resultMetricLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function formatElapsed(elapsedMs: number): string {
-  const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor(seconds / 60);
-  if (hours > 0) {
-    return `${hours}:${String(minutes % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
 function challengeTypeLabel(challengeType: PersonalBestChallengeType): string {
   return challengeType === "arrow_duel" ? "Arrow Duel" : "Puzzle";
 }
@@ -1500,11 +1315,6 @@ const useStyles = makeStyles((theme) => ({
   pressedText: {
     opacity: 0.6
   },
-  primaryActionText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 14,
-    fontWeight: "800"
-  },
   progressBanner: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shape.control,
@@ -1568,12 +1378,6 @@ const useStyles = makeStyles((theme) => ({
   recordPreviousBest: {
     flexShrink: 1
   },
-  recordsBackText: {
-    color: theme.colors.text.strong,
-    fontSize: 34,
-    fontWeight: "300",
-    lineHeight: 36
-  },
   // Fill the container (not the window) up to 680 pt so Split View and
   // other insets never clip the page.
   recordsScreen: {
@@ -1581,176 +1385,6 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.section,
     maxWidth: 680,
     width: "100%"
-  },
-  resultBadge: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: 999,
-    flexDirection: "row",
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 5
-  },
-  resultBadgeBest: {
-    backgroundColor: theme.colors.accent.s100
-  },
-  resultBadgeText: {
-    color: theme.colors.text.secondary,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.8
-  },
-  resultBadgeTextBest: {
-    color: theme.colors.accent.s700
-  },
-  resultBandCard: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 14,
-    padding: 13
-  },
-  resultBandDetail: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 3
-  },
-  resultBandTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "800"
-  },
-  resultComparison: {
-    color: theme.colors.text.tertiary,
-    fontSize: 14,
-    fontWeight: "800",
-    marginTop: 4
-  },
-  resultComparisonBest: {
-    color: theme.colors.accent.s700
-  },
-  resultDoneButton: {
-    alignItems: "flex-start",
-    justifyContent: "center",
-    minHeight: 44,
-    minWidth: 52
-  },
-  resultEndReason: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 8
-  },
-  resultHero: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 18,
-    borderWidth: 1,
-    marginTop: 8,
-    padding: 20
-  },
-  resultHeroBest: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300
-  },
-  resultMetric: {
-    alignItems: "center",
-    flex: 1,
-    gap: 3
-  },
-  resultMetricLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  resultMetricValue: {
-    color: theme.colors.text.primary,
-    fontSize: 20,
-    fontWeight: "900"
-  },
-  resultMetrics: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    marginTop: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 14
-  },
-  resultPanel: {
-    alignSelf: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 20,
-    borderWidth: 1,
-    maxWidth: 620,
-    padding: 16,
-    width: "100%"
-  },
-  resultPrimaryAction: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 12,
-    justifyContent: "center",
-    marginTop: 14,
-    minHeight: 48,
-    padding: 13
-  },
-  resultReviewCard: {
-    marginTop: 12
-  },
-  resultScore: {
-    color: theme.colors.text.primary,
-    fontSize: 54,
-    fontWeight: "900",
-    letterSpacing: -1.8
-  },
-  resultScoreBest: {
-    color: theme.colors.accent.s700
-  },
-  resultScoreLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: 17,
-    fontWeight: "800",
-    marginBottom: 9
-  },
-  resultScoreRow: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: 8
-  },
-  resultSecondaryAction: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    marginTop: 8,
-    minHeight: 46,
-    padding: 12
-  },
-  resultTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 23,
-    fontWeight: "900",
-    marginTop: 10
-  },
-  resultTopBar: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  resultTopBarTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 14,
-    fontWeight: "800"
   },
   rowCopy: {
     flex: 1,
@@ -1769,11 +1403,6 @@ const useStyles = makeStyles((theme) => ({
   },
   ruleMarkerText: {
     fontWeight: theme.typography.headline.fontWeight
-  },
-  secondaryActionText: {
-    color: theme.colors.accent.s700,
-    fontSize: 14,
-    fontWeight: "800"
   },
   sectionTitle: {
     paddingHorizontal: 4

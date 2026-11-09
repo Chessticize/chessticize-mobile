@@ -291,13 +291,14 @@ import {
   PersonalBestGuide,
   PersonalBestHomeCard,
   PersonalBestProgressBanner,
-  PersonalBestResult,
   type PersonalBestChallengeDesignPreview,
   type PersonalBestChallengeSelection,
   type PersonalBestPausedRunPresentation
 } from "./PersonalBestChallengeDesign.tsx";
 import { SprintResultScreen } from "./SprintResultScreen.tsx";
 import { sprintResultDataFromSession } from "./sprintResultPresentation.ts";
+import { SurvivalResultScreen } from "./SurvivalResultScreen.tsx";
+import { survivalResultDataFromSession } from "./survivalResultPresentation.ts";
 import { SessionMistakeIndicator } from "./SessionMistakeIndicator.tsx";
 import {
   buildSurvivalChallengePresentation,
@@ -1180,18 +1181,18 @@ export function PracticePocScreen({
     refreshKey: aggregateRevision
   });
 
-  // Sprint Result (#609) replaces the Practice tab content as a full-screen
-  // destination; the Survival result keeps its in-tab layout.
+  // The Sprint Result and its Survival sibling (#609) replace the Practice tab
+  // content as a full-screen destination.
   const sprintResultVisible = tab === "practice"
     && state !== null
     && state.status !== "active"
     && state.status !== "paused"
-    && feedbackSnapshot === null
-    && !(
-      (state.config.survival !== undefined
-        || personalBestChallengeDesignPreview?.showActivePresentation === true)
-      && personalBestPresentation?.result
-    );
+    && feedbackSnapshot === null;
+  const survivalResult = sprintResultVisible
+    && (state.config.survival !== undefined
+      || personalBestChallengeDesignPreview?.showActivePresentation === true)
+    ? personalBestPresentation?.result
+    : undefined;
 
   // Top-level navigation (#612). Global navigation is hidden whenever a focused
   // surface owns the screen (an open Run, its feedback snapshot, guides,
@@ -5341,7 +5342,25 @@ export function PracticePocScreen({
           />
         ) : null}
         <View style={styles.appContentShell}>
-          {sprintResultVisible && state ? (
+          {sprintResultVisible && state && survivalResult && personalBestPresentation ? (
+            <SurvivalResultScreen
+              data={survivalResultDataFromSession({
+                state,
+                challengeType: personalBestPresentation.challengeType ?? "puzzle",
+                level: personalBestPresentation.band,
+                result: survivalResult
+              })}
+              notice={errorNode}
+              paddingInsets={{ bottom: 0, left: 0, right: 0, top: 0 }}
+              onBack={resetToIdle}
+              onDone={resetToIdle}
+              onPlayAgain={() => {
+                resetToIdle();
+                startPersonalBestChallenge();
+              }}
+              onReplayMistakes={sprintReplayItems.length > 0 ? () => showSessionReplay() : undefined}
+            />
+          ) : sprintResultVisible && state ? (
             <SprintResultScreen
               data={sprintResultDataFromSession({
                 state,
@@ -5767,31 +5786,6 @@ export function PracticePocScreen({
                     ratingForKey={(key) => service.getRating(key).rating}
                     onStart={() => startSprint(customSprintMode, true)}
                   />
-                ) : null}
-
-                {isFinished && !isShowingFeedbackSnapshot ? (
-                  isSurvivalState && personalBestPresentation?.result ? (
-                    <PersonalBestResult
-                      activeElapsedMs={personalBestPresentation.result.activeElapsedMs}
-                      band={personalBestPresentation.band}
-                      bestStreak={state.bestStreak}
-                      challengeType={personalBestPresentation.challengeType ?? "puzzle"}
-                      endReason={personalBestPresentation.result.endReason}
-                      isNewBest={personalBestPresentation.result.isNewBest}
-                      mistakeCount={state.mistakeCount}
-                      previousBestScore={personalBestPresentation.result.previousBestScore}
-                      score={state.correctCount}
-                      sittings={personalBestPresentation.result.sittings}
-                      onDone={resetToIdle}
-                      onReplayMistakes={sprintReplayItems.length > 0
-                        ? () => showSessionReplay()
-                        : undefined}
-                      onTryAgain={() => {
-                        resetToIdle();
-                        startPersonalBestChallenge();
-                      }}
-                    />
-                  ) : null
                 ) : null}
 
                 {!isSessionGuideVisible

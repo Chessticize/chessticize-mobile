@@ -19,10 +19,7 @@ import {
   PRACTICE_UI_PADDING,
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
-import {
-  PersonalBestProgressBanner,
-  PersonalBestResult
-} from "../src/components/PersonalBestChallengeDesign";
+import { PersonalBestProgressBanner } from "../src/components/PersonalBestChallengeDesign";
 import {
   ARROW_DUEL_REPLY_LAB_MOVES,
   LabScenario,
@@ -9314,7 +9311,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-personal-best-pool-cleared");
 
     expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("88,894");
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+    expect(findByTestId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe(
       "Perfect clear at 2100–2200"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
@@ -9323,104 +9320,103 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
       "Loading and selection errors never count as a clear."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "51:12:00 active"
+    expect(collectText(findByTestId(renderer, "personal-best-result-active-time"))).toBe(
+      "Active time51:12:00"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "All 88,894 solved"
+    expect(collectText(findByTestId(renderer, "personal-best-result-sittings"))).toBe("Sittings84");
+    expect(collectText(findByTestId(renderer, "personal-best-result-summary"))).toBe(
+      "88,894 attempted · 100% accuracy"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).not.toContain(
       "ended normally after"
     );
+    // No mistakes: nothing in Review and nothing to replay.
+    expect(() => findByTestId(renderer, "personal-best-result-review")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-result-replay")).toThrow();
   });
 
   it("treats the third Survival mistake as a normal result and preserves the record context", () => {
     const renderer = renderLabScenario("practice-personal-best-result");
 
-    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-hero").props.style))
-      .toMatchObject({ backgroundColor: lightTheme.colors.accent.s50, borderColor: lightTheme.colors.accent.s300 });
-    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-badge").props.style))
+    // Direction A full-screen result (#609), like the Sprint Result: no
+    // Practice title or tab bar while it shows.
+    expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
+    expect(() => findByTestId(renderer, "practice-main-scroll")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-result-title"))).toBe("Puzzle Result");
+    // A new best uses the product blue with the shared trophy.
+    expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-badge").props.style))
       .toMatchObject({ backgroundColor: lightTheme.colors.accent.s100 });
-    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-badge-text").props.style))
-      .toMatchObject({ color: lightTheme.colors.accent.s700 });
-    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-score").props.style))
-      .toMatchObject({ color: lightTheme.colors.accent.s700 });
-    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-comparison").props.style))
-      .toMatchObject({ color: lightTheme.colors.accent.s700 });
+    expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-score").props.style))
+      .toMatchObject({ color: lightTheme.colors.accent.s600 });
+    expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-comparison").props.style))
+      .toMatchObject({ color: lightTheme.colors.accent.s600 });
     expect(findByTestId(renderer, "personal-best-result-trophy")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "personal-best-result-trophy"))).toBe("");
+    expect(findByTestId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe(
+      "New best at 900–999"
+    );
     expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("19");
     expect(collectText(findByTestId(renderer, "personal-best-result-comparison"))).toBe(
       "Previous best 18"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "The Run ended normally after 3 mistakes."
+    expect(() => findByTestId(renderer, "personal-best-result-progress")).toThrow();
+    // A third-mistake ending needs no end-reason line, and the level row no detail.
+    expect(() => findByTestId(renderer, "personal-best-result-end-reason")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-result-level")).replace(/\u2060/g, "").replace(/\u00A0/g, " ")).toBe(
+      "Puzzle · 900–999"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "This level keeps its own best"
+    expect(collectText(findByTestId(renderer, "personal-best-result-summary"))).toBe(
+      "22 attempted · 86% accuracy"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "19 solved · 12:48 active · 3 sittings"
-    );
+    expect(collectText(findByTestId(renderer, "personal-best-result-sittings"))).toBe("Sittings3");
     expect(collectText(findByTestId(renderer, "personal-best-result-replay"))).toBe(
       "Replay 3 mistakes"
     );
     expect(findByTestId(renderer, "personal-best-result-back").props.accessibilityLabel).toBe(
       "Back to Practice"
     );
+    expect(collectText(findByTestId(renderer, "personal-best-result-try-again"))).toBe("Play again");
     expect(collectText(findByTestId(renderer, "personal-best-result-done"))).toBe("Done");
     expect(() => findByTestId(renderer, "personal-best-result-change-challenge")).toThrow();
-    expect(collectText(findByTestId(renderer, "personal-best-result-review-detail"))).toBe(
-      "3 mistakes · Included in replay"
+    expect(findByTestId(renderer, "personal-best-result-review").props.accessibilityLabel).toBe(
+      "In Review, 3 mistakes"
     );
-    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-review-count").props.style))
-      .toMatchObject({ color: lightTheme.colors.danger.s800 });
+    // The In Review row stays neutral; only its count is red.
+    expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-review-count").props.style))
+      .toMatchObject({ color: lightTheme.colors.danger.s600 });
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
 
     press(renderer, "personal-best-result-done");
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-result")).toThrow();
 
     const backRenderer = renderLabScenario("practice-personal-best-result");
     press(backRenderer, "personal-best-result-back");
     expect(findByTestId(backRenderer, "personal-best-home-card")).toBeTruthy();
   });
 
-  it("keeps a Survival result neutral when it does not set a new best", () => {
-    let renderer: TestRenderer.ReactTestRenderer | undefined;
-    act(() => {
-      renderer = TestRenderer.create(
-        <PersonalBestResult
-          activeElapsedMs={94_000}
-          band={{ currentRating: 742, minRating: 700, maxRating: 799 }}
-          bestStreak={4}
-          challengeType="puzzle"
-          isNewBest={false}
-          mistakeCount={3}
-          previousBestScore={8}
-          score={6}
-          sittings={1}
-          onDone={jest.fn()}
-          onTryAgain={jest.fn()}
-        />
-      );
-    });
-    if (!renderer) {
-      throw new Error("Neutral Survival result did not render");
-    }
-    const neutralRenderer = renderer;
-    renderers.push(neutralRenderer);
+  it("opens Replay from the Survival result's Replay mistakes action", () => {
+    const renderer = renderLabScenario("practice-personal-best-result");
 
-    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-hero").props.style))
-      .toMatchObject({ backgroundColor: "#FFFFFF", borderColor: lightTheme.colors.border.default });
-    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-badge").props.style))
+    press(renderer, "personal-best-result-replay");
+
+    expect(() => findByTestId(renderer, "personal-best-result")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+  });
+
+  it("shows a Survival result that misses the best neutral, with the way to the best", () => {
+    const renderer = renderLabScenario("practice-personal-best-result-no-best");
+
+    expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
+    expect(findByTestId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe("Run complete");
+    expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-badge").props.style))
       .toMatchObject({ backgroundColor: lightTheme.colors.surfaceStrong });
-    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-badge-text").props.style))
-      .toMatchObject({ color: lightTheme.colors.text.secondary });
-    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-score").props.style))
+    expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-score").props.style))
       .toMatchObject({ color: lightTheme.colors.text.primary });
-    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-comparison").props.style))
-      .toMatchObject({ color: lightTheme.colors.text.tertiary });
-    expect(() => findByTestId(neutralRenderer, "personal-best-result-trophy")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-result-trophy")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("14");
+    expect(collectText(findByTestId(renderer, "personal-best-result-comparison"))).toBe("5 short of best 19");
+    expect(findByTestId(renderer, "personal-best-result-progress")).toBeTruthy();
   });
 
   it("shows a truthful and grammatical empty Survival records state", () => {

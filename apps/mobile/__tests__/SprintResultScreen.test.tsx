@@ -234,6 +234,9 @@ describe("Sprint Result screen", () => {
 
     const ipad = renderResult(data(), { width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 } }).renderer;
     expect(has(ipad, "sprint-result-split")).toBe(false);
+    // The top bar clears the iPad status bar in landscape, where iOS reports no top inset.
+    const ipadTopBar = ipad.root.findAll((node) => node.props.testID === "sprint-result-top-bar" && typeof node.type === "string")[0];
+    expect(flattenTestStyle(ipadTopBar?.props.style)).toMatchObject({ paddingTop: 32 });
     // Three columns on a phone and iPad.
     expect(flattenTestStyle(byId(portrait, "sprint-result-time").props.style)).toMatchObject({ flex: 1 });
     expect(flattenTestStyle(byId(ipad, "sprint-result-time").props.style)).toMatchObject({ flex: 1 });

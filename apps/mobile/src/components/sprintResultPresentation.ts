@@ -12,6 +12,7 @@ import {
   type SprintResultSummary,
   type SprintState
 } from "../../../../packages/core/src/index.ts";
+import type { ResultStat } from "./resultStat.ts";
 
 /** "ended": the puzzle supply ran out before the Sprint could pass or fail. */
 export type SprintResultOutcome = "passed" | "failed" | "abandoned" | "ended" | "completed";
@@ -52,15 +53,8 @@ export type SprintResultData = {
   unclearPrompt?: { question: string; marked: boolean };
 };
 
-export type StatColumn = {
+export type StatColumn = ResultStat & {
   key: "rating" | "time" | "streak" | "pace";
-  label: string;
-  value: string;
-  valueTone: "primary" | "positive" | "negative";
-  detail?: string;
-  /** A word rather than a number (Unrated), drawn smaller so it fits one line. */
-  valueIsWord?: boolean;
-  accessibilityLabel: string;
 };
 
 export type SprintResultPresentation = {
