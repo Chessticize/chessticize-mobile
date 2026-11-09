@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { posix } from "node:path";
 import test from "node:test";
 
 const storyUrl = new URL(
@@ -16,6 +16,7 @@ const bundledPackUrl = new URL(
   import.meta.url
 );
 const repositoryRoot = new URL("../", import.meta.url);
+const componentsRoot = "apps/mobile/src/components/";
 
 async function readJson(url) {
   return JSON.parse(await readFile(url, "utf8"));
@@ -214,30 +215,48 @@ test("story source identity and claim evidence match version-controlled files", 
   }
 
   for (const frame of story.frames) {
-    const componentSource = await readFile(
-      new URL(frame.source.component, repositoryRoot),
-      "utf8"
-    );
+    // The screen renders test IDs from the component modules it imports, so
+    // search the component and every component module it reaches.
+    const componentTree = await readComponentTree(frame.source.component);
+    const treeSource = [...componentTree.values()].join("\n");
     for (const testId of frame.source.requiredVisibleTestIds) {
       const testIdSource = frame.source.requiredVisibleTestIdSources?.[testId];
+      if (testIdSource) {
+        assert.ok(
+          componentTree.has(testIdSource),
+          `Expected ${frame.source.component} to render ${testIdSource}`
+        );
+      }
       const visibleSource = testIdSource
-        ? await readFile(new URL(testIdSource, repositoryRoot), "utf8")
-        : componentSource;
+        ? componentTree.get(testIdSource)
+        : treeSource;
       const literalTestId = new RegExp(`testID=["']${testId}["']`);
       const dynamicHistoryAttemptId = testId.startsWith("history-attempt-")
         && visibleSource.includes(
           "testID={`history-attempt-${attempt.id}`}"
         );
-      if (testIdSource) {
-        assert.ok(
-          componentSource.includes(basename(testIdSource)),
-          `Expected ${frame.source.component} to reference ${testIdSource}`
-        );
-      }
       assert.ok(
         literalTestId.test(visibleSource) || dynamicHistoryAttemptId,
-        `Expected ${testId} in ${testIdSource ?? frame.source.component}`
+        `Expected ${testId} in ${testIdSource ?? `${frame.source.component} or the components it imports`}`
       );
     }
   }
 });
+
+// Reads a component and, transitively, the modules it imports from the
+// components directory. Keys are repository-relative paths.
+async function readComponentTree(entry) {
+  const tree = new Map();
+  const pending = [entry];
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (tree.has(file)) continue;
+    const source = await readFile(new URL(file, repositoryRoot), "utf8");
+    tree.set(file, source);
+    for (const match of source.matchAll(/from\s+["'](\.{1,2}\/[^"']+\.tsx?)["']/g)) {
+      const imported = posix.join(posix.dirname(file), match[1]);
+      if (imported.startsWith(componentsRoot)) pending.push(imported);
+    }
+  }
+  return tree;
+}
