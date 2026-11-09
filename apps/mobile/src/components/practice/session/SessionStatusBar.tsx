@@ -471,10 +471,10 @@ export function SessionStatusBar({
               stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
             ]}
           >
-            <Text style={styles.listText}>
+            <Text style={styles.listText} testID="session-abandon-title">
               {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
             </Text>
-            <Text style={styles.helperText}>
+            <Text style={styles.helperText} testID="session-abandon-description">
               {isTacticalFocus
                 ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
                 : "This ends the Sprint and records it as abandoned."}
@@ -790,7 +790,9 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center"
   },
   sessionAbandonCopyStacked: {
-    flex: 0
+    flex: 0,
+    flexBasis: "auto",
+    flexShrink: 0
   },
   sessionAbandonActionsStacked: {
     justifyContent: "flex-end"

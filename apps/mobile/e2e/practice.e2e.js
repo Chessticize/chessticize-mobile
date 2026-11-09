@@ -152,7 +152,7 @@ describe('Practice POC', () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
     await element(by.id('session-pause')).tap();
-    await waitFor(element(by.id('paused-session-panel'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('paused-session-panel', 100);
     await device.takeScreenshot('paused-before-abandon');
 
     await element(by.id('paused-session-abandon')).tap();
@@ -167,7 +167,7 @@ describe('Practice POC', () => {
     await device.takeScreenshot('paused-abandon-confirmation');
 
     await element(by.id('session-abandon-cancel')).tap();
-    await waitFor(element(by.id('paused-session-panel'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('paused-session-panel', 100);
     await device.takeScreenshot('paused-after-cancel');
     await element(by.id('paused-session-resume')).tap();
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);

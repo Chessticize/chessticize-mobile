@@ -1186,6 +1186,10 @@ export const ExitConfirmation: Story = {
     await clickTestId(canvasElement, "paused-session-abandon");
     await waitForTestId(canvasElement, "session-abandon-confirmation");
     expectTestIdAbsent(canvasElement, "paused-session-panel");
+    for (const copy of ["session-abandon-title", "session-abandon-description"]) {
+      await expectTestIdsNotOverlapping(canvasElement, copy, "session-abandon-cancel");
+      await expectTestIdsNotOverlapping(canvasElement, copy, "session-abandon-confirm");
+    }
   }
 };
 
