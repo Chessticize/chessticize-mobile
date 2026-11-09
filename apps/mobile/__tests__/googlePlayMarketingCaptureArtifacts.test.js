@@ -628,6 +628,7 @@ describe('Google Play marketing capture artifacts', () => {
       },
     });
     expect(manifest.storyId).toBeUndefined();
+    expect(manifest.sourceBuild.kind).toBe('integrated-main-preparation');
     expect(manifest.frames[0].copyKey).toBeUndefined();
     expect(manifest.frames[1]).toMatchObject({
       captureId: 'dark-arrow-duel',

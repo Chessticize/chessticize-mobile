@@ -41,6 +41,28 @@ const ROOT_CLIPPED_SCROLL_CONTAINERS = new Set([
   'practice-run-editor',
   'settings-about-section',
 ]);
+const CAMPAIGN_SCROLL_SURFACES = new Set([
+  'practice-home',
+  'tactical-profile-screen',
+  'focused-run-preview',
+  'personal-best-hub',
+]);
+const CAMPAIGN_CAPTURE_CONTROLS = {
+  'practice-home': ['practice-run-start', 'training-focus-card'],
+  'dark-arrow-duel': ['session-board', 'session-progress', 'arrow-duel-reply-challenge'],
+  'tactical-profile': [
+    'tactical-profile-active-mode',
+    'tactical-profile-recommendations',
+    'tactical-profile-early-estimate',
+  ],
+  'focused-run': [
+    'focused-run-rating-anchor',
+    'focused-run-allocation-bar',
+    'tactical-profile-early-estimate',
+  ],
+  survival: ['personal-best-type-selector', 'personal-best-hub-start'],
+  review: ['review-due-card', 'review-start-due', 'review-forecast'],
+};
 const capturePlatform =
   process.env.CHESSTICIZE_MARKETING_PLATFORM ?? 'app-store';
 const isGooglePlayCapture = capturePlatform === 'google-play';
@@ -548,27 +570,38 @@ function isWideTabletTarget() {
 async function assertRequiredFrameGeometry(frame) {
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   assertPositiveFrame(screenFrame, `${frame.id} app root`);
-
+  const requiredTestIDs = frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? [];
+  const captureControlTestIDs = [
+    ...new Set([
+      ...(story.campaign ? CAMPAIGN_CAPTURE_CONTROLS[frame.id] ?? [] : []),
+      ...requiredTestIDs.filter((testID) => !CAMPAIGN_SCROLL_SURFACES.has(testID)),
+    ])
+  ];
   const requiredFrames = [];
-  for (const testID of frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []) {
+  for (const testID of requiredTestIDs) {
     const requiredElement = element(by.id(testID));
     await waitFor(requiredElement).toExist().withTimeout(10000);
     const requiredFrame = await frameFor(requiredElement);
     assertPositiveFrame(requiredFrame, `${frame.id} ${testID}`);
-    if (ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)) {
-      assertFramesIntersect(
-        requiredFrame,
-        screenFrame,
-        `${frame.id} ${testID}`
-      );
+    if (ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID) || CAMPAIGN_SCROLL_SURFACES.has(testID)) {
+      // Owner-approved iPad underlap lets the scroll surface extend behind the
+      // native tab bar. Its capture controls are checked separately below.
+      assertFramesIntersect(requiredFrame, screenFrame, `${frame.id} ${testID}`);
     } else {
-      expectFrameContained(
-        requiredFrame,
-        screenFrame,
-        `${frame.id} ${testID}`
-      );
+      expectFrameContained(requiredFrame, screenFrame, `${frame.id} ${testID}`);
     }
     requiredFrames.push({testID, frame: requiredFrame});
+  }
+
+  for (const testID of captureControlTestIDs) {
+    const control = element(by.id(testID));
+    await waitFor(control).toBeVisible().withTimeout(10000);
+    const controlFrame = await frameFor(control);
+    assertPositiveFrame(controlFrame, `${frame.id} ${testID}`);
+    expectFrameContained(controlFrame, screenFrame, `${frame.id} ${testID}`);
+    if (!requiredFrames.some((required) => required.testID === testID)) {
+      requiredFrames.push({testID, frame: controlFrame});
+    }
   }
 
   if (!isWideTabletTarget() || [
@@ -580,19 +613,26 @@ async function assertRequiredFrameGeometry(frame) {
   }
 
   if (device.getPlatform() !== 'android') {
-    // iPad: the scrolling content viewport starts below the native top tab
-    // bar (#612). Sections inside it may be scrolled up under its clipped top
-    // edge, so the viewport, not each section, is checked.
+    // Owner requested the iPad scroll viewport underlap the floating native
+    // tab bar. The viewport must reach the window top, while this capture's
+    // actionable controls remain clear of the bar and fully in-frame above.
     const tabFrame = await frameFor(topLevelTab('practice-tab'));
     assertPositiveFrame(tabFrame, `${frame.id} top tab bar item`);
     const tabBarBottom = tabFrame.y + tabFrame.height;
     const contentFrame = await frameFor(element(by.id('practice-main-scroll')));
-    if (contentFrame.y < tabBarBottom - 1) {
+    if (contentFrame.y > screenFrame.y + 1) {
       throw new Error(
-        `${frame.id} content viewport overlaps the top tab bar: `
-        + `content=${JSON.stringify(contentFrame)}, `
-        + `tab=${JSON.stringify(tabFrame)}`
+        `${frame.id} content viewport must reach the window top for native-tab underlap: `
+        + `content=${JSON.stringify(contentFrame)}, app=${JSON.stringify(screenFrame)}`
       );
+    }
+    for (const required of requiredFrames) {
+      if (captureControlTestIDs.includes(required.testID) && required.frame.y < tabBarBottom - 1) {
+        throw new Error(
+          `${frame.id} ${required.testID} is obscured by the native top tab bar: `
+          + `control=${JSON.stringify(required.frame)}, tab=${JSON.stringify(tabFrame)}`
+        );
+      }
     }
     return;
   }
@@ -600,11 +640,10 @@ async function assertRequiredFrameGeometry(frame) {
   assertPositiveFrame(navigationFrame, `${frame.id} navigation rail`);
   const navigationRight = navigationFrame.x + navigationFrame.width;
   for (const required of requiredFrames) {
-    if (required.frame.x < navigationRight - 1) {
+    if (captureControlTestIDs.includes(required.testID) && required.frame.x < navigationRight - 1) {
       throw new Error(
         `${frame.id} ${required.testID} overlaps the navigation rail: `
-        + `content=${JSON.stringify(required.frame)}, `
-        + `navigation=${JSON.stringify(navigationFrame)}`
+        + `content=${JSON.stringify(required.frame)}, navigation=${JSON.stringify(navigationFrame)}`
       );
     }
   }

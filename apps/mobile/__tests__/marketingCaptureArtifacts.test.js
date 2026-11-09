@@ -158,6 +158,7 @@ describe('App Store marketing capture artifacts', () => {
       },
     });
     expect(manifest.storyId).toBeUndefined();
+    expect(manifest.sourceBuild.kind).toBe('integrated-main-preparation');
     expect(manifest.frames.map((frame) => frame.captureId)).toEqual([
       'practice-home',
       'dark-arrow-duel',
