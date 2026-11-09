@@ -194,7 +194,7 @@ export function SessionStatusBar({
       });
     };
     const safeBottom = viewportHeight - insets.bottom;
-    const clip = confirmationClipRef?.current;
+    const clip = confirmationClipRef?.current?.getNativeScrollRef() as View | null | undefined;
     if (clip) {
       clip.measureInWindow((_x, y, _width, height) => {
         measureBelowHud(Math.min(safeBottom, y + height));
