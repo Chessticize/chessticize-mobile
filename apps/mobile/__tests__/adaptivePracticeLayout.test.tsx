@@ -370,6 +370,13 @@ describe("buildPracticeAdaptiveLayout", () => {
       expected: { className: "compactPortrait", board: 255, rail: false }
     },
     {
+      label: "iPhone Duo inner landscape active Run",
+      width: 951,
+      height: 669,
+      insets: { top: 0, right: 84, bottom: 34, left: 0 },
+      expected: { className: "regularLandscape", board: 525, rail: true }
+    },
+    {
       label: "iPad Pro 13-inch portrait",
       width: 1032,
       height: 1376,
@@ -397,8 +404,9 @@ describe("buildPracticeAdaptiveLayout", () => {
   // Sizes that cannot yet be measured headlessly (see docs/DEVICE_TARGETS.md):
   // the Duo inner display point size comes from the simulator display profile
   // (2853 x 2007 pixels at 3x); Split View and Stage Manager widths are the
-  // fractions UIKit offers. Each pose is checked with symmetric, one-sided and
-  // no side insets because the inner display's insets are not yet measured.
+  // fractions UIKit offers. Resized poses still need measured insets; exercise
+  // symmetric, one-sided and no side insets in addition to the measured
+  // full-screen inner landscape case above.
   const unmeasuredInsetVariants: Array<[string, PracticeSafeAreaInsets]> = [
     ["no side insets", { top: 24, right: 0, bottom: 20, left: 0 }],
     ["status-bar column on the right", { top: 0, right: 84, bottom: 20, left: 0 }],

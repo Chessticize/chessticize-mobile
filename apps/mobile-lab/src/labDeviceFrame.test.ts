@@ -84,7 +84,7 @@ test("the Duo inner landscape preset centres a height-filling session row", () =
   assert.deepEqual(labSafeAreaMetricsForViewport(951, 669).insets, {
     top: 0,
     right: 84,
-    bottom: 20,
+    bottom: 34,
     left: 0
   });
   const layout = buildPracticeAdaptiveLayout({

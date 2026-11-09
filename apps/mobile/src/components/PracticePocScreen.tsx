@@ -294,6 +294,7 @@ import {
   PuzzleTimingIndicator,
   SessionScoreStrip,
   SessionStatusBar,
+  SessionAbandonConfirmation,
   type SessionTimingState
 } from "./practice/session/SessionStatusBar.tsx";
 import {
@@ -963,6 +964,11 @@ export function PracticePocScreen({
   const [sessionGuideTargetRevision, setSessionGuideTargetRevision] = useState(0);
   const sessionGuideTargetRef = useRef<View>(null);
   const sessionRailScrollRef = useRef<ScrollView>(null);
+  const practiceRootRef = useRef<View>(null);
+  const activeSessionMetricsRef = useRef<View>(null);
+  const [activeAbandonAnchor, setActiveAbandonAnchor] = useState<{
+    left: number; top: number; width: number; maxHeight: number;
+  } | null>(null);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
@@ -1058,6 +1064,27 @@ export function PracticePocScreen({
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
   const isOpenSession = isActive || isPaused;
+  const measureActiveAbandonAnchor = useCallback(() => {
+    if (!isActive) return;
+    practiceRootRef.current?.measureInWindow((rootX, rootY, _rootWidth, rootHeight) => {
+      activeSessionMetricsRef.current?.measureInWindow((x, y, metricsWidth, metricsHeight) => {
+        if (rootHeight <= 0 || metricsWidth <= 0 || metricsHeight <= 0) return;
+        const top = y + metricsHeight + 8 - rootY;
+        const next = {
+          left: x - rootX,
+          top,
+          width: metricsWidth,
+          maxHeight: Math.max(1, Math.floor(rootHeight - layoutInsets.bottom - top))
+        };
+        setActiveAbandonAnchor((current) => current
+          && current.left === next.left && current.top === next.top
+          && current.width === next.width && current.maxHeight === next.maxHeight ? current : next);
+      });
+    });
+  }, [isActive, layoutInsets.bottom]);
+  useEffect(() => {
+    measureActiveAbandonAnchor();
+  }, [fontScale, height, measureActiveAbandonAnchor, practiceExitConfirmationVisible, width]);
   const isFinished = state !== null && !isOpenSession;
   const storedSprintResultSummary = useMemo<SprintResultSummary | undefined>(() => {
     void aggregateRevision;
@@ -4381,7 +4408,8 @@ export function PracticePocScreen({
         ? "Open Survival leave options"
         : "Abandon sprint"}
       compactMetrics={sessionUsesRail}
-      confirmationClipRef={sessionUsesRail ? sessionRailScrollRef : undefined}
+      metricsRef={activeSessionMetricsRef}
+      onMetricsLayout={measureActiveAbandonAnchor}
       // The overlay starts 8 points below the HUD; the prompt card follows the
       // HUD after the 10-point rail or 12-point stack gap. Four extra points
       // cover the card to its bottom edge in either layout.
@@ -5043,6 +5071,9 @@ export function PracticePocScreen({
                     {sessionLayoutUsesRail ? (
                       <ScrollView
                         ref={sessionRailScrollRef}
+                        // The confirmation owns scrolling while open; a gesture
+                        // inside it must not nudge the underlying HUD or counts.
+                        scrollEnabled={!practiceExitConfirmationVisible}
                         style={[
                           styles.activeSessionControlRailScroll,
                           {
@@ -5603,6 +5634,7 @@ export function PracticePocScreen({
         style={styles.predictiveBackStage}
         testID="practice-gesture-root"
       >
+        <View ref={practiceRootRef} onLayout={measureActiveAbandonAnchor} style={styles.predictiveBackStage}>
         {mobileBackPreview ? (
           <View
             accessible={false}
@@ -5642,6 +5674,24 @@ export function PracticePocScreen({
             </>
           ) : null}
         />
+        {practiceExitConfirmationVisible && isActive && state && !personalBestActivePresentation ? (
+          <SessionAbandonConfirmation
+            maxHeight={activeAbandonAnchor?.maxHeight ?? height}
+            minHeight={adaptiveLayout.promptFrameHeight + 4}
+            stack={adaptiveLayout.sessionColumnWidth < 320}
+            state={state}
+            style={[
+              styles.activeAbandonOverlay,
+              activeAbandonAnchor ?? { left: 0, top: 0, width: adaptiveLayout.sessionColumnWidth, opacity: 0 }
+            ]}
+            onCancel={() => setPracticeExitConfirmationVisible(false)}
+            onAbandon={() => {
+              setPracticeExitConfirmationVisible(false);
+              abandonSprint();
+            }}
+          />
+        ) : null}
+        </View>
       </GestureHandlerRootView>
     </UiHapticsProvider>
   );
@@ -6271,6 +6321,11 @@ const useStyles = makeStyles((theme) => ({
     gap: 12,
     justifyContent: "center",
     minWidth: 0
+  },
+  activeAbandonOverlay: {
+    elevation: 50,
+    position: "absolute",
+    zIndex: 50
   },
   activeSessionControlRailScroll: {
     flexGrow: 0,

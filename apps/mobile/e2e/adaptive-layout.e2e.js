@@ -391,29 +391,21 @@ async function expectAbandonConfirmationFloats(orientation) {
   const countsBefore = await frameFor(element(by.id('session-score-strip')));
   await element(by.id('session-abandon')).tap();
   await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
+  console.log(`[adaptive-abandon] opened counts=${JSON.stringify(await frameFor(element(by.id('session-score-strip'))))}`);
   const confirmationFrame = await frameFor(element(by.id('session-abandon-confirmation')));
   expectFrameContained(confirmationFrame, screenFrame, `${deviceLabel} ${orientation} abandon panel`);
-  if (await existsNow('active-session-control-rail')) {
-    expectFrameContained(
-      confirmationFrame,
-      await frameFor(element(by.id('active-session-control-rail'))),
-      `${deviceLabel} ${orientation} abandon panel inside the rail`
-    );
-  }
   await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-abandon-confirmation-top`);
   // At accessibility sizes the copy and actions can exceed the available
   // height. Scroll the panel itself; the underlying board must stay still.
-  const confirmFrame = await frameFor(element(by.id('session-abandon-confirm')));
-  if (confirmFrame.y + confirmFrame.height > confirmationFrame.y + confirmationFrame.height + 1) {
-    await element(by.id('session-abandon-scroll')).scrollTo('bottom', 0.5, 0.5);
-  }
   for (const testID of ['session-abandon-cancel', 'session-abandon-confirm']) {
+    await revealAbandonAction(testID, confirmationFrame);
     expectFrameContained(
       await frameFor(element(by.id(testID))),
-      screenFrame,
-      `${deviceLabel} ${orientation} ${testID}`
+      confirmationFrame,
+      `${deviceLabel} ${orientation} ${testID} inside the panel`
     );
-    await expect(element(by.id(testID))).toBeVisible();
+    await expect(element(by.id(testID))).toBeVisible(100);
+    await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-${testID}-visible`);
   }
   const boardOpen = await frameFor(element(by.id('session-board')));
   const countsOpen = await frameFor(element(by.id('session-score-strip')));
@@ -429,8 +421,20 @@ async function expectAbandonConfirmationFloats(orientation) {
     }
   }
   await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-abandon-confirmation`);
+  await revealAbandonAction('session-abandon-cancel', confirmationFrame);
   await element(by.id('session-abandon-cancel')).tap();
   await waitFor(element(by.id('session-abandon-confirmation'))).not.toExist().withTimeout(10000);
+}
+
+async function revealAbandonAction(testID, panel) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const frame = await frameFor(element(by.id(testID)));
+    const above = frame.y < panel.y - 1;
+    const below = frame.y + frame.height > panel.y + panel.height + 1;
+    if (!above && !below) return;
+    await element(by.id('session-abandon-scroll')).scroll(80, above ? 'up' : 'down', 0.5, 0.5);
+  }
+  throw new Error(`${testID} could not be revealed inside the abandon panel`);
 }
 
 async function existsNow(testID) {

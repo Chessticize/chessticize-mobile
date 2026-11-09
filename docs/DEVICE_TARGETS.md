@@ -71,6 +71,8 @@ Measured with the iOS 27.1 SDK Release app on the iPhone Duo simulator
 | Pose | Window (points) | Safe Area insets (points) | Layout class |
 | --- | --- | --- | --- |
 | Outer display, portrait | 466 × 678 | top 0, left 0, bottom 34, right 84 | compact portrait |
+| Inner display, landscape active Run | 951 × 669 | top 0, left 0, bottom 34, right 84 | regular landscape |
+| Inner display, landscape Home | 951 × 669 | top 0, left 0, bottom 0, right 84 | regular landscape |
 
 The outer display's status bar and camera sit in an 84-point column on the
 right edge, reported as a right Safe Area inset only. The app shell, bottom
@@ -78,23 +80,31 @@ tabs and modal dialogs therefore apply each inset to its own edge instead of
 assuming symmetric insets.
 
 The inner display panel is 2853 × 2007 pixels at 3x (951 × 669 points
-landscape, 669 × 951 points portrait). The simulator could not yet be folded,
-unfolded or placed in Split View headlessly: those controls live in the
-DeviceHub window and `simctl` exposes no fold or posture command. Inner,
-Split View and fold/unfold window sizes and insets therefore remain to be
-measured with DeviceHub. Until then the layout unit tests cover the inner
-panel sizes and the Split View fractions with no, left-only and right-only
-side insets. The Interaction Lab's "iPhone Duo inner landscape" viewport
-(951 × 669, an estimated 84-point right status-bar column) is where the inner
-landscape session is reviewed.
+landscape, 669 × 951 points portrait). Device Hub drives fold/unfold posture;
+`simctl` exposes no posture command. After opening the device in Device Hub,
+`simctl io <UDID> enumerate` identifies the active inner display, captured with
+`--display=primary-1` in this acceptance run. Keep the actual orientation and
+window measurements with each capture rather than treating a rotation request
+as proof of the resulting scene size.
+
+Split View, fold/unfold transitions and inner portrait insets still need the
+owner's Device Hub check. Layout tests cover those window fractions with no,
+left-only and right-only side insets. The Lab's inner-landscape preset uses
+the measured active-Run insets; Home's bottom inset differs as recorded above.
 
 Regular landscape sessions (iPad, Duo inner display) size the board to the
 largest square the Safe Area height and the width beside the rail allow, up to
-640 points, and centre the board and the rail's content block vertically.
+640 points, and centre the board and the rail's core controls vertically.
+A reserved feedback slot below the core keeps its header, prompt, timer and
+score stationary when a previous-attempt notice appears.
 Review, Replay and History replays use the same centred row. Compact layouts
 keep their top-aligned session. The abandon and Survival leave confirmations
 float over the prompt card below the HUD instead of growing the session stack,
 so the board and counts never move into the bottom inset at any width.
+Active Sprint confirmations are anchored below the HUD in the screen-root
+overlay, above native clipping ancestors, and scroll within the safe viewport
+when large text exceeds the available space. Paused Sprint
+confirmations use normal flow because there is no active board to cover.
 
 The full-screen iPhone portrait lock stays. It no longer constrains the inner
 display, which follows the scene size, and lifting it would also rotate every
@@ -158,7 +168,8 @@ Release readiness for this item is covered by:
   stay inside the Safe Area, and
   repeats the session checks after a rotation resize. On iPhone Duo set
   `CHESSTICIZE_ADAPTIVE_IOS_SCREENSHOT_DISPLAY=primary` so screenshots capture
-  the outer display.
+  the outer display. For an unfolded inner-display run, select `primary-1`
+  after confirming the display mapping with `simctl io <UDID> enumerate`.
 - `apps/mobile/__tests__/PracticePocScreen.test.tsx`, which renders the main app
   shell under compact iPhone SE-sized portrait, modern iPhone portrait, compact
   wide-short, iPad portrait, iPad landscape, and split-width viewports.
