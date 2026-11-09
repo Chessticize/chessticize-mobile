@@ -4,6 +4,7 @@ const {
   historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openTab,
+  tapHistoryChip,
   playBoardMove,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
@@ -35,7 +36,7 @@ describe('Android Practice History', () => {
 
       await openTab('history-tab', 'history-action-header');
       await element(by.id('history-filter-toggle')).tap();
-      await element(by.id('history-range-max')).tap();
+      await tapHistoryChip('history-range-filters', 'history-range-max');
       await element(by.id('history-rating-standard 5/20')).tap();
       await element(by.id('history-result-wrong')).tap();
       await waitForElementTextContaining('history-active-filter-summary', 'All Time', 10000);

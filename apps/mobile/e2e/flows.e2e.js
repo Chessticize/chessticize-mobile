@@ -274,33 +274,35 @@ describe('Key user flows', () => {
     await openStandardHistoryTrend();
 
     await waitForVisibleInPracticeScroll('history-result-wrong');
+    // The active-filter strip renders as flat siblings on iOS (Fabric), so its
+    // labels are matched by their unique text rather than by an ancestor.
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await waitFor(element(
-      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Result: Wrong')
     )).not.toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Source: Sprint')
     )).toExist().withTimeout(10000);
     await element(by.id('history-result-wrong')).tap();
     await waitFor(element(
-      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Result: Wrong')
     )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
     await element(by.id('history-result-all')).tap();
     await waitFor(element(
-      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Result: Wrong')
     )).not.toExist().withTimeout(10000);
 
     // Replay round trip must preserve the non-default result and theme filters
     // while retaining the default Sprint source.
     await element(by.id('history-result-wrong')).tap();
     await waitFor(element(
-      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Result: Wrong')
     )).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('history-source-sprint');
     await element(by.id('history-source-sprint')).tap();
     await waitFor(element(
-      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Source: Sprint')
     )).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('history-theme-disclosure');
     await element(by.id('history-theme-disclosure')).tap();
@@ -309,7 +311,7 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
     await element(by.id('history-theme-mate-in-3')).tap();
     await waitFor(element(
-      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected')
     )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
@@ -331,28 +333,28 @@ describe('Key user flows', () => {
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('history-panel'))).toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Result: Wrong')
     )).toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Source: Sprint')
     )).toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected')
     )).toExist().withTimeout(10000);
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
     await waitFor(element(
-      by.text('All puzzles').withAncestor(by.id('history-active-filter-summary'))
+      by.text('All puzzles')
     )).toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Result: Wrong')
     )).not.toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Source: Sprint')
     )).toExist().withTimeout(10000);
     await waitFor(element(
-      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected')
     )).not.toExist().withTimeout(10000);
   });
 
@@ -366,7 +368,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
-    await expect(element(by.text('Sprint failed'))).toBeVisible();
+    await expect(element(by.text('Sprint abandoned'))).toBeVisible();
   });
 
   it('persists rating, history, review queue, and saved Runs after relaunch', async () => {
@@ -385,7 +387,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
-    await expect(element(by.text('Sprint failed'))).toBeVisible();
+    await expect(element(by.text('Sprint abandoned'))).toBeVisible();
     await dismissSprintSummary();
 
     await openTab('practice-tab', 'practice-add-run');

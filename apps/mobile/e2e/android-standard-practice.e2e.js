@@ -1,6 +1,7 @@
 const {
   launchWithDisabledSynchronization,
   openTab,
+  tapHistoryChip,
   playBoardMove,
   startPracticeMode,
   waitForElementAccessibilityLabelContaining,
@@ -90,7 +91,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
 
     await openTab('history-tab', 'history-action-header');
     await element(by.id('history-filter-toggle')).tap();
-    await element(by.id('history-range-max')).tap();
+    await tapHistoryChip('history-range-filters', 'history-range-max');
     await element(by.id('history-source-all')).tap();
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
   });

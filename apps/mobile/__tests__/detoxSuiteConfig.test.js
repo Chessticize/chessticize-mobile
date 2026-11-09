@@ -168,7 +168,7 @@ describe('Detox suite configuration', () => {
 
     expect(helper).toContain("detoxElementIsVisible('history-rating-standard 5/20')");
     expect(helper).not.toContain("detoxElementExists('history-rating-standard 5/20')");
-    expect(helper).toContain("by.id('history-advanced-filters'))).toBeVisible()");
+    expect(helper).toContain("by.id('history-range-filters'))).toBeVisible()");
   });
 
   it('validates the stable Review Today empty sections instead of the removed empty screen', () => {
@@ -1773,14 +1773,14 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain("by.id('history-source-sprint')");
     expect(flowsSpec).toContain("by.id('history-theme-disclosure')");
     expect(flowsSpec).toContain(
-      "by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))"
+      "by.text('Result: Wrong')"
     );
     expect(flowsSpec).toContain(
-      "by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))"
+      "by.text('Source: Sprint')"
     );
     expect(
       historyCase.match(
-        /by\.text\('Source: Sprint'\)[\s\S]{0,120}\)\)\.not\.toExist\(\)/g
+        /by\.text\('Source: Sprint'\)(?:(?!await)[\s\S]){0,120}\)\)\.not\.toExist\(\)/g
       ) ?? []
     ).toHaveLength(0);
     expect(flowsSpec).toContain("by.text('2 themes selected')");
@@ -1815,7 +1815,7 @@ describe('Detox suite configuration', () => {
     );
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(practiceSpec).toContain('waitForHistoryFiltersCollapsed()');
-    expect(helpers).toContain("by.id('history-advanced-filters')");
+    expect(helpers).toContain("by.id('history-advanced-filters-motion')");
     expect(helpers).toContain('not.toBeVisible()');
     expect(helpers).toContain("'Show history filters'");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
