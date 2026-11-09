@@ -43,7 +43,9 @@ export const PRACTICE_PROMPT_BASE_HEIGHT = 96;
 const SESSION_RAIL_GAP_MIN = 14;
 const PRACTICE_PROMPT_NARROW_WIDTH = 300;
 const PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT = 16;
-const PRACTICE_PROMPT_FONT_SCALE_EXTRA_HEIGHT = 48;
+// Prompt copy grows at most this much with Dynamic Type (#652), so its frame
+// grows with the capped scale rather than the system scale.
+export const PRACTICE_PROMPT_MAX_TEXT_SCALE = 1.25;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
 const COMPACT_LANDSCAPE_RAIL_MAX = 300;
 const REGULAR_RAIL_MIN = 296;
@@ -173,7 +175,7 @@ export function buildPracticeAdaptiveLayout({
     ? PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT
     : 0;
   const promptFontScaleExtraHeight = Math.round(
-    Math.max(0, fontScale - 1) * PRACTICE_PROMPT_FONT_SCALE_EXTRA_HEIGHT
+    Math.max(0, Math.min(fontScale, PRACTICE_PROMPT_MAX_TEXT_SCALE) - 1) * PRACTICE_PROMPT_BASE_HEIGHT
   );
   const promptFrameHeight = PRACTICE_PROMPT_BASE_HEIGHT + Math.max(
     promptNarrowExtraHeight,

@@ -236,7 +236,8 @@ function TopBar({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
-  const glyphScale = Math.min(fontScale, CAPPED_SCALE);
+  // Navigation-bar glyphs keep their size so they stay inside the 44 pt
+  // circles; the title grows with the text, capped at 1.5x.
   // iOS keeps navigation-bar buttons at the screen's leading and trailing
   // edges on iPad too, even when the content column is centered.
   return (
@@ -249,7 +250,7 @@ function TopBar({
         testID="back-practice-button"
         onPress={onBack}
       >
-        <Icon color={theme.colors.accent.s600} name="chevronLeft" size={Math.round(17 * glyphScale)} weight="semibold" />
+        <Icon color={theme.colors.accent.s600} name="chevronLeft" size={17} weight="semibold" />
       </Pressable>
       <AppText
         accessibilityRole="header"
@@ -270,7 +271,7 @@ function TopBar({
           testID="sprint-result-history-button"
           onPress={onOpenHistory}
         >
-          <Icon color={theme.colors.accent.s600} name="trend" size={Math.round(20 * glyphScale)} weight="semibold" />
+          <Icon color={theme.colors.accent.s600} name="trend" size={20} weight="semibold" />
         </Pressable>
       ) : (
         <View style={styles.circleButtonSpacer} />

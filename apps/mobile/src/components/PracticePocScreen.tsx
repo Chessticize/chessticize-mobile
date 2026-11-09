@@ -236,6 +236,7 @@ import type {
   PracticeRunPresentation
 } from "./practiceRunPresentation.ts";
 import {
+  PRACTICE_PROMPT_MAX_TEXT_SCALE,
   buildPracticeAdaptiveLayout,
   PRACTICE_UI_PADDING as UI_PADDING,
   type AdaptiveLayout
@@ -4936,7 +4937,7 @@ export function PracticePocScreen({
         score={state.correctCount}
       />
     ) : (
-      <SessionScoreStrip compact={sessionUsesRail} state={state} />
+      <SessionScoreStrip compact={sessionUsesRail || adaptiveLayout.isLargeText} state={state} />
     )
   ) : null;
   const pausedSessionNode = isPaused && state && !personalBestActivePresentation ? (
@@ -11171,9 +11172,9 @@ function SessionScoreMetric({
     >
       {showLabel ? (
         <Text
-          adjustsFontSizeToFit
+          adjustsFontSizeToFit={compact}
           maxFontSizeMultiplier={SCORE_LABEL_MAX_TEXT_SCALE}
-          minimumFontScale={0.6}
+          minimumFontScale={0.75}
           numberOfLines={1}
           style={[
             styles.sessionScoreLabel,
@@ -13839,12 +13840,12 @@ const HUD_MAX_TEXT_SCALE = 2;
 // On small phones the prompt card is only as wide as the board, so its copy
 // grows less than other chrome to keep whole words on each line.
 const SESSION_CHROME_MAX_TEXT_SCALE = 1.5;
-const PROMPT_MAX_TEXT_SCALE = 1.25;
+const PROMPT_MAX_TEXT_SCALE = PRACTICE_PROMPT_MAX_TEXT_SCALE;
 // The uppercase score labels share a board-width strip with three columns;
 // they stay at their designed size so all three read at one size, and the
 // values grow only as far as the strip's slot allows.
 const SCORE_LABEL_MAX_TEXT_SCALE = 1;
-const SCORE_VALUE_MAX_TEXT_SCALE = 1.3;
+const SCORE_VALUE_MAX_TEXT_SCALE = 1.15;
 
 function ReviewForecastMetric({
   count,

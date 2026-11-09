@@ -23,7 +23,8 @@ describe("buildPracticeAdaptiveLayout", () => {
       width: 280
     },
     {
-      expectedHeight: 144,
+      // Prompt copy caps at 1.25x, so its frame grows by a quarter (#652).
+      expectedHeight: 120,
       fontScale: 2,
       height: 1376,
       label: "accessibility text scale",
