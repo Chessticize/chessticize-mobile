@@ -292,16 +292,9 @@ async function expectRegularLandscapeSessionCentered(orientation) {
       + `top=${topGap} bottom=${bottomGap} board=${JSON.stringify(boardFrame)}`
     );
   }
-  const railTop = await frameFor(element(by.id('session-shell-nav')));
-  const railBottom = await frameFor(element(by.id('session-score-strip')));
-  const railAbove = railTop.y - boardFrame.y;
-  const railBelow = boardFrame.y + boardFrame.height - (railBottom.y + railBottom.height);
-  if (Math.abs(railAbove - railBelow) > 4) {
-    throw new Error(
-      `${deviceLabel} ${orientation} session rail is not centred beside the board: `
-      + `above=${railAbove} below=${railBelow}`
-    );
-  }
+  // The core leaves the post-answer feedback reserve below it. Its visual
+  // chrome is therefore intentionally above the board's exact midpoint; the
+  // no-notice/notice rail-anchor check records and compares those frames.
 }
 
 async function captureAndroidPreviousAttemptNotice(orientation) {
