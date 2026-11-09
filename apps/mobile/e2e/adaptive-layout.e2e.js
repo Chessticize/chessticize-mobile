@@ -40,6 +40,7 @@ const onlyOrientation = process.env.CHESSTICIZE_ADAPTIVE_ONLY_ORIENTATION;
 // is the dark inner display, so the run can name the display to capture.
 const iosScreenshotDisplay = process.env.CHESSTICIZE_ADAPTIVE_IOS_SCREENSHOT_DISPLAY;
 const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();
+const regularLandscapeRailFrames = new Map();
 
 describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
   it('captures representative layouts and preserves the active puzzle through rotation', async () => {
@@ -60,6 +61,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
 
     const puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
+    await expectRegularLandscapeRailAnchored(initialOrientation, 'no-notice');
     await expectSessionControlsContained(initialOrientation);
     await expectAbandonConfirmationFloats(initialOrientation);
     await expectRegularLandscapeSessionCentered(initialOrientation);
@@ -73,11 +75,20 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
         throw new Error(`Rotation replaced the active puzzle: ${puzzleID} -> ${rotatedPuzzleID}`);
       }
       await captureSprint('landscape', { waitForPieces: true });
+      await expectRegularLandscapeRailAnchored('landscape', 'no-notice');
       // Rotation is the resize Detox can drive on iOS and Android. The same
       // containment contract applies to iPhone Duo fold/unfold and Split View
       // resizes, which the simulator cannot yet perform headlessly.
       await expectSessionControlsContained('landscape');
       await expectRegularLandscapeSessionCentered('landscape');
+    }
+
+    if (device.getPlatform() === 'android') {
+      // Keep the public wrong-move journey in the same regular-landscape
+      // state captured above. A previous-attempt notice used to recenter the
+      // whole rail; compare its live native frames with the no-notice rail.
+      const feedbackOrientation = includeLandscape ? 'landscape' : initialOrientation;
+      await captureAndroidPreviousAttemptNotice(feedbackOrientation);
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
@@ -101,31 +112,6 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       }
     }
 
-    if (device.getPlatform() === 'android') {
-      await withAndroidUiDiagnostics(async () => {
-        // Familiar 15's first Standard puzzle is a versioned product fixture:
-        // c2b3 is legal but wrong, while alternate mate c2b1 is accepted.
-        // Submit the move through the real board so every adaptive profile
-        // retains coordinate-mapping evidence after the public move chooser
-        // was removed from the product.
-        await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-        await playBoardMove('session-board', 'c2b3');
-        // The transient feedback overlay can finish before Detox begins its
-        // next poll. The persistent public score proves the real board move.
-        await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
-        await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
-
-        // A terminal wrong result advances the sprint to Familiar 15 puzzle two;
-        // c4b5 is its maintained legal-wrong fixture move (also used by the full
-        // public-UI sprint failure journey). Submit that move through the real
-        // board to retain coordinate-mapping evidence on every display profile.
-        await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-        await playBoardMove('session-board', 'c4b5');
-        await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
-        await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
-      });
-    }
-
     if (device.getPlatform() === 'ios') {
       // The post-answer feedback row is the last item in the locked session
       // stack, so it is the first to fall off a short phone (#639). Familiar 15
@@ -139,6 +125,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await playBoardMove('session-board', 'c4b5');
       await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
       await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
+      await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
       await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
     }
 
@@ -311,6 +298,76 @@ async function expectRegularLandscapeSessionCentered(orientation) {
       `${deviceLabel} ${orientation} session rail is not centred beside the board: `
       + `above=${railAbove} below=${railBelow}`
     );
+  }
+}
+
+async function captureAndroidPreviousAttemptNotice(orientation) {
+  await withAndroidUiDiagnostics(async () => {
+    // Familiar 15's first Standard puzzle is a versioned product fixture:
+    // c2b3 is legal but wrong, while alternate mate c2b1 is accepted.
+    // Submit the move through the real board so every adaptive profile retains
+    // coordinate-mapping evidence after the public move chooser was removed.
+    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+    await playBoardMove('session-board', 'c2b3');
+    // The transient feedback overlay can finish before Detox begins its next
+    // poll. The persistent public score proves the real board move.
+    await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
+
+    // A terminal wrong result advances the sprint to Familiar 15 puzzle two;
+    // c4b5 is its maintained legal-wrong fixture move. The following puzzle's
+    // notice must occupy the reserved feedback slot without moving the rail.
+    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+    await playBoardMove('session-board', 'c4b5');
+    await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
+    await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
+    await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
+    await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
+    await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
+  });
+}
+
+async function expectRegularLandscapeRailAnchored(orientation, state) {
+  const layoutAttributes = await element(by.id('adaptive-layout')).getAttributes();
+  const layoutLabel = (Array.isArray(layoutAttributes) ? layoutAttributes[0] : layoutAttributes).label;
+  if (layoutLabel !== 'Layout regularLandscape') {
+    return;
+  }
+
+  const ids = [
+    'session-status-metrics',
+    'practice-prompt-stack',
+    'session-puzzle-timing',
+    'session-score-strip'
+  ];
+  const frames = {};
+  for (const testID of ids) {
+    frames[testID] = await frameFor(element(by.id(testID)));
+  }
+  const key = `${orientation}`;
+  const prior = regularLandscapeRailFrames.get(key);
+  const record = `rail-anchor ${deviceLabel} ${orientation} state=${state} frames=${JSON.stringify(frames)}`;
+  console.log(`[adaptive-rail-anchor] ${record}`);
+  const evidencePath = process.env.CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE;
+  if (evidencePath) {
+    fs.appendFileSync(evidencePath, `${record}\n`, 'utf8');
+  }
+
+  if (!prior) {
+    regularLandscapeRailFrames.set(key, frames);
+    return;
+  }
+
+  for (const testID of ids) {
+    const before = prior[testID];
+    const after = frames[testID];
+    if (Math.abs(before.y - after.y) > 1) {
+      throw new Error(
+        `${deviceLabel} ${orientation} ${testID} moved when ${state} appeared: `
+        + `${JSON.stringify(before)} -> ${JSON.stringify(after)}`
+      );
+    }
   }
 }
 
