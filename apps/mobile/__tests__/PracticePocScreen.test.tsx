@@ -5439,6 +5439,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-filter-timed-out-only")).toThrow();
     expectDisclosureClosed(renderer, "history-advanced-filters");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-label-Source: Sprint"))).toBe("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
       "Wrong move"

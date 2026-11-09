@@ -54,7 +54,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("by.id('arrow-duel-reply-challenge')");
     expect(journey).toContain("by.id('arrow-duel-what-if-action')");
     expect(journey).toContain('fixture.puzzle.solutionMoves[1]');
-    expect(journey).toContain("by.id('move-feedback-overlay')");
+    expect(journey).toContain("waitForElementTextContaining('sprint-result-solved', '0 / '");
     expect(journey).toContain("toHaveText('No more puzzles')");
     expect(journey).not.toContain('sleep(1800)');
     expect(journey).toContain("by.id('sprint-result-outcome')");
@@ -66,7 +66,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('device.terminateApp()');
     expect(journey).toContain('deleteData: false');
     expect(journey).toContain("element(by.id('history-filter-toggle')).tap()");
-    expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
+    expect(journey).toContain("tapHistoryChip('history-rating-filters', 'history-rating-arrow_duel 5/30')");
     expect(journey).toContain("waitForVisibleInPracticeScroll('history-attention-all')");
     expect(journey).toContain('waitForHistoryFiltersCollapsed()');
     expect(journey).not.toContain(

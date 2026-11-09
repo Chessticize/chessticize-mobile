@@ -114,7 +114,7 @@ describe('Android product-aware system Back', () => {
       await device.pressBack();
       await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
       await element(by.id('session-abandon-confirm')).tap();
-      await waitFor(element(by.text('Sprint failed'))).toExist().withTimeout(10000);
+      await waitFor(element(by.text('Sprint abandoned'))).toExist().withTimeout(10000);
       await element(by.id('back-practice-button')).tap();
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 

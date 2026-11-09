@@ -3,6 +3,7 @@ const {
   openTab,
   playBoardMove,
   startPracticeMode,
+  tapHistoryChip,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
   waitForHistoryFiltersCollapsed,
@@ -42,11 +43,12 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.id('session-abandon-confirmation'))).not.toExist().withTimeout(10000);
 
       await playBoardMove('session-board', fixture.wrongMove);
-      await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
-      await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
-      await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
-
+      // The one-puzzle Arrow Duel ends on this move. The session HUD and
+      // feedback overlay last only the 800 ms feedback snapshot before the
+      // full-screen Sprint Result replaces them (#660), too brief to assert
+      // reliably, so assert the lasting outcome.
       await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
+      await waitForElementTextContaining('sprint-result-solved', '0 / ', 10000);
       await waitFor(element(by.id('sprint-result-reason'))).toHaveText('No more puzzles').withTimeout(10000);
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
@@ -151,8 +153,7 @@ async function startArrowDuel() {
 async function openArrowDuelHistory() {
   await openTab('history-tab', 'history-action-header');
   await element(by.id('history-filter-toggle')).tap();
-  await waitForVisibleInPracticeScroll('history-rating-arrow_duel 5/30');
-  await element(by.id('history-rating-arrow_duel 5/30')).tap();
+  await tapHistoryChip('history-rating-filters', 'history-rating-arrow_duel 5/30');
   await waitForVisibleInPracticeScroll('history-attention-all');
   await element(by.id('history-attention-all')).tap();
   await waitForVisibleInPracticeScroll('history-filter-toggle');
