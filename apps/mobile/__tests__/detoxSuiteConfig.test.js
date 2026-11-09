@@ -1252,6 +1252,9 @@ describe('Detox suite configuration', () => {
       caseStart
     );
     const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
+    expect(responsiveHistoryCase).toContain("by.id('sprint-result-headline')");
+    expect(responsiveHistoryCase).toContain("toHaveText('Sprint abandoned')");
+    expect(responsiveHistoryCase).not.toContain("by.text('Sprint failed')");
     const normalizeOuterScroll = responsiveHistoryCase.indexOf(
       "element(by.id('practice-main-scroll')).scrollTo('top')"
     );
@@ -1259,7 +1262,7 @@ describe('Detox suite configuration', () => {
       "element(by.id('review-session-control-rail')).scrollTo('bottom')"
     );
     const requireUnclearVisible = responsiveHistoryCase.indexOf(
-      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()"
+      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible(100)"
     );
 
     expect(normalizeOuterScroll).toBeGreaterThan(0);
@@ -1267,7 +1270,7 @@ describe('Detox suite configuration', () => {
     expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
   });
 
-  it('uses a bounded public swipe for compact History review actions', () => {
+  it('requires full Review action visibility with bounded scrolls outside the board', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const caseStart = practiceSpec.indexOf(
       "it('persists Unclear, places its History actions responsively"
@@ -1278,18 +1281,16 @@ describe('Detox suite configuration', () => {
     );
     const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
     const compactBranch = responsiveHistoryCase.indexOf("'compactPortrait'");
-    const boundedSwipe = responsiveHistoryCase.indexOf(
-      "element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9)",
+    const requireUnclearVisible = responsiveHistoryCase.indexOf(
+      "await waitForReviewAction('history-attempt-clear-unclear')",
       compactBranch
     );
-    const requireUnclearVisible = responsiveHistoryCase.indexOf(
-      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()",
-      boundedSwipe
-    );
-
     expect(compactBranch).toBeGreaterThan(0);
-    expect(boundedSwipe).toBeGreaterThan(compactBranch);
-    expect(requireUnclearVisible).toBeGreaterThan(boundedSwipe);
+    expect(requireUnclearVisible).toBeGreaterThan(compactBranch);
+    expect(responsiveHistoryCase).toContain("'review-session-control-rail' : 'practice-main-scroll',\n      0.99");
+    expect(practiceSpec).toContain("toBeVisible(100)");
+    expect(practiceSpec).toContain(".scroll(100, 'down', startX, 0.5)");
+    expect(practiceSpec).toContain(".scroll(100, 'up', startX, 0.5)");
   });
 
   it('checks the visible Sprint result boundary after first-use guidance', () => {
@@ -1306,7 +1307,7 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('sprint-summary-panel'))).toExist()"
     );
     const normalizeResultScroll = firstUseCase.indexOf(
-      "element(by.id('practice-main-scroll')).scrollTo('top')",
+      "element(by.id('sprint-result-scroll')).scrollTo('top')",
       requireResultExists
     );
     const requireResultTopBarVisible = firstUseCase.indexOf(
@@ -1316,6 +1317,9 @@ describe('Detox suite configuration', () => {
     expect(requireResultExists).toBeGreaterThan(0);
     expect(normalizeResultScroll).toBeGreaterThan(requireResultExists);
     expect(requireResultTopBarVisible).toBeGreaterThan(normalizeResultScroll);
+    expect(firstUseCase).toContain("by.id('sprint-result-headline')");
+    expect(firstUseCase).toContain("toHaveText('Sprint abandoned')");
+    expect(firstUseCase).not.toContain("by.text('Sprint failed')");
   });
 
   it('returns from the active Tactical Profile through its public header control', () => {
@@ -1823,7 +1827,7 @@ describe('Detox suite configuration', () => {
     expect(helpers).toContain('not.toBeVisible()');
     expect(helpers).toContain("'Show history filters'");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
-    expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()");
+    expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible(100)");
     expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Correct')");
     expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
     expect(practiceSpec).not.toContain('async function tapVisibleHistoryResult');
@@ -1834,7 +1838,8 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain("orientation: 'portrait'");
     expect(practiceSpec).toContain("by.id('review-context-actions-bottom')");
     expect(practiceSpec).toContain("screenshotLabel: 'history-review-actions-ipad-landscape'");
-    expect(practiceSpec).not.toContain("device.setOrientation('landscape')");
+    expect(practiceSpec).toContain("process.env.CHESSTICIZE_REVIEW_ACTIONS_LANDSCAPE === '1'");
+    expect(practiceSpec).toContain("if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('landscape');");
     expect(practiceSpec).not.toContain("for (const orientation of ['portrait', 'landscape'])");
     expect(practiceSpec).not.toContain('history-filter-unclear');
     expect(practiceSpec).not.toContain("endsWith('-result')");

@@ -59,7 +59,7 @@ describe("MoveFeedbackSettingsSection", () => {
       "Brief board sounds for moves and captures."
     );
     expect(text(find(renderer, "settings-move-feedback-content"))).toContain(
-      "Light touch feedback for moves and captures."
+      "Touch feedback for moves, captures, and controls."
     );
     expect(text(find(renderer, "settings-move-feedback-content"))).not.toContain(
       "puzzle results"

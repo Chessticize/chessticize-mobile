@@ -11,7 +11,8 @@ import {
   type ReviewQueueState,
   type SessionReplayItem
 } from "../../../../../../packages/core/src/index.ts";
-import { FABRIC_SAFE_HIDDEN_TEXT_STYLE, modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 import {
   type CompletedReviewItem,
   filterReviewTodayPresentation,
@@ -386,7 +387,7 @@ export function ReviewPanel({
   );
 
   return (
-    <View style={styles.reviewQueuePanel} testID="review-panel">
+    <View style={styles.historyPanel} testID="review-panel">
       <View style={styles.historyHeaderRow} testID="review-action-header">
         <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">Review</AppText>
         <ToolbarIconButton
@@ -407,7 +408,7 @@ export function ReviewPanel({
         style={styles.reviewDueCard}
         testID="review-due-card"
       >
-        <View style={styles.reviewDueCopy}>
+        <View style={styles.editorRowLabel}>
           <AppText variant="headline">Today</AppText>
           <AppText testID="review-due-summary" tone="secondary" variant="subheadline">
             {reviewDueSummaryLabel}
@@ -669,7 +670,7 @@ function ReviewQueueItemCard({
       <View testID={`${rowTestId}-badge`}>
         <IconTile name="review" />
       </View>
-      <View style={styles.attemptRowCopy}>
+      <View style={styles.settingsRowCopy}>
         <AppText variant="headline">{modeLabel(item.review.mode)}</AppText>
         <AppText testID={`${rowTestId}-context`} tone="secondary" variant="subheadline">{activityLabel}</AppText>
         <AppText testID={`${rowTestId}-meta`} tone="secondary" variant="footnote">
@@ -753,7 +754,7 @@ function TodayReviewAttemptRow({
         testID={`review-today-attempt-${item.attempt.id}-badge`}
         tone={isWrong ? "wrong" : "correct"}
       />
-      <View style={styles.attemptRowCopy}>
+      <View style={styles.settingsRowCopy}>
         <View style={styles.historyAttemptHeader}>
           <AppText variant="headline">{modeLabel(item.attempt.mode)}</AppText>
           <AppText
@@ -809,18 +810,7 @@ export function reviewCountLabel(count: number): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  historyHeaderRow: {
-    alignItems: "center",
-    columnGap: theme.spacing.row,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    minHeight: theme.metrics.minTarget,
-    rowGap: theme.spacing.inline
-  },
-  reviewQueuePanel: {
-    gap: theme.spacing.row
-  },
+  ...pickPracticeStyles(theme, ["editorRowLabel", "historyHeaderRow", "historyPanel", "reviewDueHiddenMetric", "settingsRowCopy", "settingsRowPressed"]),
   reviewFilterControlSlot: {
     overflow: "hidden"
   },
@@ -832,11 +822,6 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.row,
     padding: 16
   },
-  reviewDueCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
   reviewDueBigCount: {
     textAlign: "right"
   },
@@ -844,7 +829,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "flex-end",
     flexShrink: 0
   },
-  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
   },
@@ -935,12 +919,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "flex-start",
     paddingVertical: 12
   },
-  attemptRowCopy: {
-    flex: 1,
-    flexShrink: 1,
-    gap: 2,
-    minWidth: 0
-  },
   attemptRowChevron: {
     alignSelf: "center"
   },
@@ -983,8 +961,5 @@ const useStyles = makeStyles((theme) => ({
     columnGap: 8,
     flexDirection: "row",
     flexWrap: "wrap"
-  },
-  settingsRowPressed: {
-    backgroundColor: theme.colors.surfaceStrong
   },
 }));
