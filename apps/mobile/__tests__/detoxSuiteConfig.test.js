@@ -1934,6 +1934,9 @@ describe('Detox suite configuration', () => {
     expect(prepareHelper).toContain(
       "element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5)"
     );
+    expect(prepareHelper).toContain(
+      "element(by.id('practice-main-scroll')).scroll(125, 'down', 0.5, 0.5)"
+    );
     expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
     expect(spec).toContain('frame.captureAnchorTestId === testID');
     expect(spec).toContain('TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE');
