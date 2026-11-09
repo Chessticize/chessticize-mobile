@@ -238,7 +238,6 @@ export function ICloudSyncErrorDetails({
           : "settings-sync-error-details"}
       >
         <IconTile
-          alignFirstLine
           name={entryVariant === "support" ? "share" : "warning"}
           tone={entryVariant === "support" ? "accent" : "warning"}
         />
