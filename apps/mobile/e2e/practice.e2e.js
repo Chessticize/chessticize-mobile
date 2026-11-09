@@ -460,7 +460,8 @@ describe('Practice POC', () => {
     // remains bound to the completed attempt rather than the newly shown puzzle.
     await waitForElementTextContaining('sprint-unclear-question', 'previous puzzle', 10000);
     await element(by.id('session-abandon')).tap();
-    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(5000);
+    await waitFor(element(by.id('session-abandon-confirm'))).toBeVisible(100).withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.label('Sprint abandoned'))).toBeVisible().withTimeout(10000);
 
