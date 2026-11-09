@@ -16,9 +16,9 @@ The site is served from the custom domain `chessticize.com`. Once the custom
 domain is set in the repository's Pages settings, the old
 `https://chessticize.github.io/chessticize-mobile/...` URLs redirect
 automatically to the same path on `chessticize.com`, so existing app, store, and
-shared links keep working. The old web app (`app.chessticize.com`) has been
-retired and is offline; `site/404.html` says so in plain text, without linking
-to that host, and returns visitors to the home page.
+shared links keep working. The web app (`app.chessticize.com`) is live and
+linked as "Play online" from the homepage header, hero actions, and footer, and
+from `site/404.html`.
 
 Pages use relative asset and link paths so they work from the domain root. Only
 `404.html` needs root-absolute paths because it is served for any missing URL
