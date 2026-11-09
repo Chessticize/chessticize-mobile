@@ -8735,6 +8735,17 @@ function StepperButton({
 
 const STEPPER_HIT_SLOP = { bottom: 6, left: 4, right: 4, top: 6 };
 
+// Short numeric fields grow with the text size up to 1.5x, then cap their
+// text there, so four digits never clip inside a fixed-width field.
+const NUMERIC_FIELD_MAX_TEXT_SCALE = 1.5;
+
+function useNumericFieldScale(): number {
+  const appTheme = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const themeScale = appTheme.typography.body.fontSize / baseTypography.body.fontSize;
+  return Math.min(NUMERIC_FIELD_MAX_TEXT_SCALE, Math.max(1, fontScale, themeScale));
+}
+
 function ArrowDuelReplyChallengeSetting({
   enabled,
   individualRunCopy = false,
@@ -8753,6 +8764,7 @@ function ArrowDuelReplyChallengeSetting({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const fieldScale = useNumericFieldScale();
   return (
     <Section header="Arrow Duel" rows testID="practice-run-arrow-duel-reply-setting">
       <View style={[rowStyle, styles.editorWrapRow]}>
@@ -8822,6 +8834,7 @@ function ArrowDuelReplyChallengeSetting({
           <View
             style={[
               styles.arrowDuelReplySecondsInputShell,
+              { width: Math.round(64 * fieldScale) },
               replySecondsError ? styles.editorInputError : null
             ]}
           >
@@ -8832,9 +8845,13 @@ function ArrowDuelReplyChallengeSetting({
               editable={enabled}
               inputMode="numeric"
               keyboardType="number-pad"
+              maxFontSizeMultiplier={NUMERIC_FIELD_MAX_TEXT_SCALE}
               maxLength={2}
               selectTextOnFocus
-              style={styles.arrowDuelReplySecondsInput}
+              style={[
+                styles.arrowDuelReplySecondsInput,
+                { fontSize: Math.min(appTheme.typography.body.fontSize, baseTypography.body.fontSize * NUMERIC_FIELD_MAX_TEXT_SCALE) }
+              ]}
               testID="practice-run-arrow-duel-reply-seconds"
               value={replySecondsInput}
               onChangeText={onReplySecondsInputChange}
@@ -9044,6 +9061,7 @@ function PracticeRunEloRow({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const fieldScale = useNumericFieldScale();
   if (directEntry) {
     const parsedInput = Number(inputValue);
     const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
@@ -9071,7 +9089,11 @@ function PracticeRunEloRow({
               onPress={() => onInputStep?.(-1)}
             />
             <View
-              style={[styles.runEloInputShell, error ? styles.editorInputError : null]}
+              style={[
+                styles.runEloInputShell,
+                { width: Math.round(72 * fieldScale) },
+                error ? styles.editorInputError : null
+              ]}
               testID="practice-run-elo-input-shell"
             >
               <TextInput
@@ -9079,9 +9101,13 @@ function PracticeRunEloRow({
                 accessibilityLabel={isCreate ? "Starting rating" : "Current rating"}
                 inputMode="numeric"
                 keyboardType="number-pad"
+                maxFontSizeMultiplier={NUMERIC_FIELD_MAX_TEXT_SCALE}
                 maxLength={4}
                 selectTextOnFocus
-                style={styles.runEloInput}
+                style={[
+                  styles.runEloInput,
+                  { fontSize: Math.min(appTheme.typography.body.fontSize, baseTypography.body.fontSize * NUMERIC_FIELD_MAX_TEXT_SCALE) }
+                ]}
                 testID="practice-run-elo-input"
                 value={inputValue ?? String(value)}
                 onChangeText={onInputChange}
@@ -18394,6 +18420,7 @@ const useStyles = makeStyles((theme) => ({
   runNameRow: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 16
   },
   runNameCopy: {
