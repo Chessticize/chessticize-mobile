@@ -10390,7 +10390,7 @@ function SessionStatusBar({
         style={[
           styles.sessionProgressValue,
           styles.sessionMetricValueFill,
-          isPersonalBest ? styles.personalBestProgressValue : null,
+          styles.sessionMetricValueLeading,
           compactMetrics ? styles.sessionMetricTextCompact : null,
           sharedValueStyle
         ]}
@@ -10436,6 +10436,7 @@ function SessionStatusBar({
         style={[
           styles.timerText,
           styles.sessionMetricValueFill,
+          styles.sessionMetricValueTrailing,
           compactMetrics ? styles.sessionMetricTextCompact : null,
           sharedValueStyle
         ]}
@@ -10448,6 +10449,7 @@ function SessionStatusBar({
       accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
       style={[
         styles.sessionMetricBlock,
+        styles.sessionMetricBlockTrailing,
         isPersonalBest ? styles.personalBestMistakesMetricBlock : null
       ]}
       testID="session-mistakes-block"
@@ -10476,6 +10478,9 @@ function SessionStatusBar({
         )}
         <Text
           adjustsFontSizeToFit
+          // iOS keeps a shrink-to-fit title's old size after a Dynamic Type
+          // change; a new key measures it again at the new size.
+          key={`session-title-${fontScale}`}
           maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
           minimumFontScale={0.5}
           numberOfLines={1}
@@ -18791,9 +18796,19 @@ const useStyles = makeStyles((theme) => ({
     gap: 6
   },
   // HUD values span their metric block so shrink-to-fit measures against
-  // the block width rather than the text's own width (#652).
+  // the block width rather than the text's own width (#652). The first and
+  // last values align to the content edges; the timer stays centred.
   sessionMetricValueFill: {
     alignSelf: "stretch"
+  },
+  sessionMetricValueLeading: {
+    textAlign: "left"
+  },
+  sessionMetricValueTrailing: {
+    textAlign: "right"
+  },
+  sessionMetricBlockTrailing: {
+    alignItems: "flex-end"
   },
   sessionMetricBlockFullRow: {
     flexBasis: "auto",
@@ -18810,9 +18825,6 @@ const useStyles = makeStyles((theme) => ({
   personalBestProgressMetricBlock: {
     alignItems: "flex-start",
     flex: 1
-  },
-  personalBestProgressValue: {
-    textAlign: "left"
   },
   personalBestMistakesMetricBlock: {
     alignItems: "flex-end",

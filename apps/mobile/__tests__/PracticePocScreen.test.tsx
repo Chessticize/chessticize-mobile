@@ -7279,6 +7279,8 @@ describe("PracticePocScreen", () => {
     expect(styleEntryMatches(findByTestId(renderer, "session-progress-block").props.style, "flex", 1)).toBe(true);
     expect(styleEntryMatches(findByTestId(renderer, "session-timer-block").props.style, "flex", 1)).toBe(true);
     expect(styleEntryMatches(findByTestId(renderer, "session-mistakes-block").props.style, "flex", 1)).toBe(true);
+    // The mistake pips end at the content edge, under the prompt card's edge.
+    expect(flattenTestStyle(findByTestId(renderer, "session-mistakes-block").props.style).alignItems).toBe("flex-end");
     expect(findByTestId(renderer, "chessboard-king-white-sprite")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-white-sprite").props.style).width).toBe(
@@ -9561,6 +9563,11 @@ describe("PracticePocScreen", () => {
       expect(value.props.allowFontScaling).toBe(false);
       expect(value.props.adjustsFontSizeToFit).toBe(true);
     }
+    // The row lines up with the prompt and score strip: progress at the
+    // leading edge, the timer centred, Unrated at the trailing edge.
+    expect(flattenTestStyle(findByTestId(renderer, "session-progress").props.style).textAlign).toBe("left");
+    expect(flattenTestStyle(findByTestId(renderer, "session-timer").props.style).textAlign).toBe("center");
+    expect(flattenTestStyle(unratedText()?.props.style).textAlign).toBe("right");
   });
 
   it("caps the previous-attempt notice copy so the locked phone session keeps it on screen", () => {
