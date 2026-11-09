@@ -68,6 +68,24 @@ export const LAB_DEVICE_VIEWPORTS = {
     width: 951,
     height: 669,
     insets: { top: 0, right: 84, bottom: 20, left: 0 }
+  },
+  // The other inner-display poses. Insets are not yet measured (Device Hub
+  // drives fold and Split View), so these use the iPad-style status bar and
+  // home indicator; adaptivePracticeLayout.test.tsx covers one-sided columns.
+  duoInnerPortrait: {
+    width: 669,
+    height: 951,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  duoSplitViewHalf: {
+    width: 475,
+    height: 669,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  duoSplitViewThird: {
+    width: 317,
+    height: 669,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
   }
 } as const satisfies Record<string, LabDeviceViewport>;
 
