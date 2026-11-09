@@ -7,14 +7,123 @@
     "publicVersion": "1.6.0",
     "status": "capture-plan"
   },
-  "altTextContract": null,
+  "altTextContract": {
+    "repositoryFile": "config/google-play-metadata-en-us-mobile-1.6-v2.json",
+    "collection": "previewAssets.screenshots.frames"
+  },
   "frames": [
-    { "order": 1, "frameId": "practice-home", "captureId": "practice-home", "headline": "Find Your Next Puzzle", "fileName": "practice-home.png", "appearance": "light", "highlights": ["fresh-design", "practice-home", "native-navigation"], "storyId": "practice--home", "requiredVisibleTestIds": ["practice-home", "practice-run-start", "training-focus-card"], "captureAnchorTestId": "practice-home" },
-    { "order": 2, "frameId": "dark-arrow-duel", "captureId": "dark-arrow-duel", "headline": "Choose the Best Move", "fileName": "dark-arrow-duel.png", "appearance": "dark", "highlights": ["dark-mode", "arrow-duel"], "storyId": "practice--arrow-duel-prompt", "requiredVisibleTestIds": ["session-board", "session-progress"], "moment": "opponent-reply", "captureAnchorTestId": "active-session-shell" },
-    { "order": 3, "frameId": "tactical-profile", "captureId": "tactical-profile", "headline": "Find Your Training Focus", "fileName": "tactical-profile.png", "appearance": "light", "highlights": ["tactical-profile"], "storyId": "practice--tactical-profile-ranked", "requiredVisibleTestIds": ["tactical-profile-active-mode", "tactical-profile-recommendations"], "previewActions": ["training-focus-open-profile"], "captureAnchorTestId": "tactical-profile-screen" },
-    { "order": 4, "frameId": "focused-run", "captureId": "focused-run", "headline": "Practice What You Need", "fileName": "focused-run.png", "appearance": "light", "highlights": ["focused-run"], "storyId": "practice--tactical-profile-focused-run", "requiredVisibleTestIds": ["focused-run-rating-anchor", "focused-run-allocation-bar"], "captureAnchorTestId": "focused-run-preview" },
-    { "order": 5, "frameId": "survival", "captureId": "survival", "headline": "Beat Your Best", "fileName": "survival.png", "appearance": "dark", "highlights": ["survival"], "storyId": "practice--personal-best-hub", "requiredVisibleTestIds": ["personal-best-hub", "personal-best-type-selector", "personal-best-hub-start"], "captureAnchorTestId": "personal-best-hub" },
-    { "order": 6, "frameId": "review", "captureId": "review", "headline": "Make Every Mistake Count", "fileName": "review.png", "appearance": "light", "highlights": ["scheduled-review"], "storyId": "review--due-queue", "requiredVisibleTestIds": ["review-due-card", "review-start-due", "review-forecast"], "captureAnchorTestId": "review-panel" }
+    {
+      "order": 1,
+      "frameId": "practice-home",
+      "captureId": "practice-home",
+      "headline": "Find Your Next Puzzle",
+      "fileName": "practice-home.png",
+      "appearance": "light",
+      "highlights": [
+        "fresh-design",
+        "practice-home",
+        "native-navigation"
+      ],
+      "storyId": "practice--home",
+      "requiredVisibleTestIds": [
+        "practice-home",
+        "practice-run-start",
+        "training-focus-card"
+      ],
+      "captureAnchorTestId": "practice-home"
+    },
+    {
+      "order": 2,
+      "frameId": "dark-arrow-duel",
+      "captureId": "dark-arrow-duel",
+      "headline": "Choose the Best Move",
+      "fileName": "dark-arrow-duel.png",
+      "appearance": "dark",
+      "highlights": [
+        "dark-mode",
+        "arrow-duel"
+      ],
+      "storyId": "practice--arrow-duel-prompt",
+      "requiredVisibleTestIds": [
+        "session-board",
+        "session-progress"
+      ],
+      "moment": "opponent-reply",
+      "captureAnchorTestId": "active-session-shell"
+    },
+    {
+      "order": 3,
+      "frameId": "tactical-profile",
+      "captureId": "tactical-profile",
+      "headline": "Find Your Training Focus",
+      "fileName": "tactical-profile.png",
+      "appearance": "light",
+      "highlights": [
+        "tactical-profile"
+      ],
+      "storyId": "practice--tactical-profile-ranked",
+      "requiredVisibleTestIds": [
+        "tactical-profile-active-mode",
+        "tactical-profile-recommendations"
+      ],
+      "previewActions": [
+        "training-focus-open-profile"
+      ],
+      "captureAnchorTestId": "tactical-profile-screen"
+    },
+    {
+      "order": 4,
+      "frameId": "focused-run",
+      "captureId": "focused-run",
+      "headline": "Practice What You Need",
+      "fileName": "focused-run.png",
+      "appearance": "light",
+      "highlights": [
+        "focused-run"
+      ],
+      "storyId": "practice--tactical-profile-focused-run",
+      "requiredVisibleTestIds": [
+        "focused-run-rating-anchor",
+        "focused-run-allocation-bar"
+      ],
+      "captureAnchorTestId": "focused-run-preview"
+    },
+    {
+      "order": 5,
+      "frameId": "survival",
+      "captureId": "survival",
+      "headline": "Beat Your Best",
+      "fileName": "survival.png",
+      "appearance": "dark",
+      "highlights": [
+        "survival"
+      ],
+      "storyId": "practice--personal-best-hub",
+      "requiredVisibleTestIds": [
+        "personal-best-hub",
+        "personal-best-type-selector",
+        "personal-best-hub-start"
+      ],
+      "captureAnchorTestId": "personal-best-hub"
+    },
+    {
+      "order": 6,
+      "frameId": "review",
+      "captureId": "review",
+      "headline": "Make Every Mistake Count",
+      "fileName": "review.png",
+      "appearance": "light",
+      "highlights": [
+        "scheduled-review"
+      ],
+      "storyId": "review--due-queue",
+      "requiredVisibleTestIds": [
+        "review-due-card",
+        "review-start-due",
+        "review-forecast"
+      ],
+      "captureAnchorTestId": "review-panel"
+    }
   ],
   "visualDirection": {
     "name": "Android Photo Studio",
@@ -26,12 +135,66 @@
   "presets": {
     "android-phone": {
       "backgroundTemplates": {
-        "practice-home": { "file": "photo-studio-background-01-android-phone-v1.png", "sha256": "1b035c140d925946404c09740ae069a5cc60f1527d5831b7816fbaec85e2d4ba", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
-        "dark-arrow-duel": { "file": "photo-studio-background-02-android-phone-v1.png", "sha256": "98f6a19e0671fe0be844a80e646ceab8de28d2248ca3902602eef7480b26b6c4", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
-        "tactical-profile": { "file": "photo-studio-background-03-android-phone-v1.png", "sha256": "7b1d9531cd208620acf2dbf1902deb3731b98a6f953c12e98179fa9e2b19b18a", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
-        "focused-run": { "file": "photo-studio-background-04-android-phone-v1.png", "sha256": "6bffcf0fd177af59f913e6130ddb222e11a26d2162a4a5925e1dc952c88f8c41", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
-        "survival": { "file": "photo-studio-background-05-android-phone-v1.png", "sha256": "9683754ee2ddfaa3c8cd7031461ea2a907c2d6a5c8afb783010a9ae02ce418e6", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
-        "review": { "file": "photo-studio-background-06-android-phone-v1.png", "sha256": "14e1b1a0676eb57717fb06231d1ec6111336e66a90b12e2983803bfb491fc80d", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" }
+        "practice-home": {
+          "file": "photo-studio-background-01-android-phone-v1.png",
+          "sha256": "1b035c140d925946404c09740ae069a5cc60f1527d5831b7816fbaec85e2d4ba",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "dark-arrow-duel": {
+          "file": "photo-studio-background-02-android-phone-v1.png",
+          "sha256": "98f6a19e0671fe0be844a80e646ceab8de28d2248ca3902602eef7480b26b6c4",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "tactical-profile": {
+          "file": "photo-studio-background-03-android-phone-v1.png",
+          "sha256": "7b1d9531cd208620acf2dbf1902deb3731b98a6f953c12e98179fa9e2b19b18a",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "focused-run": {
+          "file": "photo-studio-background-04-android-phone-v1.png",
+          "sha256": "6bffcf0fd177af59f913e6130ddb222e11a26d2162a4a5925e1dc952c88f8c41",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "survival": {
+          "file": "photo-studio-background-05-android-phone-v1.png",
+          "sha256": "9683754ee2ddfaa3c8cd7031461ea2a907c2d6a5c8afb783010a9ae02ce418e6",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "review": {
+          "file": "photo-studio-background-06-android-phone-v1.png",
+          "sha256": "14e1b1a0676eb57717fb06231d1ec6111336e66a90b12e2983803bfb491fc80d",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        }
       }
     }
   }

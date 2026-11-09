@@ -536,15 +536,14 @@ function validateGooglePlayPolicy(config, compositionMode, presets) {
   ) {
     fail("Google Play frame count is outside the store policy");
   }
+  const canonicalAltTextFile =
+    config.schemaVersion === 2
+      ? "config/google-play-metadata-en-us-mobile-1.6-v2.json"
+      : "config/google-play-metadata-en-us-v1.json";
   if (
-    config.schemaVersion === 1 &&
-    (
-      !config.altTextContract ||
-      config.altTextContract.repositoryFile !==
-        "config/google-play-metadata-en-us-v1.json" ||
-      config.altTextContract.collection !==
-        "previewAssets.screenshots.frames"
-    )
+    !config.altTextContract ||
+    config.altTextContract.repositoryFile !== canonicalAltTextFile ||
+    config.altTextContract.collection !== "previewAssets.screenshots.frames"
   ) {
     fail("Google Play layout must reference the canonical alt-text contract");
   }
@@ -940,9 +939,7 @@ async function validateBackgroundTemplate(configRoot, preset, frameId) {
     template.file === "" ||
     path.isAbsolute(template.file) ||
     template.fit !== "cover" ||
-    !/^openai-imagegen(?:-derived-deterministic-headline-v1)?$/u.test(
-      template.generatedWith ?? "",
-    ) ||
+    template.generatedWith !== "openai-imagegen" ||
     !/^[a-f0-9]{64}$/u.test(template.sha256 ?? "")
   ) {
     fail(
@@ -1013,10 +1010,14 @@ export async function validateManifest({
   validateLayoutConfig(config);
   validateGooglePlayCaptureIdentity(config, manifest);
   if (
-    config.schemaVersion === 1 &&
     manifest.platform === "google-play" &&
     manifest.status === "exact-artifact-capture"
   ) {
+    if (config.schemaVersion === 2) {
+      fail(
+        "exact Google Play campaign capture requires the campaign-aware provenance verifier",
+      );
+    }
     try {
       assertCombinedGooglePlayCaptureManifest({
         manifest,

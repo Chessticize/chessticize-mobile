@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "metadataId": "google-play-en-us-mobile-1.6-v2",
+  "issue": 683,
+  "locale": "en-US",
+  "verifiedOn": "2026-08-10",
+  "officialReferences": [
+    "https://support.google.com/googleplay/android-developer/answer/9859152",
+    "https://support.google.com/googleplay/android-developer/answer/13393723",
+    "https://support.google.com/googleplay/android-developer/answer/9866151",
+    "https://support.google.com/googleplay/android-developer/answer/9898842",
+    "https://support.google.com/googleplay/android-developer/answer/9859654"
+  ],
+  "limits": {
+    "appNameCharacters": 30,
+    "shortDescriptionCharacters": 80,
+    "fullDescriptionCharacters": 4000,
+    "graphicAltTextCharacters": 140,
+    "screenshotsPerDeviceType": 8
+  },
+  "appName": "Chessticize: Chess Puzzles",
+  "shortDescription": "Build Tactical Intuition",
+  "fullDescription": "Build tactical intuition with focused chess practice\u2014completely free, with no ads or paywalls.\n\nPractice. Review. Improve.\n\nPuzzle Sprints\n\nSolve short, rating-matched puzzle sets against the clock. Build pattern recognition one focused Sprint at a time.\n\nArrow Duel\n\nCompare two candidate moves in the same position. Choose the better move, reject the tempting blunder, and practice the opponent's reply.\n\nCustom Practice\n\nCreate a Custom Run with the puzzle themes, pace, duration, and difficulty you want to train.\n\nReview what you miss\n\nMissed and unclear puzzles enter scheduled Review so they return when due. Replay completed puzzles and explore positions with on-device Stockfish analysis\u2014without changing your Rating or Review schedule.\n\nTrack your progress\n\nFollow separate Ratings for Standard and Arrow Duel, review recent Runs, and filter History to revisit individual puzzles.\n\nCompletely free\n\n\u2022 No ads\n\u2022 No subscriptions, paid unlocks, or paywalls\n\u2022 No Chessticize account required\n\nPractice offline\n\nBundled puzzles and Stockfish analysis work on your device. Progress is stored locally, with Android-managed backup available for eligible restore or device transfer when Android backup is enabled.\n\nOpen source\n\nChessticize is published under GPL-3.0-or-later. Source code, Stockfish, puzzle-data attribution, and licenses are available from Settings and the public project page.\n\nAlso included\n\n\u2022 Curated puzzle themes\n\u2022 Adjustable pace, duration, and difficulty\n\u2022 Scheduled Review and Replay\n\u2022 Optional move sounds and haptic feedback\n\u2022 Phone, tablet, foldable, and compatible Chromebook layouts",
+  "listingSettings": {
+    "defaultLanguage": "English (United States)",
+    "appOrGame": "Game",
+    "category": "Board",
+    "pricing": "Free"
+  },
+  "contact": {
+    "supportEmail": "support@chessticize.com",
+    "supportUrl": "https://chessticize.com/support/",
+    "marketingUrl": "https://chessticize.com/",
+    "androidInstallUrl": "https://chessticize.com/android/",
+    "accessibilityUrl": "https://chessticize.com/accessibility/",
+    "privacyPolicyUrl": "https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md",
+    "sourceUrl": "https://github.com/Chessticize/chessticize-mobile"
+  },
+  "previewAssets": {
+    "appIcon": {
+      "path": "apps/mobile/store-assets/android/play-icon-512.png",
+      "altText": "Blue diagonal move arrow over a four-square white and gray chessboard."
+    },
+    "featureGraphic": {
+      "path": "apps/mobile/store-assets/android/feature-graphic-1024x500.png",
+      "altText": "Chessticize: Build Tactical Intuition, with practice features and an Android phone showing an Arrow Duel tactic with two candidate arrows."
+    },
+    "screenshots": {
+      "sharedStoryContract": "config/app-store-marketing-story-v1.json#releaseCampaign",
+      "capturePolicy": {
+        "requiredDeviceTypes": [
+          "phone"
+        ],
+        "source": "owner-approved-self-built-android-capture",
+        "presentation": "generic-android-center-punch-hole-no-dynamic-island",
+        "tabletScreenshots": "optional-and-not-in-this-listing-update"
+      },
+      "deviceTypes": [
+        {
+          "id": "phone",
+          "captureCount": 6,
+          "status": "draft-pending-owner-approval"
+        }
+      ],
+      "frames": [
+        {
+          "id": "practice-home",
+          "headline": "Find Your Next Puzzle",
+          "altText": "Practice Home with a fresh puzzle ready to start, a Training Focus card, and bottom navigation."
+        },
+        {
+          "id": "dark-arrow-duel",
+          "headline": "Choose the Best Move",
+          "altText": "Dark Arrow Duel puzzle board with two candidate move arrows and progress for the current session."
+        },
+        {
+          "id": "tactical-profile",
+          "headline": "Find Your Training Focus",
+          "altText": "Training Focus profile with a ranked recommendation and early estimate disclosure for the next practice run."
+        },
+        {
+          "id": "focused-run",
+          "headline": "Practice What You Need",
+          "altText": "Focused Run preview with the selected rating anchor and allocation bar for the planned practice session."
+        },
+        {
+          "id": "survival",
+          "headline": "Beat Your Best",
+          "altText": "Dark personal best hub with a Survival challenge type selected and a visible start control."
+        },
+        {
+          "id": "review",
+          "headline": "Make Every Mistake Count",
+          "altText": "Scheduled Review queue with due puzzles, a start button, and a forecast of upcoming reviews."
+        }
+      ]
+    }
+  },
+  "truthEvidence": [
+    {
+      "id": "offline-production-manifest",
+      "source": "apps/mobile/android/app/src/main/AndroidManifest.xml",
+      "mustNotContain": [
+        "android.permission.INTERNET"
+      ]
+    },
+    {
+      "id": "local-progress-and-backup",
+      "source": "docs/ANDROID_PRIVACY_DISCLOSURE.md",
+      "mustContain": [
+        "local SQLite progress database so practice works offline",
+        "Android-managed backup may copy that progress database",
+        "not continuous synchronization"
+      ]
+    },
+    {
+      "id": "no-account-or-telemetry",
+      "source": "docs/ANDROID_PRIVACY_DISCLOSURE.md",
+      "mustContain": [
+        "does not create a Chessticize account",
+        "no analytics, crash-reporting, advertising, tracking",
+        "remote telemetry SDK"
+      ]
+    },
+    {
+      "id": "no-js-monetization-sdk",
+      "source": "apps/mobile/package.json",
+      "mustNotContain": [
+        "react-native-google-mobile-ads",
+        "react-native-iap",
+        "@revenuecat/purchases-react-native"
+      ]
+    },
+    {
+      "id": "no-native-billing-or-ads",
+      "source": "apps/mobile/android/app/build.gradle",
+      "mustNotContain": [
+        "com.android.billingclient",
+        "com.google.android.gms:play-services-ads"
+      ]
+    },
+    {
+      "id": "public-product-journeys",
+      "source": "docs/TESTING_ARCHITECTURE.md",
+      "mustContain": [
+        "Standard and Arrow Duel board callback handling",
+        "Review queue states",
+        "History filters",
+        "Stockfish analysis integration"
+      ]
+    }
+  ],
+  "prohibitedClaims": [
+    "iCloud",
+    "cross-platform sync",
+    "exact reminder delivery",
+    "automatic updates",
+    "developer telemetry",
+    "Tactical Profile",
+    "weakness detection"
+  ],
+  "releaseCampaign": {
+    "id": "mobile-1.6-en-us",
+    "publicVersion": "1.6.0",
+    "status": "capture-plan"
+  },
+  "listingStatus": "draft-pending-owner-approval"
+}

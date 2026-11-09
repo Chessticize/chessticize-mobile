@@ -572,39 +572,42 @@ test("1.6 campaign binds its new capture contract and title templates", async (t
       headline,
     })),
   );
-  for (const template of Object.values(config.presets.iphone.backgroundTemplates)) {
-    const buffer = await readFile(new URL(template.file, CAMPAIGN_LAYOUT_URL));
-    assert.equal(sha256(buffer), template.sha256);
+  let fixture;
+  for (const family of ["iphone", "ipad"]) {
+    for (const template of Object.values(config.presets[family].backgroundTemplates)) {
+      const buffer = await readFile(new URL(template.file, CAMPAIGN_LAYOUT_URL));
+      assert.equal(sha256(buffer), template.sha256);
+    }
+
+    fixture = await createCampaignManifest(root, config, family);
+    const validated = await validateManifest({
+      captureRoot: fixture.captureRoot,
+      config,
+      deviceFamilies: [family],
+      locale: "en-US",
+      manifest: fixture.manifest,
+    });
+    assert.equal(validated.length, 6);
+
+    const manifestPath = path.join(fixture.captureRoot, "manifest.json");
+    await writeFile(manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
+    const composed = await composeMarketingAssets({
+      campaign: "mobile-1.6-en-us",
+      captureRoot: fixture.captureRoot,
+      deviceFamily: family,
+      manifest: manifestPath,
+      outputDir: path.join(root, `output-${family}`),
+      platform: "app-store",
+      previewOnly: true,
+    });
+    assert.equal(composed.manifest.schemaVersion, 2);
+    assert.deepEqual(composed.manifest.campaign, override.campaign);
+    assert.deepEqual(composed.manifest.source.campaign, override.campaign);
+    assert.deepEqual(
+      composed.manifest.contactSheets.map(({ kind }) => kind),
+      family === "iphone" ? ["overview", "corner-audit"] : ["overview"],
+    );
   }
-
-  const fixture = await createCampaignManifest(root, config, "iphone");
-  const validated = await validateManifest({
-    captureRoot: fixture.captureRoot,
-    config,
-    deviceFamilies: ["iphone"],
-    locale: "en-US",
-    manifest: fixture.manifest,
-  });
-  assert.equal(validated.length, 6);
-
-  const manifestPath = path.join(fixture.captureRoot, "manifest.json");
-  await writeFile(manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
-  const composed = await composeMarketingAssets({
-    campaign: "mobile-1.6-en-us",
-    captureRoot: fixture.captureRoot,
-    deviceFamily: "iphone",
-    manifest: manifestPath,
-    outputDir: path.join(root, "output"),
-    platform: "app-store",
-    previewOnly: true,
-  });
-  assert.equal(composed.manifest.schemaVersion, 2);
-  assert.deepEqual(composed.manifest.campaign, override.campaign);
-  assert.deepEqual(composed.manifest.source.campaign, override.campaign);
-  assert.deepEqual(
-    composed.manifest.contactSheets.map(({ kind }) => kind),
-    ["overview", "corner-audit"],
-  );
 
   fixture.manifest.frames[0].headline = "Build Tactical Intuition";
   await assert.rejects(

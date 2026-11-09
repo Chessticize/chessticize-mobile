@@ -31,6 +31,10 @@ const PLAY_METADATA_URL = new URL(
   "../config/google-play-metadata-en-us-v1.json",
   import.meta.url,
 );
+const CAMPAIGN_PLAY_METADATA_URL = new URL(
+  "../config/google-play-metadata-en-us-mobile-1.6-v2.json",
+  import.meta.url,
+);
 
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
@@ -225,7 +229,10 @@ test("1.6 Google Play campaign selects a v2 receipt and reuses text-free plates"
   ]);
   assert.match(parsed.layoutConfig, /google-play-marketing-layout-mobile-1\.6-en-us-v3\.json$/u);
   assert.equal(campaign.schemaVersion, 2);
-  assert.equal(campaign.altTextContract, null);
+  assert.deepEqual(campaign.altTextContract, {
+    repositoryFile: "config/google-play-metadata-en-us-mobile-1.6-v2.json",
+    collection: "previewAssets.screenshots.frames",
+  });
   assert.deepEqual(
     campaign.frames.map(({ captureId, frameId, headline }) => ({ captureId, frameId, headline })),
     [
@@ -246,6 +253,187 @@ test("1.6 Google Play campaign selects a v2 receipt and reuses text-free plates"
     assert.equal(template.sha256, retained?.sha256);
     assert.equal(template.generatedWith, "openai-imagegen");
   }
+});
+
+
+async function createCampaignPlayFixture(root) {
+  const captureRoot = path.join(root, "campaign-capture");
+  const [base, campaign] = await Promise.all([
+    readFile(PLAY_LAYOUT_URL, "utf8").then(JSON.parse),
+    readFile(CAMPAIGN_PLAY_LAYOUT_URL, "utf8").then(JSON.parse),
+  ]);
+  const config = {
+    ...base,
+    ...campaign,
+    presets: Object.fromEntries(
+      Object.entries(base.presets).map(([family, preset]) => [
+        family,
+        { ...preset, ...(campaign.presets?.[family] ?? {}) },
+      ]),
+    ),
+  };
+  await mkdir(captureRoot, { recursive: true });
+  const frames = [];
+  for (const frameContract of config.frames) {
+    const dimensions = config.presets["android-phone"].acceptedSourceSizes[0];
+    const relativeFile = path.join(
+      "android-phone-phone-portrait",
+      frameContract.fileName,
+    );
+    const absoluteFile = path.join(captureRoot, relativeFile);
+    await mkdir(path.dirname(absoluteFile), { recursive: true });
+    const buffer = await sharp({
+      create: {
+        width: dimensions.width,
+        height: dimensions.height,
+        channels: 3,
+        background: {
+          r: 20 + frameContract.order * 10,
+          g: 72 + frameContract.order * 8,
+          b: 104 + frameContract.order * 6,
+        },
+      },
+    })
+      .png({ adaptiveFiltering: false, compressionLevel: 9 })
+      .toBuffer();
+    await writeFile(absoluteFile, buffer);
+    const capture = {
+      order: frameContract.order,
+      frameId: frameContract.frameId,
+      captureId: frameContract.captureId,
+      locale: config.locale,
+      deviceFamily: "android-phone",
+      displayGroup: "phone",
+      orientation: "portrait",
+      pixelDimensions: dimensions,
+      sourceCommit: "1234567890123456789012345678901234567890",
+      file: relativeFile,
+      fileName: frameContract.fileName,
+      sha256: sha256(buffer),
+    };
+    frames.push({
+      order: frameContract.order,
+      frameId: frameContract.frameId,
+      captureId: frameContract.captureId,
+      headline: frameContract.headline,
+      appearance: frameContract.appearance,
+      storyId: frameContract.storyId,
+      highlights: frameContract.highlights,
+      requiredVisibleTestIds: frameContract.requiredVisibleTestIds,
+      captureAnchorTestId: frameContract.captureAnchorTestId,
+      ...(frameContract.moment ? { moment: frameContract.moment } : {}),
+      ...(frameContract.previewActions
+        ? { previewActions: frameContract.previewActions }
+        : {}),
+      captures: { "android-phone": capture },
+    });
+  }
+  const manifest = {
+    schemaVersion: 2,
+    platform: "google-play",
+    status: "preview-only",
+    campaign: config.campaign,
+    locale: config.locale,
+    artifact: {
+      captureMode: "deterministic-e2e",
+      artifactRole: "detox-e2e-apk",
+      fileName: "chessticize-marketing-preview.apk",
+      bytes: 1024,
+      sha256: "a".repeat(64),
+    },
+    sourceBuild: {
+      sourceCommit: "1234567890123456789012345678901234567890",
+    },
+    targets: {
+      "android-phone": {
+        deviceFamily: "android-phone",
+        displayGroup: "phone",
+        orientation: "portrait",
+        rawPixelDimensions: config.presets["android-phone"].acceptedSourceSizes[0],
+      },
+    },
+    frames,
+  };
+  const manifestPath = path.join(captureRoot, "manifest.json");
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return { captureRoot, config, manifest, manifestPath };
+}
+
+test("1.6 Google Play campaign binds its versioned alt text in a composition receipt", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-google-play-campaign-composition-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createCampaignPlayFixture(root);
+  const outputDir = path.join(root, "output");
+  const result = await composeMarketingAssets({
+    captureRoot: fixture.captureRoot,
+    campaign: "mobile-1.6-en-us",
+    layoutConfig: CAMPAIGN_PLAY_LAYOUT_URL.pathname,
+    manifest: fixture.manifestPath,
+    outputDir,
+    platform: "google-play",
+  });
+  const metadata = JSON.parse(await readFile(CAMPAIGN_PLAY_METADATA_URL, "utf8"));
+  const altTextByFrame = new Map(
+    metadata.previewAssets.screenshots.frames.map((frame) => [
+      frame.id,
+      frame.altText,
+    ]),
+  );
+
+  assert.deepEqual(result.manifest.campaign, fixture.config.campaign);
+  assert.equal(
+    result.manifest.altTextContract.repositoryFile,
+    "config/google-play-metadata-en-us-mobile-1.6-v2.json",
+  );
+  assert.match(result.manifest.altTextContract.sha256, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(
+    result.manifest.artifacts.map(({ altText, frameId }) => ({ altText, frameId })),
+    fixture.config.frames.map(({ frameId }) => ({
+      altText: altTextByFrame.get(frameId),
+      frameId,
+    })),
+  );
+});
+
+test("1.6 Google Play exact capture fails closed until campaign provenance verification is available", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-google-play-campaign-exact-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createCampaignPlayFixture(root);
+  const manifest = structuredClone(fixture.manifest);
+  manifest.status = "exact-artifact-capture";
+  manifest.artifact = {
+    captureMode: "public-ui-exact-artifact",
+    artifactRole: "play-delivered-apk",
+    fileName: "Chessticize-Android-1.6.0.apk",
+    bytes: 1024,
+    sha256: "a".repeat(64),
+    candidate: {
+      applicationId: "com.chessticize.mobile",
+      versionName: "1.6.0",
+      versionCode: 16,
+      aabSha256: "b".repeat(64),
+      signerCertificateSha256: "c".repeat(64),
+    },
+    sourceManifest: { fileName: "android-source-manifest.json", sha256: "d".repeat(64) },
+    mirrorEvidence: { fileName: "android-apk-mirror-evidence.json", sha256: "e".repeat(64) },
+  };
+  await writeFile(fixture.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      campaign: "mobile-1.6-en-us",
+      layoutConfig: CAMPAIGN_PLAY_LAYOUT_URL.pathname,
+      manifest: fixture.manifestPath,
+      outputDir: path.join(root, "output"),
+      platform: "google-play",
+    }),
+    /campaign-aware provenance verifier/u,
+  );
 });
 
 test("Google Play export writes six phone Photo Studio assets with canonical alt text", async (t) => {
