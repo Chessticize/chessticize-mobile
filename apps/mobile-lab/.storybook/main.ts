@@ -73,6 +73,10 @@ const config: StorybookConfig = {
             replacement: fileURLToPath(new URL("../../mobile/src/navigation/nativeTabsFake.tsx", import.meta.url))
           },
           {
+            find: /^.*\/ChessticizeSymbolViewNativeComponent\.ts$/,
+            replacement: fileURLToPath(new URL("../src/browserSymbolViewNativeComponent.ts", import.meta.url))
+          },
+          {
             find: /^.*\/mobilePractice\.ts$/,
             replacement: fileURLToPath(new URL("../src/browserMobilePractice.ts", import.meta.url))
           },

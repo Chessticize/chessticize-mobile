@@ -22,7 +22,7 @@
 		A24700032E70000100A00001 /* freesound-546119-piece-placement.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */; };
 		A24700052E70000100A00001 /* freesound-546120-piece-capture.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */; };
 		A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A24700082E70000100A00001 /* AVFoundation.framework */; };
-		A6090B012F00000100A00001 /* ChessticizeSymbolView.m in Sources */ = {isa = PBXBuildFile; fileRef = A6090B022F00000100A00001 /* ChessticizeSymbolView.m */; };
+		A6090B012F00000100A00001 /* ChessticizeSymbolView.mm in Sources */ = {isa = PBXBuildFile; fileRef = A6090B022F00000100A00001 /* ChessticizeSymbolView.mm */; };
 		B35300012E70000100A00001 /* ICloudSyncDiagnostics.m in Sources */ = {isa = PBXBuildFile; fileRef = B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */; };
 		B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B35300042E70000100A00001 /* libsqlite3.tbd */; };
 		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
@@ -55,7 +55,7 @@
 		A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546119-piece-placement.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546120-piece-capture.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700082E70000100A00001 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
-		A6090B022F00000100A00001 /* ChessticizeSymbolView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ChessticizeSymbolView.m; path = ChessticizeMobile/ChessticizeSymbolView.m; sourceTree = "<group>"; };
+		A6090B022F00000100A00001 /* ChessticizeSymbolView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = ChessticizeSymbolView.mm; path = ChessticizeMobile/ChessticizeSymbolView.mm; sourceTree = "<group>"; };
 		B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ICloudSyncDiagnostics.m; path = ChessticizeMobile/ICloudSyncDiagnostics.m; sourceTree = "<group>"; };
 		B35300042E70000100A00001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };
@@ -86,7 +86,7 @@
 				2A7D186A2E50000100A00001 /* ApplicationMetadata.m */,
 				C41500022E80000100A00001 /* AppStoreReviewRequest.m */,
 				A24700022E70000100A00001 /* MoveFeedback.m */,
-				A6090B022F00000100A00001 /* ChessticizeSymbolView.m */,
+				A6090B022F00000100A00001 /* ChessticizeSymbolView.mm */,
 				A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */,
 				A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
@@ -336,7 +336,7 @@
 				2A7D186B2E50000100A00001 /* ApplicationMetadata.m in Sources */,
 				C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */,
 				A24700012E70000100A00001 /* MoveFeedback.m in Sources */,
-				A6090B012F00000100A00001 /* ChessticizeSymbolView.m in Sources */,
+				A6090B012F00000100A00001 /* ChessticizeSymbolView.mm in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				761780EF2CA45674006654EE /* SceneDelegate.swift in Sources */,
 				8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */,

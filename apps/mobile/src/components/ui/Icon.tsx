@@ -1,32 +1,26 @@
 import React from "react";
-import {
-  Platform,
-  Text,
-  requireNativeComponent,
-  type HostComponent,
-  type ViewProps
-} from "react-native";
+import { Platform, Text, type HostComponent } from "react-native";
+import type { NativeProps as NativeSymbolProps } from "./ChessticizeSymbolViewNativeComponent.ts";
 import { ICON_FONT_FAMILY, ICONS, type IconName } from "./iconNames.ts";
 
 // One icon API for every platform (#609). iOS draws the SF Symbol through the
-// app-local ChessticizeSymbolView; Android and the web Lab draw the matching
-// Material Symbols Rounded glyph from the bundled ChessticizeSymbols subset font.
-// Icons are decorative: put the accessible label on the surrounding control.
-
-type NativeSymbolProps = ViewProps & {
-  symbolName: string;
-  pointSize: number;
-  symbolWeight: IconWeight;
-  // Theme color string; the native view parses "#RRGGBB(AA)" and "rgba()".
-  symbolColor: string;
-};
+// app-local ChessticizeSymbolView Fabric component (#640); Android and the web Lab
+// draw the matching Material Symbols Rounded glyph from the bundled
+// ChessticizeSymbols subset font. Icons are decorative: put the accessible label on
+// the surrounding control.
 
 type IconWeight = "regular" | "semibold" | "bold";
 
 let NativeSymbolView: HostComponent<NativeSymbolProps> | null = null;
 
+// Loaded on first iOS use only, so Android and the web Lab never evaluate the
+// native component spec.
 function nativeSymbolView(): HostComponent<NativeSymbolProps> {
-  NativeSymbolView ??= requireNativeComponent<NativeSymbolProps>("ChessticizeSymbolView");
+  NativeSymbolView ??= (
+    require("./ChessticizeSymbolViewNativeComponent.ts") as {
+      default: HostComponent<NativeSymbolProps>;
+    }
+  ).default;
   return NativeSymbolView;
 }
 

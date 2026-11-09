@@ -123,6 +123,13 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
+// The SF Symbol view is a codegen Fabric component (#640); its generated view
+// config needs the native runtime, so tests render it as a plain host element.
+jest.mock('./src/components/ui/ChessticizeSymbolViewNativeComponent.ts', () => ({
+  __esModule: true,
+  default: require('react-native').requireNativeComponent('ChessticizeSymbolView'),
+}));
+
 jest.mock('react-native-chessboard', () => {
   const React = require('react');
   const { Chess } = require('chess.js');
