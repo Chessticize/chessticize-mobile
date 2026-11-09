@@ -2105,7 +2105,6 @@ function HistoryUnclearAction({
   actionLabel?: "Clear" | "Mark clear";
   onClear: () => void;
 }): React.JSX.Element {
-  const styles = useStyles();
   return (
     <ReviewActionRow
       accessibilityLabel="This attempt is marked unclear"
