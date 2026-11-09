@@ -21,6 +21,7 @@ import {
   nativeTabBarMinimizeBehavior,
   nativeTabControllerMode,
   nativeTabSelectionRequest,
+  placeholderIdiomForWindow,
   reconcileNativeTabSelection,
   resolveTopLevelChromePlacement,
   reviewTabBadge,
@@ -87,16 +88,21 @@ export function NativeTabHost({
   // In the plain tab bar mode the iPad top tab bar floats over the content
   // without adding to the tab screen's top safe area, so content keeps clear
   // of it here.
-  const iPadTopBarShown = Platform.OS === "ios"
-    && Platform.isPad === true
+  // The Lab uses the maintained native-tabs fake, which has no Platform.isPad
+  // but follows the same regular iPad window rule as the native host.
+  const iPadTopTabCandidate = Platform.OS === "ios"
+    ? Platform.isPad === true
+    : Platform.OS === "web" && placeholderIdiomForWindow(width, height) === "pad";
+  const iPadTopBarShown = iPadTopTabCandidate
     && !chromeHidden
     && resolveTopLevelChromePlacement({ height, idiom: "pad", insets: windowInsets, platform: "ios", width }) === "topBar";
   const minimumTop = iPadTopBarShown ? windowInsets.top + IPAD_TOP_TAB_BAR_CLEARANCE : 0;
   const chromeContext = React.useMemo<TabChromeLayout>(() => ({
     bottomNavigationShown: Platform.OS === "android" && !usesAndroidRail && !chromeHidden,
     leadingRailWidth: railShown ? NAVIGATION_RAIL_WIDTH : 0,
-    minimumTop
-  }), [chromeHidden, minimumTop, railShown, usesAndroidRail]);
+    minimumTop,
+    topTabBarOverlay: iPadTopBarShown
+  }), [chromeHidden, iPadTopBarShown, minimumTop, railShown, usesAndroidRail]);
   const host = (
     <Tabs.Host
       colorScheme={colorScheme}
@@ -211,12 +217,15 @@ type TabChromeLayout = {
   leadingRailWidth: number;
   // Smallest top inset that keeps content below the iPad top tab bar.
   minimumTop: number;
+  // The iPad tab bar is a floating overlay rather than an opaque shell edge.
+  topTabBarOverlay: boolean;
 };
 
 const TabChromeContext = React.createContext<TabChromeLayout>({
   bottomNavigationShown: false,
   leadingRailWidth: 0,
-  minimumTop: 0
+  minimumTop: 0,
+  topTabBarOverlay: false
 });
 
 // Insets of the current tab's content area, including the space the native tab
@@ -225,14 +234,23 @@ const TabChromeContext = React.createContext<TabChromeLayout>({
 // On Android the tab content extends edge to edge under the Material bottom
 // navigation, and the nested safe area reports only the system navigation bar
 // (gesture or 3-button), so the bottom navigation's height is added here.
-export function useTabContentInsets(): { bottom: number; left: number; right: number; top: number } {
+export type TabContentInsets = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+  topTabBarOverlay: boolean;
+};
+
+export function useTabContentInsets(): TabContentInsets {
   const insets = useSafeAreaInsets();
   const chrome = React.useContext(TabChromeContext);
   return {
     ...insets,
     bottom: chrome.bottomNavigationShown ? insets.bottom + ANDROID_BOTTOM_NAVIGATION_HEIGHT : insets.bottom,
     left: chrome.leadingRailWidth > 0 ? insets.left + chrome.leadingRailWidth : insets.left,
-    top: Math.max(insets.top, chrome.minimumTop)
+    top: Math.max(insets.top, chrome.minimumTop),
+    topTabBarOverlay: chrome.topTabBarOverlay
   };
 }
 
@@ -245,13 +263,13 @@ export function useTabContentInsets(): { bottom: number; left: number; right: nu
 export function TabContentInsetsReporter({
   onChange
 }: {
-  onChange: (insets: { bottom: number; left: number; right: number; top: number }) => void;
+  onChange: (insets: TabContentInsets) => void;
 }): null {
   const insets = useTabContentInsets();
-  const { bottom, left, right, top } = insets;
+  const { bottom, left, right, top, topTabBarOverlay } = insets;
   React.useLayoutEffect(() => {
-    onChange({ bottom, left, right, top });
-  }, [bottom, left, onChange, right, top]);
+    onChange({ bottom, left, right, top, topTabBarOverlay });
+  }, [bottom, left, onChange, right, top, topTabBarOverlay]);
   return null;
 }
 

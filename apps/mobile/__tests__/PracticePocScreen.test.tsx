@@ -6590,6 +6590,83 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("lets an iPad top-tab page scroll behind the glass while its initial content stays clear", () => {
+    const platform = ReactNative.Platform as unknown as { isPad?: boolean };
+    const previousIsPad = platform.isPad;
+    platform.isPad = true;
+    try {
+      setPracticeViewport({
+        width: 1180,
+        height: 820,
+        scale: 2,
+        insets: { top: 24, right: 0, bottom: 20, left: 0 }
+      });
+      const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+      const shell = findByTestId(renderer, "safe-area-shell");
+      const scroll = findByTestId(renderer, "practice-main-scroll");
+
+      // The scroll view reaches the window top. Its content begins below the
+      // 24-point system inset and 72-point floating native tab bar instead.
+      expect(flattenTestStyle(shell.props.style).paddingTop).toBe(0);
+      expect(flattenTestStyle(scroll.props.contentContainerStyle).paddingTop).toBe(96);
+      expect(scroll.findByProps({ testID: "app-shell-header" })).toBeTruthy();
+
+      // Settings uses the same scroll-owned large-title header. Review owns
+      // its header but receives the same initial top clearance.
+      press(renderer, "settings-tab");
+      const settingsScroll = findByTestId(renderer, "practice-main-scroll");
+      expect(settingsScroll.findByProps({ testID: "app-shell-header" })).toBeTruthy();
+      expect(flattenTestStyle(settingsScroll.props.contentContainerStyle).paddingTop).toBe(96);
+      press(renderer, "review-tab");
+      const reviewScroll = findByTestId(renderer, "practice-main-scroll");
+      expect(() => reviewScroll.findByProps({ testID: "app-shell-header" })).toThrow();
+      expect(flattenTestStyle(reviewScroll.props.contentContainerStyle).paddingTop).toBe(96);
+    } finally {
+      if (previousIsPad === undefined) {
+        delete platform.isPad;
+      } else {
+        platform.isPad = previousIsPad;
+      }
+    }
+  });
+
+  it.each([
+    { platform: "ios", insetTop: 47 },
+    { platform: "android", insetTop: 24 }
+  ] as const)("keeps the Practice title in the main scroll on $platform without changing its safe-area start", ({ insetTop, platform: targetPlatform }) => {
+    const nativePlatform = ReactNative.Platform as unknown as { isPad?: boolean; OS: string };
+    const previousIsPad = nativePlatform.isPad;
+    const previousPlatform = nativePlatform.OS;
+    nativePlatform.OS = targetPlatform;
+    nativePlatform.isPad = false;
+    try {
+      setPracticeViewport({
+        width: 390,
+        height: 844,
+        scale: 3,
+        insets: { top: insetTop, right: 0, bottom: 20, left: 0 }
+      });
+      const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+      const shell = findByTestId(renderer, "safe-area-shell");
+      const practiceScroll = findByTestId(renderer, "practice-main-scroll");
+
+      expect(flattenTestStyle(shell.props.style).paddingTop).toBe(insetTop);
+      expect(practiceScroll.findByProps({ testID: "app-shell-header" })).toBeTruthy();
+
+      press(renderer, "settings-tab");
+      const settingsScroll = findByTestId(renderer, "practice-main-scroll");
+      expect(() => settingsScroll.findByProps({ testID: "app-shell-header" })).toThrow();
+      expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
+    } finally {
+      nativePlatform.OS = previousPlatform;
+      if (previousIsPad === undefined) {
+        delete nativePlatform.isPad;
+      } else {
+        nativePlatform.isPad = previousIsPad;
+      }
+    }
+  });
+
   it.each([
     { label: "Duo inner landscape", width: 951, height: 669, insets: { top: 0, right: 84, bottom: 20, left: 0 }, centered: true, boardSize: 525 },
     { label: "iPad landscape", width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 }, centered: true, boardSize: 640 },
