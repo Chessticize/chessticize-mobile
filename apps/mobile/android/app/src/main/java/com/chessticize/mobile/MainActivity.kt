@@ -5,10 +5,12 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.view.ViewTreeObserver
 import androidx.activity.OnBackPressedCallback
 import androidx.core.view.WindowCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 import com.swmansion.rnscreens.fragment.restoration.RNScreensFragmentFactory
@@ -30,6 +32,7 @@ internal fun reviewReminderPermissionResult(grantResults: IntArray): ReviewRemin
 }
 
 class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewReminderPermissionHost {
+  private var handledFontScale = Float.NaN
   private var reviewReminderPermissionCallback: ((ReviewReminderPermissionResult) -> Unit)? = null
   private val reactNativeBackPressedCallback: OnBackPressedCallback by lazy(LazyThreadSafetyMode.NONE) {
     val callbackField = ReactActivity::class.java.getDeclaredField("mBackPressedCallback")
@@ -45,12 +48,41 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
     // so the native tab host must not restore the previous tab selection (#612).
     supportFragmentManager.fragmentFactory = RNScreensFragmentFactory()
     super.onCreate(null)
+    handledFontScale = resources.configuration.fontScale
     syncSystemBars()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
+    val fontScaleChanged = newConfig.fontScale != handledFontScale
+    handledFontScale = newConfig.fontScale
     super.onConfigurationChanged(newConfig)
     syncSystemBars()
+    if (fontScaleChanged) {
+      publishFontScaleAfterLayout()
+    }
+  }
+
+  /**
+   * The activity handles `fontScale` in place (#637) instead of restarting and
+   * dropping a live Run. React Native re-lays out its surfaces with the new
+   * multiplier on the next layout pass, but in bridgeless mode DeviceInfo only
+   * reports a new font scale to JavaScript on resume, so Dimensions and the
+   * patched Text would keep the old value while the app stays in front. After
+   * that layout pass, DeviceInfo re-reads the font scale and emits the change,
+   * so JavaScript re-renders with a multiplier the native layout already uses.
+   */
+  private fun publishFontScaleAfterLayout() {
+    val decorView = window.decorView
+    decorView.viewTreeObserver.addOnGlobalLayoutListener(
+      object : ViewTreeObserver.OnGlobalLayoutListener {
+        override fun onGlobalLayout() {
+          decorView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+          val deviceInfo = reactActivityDelegate.currentReactContext?.getNativeModule("DeviceInfo")
+          (deviceInfo as? LifecycleEventListener)?.onHostResume()
+        }
+      },
+    )
+    decorView.requestLayout()
   }
 
   /**
