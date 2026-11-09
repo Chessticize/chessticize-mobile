@@ -495,7 +495,7 @@ export function PersonalBestChallengeHub({
           >
             <Section rows>
               {inProgress.map((run) => (
-                <View key={run.id} style={rowStyle} testID={`personal-best-paused-${run.id}`}>
+                <View key={run.id} style={[rowStyle, styles.pausedRunRow]} testID={`personal-best-paused-${run.id}`}>
                   <View style={styles.rowCopy}>
                     <AppText variant="headline">{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</AppText>
                     <AppText tone="secondary" variant="subheadline">
@@ -509,6 +509,7 @@ export function PersonalBestChallengeHub({
                     accessibilityLabel={`Continue ${challengeTypeLabel(run.challengeType)} ${levelLabel(run)}`}
                     label="Continue"
                     size="compact"
+                    style={styles.pausedRunContinue}
                     testID={`personal-best-paused-continue-${run.id}`}
                     onPress={() => onContinue(run.id)}
                   />
@@ -838,14 +839,13 @@ export function PersonalBestProgressBanner({
         : `${score} solved, ${remaining} more to beat best ${bestScore}`}
       style={[
         styles.progressBanner,
-        showsRecordMilestone ? styles.progressBannerRecord : null,
         compact ? styles.progressBannerCompact : null
       ]}
       testID="personal-best-progress"
     >
       {showsRecordMilestone ? (
         <View style={styles.recordMilestoneRow}>
-          <Badge label={`NEW BEST ${score.toLocaleString("en-US")}`} testID="personal-best-record-badge" tone="warning" />
+          <Badge label={`NEW BEST ${score.toLocaleString("en-US")}`} testID="personal-best-record-badge" tone="accent" />
           <AppText
             adjustsFontSizeToFit
             minimumFontScale={0.85}
@@ -1474,6 +1474,15 @@ const useStyles = makeStyles((theme) => ({
     minHeight: theme.metrics.minTarget,
     paddingHorizontal: 4
   },
+  pausedRunContinue: {
+    alignSelf: "flex-end"
+  },
+  pausedRunRow: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: theme.spacing.inline,
+    paddingVertical: 12
+  },
   pressed: {
     backgroundColor: theme.colors.surfaceStrong
   },
@@ -1496,9 +1505,6 @@ const useStyles = makeStyles((theme) => ({
   progressBannerCompact: {
     paddingHorizontal: 10,
     paddingVertical: 8
-  },
-  progressBannerRecord: {
-    backgroundColor: theme.colors.warning.s50
   },
   progressCopyAndTrack: {
     gap: theme.spacing.inline
