@@ -527,6 +527,9 @@ async function assertForbiddenState(frame) {
       throw new Error(`Review marketing frame must not show overdue work: ${dueCardText}`);
     }
   }
+  if (frame.id === 'review') {
+    await expect(element(by.text('Overdue now'))).not.toExist();
+  }
 }
 
 async function assertNativeResponsiveLayout(frame) {

@@ -127,9 +127,10 @@ pnpm app-store:compose-marketing -- \
 ```
 
 Review the single contact sheet. Omit `--preview-only` to write the six opaque
-1080 x 1920 upload assets and `composition-manifest.json`. The campaign-aware
-Google verifier currently fails closed for a final export until that verifier
-accepts the v2 campaign receipt; preview-only remains useful for layout review.
+1080 x 1920 upload assets and `composition-manifest.json`. A self-built v2
+capture with its truthful preparation status can export these assets after
+review. Exact-artifact capture provenance remains separately fail-closed until
+the campaign-aware verifier accepts its schema-v2 receipt.
 
 ## Listing handoff
 
