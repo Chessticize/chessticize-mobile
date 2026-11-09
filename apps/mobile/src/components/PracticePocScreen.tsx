@@ -4425,7 +4425,7 @@ export function PracticePocScreen({
   ) : null;
   // The inline abandon confirmation occupies the paused card's slot below the
   // HUD. Keeping the card mounted behind its absolute sheet leaves its border
-  // exposed below the sheet, especially after the top-tab scroll change.
+  // exposed below the sheet.
   const pausedSessionNode = isPaused && state && !personalBestActivePresentation
     && !practiceExitConfirmationVisible ? (
     <PausedSessionPanel

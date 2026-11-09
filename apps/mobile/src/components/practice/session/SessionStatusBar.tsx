@@ -456,6 +456,7 @@ export function SessionStatusBar({
         <View
           style={[
             styles.sessionLeaveConfirmationOverlay,
+            state.status === "paused" ? styles.sessionLeaveConfirmationInFlow : null,
             styles.sessionAbandonConfirm,
             stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
             leaveConfirmationMinHeight === undefined
@@ -670,6 +671,12 @@ const useStyles = makeStyles((theme) => ({
     shadowRadius: 8,
     top: "100%",
     zIndex: 12
+  },
+  // A paused Sprint has no board or prompt to cover. Its confirmation owns
+  // normal flow so native scroll bounds include the complete card.
+  sessionLeaveConfirmationInFlow: {
+    position: "relative",
+    top: 0
   },
   sessionNavRow: {
     alignItems: "center",
