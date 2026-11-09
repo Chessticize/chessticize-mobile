@@ -14,10 +14,17 @@ import test from "node:test";
 
 import sharp from "sharp";
 
-import { composeMarketingAssets } from "../.codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs";
+import {
+  composeMarketingAssets,
+  parseArgs,
+} from "../.codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs";
 
 const PLAY_LAYOUT_URL = new URL(
   "../.codex/skills/chessticize-app-store-marketing/assets/google-play-marketing-layout-v2.json",
+  import.meta.url,
+);
+const CAMPAIGN_PLAY_LAYOUT_URL = new URL(
+  "../.codex/skills/chessticize-app-store-marketing/assets/google-play-marketing-layout-mobile-1.6-en-us-v3.json",
   import.meta.url,
 );
 const PLAY_METADATA_URL = new URL(
@@ -199,6 +206,46 @@ test("Google Play layout encodes the phone-only Android Photo Studio policy", as
     layout.presets["android-phone"].product.topRatio <=
       layout.storePolicy.phoneOverlayMaximumHeightRatio,
   );
+});
+
+test("1.6 Google Play campaign selects a v2 receipt and reuses text-free plates", async () => {
+  const [base, campaign] = await Promise.all([
+    readFile(PLAY_LAYOUT_URL, "utf8").then(JSON.parse),
+    readFile(CAMPAIGN_PLAY_LAYOUT_URL, "utf8").then(JSON.parse),
+  ]);
+  const parsed = parseArgs([
+    "--capture-root",
+    "/tmp/raw",
+    "--output-dir",
+    "/tmp/output",
+    "--platform",
+    "google-play",
+    "--campaign",
+    "mobile-1.6-en-us",
+  ]);
+  assert.match(parsed.layoutConfig, /google-play-marketing-layout-mobile-1\.6-en-us-v3\.json$/u);
+  assert.equal(campaign.schemaVersion, 2);
+  assert.equal(campaign.altTextContract, null);
+  assert.deepEqual(
+    campaign.frames.map(({ captureId, frameId, headline }) => ({ captureId, frameId, headline })),
+    [
+      { captureId: "practice-home", frameId: "practice-home", headline: "Find Your Next Puzzle" },
+      { captureId: "dark-arrow-duel", frameId: "dark-arrow-duel", headline: "Choose the Best Move" },
+      { captureId: "tactical-profile", frameId: "tactical-profile", headline: "Find Your Training Focus" },
+      { captureId: "focused-run", frameId: "focused-run", headline: "Practice What You Need" },
+      { captureId: "survival", frameId: "survival", headline: "Beat Your Best" },
+      { captureId: "review", frameId: "review", headline: "Make Every Mistake Count" },
+    ],
+  );
+  const campaignTemplates = campaign.presets["android-phone"].backgroundTemplates;
+  const baseTemplates = base.presets["android-phone"].backgroundTemplates;
+  for (const template of Object.values(campaignTemplates)) {
+    const retained = Object.values(baseTemplates).find(
+      ({ file }) => file === template.file,
+    );
+    assert.equal(template.sha256, retained?.sha256);
+    assert.equal(template.generatedWith, "openai-imagegen");
+  }
 });
 
 test("Google Play export writes six phone Photo Studio assets with canonical alt text", async (t) => {

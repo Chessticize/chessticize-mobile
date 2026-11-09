@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "extends": "app-store-marketing-layout-v2.json",
+  "layoutId": "chessticize-photo-studio-a-mobile-1.6-en-us-v3",
+  "campaign": {
+    "id": "mobile-1.6-en-us",
+    "publicVersion": "1.6.0",
+    "status": "capture-plan"
+  },
+  "frames": [
+    {
+      "order": 1,
+      "frameId": "practice-home",
+      "captureId": "practice-home",
+      "headline": "Find Your Next Puzzle",
+      "fileName": "practice-home.png",
+      "appearance": "light",
+      "highlights": ["fresh-design", "practice-home", "native-navigation"],
+      "storyId": "practice--home",
+      "requiredVisibleTestIds": ["practice-home", "practice-run-start", "training-focus-card"],
+      "captureAnchorTestId": "practice-home"
+    },
+    {
+      "order": 2,
+      "frameId": "dark-arrow-duel",
+      "captureId": "dark-arrow-duel",
+      "headline": "Choose the Best Move",
+      "fileName": "dark-arrow-duel.png",
+      "appearance": "dark",
+      "highlights": ["dark-mode", "arrow-duel"],
+      "storyId": "practice--arrow-duel-prompt",
+      "requiredVisibleTestIds": ["session-board", "session-progress"],
+      "moment": "opponent-reply",
+      "captureAnchorTestId": "active-session-shell"
+    },
+    {
+      "order": 3,
+      "frameId": "tactical-profile",
+      "captureId": "tactical-profile",
+      "headline": "Find Your Training Focus",
+      "fileName": "tactical-profile.png",
+      "appearance": "light",
+      "highlights": ["tactical-profile"],
+      "storyId": "practice--tactical-profile-ranked",
+      "requiredVisibleTestIds": ["tactical-profile-active-mode", "tactical-profile-recommendations"],
+      "previewActions": ["training-focus-open-profile"],
+      "captureAnchorTestId": "tactical-profile-screen"
+    },
+    {
+      "order": 4,
+      "frameId": "focused-run",
+      "captureId": "focused-run",
+      "headline": "Practice What You Need",
+      "fileName": "focused-run.png",
+      "appearance": "light",
+      "highlights": ["focused-run"],
+      "storyId": "practice--tactical-profile-focused-run",
+      "requiredVisibleTestIds": ["focused-run-rating-anchor", "focused-run-allocation-bar"],
+      "captureAnchorTestId": "focused-run-preview"
+    },
+    {
+      "order": 5,
+      "frameId": "survival",
+      "captureId": "survival",
+      "headline": "Beat Your Best",
+      "fileName": "survival.png",
+      "appearance": "dark",
+      "highlights": ["survival"],
+      "storyId": "practice--personal-best-hub",
+      "requiredVisibleTestIds": ["personal-best-hub", "personal-best-type-selector", "personal-best-hub-start"],
+      "captureAnchorTestId": "personal-best-hub"
+    },
+    {
+      "order": 6,
+      "frameId": "review",
+      "captureId": "review",
+      "headline": "Make Every Mistake Count",
+      "fileName": "review.png",
+      "appearance": "light",
+      "highlights": ["scheduled-review"],
+      "storyId": "review--due-queue",
+      "requiredVisibleTestIds": ["review-due-card", "review-start-due", "review-forecast"],
+      "captureAnchorTestId": "review-panel"
+    }
+  ],
+  "visualDirection": {
+    "name": "Photo Studio A",
+    "composition": "product-first-photographic-device",
+    "background": "warm-white-icy-blue-chessboard-mobile-1.6-v3",
+    "productProof": "immutable-native-capture-in-exact-generated-device-silhouette"
+  },
+  "presets": {
+    "iphone": {
+      "backgroundTemplates": {
+        "practice-home": { "file": "photo-studio-frame-16-01-iphone-portrait-v3.png", "sha256": "6d23c61117289ee078fb8041cd8a1b10c1eba84a2911bc3e1c580dcd142b69c8", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "dark-arrow-duel": { "file": "photo-studio-frame-02-iphone-portrait-v2.png", "sha256": "6811e1fd62442ef5e55c4352493fe430e223553d3d2836273279b7edd76faa3f", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "tactical-profile": { "file": "photo-studio-frame-16-03-iphone-portrait-v3.png", "sha256": "68696100b8f5b787f034979b352443688f5b6a11e9fe1ce3708ca3d9aa5d36f2", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "focused-run": { "file": "photo-studio-frame-16-04-iphone-portrait-v3.png", "sha256": "40c5f8f8386377512e5c3633faa20b322de1c062398f3f794b69824060fcfa1a", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "survival": { "file": "photo-studio-frame-16-05-iphone-portrait-v3.png", "sha256": "36fd0c48af0f330e79df65f22a019aa188a3c36a4f4ff5ddd6cf093c62154458", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "review": { "file": "photo-studio-frame-04-iphone-portrait-v2.png", "sha256": "a3daa639ca678171358edd9e716ac6ed51c97d67272ef59c6e50400bb52d79c0", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" }
+      }
+    },
+    "ipad": {
+      "backgroundTemplates": {
+        "practice-home": { "file": "photo-studio-frame-16-01-ipad-landscape-v3.png", "sha256": "f9db4e793fec07b997b3893e22587303de604d7175aa7bb0b9073336b6286461", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "dark-arrow-duel": { "file": "photo-studio-frame-02-ipad-landscape-v2.png", "sha256": "8b49879518de63ee793f4150ec9a5c1909f4d800f2fcd2a6870c2a155d2000f1", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "tactical-profile": { "file": "photo-studio-frame-16-03-ipad-landscape-v3.png", "sha256": "ee953bbc3070871a10ec11ea224ca78ecb9bffba53c54c964a838b2999a92aed", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "focused-run": { "file": "photo-studio-frame-16-04-ipad-landscape-v3.png", "sha256": "6c7f7f0f88b9669cfc7242e90a5cfa957f58853674a5eabae6de9b68351a0545", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "survival": { "file": "photo-studio-frame-16-05-ipad-landscape-v3.png", "sha256": "0b18371e2edba8c750bfb0186711c8a7e6abc67898d48e22a46b38f1c34b4107", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen-derived-deterministic-headline-v1" },
+        "review": { "file": "photo-studio-frame-04-ipad-landscape-v2.png", "sha256": "acdd3a58806cc941509124840dc0bfddd94f921c649b1f0735712f0a0497015a", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" }
+      }
+    }
+  }
+}
