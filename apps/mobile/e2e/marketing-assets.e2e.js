@@ -557,6 +557,11 @@ async function assertNativeResponsiveLayout(frame) {
     const tabFrame = await frameFor(practiceTab);
     assertPositiveFrame(tabFrame, `${frame.id} native Practice tab`);
   }
+  if (frame.id === 'survival') {
+    // Survival setup is an intentional full-screen surface on every device.
+    await expect(topLevelTab('practice-tab')).not.toExist();
+    return;
+  }
   if (isWideTabletTarget()) {
     const isActiveSessionFrame = (
       frame.id === 'build-tactical-intuition'
@@ -685,7 +690,7 @@ async function assertRequiredFrameGeometry(frame) {
     }
   }
 
-  if (!isWideTabletTarget() || [
+  if (frame.id === 'survival' || !isWideTabletTarget() || [
     'build-tactical-intuition',
     'choose-the-best-move',
     'dark-arrow-duel',
