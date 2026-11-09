@@ -712,7 +712,7 @@ function SprintRulesGuide({
   // One badge width for every rule so the descriptions share a column. The
   // width follows the text size; when it would take more than a third of the
   // card (narrow screens at accessibility sizes), badges stack above their copy.
-  const { fontScale } = usePracticeViewport();
+  const { fontScale, width: viewportWidth } = usePracticeViewport();
   const [listWidth, setListWidth] = useState(0);
   const badgeMinWidth = Math.ceil(SPRINT_RULE_BADGE_MIN_WIDTH * Math.max(1, fontScale));
   const stacked = listWidth > 0 && badgeMinWidth > listWidth / 3;
@@ -721,7 +721,9 @@ function SprintRulesGuide({
   // of the header row and squeezes the title to one word per line. Past a third
   // of the card it moves below the title, which then gets the full width.
   const dismissMinWidth = Math.ceil(SPRINT_RULES_DISMISS_MIN_WIDTH * Math.max(1, fontScale));
-  const dismissStacked = listWidth > 0 && dismissMinWidth > listWidth / 3;
+  // Until the list reports its width, estimate it from the screen (page and card
+  // padding) so the first frame does not flip from side by side to stacked.
+  const dismissStacked = dismissMinWidth > (listWidth > 0 ? listWidth : viewportWidth - 64) / 3;
 
   return (
     <View
