@@ -48,7 +48,6 @@ import {
   formatLocalCalendarDate,
   formatLocalCalendarDateLabel,
   formatReviewDay,
-  formatWhitePerspectiveScore,
   historyAttemptReplayAvailability,
   historyAttemptSpeedSeconds,
   isAttemptMarkedUnclear,
@@ -98,7 +97,6 @@ import type {
   PuzzleFeedback,
   PuzzleLineState,
   PracticeRunRecord,
-  RatingRecord,
   ReviewAnalysisLine,
   ReviewReminderDecision,
   ReviewQueueItem,
@@ -113,8 +111,7 @@ import type {
   SprintSessionGuideStep,
   TacticalProfileTaskFamily,
   ThemeChoiceIntent,
-  SprintState,
-  UciEngineTransport
+  SprintState
 } from "../../../../packages/core/src/index.ts";
 import {
   ActiveSprintConflictError,
@@ -135,8 +132,7 @@ import type {
 import {
   ProgressV2SyncCancelledError,
   fingerprintOpaqueToken,
-  syncPracticeProgressV2,
-  type ProgressV2SyncResult
+  syncPracticeProgressV2
 } from "../../../../packages/storage/src/progress-sync-v2.ts";
 import type { PracticeProgressSummary } from "../../../../packages/storage/src/rating-history.ts";
 import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
@@ -169,7 +165,6 @@ import {
   type SupportDiagnosticMetadata
 } from "../platform/iCloudSyncDiagnostics.ts";
 import type {
-  MobileApplicationMetadata,
   MobilePlatformCapabilities,
   MobileStockfishCapabilities
 } from "../platform/mobilePlatformCapabilities.ts";
@@ -214,10 +209,9 @@ import type {
   MobileSystemBackEdge,
   MobileSystemBackSource
 } from "../navigation/mobileSystemBack.ts";
-import {
-  MoveFeedbackSettingsSection,
-  type MoveFeedbackPreferences,
-  type MoveFeedbackPreviewer
+import type {
+  MoveFeedbackPreferences,
+  MoveFeedbackPreviewer
 } from "./MoveFeedbackSettingsSection.tsx";
 import {
   emitCommittedMoveFeedback,
@@ -252,7 +246,6 @@ import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
 import { WhatsNewSheet } from "./WhatsNewSheet.tsx";
 import { useWhatsNew } from "../whatsNew/useWhatsNew.ts";
-import { WHATS_NEW_SETTINGS_LABEL } from "../whatsNew/whatsNewContent.ts";
 import {
   sessionGuideContainerTestID,
   sessionGuideStartLabel,
@@ -270,11 +263,9 @@ import {
 } from "./TacticalProfileSection.tsx";
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
 import { useTacticalProfilePresentation } from "./useTacticalProfilePresentation.ts";
-import {
-  ICloudSyncErrorDetails,
-  ICloudSyncSupportDiagnosticsEntry,
-  type ICloudSyncErrorDetailsPresentation,
-  type ICloudSyncSupportBundlePresentation
+import type {
+  ICloudSyncErrorDetailsPresentation,
+  ICloudSyncSupportBundlePresentation
 } from "./ICloudSyncErrorDetails.tsx";
 import {
   HistoryProgressEntryButton,
@@ -327,7 +318,7 @@ export type {
 } from "./historyProgressPresentation.ts";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 import { typography as baseTypography } from "../theme/scales.ts";
-import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, SegmentedControl, useListRowStyle, type IconName } from "./ui/index.tsx";
+import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, useListRowStyle, type IconName } from "./ui/index.tsx";
 import type { MoveSide } from "./practice/shared/moveSide.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
 import {
@@ -346,6 +337,18 @@ import { CollapsibleRegion, DisclosureChevron } from "./practice/shared/Collapsi
 import { ToolbarIconButton } from "./practice/shared/ToolbarIconButton.tsx";
 import { FilterButton } from "./practice/shared/FilterButton.tsx";
 import { AttemptStatusTile } from "./practice/shared/AttemptStatusTile.tsx";
+import { ANALYSIS_DEPTH, errorMessage, FABRIC_SAFE_HIDDEN_TEXT_STYLE, safeTestId } from "./practice/shared/practiceUtils.ts";
+import {
+  iCloudAccountStatusMessage,
+  localReminderTarget,
+  progressSyncStatusMessage,
+  ratingLabelFromKey,
+  ReviewReminderPermissionPrompt,
+  reviewReminderScheduleStatusLabel,
+  scheduledReviewAttemptCount,
+  SettingsPanel,
+  StockfishDiagnosticsPanel
+} from "./practice/settings/SettingsPanel.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

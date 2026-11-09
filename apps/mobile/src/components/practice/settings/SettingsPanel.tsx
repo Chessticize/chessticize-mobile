@@ -1,3 +1,70 @@
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Modal,
+  Pressable,
+  type StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle
+} from "react-native";
+import { Chess } from "chess.js";
+import {
+  computeReviewReminderDecision,
+  type ReviewReminderPermissionStatus,
+  type ReviewReminderScheduleResult
+} from "../../../platform/reviewReminderScheduler.ts";
+import type { ProgressV2SyncResult } from "../../../../../../packages/storage/src/progress-sync-v2.ts";
+import type { ICloudAccountStatus } from "../../../platform/iCloudProgressSync.ts";
+import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
+import type {
+  MobileApplicationMetadata,
+  MobilePlatformCapabilities,
+  MobileStockfishCapabilities
+} from "../../../platform/mobilePlatformCapabilities.ts";
+import {
+  analyzeFenWithUciEngine,
+  type EngineAnalysisLine,
+  formatWhitePerspectiveScore,
+  RATING_FLOOR,
+  type RatingRecord,
+  stepManualRating,
+  type UciEngineTransport
+} from "../../../../../../packages/core/src/index.ts";
+import type { ReviewReminderPreference } from "../../../../../../packages/storage/src/practice-store.ts";
+import {
+  ICloudSyncErrorDetails,
+  type ICloudSyncErrorDetailsPresentation,
+  type ICloudSyncSupportBundlePresentation,
+  ICloudSyncSupportDiagnosticsEntry
+} from "../../ICloudSyncErrorDetails.tsx";
+import { type AppearancePreference, makeStyles, useTheme } from "../../../theme/index.ts";
+import {
+  type MoveFeedbackPreferences,
+  type MoveFeedbackPreviewer,
+  MoveFeedbackSettingsSection
+} from "../../MoveFeedbackSettingsSection.tsx";
+import { getBundledCorePackManifest } from "../../../platform/mobilePractice.ts";
+import { arePracticeTestControlsEnabled } from "../../../releaseConfig.ts";
+import {
+  AppText,
+  Badge,
+  Button,
+  Icon,
+  IconTile,
+  Section,
+  SegmentedControl,
+  useListRowStyle
+} from "../../ui/index.tsx";
+import { WHATS_NEW_SETTINGS_LABEL } from "../../../whatsNew/whatsNewContent.ts";
+import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
+import { ChevronGlyph, CloseGlyph } from "../shared/Glyphs.tsx";
+import { normalizeUci } from "../../../backend/premove.ts";
+import { ANALYSIS_DEPTH, errorMessage, FABRIC_SAFE_HIDDEN_TEXT_STYLE, safeTestId } from "../shared/practiceUtils.ts";
+
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
 
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
@@ -18,7 +85,7 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   }
 ] as const;
 
-function reviewReminderScheduleStatusLabel(
+export function reviewReminderScheduleStatusLabel(
   decision: ReturnType<typeof computeReviewReminderDecision>,
   result: ReviewReminderScheduleResult
 ): string {
@@ -28,11 +95,11 @@ function reviewReminderScheduleStatusLabel(
   return `scheduled|${result.scheduledAt ?? decision.scheduledAt}|${decision.dueCount}|${decision.body}|${decision.route}|${decision.workloadState}|${decision.targetLocalDateTime}`;
 }
 
-function localReminderTarget(date: Date): string {
+export function localReminderTarget(date: Date): string {
   return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function progressSyncStatusMessage(result: ProgressV2SyncResult): string {
+export function progressSyncStatusMessage(result: ProgressV2SyncResult): string {
   if (result.status === "disabled") {
     return "iCloud sync is off";
   }
@@ -47,7 +114,7 @@ function progressSyncStatusMessage(result: ProgressV2SyncResult): string {
   return `Synced ${importedCount} updates`;
 }
 
-function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
+export function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
   switch (status) {
     case "available":
       return "Ready";
@@ -62,7 +129,7 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
   }
 }
 
-function SettingsPanel({
+export function SettingsPanel({
   advancedRatingsOpen,
   adaptiveLayout,
   appearance,
@@ -650,7 +717,7 @@ function FeedbackSupportCard({
   );
 }
 
-function ReviewReminderPermissionPrompt({
+export function ReviewReminderPermissionPrompt({
   onDismiss,
   onEnable
 }: {
@@ -873,7 +940,7 @@ function reviewReminderPermissionStatusMessage(
   }
 }
 
-function scheduledReviewAttemptCount(service: PracticeService): number {
+export function scheduledReviewAttemptCount(service: PracticeService): number {
   return service.countHistory({ source: "scheduled_review" });
 }
 
@@ -959,7 +1026,7 @@ function AdvancedRatingRow({
   );
 }
 
-function ratingLabelFromKey(ratingKey: string): string {
+export function ratingLabelFromKey(ratingKey: string): string {
   if (/\barrow[_ ]duel\b/.test(ratingKey)) {
     return "Arrow Duel";
   }
@@ -1421,7 +1488,7 @@ function PackInfoRow({
   );
 }
 
-function StockfishDiagnosticsPanel({
+export function StockfishDiagnosticsPanel({
   stockfish
 }: {
   stockfish: MobileStockfishCapabilities;
@@ -1632,16 +1699,67 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
   return sanMoves.join(" ") || pv.join(" ");
 }
 
+const useStyles = makeStyles((theme) => ({
+  accessibleMoveModalBackdrop: {
+    alignItems: "center",
+    backgroundColor: theme.colors.scrimSoft,
+    flex: 1,
+    justifyContent: "center",
+    padding: 20
+  },
   sectionHeaderRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between"
+  },
+  historyHeaderRow: {
+    alignItems: "center",
+    columnGap: theme.spacing.row,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget,
+    rowGap: theme.spacing.inline
   },
   screenTitle: {
     color: theme.colors.text.ink,
     fontSize: 22,
     fontWeight: "800",
     lineHeight: 28
+  },
+  sectionLabel: {
+    color: theme.colors.text.ink,
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  optionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  optionButton: {
+    alignItems: "center",
+    borderColor: theme.colors.border.strong,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: "30%",
+    flexGrow: 1,
+    height: 36,
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  optionButtonActive: {
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
+  },
+  optionButtonText: {
+    color: theme.colors.text.strong,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  optionButtonTextActive: {
+    color: theme.colors.accent.s700
   },
   primarySmallButton: {
     alignItems: "center",
@@ -1656,6 +1774,23 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     fontSize: 12,
     fontWeight: "800"
   },
+  secondaryButton: {
+    alignItems: "center",
+    borderColor: theme.colors.border.strong,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  secondaryButtonText: {
+    color: theme.colors.text.strong,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  disabledButton: {
+    opacity: 0.36
+  },
   listPanel: {
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border.default,
@@ -1663,6 +1798,51 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     borderWidth: 1,
     padding: 12,
     gap: 8
+  },
+  panelTitle: {
+    color: theme.colors.text.ink,
+    fontSize: 18,
+    fontWeight: "800"
+  },
+  analysisPanel: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    padding: 12
+  },
+  analysisLineRow: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 34,
+    paddingHorizontal: 9,
+    paddingVertical: 7
+  },
+  analysisEvalText: {
+    color: theme.colors.text.strong,
+    fontFamily: "Menlo",
+    fontSize: 12,
+    fontWeight: "800",
+    minWidth: 44
+  },
+  analysisMoveText: {
+    color: theme.colors.text.ink,
+    fontFamily: "Menlo",
+    fontSize: 13,
+    fontWeight: "800",
+    flexShrink: 1
+  },
+  analysisLineLabel: {
+    color: theme.colors.text.tertiary,
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: "auto"
   },
   diagnosticHeader: {
     alignItems: "center",
@@ -1707,6 +1887,16 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     fontSize: 10,
     lineHeight: 14
   },
+  listText: {
+    color: theme.colors.text.strong,
+    fontSize: 13,
+    fontWeight: "600"
+  },
+  helperText: {
+    color: theme.colors.text.tertiary,
+    fontSize: 12,
+    fontWeight: "600"
+  },
   historyRowTitle: {
     color: theme.colors.text.heading,
     fontSize: 13,
@@ -1727,6 +1917,11 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     flexBasis: "48%",
     flexGrow: 1,
     minWidth: 300
+  },
+  // Still used by the run timing editor and packs panel, which have not moved
+  // to the ui/ primitives yet.
+  settingsSection: {
+    gap: 8
   },
   settingsSectionCard: {
     backgroundColor: theme.colors.surface,
@@ -1756,6 +1951,21 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     flexDirection: "row",
     gap: theme.spacing.row
   },
+  feedbackHandoffConfirmation: {
+    backgroundColor: theme.colors.surfaceRaised,
+    // Dark surfaceRaised matches the dimmed Home, so the card needs an edge.
+    borderColor: theme.colors.border.default,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: theme.shape.sheet,
+    gap: theme.spacing.row,
+    maxWidth: 430,
+    padding: 24,
+    width: "100%"
+  },
+  feedbackHandoffActions: {
+    gap: theme.spacing.group,
+    marginTop: 4
+  },
   feedbackHandoffContinueButton: {
     alignItems: "center",
     alignSelf: "stretch",
@@ -1770,6 +1980,15 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
   },
   settingsRow: {
     justifyContent: "space-between"
+  },
+  settingsRowPressed: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  settingsRowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
   },
   // Label and value share the first line; an explanation spans the full row
   // below them so long copy never runs in a narrow column.
@@ -1847,6 +2066,11 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     flex: 1,
     gap: 2,
     minWidth: 180
+  },
+  confirmationActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end"
   },
   advancedRatingsPanel: {
     gap: theme.spacing.row,
@@ -2032,3 +2256,4 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     fontWeight: "600",
     lineHeight: 17
   },
+}));
