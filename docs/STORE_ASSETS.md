@@ -127,7 +127,8 @@ lead with user benefits, use two or three short bullets, and omit raw URLs.
 
 This copy belongs to the planned `ios-v1.6.0-build-1` identity and matches
 [`docs/releases/ios-v1.6.0-build-1.md`](releases/ios-v1.6.0-build-1.md).
-It is Draft, not a tagged candidate or submitted store record. Reconcile the
+It is stored as `nextVersionWhatsNew`, separate from the canonical 1.5.2
+release metadata. It is Draft, not a tagged or submitted store record. Reconcile the
 exact candidate and validation evidence before marking the note Approved.
 The release PR must retain the exact submitted text after owner approval.
 

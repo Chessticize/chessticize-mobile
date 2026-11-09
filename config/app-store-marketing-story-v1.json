@@ -418,14 +418,14 @@
         ],
         "stableText": {
           "title": "Rating Trend",
-          "history-performance-context": "Standard \u00b7 20s pace \u00b7 90 days",
+          "history-performance-context": "Standard · 20s pace · 90 days",
           "history-chart-value": "925",
           "history-chart-label": "Rating",
           "latest-attempt-run": "Standard",
           "latest-attempt-result": "Correct",
-          "latest-attempt-identity": "ID 01NVd \u00b7 Rating 918",
+          "latest-attempt-identity": "ID 01NVd · Rating 918",
           "latest-attempt-pace": "20s pace",
-          "latest-attempt-meta": "Sprint \u00b7 12s \u00b7 Today"
+          "latest-attempt-meta": "Sprint · 12s · Today"
         },
         "forbiddenStates": [
           "history-empty-state",
@@ -561,8 +561,7 @@
         "storyId": "practice--arrow-duel-prompt",
         "requiredVisibleTestIds": [
           "session-board",
-          "session-progress",
-          "arrow-duel-reply-timer"
+          "session-progress"
         ],
         "moment": "opponent-reply",
         "captureAnchorTestId": "active-session-shell"
@@ -639,7 +638,7 @@
       "Tactical Profile and Focused Run must use a coherent maintained fictional fixture and retain visible early-estimate disclosures.",
       "Do not relabel existing approved v1 captures or compositions as 1.6 campaign exports.",
       "Render new headline templates and verify their hashes before composing this campaign.",
-      "Store upload and submission require the owner\u2019s explicit approval."
+      "Store upload and submission require the owner’s explicit approval."
     ]
   }
 }

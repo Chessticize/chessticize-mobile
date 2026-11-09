@@ -7,11 +7,11 @@ const appStorePlan = fs.readFileSync(path.join(repoRoot, "docs/APP_STORE_PLAN.md
 const appStoreMetadata = JSON.parse(
   fs.readFileSync(path.join(repoRoot, "config/app-store-metadata-en-us-v1.json"), "utf8")
 );
-const currentIOSReleaseNote = fs.readFileSync(
+const plannedIOSReleaseNote = fs.readFileSync(
   path.join(
     repoRoot,
     "docs/releases",
-    `${appStoreMetadata.currentVersionWhatsNew.sourceTag}.md`
+    `${appStoreMetadata.nextVersionWhatsNew.sourceTag}.md`
   ),
   "utf8"
 );
@@ -136,18 +136,18 @@ describe("App Store assets document", () => {
 
   it("keeps reusable What's New copy benefit-first and free of raw URLs", () => {
     const template = appStoreMetadata.whatsNewTemplate;
-    const currentVersion = appStoreMetadata.currentVersionWhatsNew;
-    const draft = currentVersion.storeCopy;
+    const plannedVersion = appStoreMetadata.nextVersionWhatsNew;
+    const draft = plannedVersion.storeCopy;
 
     expect(template.storeCopy).toBe(storeCopyTemplateBlock());
     expect(template.rules).toContain("Use two or three short bullets and no raw URLs.");
-    expect(currentVersion.sourceTag).toBe("ios-v1.6.0-build-1");
-    expect(currentVersion.status).toBe("draft");
+    expect(plannedVersion.sourceTag).toBe("ios-v1.6.0-build-1");
+    expect(plannedVersion.status).toBe("draft");
     expect(template.storeCopy).not.toMatch(/https?:\/\//u);
     expect(draft).not.toMatch(/https?:\/\//u);
     expect(draft).not.toContain("experimental");
     expect(draft).not.toContain("Tactical Profile");
-    expect(currentIOSReleaseNote).toContain(draft);
+    expect(plannedIOSReleaseNote).toContain(draft);
     expect(Array.from(draft).length).toBeLessThanOrEqual(
       appStoreMetadata.limits.chessticizeWhatsNewCharacters
     );
