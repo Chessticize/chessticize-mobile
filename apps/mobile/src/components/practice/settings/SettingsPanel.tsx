@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
-  Modal,
   Pressable,
   type StyleProp,
   StyleSheet,
@@ -61,6 +60,7 @@ import {
 } from "../../ui/index.tsx";
 import { WHATS_NEW_SETTINGS_LABEL } from "../../../whatsNew/whatsNewContent.ts";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+import { AppModal } from "../../AppModal.tsx";
 import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
 import { ChevronGlyph, CloseGlyph } from "../shared/Glyphs.tsx";
 import { normalizeUci } from "../../../backend/premove.ts";
@@ -658,7 +658,7 @@ function FeedbackSupportCard({
         }}
       />
       {confirmationVisible ? (
-        <Modal
+        <AppModal
           animationType="fade"
           onRequestClose={closeConfirmation}
           transparent
@@ -713,7 +713,7 @@ function FeedbackSupportCard({
               </View>
             </View>
           </SafeAreaModalBackdrop>
-        </Modal>
+        </AppModal>
       ) : null}
     </SettingsSection>
   );

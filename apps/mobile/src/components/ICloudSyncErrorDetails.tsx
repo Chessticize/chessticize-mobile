@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
+import { AppModal } from "./AppModal.tsx";
 import { makeStyles, useTheme } from "../theme/index.ts";
 import {
   AppText,
@@ -256,7 +256,7 @@ export function ICloudSyncErrorDetails({
         <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
       </Pressable>
 
-      <Modal
+      <AppModal
         animationType="fade"
         onRequestClose={close}
         statusBarTranslucent
@@ -638,7 +638,7 @@ export function ICloudSyncErrorDetails({
             </ScrollView>
           </View>
         </SafeAreaModalBackdrop>
-      </Modal>
+      </AppModal>
     </>
   );
 }

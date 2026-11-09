@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { GestureType } from "react-native-gesture-handler";
 import Chessboard, { type ChessboardRef, type MoveResult } from "react-native-chessboard";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
@@ -92,6 +92,7 @@ import { isStoreAssetCaptureEnabled } from "../../../platform/testLaunchConfig.t
 import { CHESS_PIECE_SPRITE } from "../shared/chessPieceSprite.ts";
 import { ThemeTagRail } from "../history/HistoryPanel.tsx";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+import { AppModal } from "../../AppModal.tsx";
 import {
   ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS,
   ARROW_DUEL_REPLY_PREPARATION_MS,
@@ -146,17 +147,6 @@ const REVIEW_HEADER_PAIRED_MIN_WIDTH = 348;
 // copy instead of relying on a wrap that a live text-size change may not redo,
 // as the run editor's rows do.
 const REVIEW_ACTION_ROW_STACKED_TEXT_SCALE = 1.35;
-// The removal confirmation keeps the current orientation. React Native's iOS
-// Modal defaults to portrait only, which rotates a landscape phone and crashes
-// a landscape-only window.
-const MODAL_ORIENTATIONS: React.ComponentProps<typeof Modal>["supportedOrientations"] = [
-  "portrait",
-  "portrait-upside-down",
-  "landscape",
-  "landscape-left",
-  "landscape-right"
-];
-
 export type ReviewBackCommand = {
   id: number;
   kind: "close-analysis" | "return-to-owner";
@@ -1497,7 +1487,9 @@ export function ReviewSession({
                       <Pressable
                         key={`${line.move}-${index}`}
                         accessibilityRole="button"
-                        accessibilityLabel={`${line.score} ${formatAnalysisLineMoveLabel(line, index)} ${line.label}`}
+                        accessibilityLabel={[line.score, formatAnalysisLineMoveLabel(line, index), line.label]
+                          .filter((part, partIndex, parts) => partIndex < 2 || part !== parts[1])
+                          .join(" ")}
                         accessibilityState={{ disabled: !line.move }}
                         disabled={!line.move}
                         style={({ pressed }) => [styles.analysisLineRow, pressed && line.move ? styles.rowPressed : null]}
@@ -1799,7 +1791,10 @@ function ReviewCircleButton({
   );
 }
 
-// One engine line: the evaluation first, then the numbered move, then its label.
+// One engine line: the evaluation first, then the numbered move, then its
+// label. A current-position line already names the position in the move slot,
+// so its matching label is not repeated; a terminal result (such as Checkmate)
+// keeps the label.
 function AnalysisLineContent({
   label,
   move,
@@ -1814,7 +1809,9 @@ function AnalysisLineContent({
     <>
       <AppText numberOfLines={1} style={[styles.analysisEvalText, styles.tabularText]} variant="headline">{score}</AppText>
       <AppText numberOfLines={1} style={styles.analysisMoveText} variant="headline">{move}</AppText>
-      <AppText numberOfLines={1} style={styles.analysisLineLabel} tone="secondary" variant="footnote">{label}</AppText>
+      {label === move ? null : (
+        <AppText numberOfLines={1} style={styles.analysisLineLabel} tone="secondary" variant="footnote">{label}</AppText>
+      )}
     </>
   );
 }
@@ -1968,10 +1965,9 @@ function ReviewScheduleControl({
             testID={review ? "review-schedule-remove" : "review-schedule-add"}
             onPress={review ? () => setConfirmationVisible(true) : addToReview}
           />
-          <Modal
+          <AppModal
             animationType="fade"
             onRequestClose={() => setConfirmationVisible(false)}
-            supportedOrientations={MODAL_ORIENTATIONS}
             transparent
             visible={confirmationVisible}
           >
@@ -2010,7 +2006,7 @@ function ReviewScheduleControl({
                 </View>
               </ScrollView>
             </SafeAreaModalBackdrop>
-          </Modal>
+          </AppModal>
         </>
       ) : null}
     </ReviewActionRow>

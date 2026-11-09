@@ -3,7 +3,6 @@ import {
   Animated,
   LayoutAnimation,
   type LayoutChangeEvent,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -32,6 +31,7 @@ import { AppText, Button, Icon, type IconName, IconTile, ListRow, Section } from
 import { RunRemovalConfirmation } from "../runEditor/PracticeRunEditor.tsx";
 import { customThemeLabel } from "../shared/themeCatalog.ts";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+import { AppModal } from "../../AppModal.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 export type RunReorderPickupFeedback = {
@@ -1810,7 +1810,7 @@ export function StartConflictPrompt({
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <Modal animationType="fade" onRequestClose={onCancel} transparent visible>
+    <AppModal animationType="fade" onRequestClose={onCancel} transparent visible>
       <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
         <ScrollView
           accessibilityViewIsModal
@@ -1851,7 +1851,7 @@ export function StartConflictPrompt({
           </View>
         </ScrollView>
       </SafeAreaModalBackdrop>
-    </Modal>
+    </AppModal>
   );
 }
 

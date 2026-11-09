@@ -1,10 +1,11 @@
 import React, { useRef } from "react";
-import { Modal, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { makeStyles } from "../theme/makeStyles.ts";
 import type { WhatsNewContent } from "../whatsNew/whatsNewContent.ts";
 import { usePracticeViewport } from "./PracticeViewport.tsx";
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
+import { AppModal } from "./AppModal.tsx";
 import { AppText, Button, IconTile } from "./ui/index.tsx";
 
 // The one-time What's New sheet (#651). A large title, three highlights with a
@@ -25,14 +26,6 @@ const TITLE_MAX_FONT_MULTIPLIER = 1.35;
 const HEADLINE_LINE_HEIGHT = 21;
 const TILE_SIZE = 30;
 const SHORT_MARGIN = 12;
-
-const ALL_ORIENTATIONS: React.ComponentProps<typeof Modal>["supportedOrientations"] = [
-  "portrait",
-  "portrait-upside-down",
-  "landscape",
-  "landscape-left",
-  "landscape-right"
-];
 
 export function WhatsNewSheet({
   content,
@@ -61,9 +54,8 @@ export function WhatsNewSheet({
   const tileOffset = Math.max(0, Math.round((HEADLINE_LINE_HEIGHT * (fontScale ?? 1) - TILE_SIZE) / 2));
 
   return (
-    <Modal
+    <AppModal
       animationType="fade"
-      supportedOrientations={ALL_ORIENTATIONS}
       transparent
       visible
       onRequestClose={onContinue}
@@ -133,7 +125,7 @@ export function WhatsNewSheet({
           </View>
         </View>
       </SafeAreaModalBackdrop>
-    </Modal>
+    </AppModal>
   );
 }
 
