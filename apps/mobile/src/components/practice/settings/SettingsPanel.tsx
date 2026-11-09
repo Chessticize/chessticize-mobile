@@ -1954,10 +1954,12 @@ const useStyles = makeStyles((theme) => ({
   // buttons stay reachable.
   feedbackHandoffCard: {
     flexGrow: 0,
-    flexShrink: 1
+    flexShrink: 1,
+    padding: 0
   },
   feedbackHandoffContent: {
-    gap: theme.spacing.row
+    gap: theme.spacing.row,
+    padding: 24
   },
   confirmationActionsStacked: {
     flexDirection: "column",

@@ -326,7 +326,7 @@ describe("App Store assets document", () => {
     );
     const portraitHelper = storeAssetsE2e.slice(portraitHelperStart, landscapeHelperStart);
     const captureGuard = "if (!capturePortraitAssets)";
-    const restoreTop = "await element(by.id('practice-main-scroll')).scrollTo('top')";
+    const restoreTop = "await scrollStoreAssetToTop()";
     const delegateScreenshot = "await takePortraitScreenshot(name)";
     const waitForPortrait = "await waitForScreenOrientation('portrait')";
     const takeScreenshot = "await device.takeScreenshot(name)";
@@ -349,6 +349,13 @@ describe("App Store assets document", () => {
     expect(portraitHelper.indexOf(takeScreenshot)).toBeGreaterThan(
       portraitHelper.indexOf(waitForPortrait)
     );
+    const scrollHelperStart = storeAssetsE2e.indexOf('async function scrollStoreAssetToTop');
+    const scrollHelperEnd = storeAssetsE2e.indexOf('async function waitForScreenOrientation', scrollHelperStart);
+    const scrollHelper = storeAssetsE2e.slice(scrollHelperStart, scrollHelperEnd);
+    expect(scrollHelper).toContain("let scrollID = 'practice-main-scroll'");
+    expect(scrollHelper).toContain("await expect(element(by.id('sprint-result-scroll'))).toExist()");
+    expect(scrollHelper).toContain("scrollID = 'sprint-result-scroll'");
+    expect(scrollHelper).toContain("await element(by.id(scrollID)).scrollTo('top')");
   });
 
   it("settles the landscape editor after dismissing the number pad before saving", () => {

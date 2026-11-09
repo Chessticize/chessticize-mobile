@@ -980,11 +980,11 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function tapUntilExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
-    const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible()');
+    const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible(visibilityPercent)');
     // The full-screen Sprint Result owns its own scroll view (#609).
     const chooseScroll = helper.indexOf("existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll'");
     const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top')");
-    const requireVisible = helper.indexOf('.toBeVisible()', restoreTop);
+    const requireVisible = helper.indexOf('.toBeVisible(visibilityPercent)', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
     expect(waitForExist).toBeGreaterThan(0);
@@ -1066,10 +1066,14 @@ describe('Detox suite configuration', () => {
     const retryRulesDismiss = helper.indexOf(
       "tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3)"
     );
+    const revealRulesDismiss = helper.indexOf(
+      "waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss', 100)"
+    );
     const tapStart = helper.indexOf("element(by.id('practice-run-start')).tap()");
 
     expect(findRulesDismiss).toBeGreaterThan(0);
-    expect(retryRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(revealRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(retryRulesDismiss).toBeGreaterThan(revealRulesDismiss);
     expect(tapStart).toBeGreaterThan(retryRulesDismiss);
   });
 
@@ -1861,6 +1865,27 @@ describe('Detox suite configuration', () => {
   it('keeps the App Store screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_STORE_ASSETS: '1' }))
       .toEqual(STORE_ASSETS_TEST_MATCH);
+  });
+
+  it('captures the current full-screen Sprint results without using the hidden main scroll', () => {
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/store-assets.e2e.js'), 'utf8');
+    const resultStart = spec.indexOf('async function failArrowDuelSprint');
+    const resultEnd = spec.indexOf('async function completeOneWrongReview', resultStart);
+    const result = spec.slice(resultStart, resultEnd);
+    expect(result).toContain("by.label('Arrow Duel failed · 3 mistakes')");
+    expect(result).toContain("by.id('sprint-result-review-count')");
+    expect(result).not.toContain("by.text('Sprint failed')");
+    const abandonStart = spec.indexOf('async function captureSprintScenes');
+    const abandonEnd = spec.indexOf('async function takePortraitScreenshotAtTop', abandonStart);
+    expect(spec.slice(abandonStart, abandonEnd)).toContain("by.label('Sprint abandoned')");
+    for (const helperName of ['takePortraitScreenshotAtTop', 'takeLandscapeScreenshot']) {
+      const start = spec.indexOf(`async function ${helperName}`);
+      const end = spec.indexOf('\nasync function ', start + 1);
+      const capture = spec.slice(start, end);
+      expect(capture).toContain('scrollStoreAssetToTop()');
+      expect(capture).not.toContain("by.id('practice-main-scroll')");
+    }
+    expect(spec).toContain("by.id('sprint-result-scroll')");
   });
 
   it('keeps marketing capture separate from the release-QA screenshot suite', () => {
