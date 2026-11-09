@@ -587,7 +587,6 @@ function FeedbackSupportCard({
   wide: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
-  const appTheme = useTheme();
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
 
@@ -695,21 +694,17 @@ function FeedbackSupportCard({
                   variant="secondary"
                   onPress={closeConfirmation}
                 />
-                <Pressable
-                  accessibilityRole="link"
+                <Button
                   accessibilityLabel="Continue to GitHub Issues"
-                  style={({ pressed }) => [
-                    styles.feedbackHandoffContinueButton,
-                    pressed ? styles.settingsActionButtonPressed : null
-                  ]}
+                  accessibilityRole="link"
+                  icon="external"
+                  label="Continue to GitHub"
+                  stretch
                   testID="settings-feedback-handoff-continue"
                   onPress={() => {
                     void continueToGitHub();
                   }}
-                >
-                  <Icon color={appTheme.colors.text.onAccent} name="external" size={17} weight="semibold" />
-                  <AppText tone="onAccent" variant="headline">Continue to GitHub</AppText>
-                </Pressable>
+                />
               </View>
             </View>
           </SafeAreaModalBackdrop>
@@ -734,24 +729,21 @@ export function ReviewReminderPermissionPrompt({
         <Text style={styles.helperText}>Get a local reminder when missed puzzles are ready again.</Text>
       </View>
       <View style={styles.confirmationActionRow}>
-        <Pressable
-          accessibilityRole="button"
+        <Button
           accessibilityLabel="Dismiss review reminder permission prompt"
+          label="Not Now"
+          size="compact"
           testID="review-reminder-permission-dismiss"
-          style={styles.secondaryButton}
+          variant="secondary"
           onPress={onDismiss}
-        >
-          <Text style={styles.secondaryButtonText}>Not Now</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
+        />
+        <Button
           accessibilityLabel="Enable review reminders"
+          label="Enable"
+          size="compact"
           testID="review-reminder-permission-enable"
-          style={styles.primarySmallButton}
           onPress={onEnable}
-        >
-          <Text style={styles.primarySmallButtonText}>Enable</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -1604,15 +1596,14 @@ export function StockfishDiagnosticsPanel({
             {firstEvalMs === null ? status : `${status} · first eval ${firstEvalMs}ms`}
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
+        <Button
           accessibilityLabel="Run Stockfish diagnostics"
+          label="Run"
+          size="compact"
           testID="stockfish-diagnostics-run"
-          style={styles.secondaryButton}
+          variant="secondary"
           onPress={() => setRunId((current) => current + 1)}
-        >
-          <Text style={styles.secondaryButtonText}>Run</Text>
-        </Pressable>
+        />
       </View>
 
       <View style={styles.optionRow}>
@@ -1709,7 +1700,7 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "disabledButton", "feedbackHandoffActions", "feedbackHandoffConfirmation", "helperText", "historyHeaderRow", "listText", "optionButton", "optionButtonActive", "optionButtonText", "optionButtonTextActive", "optionRow", "reviewDueHiddenMetric", "secondaryButton", "secondaryButtonText", "sectionLabel", "settingsRowCopy", "settingsRowPressed", "settingsSection"]),
+  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "disabledButton", "feedbackHandoffActions", "feedbackHandoffConfirmation", "helperText", "historyHeaderRow", "listText", "optionButton", "optionButtonActive", "optionButtonText", "optionButtonTextActive", "optionRow", "reviewDueHiddenMetric", "sectionLabel", "settingsRowCopy", "settingsRowPressed", "settingsSection"]),
   sectionHeaderRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -1720,19 +1711,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 22,
     fontWeight: "800",
     lineHeight: 28
-  },
-  primarySmallButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
-    height: 38,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  primarySmallButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 12,
-    fontWeight: "800"
   },
   listPanel: {
     backgroundColor: theme.colors.surface,
@@ -1878,18 +1856,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     gap: theme.spacing.row
-  },
-  feedbackHandoffContinueButton: {
-    alignItems: "center",
-    alignSelf: "stretch",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: theme.shape.control,
-    flexDirection: "row",
-    gap: 6,
-    justifyContent: "center",
-    minHeight: 50,
-    paddingHorizontal: 20,
-    paddingVertical: 12
   },
   settingsRow: {
     justifyContent: "space-between"

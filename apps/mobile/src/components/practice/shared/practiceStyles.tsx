@@ -16,34 +16,6 @@ function practiceStyles(theme: Theme) {
       fontSize: 12,
       fontWeight: "600"
     },
-    secondaryButton: {
-      alignItems: "center",
-      borderColor: theme.colors.border.strong,
-      borderRadius: 8,
-      borderWidth: 1,
-      height: 42,
-      justifyContent: "center",
-      paddingHorizontal: 14
-    },
-    secondaryButtonText: {
-      color: theme.colors.text.strong,
-      fontSize: 13,
-      fontWeight: "700"
-    },
-    primaryButton: {
-      alignItems: "center",
-      backgroundColor: theme.colors.accent.fill,
-      borderRadius: 8,
-      flex: 1,
-      height: 42,
-      justifyContent: "center",
-      paddingHorizontal: 14
-    },
-    primaryButtonText: {
-      color: theme.colors.text.onAccent,
-      fontSize: 13,
-      fontWeight: "800"
-    },
     disabledButton: {
       opacity: 0.36
     },

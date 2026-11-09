@@ -10,6 +10,7 @@ import { CloseGlyph, MoreGlyph, PauseGlyph, PlayGlyph, SessionScoreGlyph } from 
 import { PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE, PRACTICE_SESSION_HUD_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
 import { makeStyles } from "../../../theme/index.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import { Button } from "../../ui/index.tsx";
 
 export type SessionTimingState = {
   elapsedSeconds: number;
@@ -415,30 +416,29 @@ export function SessionStatusBar({
             </Text>
           </View>
           <View style={styles.survivalExitPrimaryActions}>
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel="Leave Survival paused"
+              label="Leave paused"
+              size="compact"
+              style={styles.survivalExitAction}
               testID="personal-best-pause-and-leave"
-              style={[styles.secondaryButton, styles.survivalExitAction]}
+              variant="secondary"
               onPress={() => {
                 onConfirmAbandonChange(false);
                 onPauseAndLeave?.();
               }}
-            >
-              <Text style={styles.secondaryButtonText}>Leave paused</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
+            />
+            <Button
               accessibilityLabel="Resume Survival"
+              label="Resume"
+              size="compact"
+              style={styles.survivalExitAction}
               testID="session-abandon-cancel"
-              style={[styles.primaryButton, styles.survivalExitAction]}
               onPress={() => {
                 onResume?.();
                 onConfirmAbandonChange(false);
               }}
-            >
-              <Text style={styles.primaryButtonText}>Resume</Text>
-            </Pressable>
+            />
           </View>
         </View>
       ) : confirmAbandon ? (
@@ -474,31 +474,29 @@ export function SessionStatusBar({
               stackLeaveConfirmation ? styles.sessionAbandonActionsStacked : null
             ]}
           >
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel={isTacticalFocus
                 ? "Cancel abandoning Focused Run"
                 : "Cancel abandon sprint"}
+              label="Cancel"
+              size="compact"
               testID="session-abandon-cancel"
-              style={styles.secondaryButton}
+              variant="secondary"
               onPress={() => onConfirmAbandonChange(false)}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
+            />
+            <Button
               accessibilityLabel={isTacticalFocus
                 ? "Confirm abandoning Focused Run"
                 : "Confirm abandon sprint"}
+              label="Abandon"
+              size="compact"
               testID="session-abandon-confirm"
-              style={styles.destructiveButton}
+              variant="destructive"
               onPress={() => {
                 onConfirmAbandonChange(false);
                 onAbandon?.();
               }}
-            >
-              <Text style={styles.destructiveButtonText}>Abandon</Text>
-            </Pressable>
+            />
           </View>
         </View>
       ) : null}
@@ -636,7 +634,7 @@ const SCORE_LABEL_MAX_TEXT_SCALE = 1;
 const SCORE_VALUE_MAX_TEXT_SCALE = 1.15;
 
 const useStyles = makeStyles((theme) => ({
-  ...pickPracticeStyles(theme, ["helperText", "listText", "primaryButton", "primaryButtonText", "secondaryButton", "secondaryButtonText"]),
+  ...pickPracticeStyles(theme, ["helperText", "listText"]),
   activeSessionShell: {
     gap: 8
   },
@@ -918,18 +916,5 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 17
-  },
-  destructiveButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.danger.s600,
-    borderRadius: 8,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  destructiveButtonText: {
-    color: theme.colors.text.onTone,
-    fontSize: 13,
-    fontWeight: "800"
   },
 }));
