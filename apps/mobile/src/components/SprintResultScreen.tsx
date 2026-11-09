@@ -160,7 +160,6 @@ export function SprintResultScreen({
           buttons at their old heights after the user shrinks the text. */}
       <React.Fragment key={`text-scale-${fontScale}`}>
       <TopBar
-        fontScale={fontScale}
         onBack={actions.onBack}
         onLayout={measure("bar")}
         onOpenHistory={result.showTrendAction ? actions.onOpenHistory : undefined}
@@ -220,14 +219,12 @@ export function SprintResultScreen({
 }
 
 function TopBar({
-  fontScale,
   onBack,
   onLayout,
   onOpenHistory,
   style,
   title
 }: {
-  fontScale: number;
   onBack: () => void;
   onLayout: (event: LayoutChangeEvent) => void;
   onOpenHistory?: () => void;
