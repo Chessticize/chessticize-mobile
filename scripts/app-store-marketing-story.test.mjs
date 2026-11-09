@@ -56,7 +56,7 @@ test("1.6 capture plan covers both stores, real destinations, navigation and dar
     assert.equal("supporting" in frame, false);
     assert.ok(["light", "dark"].includes(frame.appearance));
     assert.ok(registry.includes(`"${frame.storyId}"`), `Missing product-clone story ${frame.storyId}`);
-    for (const id of [...frame.requiredVisibleTestIds, ...(frame.previewActions ?? [])]) {
+    for (const id of [frame.captureAnchorTestId, ...frame.requiredVisibleTestIds, ...(frame.previewActions ?? [])]) {
       // Some public controls select their stable ID through a conditional
       // startTestID prop; the maintained component tree must still own it.
       assert.ok(source.includes(`"${id}"`), `Missing real control ${id}`);

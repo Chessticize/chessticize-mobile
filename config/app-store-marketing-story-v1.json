@@ -546,7 +546,8 @@
           "practice-home",
           "practice-run-start",
           "training-focus-card"
-        ]
+        ],
+        "captureAnchorTestId": "practice-home"
       },
       {
         "order": 2,
@@ -560,9 +561,11 @@
         "storyId": "practice--arrow-duel-prompt",
         "requiredVisibleTestIds": [
           "session-board",
-          "arrow-duel-candidate-overlay",
-          "session-progress"
-        ]
+          "session-progress",
+          "arrow-duel-reply-timer"
+        ],
+        "moment": "opponent-reply",
+        "captureAnchorTestId": "active-session-shell"
       },
       {
         "order": 3,
@@ -579,7 +582,8 @@
         ],
         "previewActions": [
           "training-focus-open-profile"
-        ]
+        ],
+        "captureAnchorTestId": "tactical-profile-screen"
       },
       {
         "order": 4,
@@ -593,7 +597,8 @@
         "requiredVisibleTestIds": [
           "focused-run-rating-anchor",
           "focused-run-allocation-bar"
-        ]
+        ],
+        "captureAnchorTestId": "focused-run-preview"
       },
       {
         "order": 5,
@@ -608,7 +613,8 @@
           "personal-best-hub",
           "personal-best-type-selector",
           "personal-best-hub-start"
-        ]
+        ],
+        "captureAnchorTestId": "personal-best-hub"
       },
       {
         "order": 6,
@@ -623,7 +629,8 @@
           "review-due-card",
           "review-start-due",
           "review-forecast"
-        ]
+        ],
+        "captureAnchorTestId": "review-panel"
       }
     ],
     "handoffRules": [
