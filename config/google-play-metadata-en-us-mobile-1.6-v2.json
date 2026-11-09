@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "metadataId": "google-play-en-us-mobile-1.6-v2",
+  "issue": 683,
+  "locale": "en-US",
+  "listingMetadataReference": "config/google-play-metadata-en-us-v1.json",
+  "limits": {
+    "graphicAltTextCharacters": 140
+  },
+  "releaseCampaign": {
+    "id": "mobile-1.6-en-us",
+    "publicVersion": "1.6.0",
+    "status": "capture-plan"
+  },
+  "listingStatus": "draft-pending-owner-approval",
+  "previewAssets": {
+    "screenshots": {
+      "sharedStoryContract": "config/app-store-marketing-story-v1.json#releaseCampaign",
+      "capturePolicy": {
+        "requiredDeviceTypes": [
+          "phone"
+        ],
+        "source": "owner-approved-self-built-android-capture",
+        "presentation": "generic-android-center-punch-hole-no-dynamic-island",
+        "tabletScreenshots": "optional-and-not-in-this-listing-update"
+      },
+      "deviceTypes": [
+        {
+          "id": "phone",
+          "captureCount": 6,
+          "status": "draft-pending-owner-approval"
+        }
+      ],
+      "frames": [
+        {
+          "id": "practice-home",
+          "headline": "Find Your Next Puzzle",
+          "altText": "Practice Home with a fresh puzzle ready to start, a Training Focus card, and bottom navigation."
+        },
+        {
+          "id": "dark-arrow-duel",
+          "headline": "Choose the Best Move",
+          "altText": "Dark Arrow Duel board asking for the opponent's reply, with session progress and a reply challenge prompt."
+        },
+        {
+          "id": "tactical-profile",
+          "headline": "Find Your Training Focus",
+          "altText": "Training Focus profile with a ranked recommendation and early estimate disclosure for the next practice run."
+        },
+        {
+          "id": "focused-run",
+          "headline": "Practice What You Need",
+          "altText": "Focused Run preview with the selected rating anchor and allocation bar for the planned practice session."
+        },
+        {
+          "id": "survival",
+          "headline": "Beat Your Best",
+          "altText": "Dark personal best hub with a Survival challenge type selected and a visible start control."
+        },
+        {
+          "id": "review",
+          "headline": "Make Every Mistake Count",
+          "altText": "Scheduled Review queue with due puzzles, a start button, and a forecast of upcoming reviews."
+        }
+      ]
+    }
+  }
+}
