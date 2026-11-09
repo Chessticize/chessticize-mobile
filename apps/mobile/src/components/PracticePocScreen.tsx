@@ -4381,6 +4381,7 @@ export function PracticePocScreen({
         ? "Open Survival leave options"
         : "Abandon sprint"}
       compactMetrics={sessionUsesRail}
+      confirmationClipRef={sessionUsesRail ? sessionRailScrollRef : undefined}
       // The overlay starts 8 points below the HUD; the prompt card follows the
       // HUD after the 10-point rail or 12-point stack gap. Four extra points
       // cover the card to its bottom edge in either layout.

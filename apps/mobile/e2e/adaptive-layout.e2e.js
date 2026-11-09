@@ -393,12 +393,19 @@ async function expectAbandonConfirmationFloats(orientation) {
   await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
   const confirmationFrame = await frameFor(element(by.id('session-abandon-confirmation')));
   expectFrameContained(confirmationFrame, screenFrame, `${deviceLabel} ${orientation} abandon panel`);
+  if (await existsNow('active-session-control-rail')) {
+    expectFrameContained(
+      confirmationFrame,
+      await frameFor(element(by.id('active-session-control-rail'))),
+      `${deviceLabel} ${orientation} abandon panel inside the rail`
+    );
+  }
   await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-abandon-confirmation-top`);
   // At accessibility sizes the copy and actions can exceed the available
   // height. Scroll the panel itself; the underlying board must stay still.
   const confirmFrame = await frameFor(element(by.id('session-abandon-confirm')));
   if (confirmFrame.y + confirmFrame.height > confirmationFrame.y + confirmationFrame.height + 1) {
-    await element(by.id('session-abandon-scroll')).scrollTo('bottom');
+    await element(by.id('session-abandon-scroll')).scrollTo('bottom', 0.5, 0.5);
   }
   for (const testID of ['session-abandon-cancel', 'session-abandon-confirm']) {
     expectFrameContained(

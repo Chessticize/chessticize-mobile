@@ -123,6 +123,7 @@ function hudValueTextSize({
 export function SessionStatusBar({
   closeAccessibilityLabel = "Abandon sprint",
   compactMetrics = false,
+  confirmationClipRef,
   confirmAbandon,
   leaveConfirmationMinHeight,
   metricsRef,
@@ -141,6 +142,7 @@ export function SessionStatusBar({
 }: {
   closeAccessibilityLabel?: string;
   compactMetrics?: boolean;
+  confirmationClipRef?: React.RefObject<ScrollView | null>;
   confirmAbandon: boolean;
   // The confirmation floats in the prompt card's slot; at least that tall, it
   // covers the card instead of leaving a sliver of it showing beneath.
@@ -183,13 +185,24 @@ export function SessionStatusBar({
   const [confirmationMaxHeight, setConfirmationMaxHeight] = useState<number | null>(null);
   const measureConfirmationSpace = useCallback(() => {
     if (state.status === "paused" || isPersonalBest) return;
-    shellRef.current?.measureInWindow((_x, y, _width, height) => {
-      // Keep the active board and HUD stationary. A tall confirmation scrolls
-      // inside the space below the HUD, above the bottom safe area.
-      const available = Math.max(1, Math.floor(viewportHeight - insets.bottom - y - height - 8));
-      setConfirmationMaxHeight((current) => current === available ? current : available);
-    });
-  }, [insets.bottom, isPersonalBest, state.status, viewportHeight]);
+    const measureBelowHud = (clipBottom: number) => {
+      shellRef.current?.measureInWindow((_x, y, _width, height) => {
+        // The landscape rail also clips its children at the board's bottom.
+        // Keep the panel inside that scroll viewport as well as the safe area.
+        const available = Math.max(1, Math.floor(clipBottom - y - height - 8));
+        setConfirmationMaxHeight((current) => current === available ? current : available);
+      });
+    };
+    const safeBottom = viewportHeight - insets.bottom;
+    const clip = confirmationClipRef?.current;
+    if (clip) {
+      clip.measureInWindow((_x, y, _width, height) => {
+        measureBelowHud(Math.min(safeBottom, y + height));
+      });
+    } else {
+      measureBelowHud(safeBottom);
+    }
+  }, [confirmationClipRef, insets.bottom, isPersonalBest, state.status, viewportHeight]);
   useLayoutEffect(() => {
     measureConfirmationSpace();
   }, [confirmAbandon, fontScale, measureConfirmationSpace]);
