@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Page } from "playwright-core";
+import type { Browser, Page } from "playwright-core";
 import { launchBrowser, serve } from "./labBrowser.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -51,8 +51,9 @@ async function colorsFor(page: Page): Promise<Colors> {
 
 test("landing notice action and focused skip links have readable rendered contrast", async () => {
   const server = await serve(siteRoot);
-  const browser = await launchBrowser();
+  let browser: Browser | undefined;
   try {
+    browser = await launchBrowser();
     for (const route of routes) {
       for (const colorScheme of ["light", "dark"] as const) {
         const page = await browser.newPage();
@@ -83,7 +84,7 @@ test("landing notice action and focused skip links have readable rendered contra
     );
     await page.close();
   } finally {
-    await browser.close();
+    await browser?.close();
     server.close();
   }
 });
