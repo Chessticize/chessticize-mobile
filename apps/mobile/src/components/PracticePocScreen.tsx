@@ -5069,7 +5069,7 @@ export function PracticePocScreen({
       </View>
       {!sessionUsesRail && (sessionPuzzleTimingNode || sessionScoreNode) ? (
         <View
-          style={[styles.sessionBoardDetails, { width: boardSize }]}
+          style={[styles.sessionBoardDetails, { width: adaptiveLayout.sessionColumnWidth }]}
           testID="session-board-details"
         >
           {sessionPuzzleTimingNode}
@@ -5087,7 +5087,7 @@ export function PracticePocScreen({
     <View
       style={[
         styles.practicePromptStack,
-        { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
+        { width: adaptiveLayout.sessionColumnWidth }
       ]}
       testID="practice-prompt-stack"
     >
@@ -5096,9 +5096,7 @@ export function PracticePocScreen({
             currentPuzzle={displayedPuzzle}
             explicitReplySideCopy={explicitReplySideCopy}
             frameHeight={adaptiveLayout.promptFrameHeight}
-            hideSideGlyph={explicitReplySideCopy && (
-              sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize
-            ) < 240}
+            hideSideGlyph={explicitReplySideCopy && adaptiveLayout.sessionColumnWidth < 240}
             kingPieceSize={kingGlyphSizeForBoard(boardSize)}
             phase={arrowDuelReplyChallengeDisplayPhase}
             promptSide={arrowDuelPromptSide}
@@ -5128,7 +5126,7 @@ export function PracticePocScreen({
         sessionUsesRail && !adaptiveLayout.sessionCentersRow
           ? styles.activeSessionRailBottomFeedback
           : null,
-        { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
+        { width: adaptiveLayout.sessionColumnWidth }
       ]}
     >
       {previousAttemptNotice ? (
@@ -7126,7 +7124,7 @@ function buildSessionGuideStageNodes({
       : ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
     : SESSION_GUIDE_DEMO_CURRENT_PUZZLE;
   const guideState = sessionGuideDemoState(presentation, currentPuzzle);
-  const slotWidth = usesRail ? adaptiveLayout.sessionRailWidth : boardSize;
+  const slotWidth = adaptiveLayout.sessionColumnWidth;
   const targetsBoard = step === "arrow_duel_choice" || step === "arrow_duel_reply";
   const settingsHint = presentation.opponentReplySettingsHint
     ? "Optional · Turn off in Settings"
@@ -7193,7 +7191,7 @@ function buildSessionGuideStageNodes({
       </View>
       {!usesRail ? (
         <View
-          style={[styles.sessionBoardDetails, { width: boardSize }]}
+          style={[styles.sessionBoardDetails, { width: adaptiveLayout.sessionColumnWidth }]}
           testID="session-board-details"
         >
           {timing}
