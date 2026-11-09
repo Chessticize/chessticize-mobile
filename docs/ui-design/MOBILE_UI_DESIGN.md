@@ -416,10 +416,15 @@ highlights, and arrows keep their own palette; #610 owns the board in dark mode.
 - Motion: system springs only. Use standard push, pop, and sheet transitions.
   Disclosure rows expand with a 0.35 s spring, and score and timer numerals
   roll on change. Under Reduce Motion, replace movement with a cross-fade.
-- Haptics, at the system-default level: a selection tick on segmented controls
-  and run selection, a light impact on Start, and a success or warning
-  notification on the Sprint result. Move feedback keeps the existing
-  move-feedback setting, and UI haptics respect it where the two overlap.
+- Haptics, at the system-default level, from one module
+  (`src/platform/uiHaptics.ts`): a selection tick when a segmented control, a
+  mode, theme or level choice, a switch or a stepper changes; a light impact on
+  a primary button, including Start; and, once when a result appears, a success
+  notification for a passed Sprint or a Survival new best and a warning for a
+  failed Sprint or a Survival Run ended by three mistakes. Navigation,
+  scrolling, back buttons, list row taps and view filters stay silent, and
+  board moves keep move feedback. All of them follow the single Haptic feedback
+  setting and the system haptics setting.
 
 ### Core Components
 
