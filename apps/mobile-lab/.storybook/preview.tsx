@@ -10,6 +10,7 @@ import "../src/lab.css";
 import { installLabIconFont } from "../src/labIconFont.ts";
 import { themeWithTextScale } from "../src/labTextScale.ts";
 import { LabDeviceStatusBar } from "../src/LabDeviceStatusBar.tsx";
+import { LabTextSize, LARGEST_ACCESSIBILITY_FONT_SCALE } from "../src/LabTextSize.tsx";
 import {
   LAB_DEVICE_VIEWPORTS,
   labDeviceViewportForGlobal,
@@ -78,6 +79,17 @@ installLabIconFont();
 
 const preview: Preview = {
   decorators: [
+    // The Text size toolbar (or `globals=textSize:largest` in a story URL) shows any
+    // story at the largest accessibility size, the way the large-text stories do.
+    (Story, context) => (
+      context.globals.textSize === "largest" ? (
+        <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+          <Story />
+        </LabTextSize>
+      ) : (
+        <Story />
+      )
+    ),
     (Story, context) => (
       <LabThemeScope
         textScale={typeof context.parameters.labTextScale === "number" ? context.parameters.labTextScale : 1}
@@ -96,6 +108,18 @@ const preview: Preview = {
     )
   ],
   globalTypes: {
+    textSize: {
+      description: "Simulated Dynamic Type size",
+      toolbar: {
+        dynamicTitle: true,
+        icon: "paragraph",
+        items: [
+          { title: "Default text", value: "default" },
+          { title: "Largest accessibility text (AX5)", value: "largest" }
+        ],
+        title: "Text size"
+      }
+    },
     theme: {
       description: "Interaction Lab theme",
       toolbar: {
@@ -110,6 +134,7 @@ const preview: Preview = {
     }
   },
   initialGlobals: {
+    textSize: "default",
     theme: "light",
     viewport: {
       value: "phonePortrait",

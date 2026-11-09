@@ -35,6 +35,8 @@ The viewport toolbar includes:
 - Phone portrait: 402 × 874, with the iPhone 17 Release Safe Area.
 - Phone landscape: 874 × 402, with the iPhone 17 Release Safe Area.
 - Regular width: 1180 × 820.
+- iPad Pro 11-inch (834 × 1194) and 13-inch (1032 × 1376), in portrait and
+  landscape, and the iPhone Duo outer display (466 × 678).
 - iPad Split View half (684 × 1032), one third (458 × 1032), and a short
   Stage Manager window (800 × 600). The simulator cannot resize these windows
   headlessly, so the Lab is where their layouts are reviewed.
@@ -49,6 +51,11 @@ A story can preview large text with the `labTextScale` parameter (for example
 text size, so the Lab multiplies the theme's type sizes and line heights, the way
 Dynamic Type scales the same points on a device. A story can also start in a given
 viewport and theme with story-level `globals`.
+
+The **Text size** toolbar item shows any story at the largest accessibility size
+(simulated AX5), the same simulation the large-text stories use. Open a story that
+way with `globals=textSize:largest`, for example
+`/?path=/story/practice--home&globals=textSize:largest`.
 
 ## Validate the lab
 
