@@ -1,7 +1,35 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/container/TabsContainer.kt b/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/container/TabsContainer.kt
+index b72e709dfdca8f55db49356daa4306a4f4608601..0549e39b5d4e0477f025ae4843b135b5fcea8ea2 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/container/TabsContainer.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/container/TabsContainer.kt
+@@ -325,8 +325,22 @@ class TabsContainer internal constructor(
+     override fun onConfigurationChanged(newConfig: Configuration?) {
+         super.onConfigurationChanged(newConfig)
+         colorSchemeCoordinator.onConfigurationChanged(newConfig)
++        // Chessticize (#637): the app handles fontScale in place, so the tab
++        // labels' text sizes (applied in pixels from sp) must be re-applied when
++        // the font scale changes, or they keep the old size until the next
++        // appearance update.
++        val fontScale = newConfig?.fontScale
++        if (fontScale != null && fontScale != appliedFontScale) {
++            appliedFontScale = fontScale
++            invalidationFlags.isNavigationMenuAppearanceInvalidated = true
++            post {
++                flushPendingUpdates()
++            }
++        }
+     }
+ 
++    private var appliedFontScale: Float = context.resources.configuration.fontScale
++
+     override fun dispatchApplyWindowInsets(insets: WindowInsets?): WindowInsets? {
+         // On Android versions prior to R, insets dispatch is broken.
+         // In order to mitigate this, we override dispatchApplyWindowInsets with
 diff --git a/ios/tabs/host/RNSTabBarController.mm b/ios/tabs/host/RNSTabBarController.mm
+index 4e0e1118e1aca72354dbb92d6b1bef43c3605510..66d69a56bf7c1f904f49c1224539fc828edba929 100644
 --- a/ios/tabs/host/RNSTabBarController.mm
 +++ b/ios/tabs/host/RNSTabBarController.mm
-@@ -755,12 +755,21 @@
+@@ -755,12 +755,21 @@ - (UITab *)makeTabForTabScreenController:(RNSTabsScreenViewController *)screenCo
      return searchTab;
    }
  

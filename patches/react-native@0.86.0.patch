@@ -1,5 +1,96 @@
+diff --git a/Libraries/Text/Text.js b/Libraries/Text/Text.js
+index 8e7b29cb609698cbd6a1852a4276fda920f860ba..38a5ff6b3046f2d939af5235a1a52a03a441b481 100644
+--- a/Libraries/Text/Text.js
++++ b/Libraries/Text/Text.js
+@@ -20,6 +20,7 @@ import usePressability from '../Pressability/usePressability';
+ import flattenStyle from '../StyleSheet/flattenStyle';
+ import processColor from '../StyleSheet/processColor';
+ import StyleSheet from '../StyleSheet/StyleSheet';
++import Dimensions from '../Utilities/Dimensions';
+ import Platform from '../Utilities/Platform';
+ import TextAncestorContext from './TextAncestorContext';
+ import {
+@@ -28,7 +29,7 @@ import {
+   NativeVirtualText,
+ } from './TextNativeComponent';
+ import * as React from 'react';
+-import {useContext, useMemo, useState} from 'react';
++import {useContext, useMemo, useState, useSyncExternalStore} from 'react';
+ 
+ export type {TextProps} from './TextProps';
+ 
+@@ -267,6 +268,7 @@ const TextImpl: component(
+     };
+   }
+ 
++  const fontScale = useSyncExternalStore(subscribeToFontScale, getFontScale);
+   const hasTextAncestor = useContext(TextAncestorContext);
+   if (hasTextAncestor) {
+     processedProps.disabled = disabled;
+@@ -287,6 +289,10 @@ const TextImpl: component(
+ 
+   processedProps.accessible = _accessible;
+   processedProps.allowFontScaling = allowFontScaling !== false;
++  if (processedProps.allowFontScaling) {
++    // Chessticize patch (#637): see `subscribeToFontScale` below.
++    processedProps.fontScaleRevision = fontScale;
++  }
+   processedProps.disabled = _disabled;
+   processedProps.ellipsizeMode = ellipsizeMode ?? 'tail';
+   processedProps.children = children;
+@@ -339,6 +345,37 @@ const TextImpl: component(
+ 
+ TextImpl.displayName = 'Text';
+ 
++// Chessticize patch (#637): after a live text size change, Fabric dirties the
++// measurement of every paragraph in its own tree revision, but the next React
++// commit is built from the shadow nodes React holds. Text whose props did not
++// change keeps its old measurement and stays clipped at the old size until
++// relaunch. Passing the font scale as an inert native prop gives every scaling
++// Text exactly one props update per font-scale change, so Fabric re-measures it
++// with the current multiplier, without remounting anything.
++let currentFontScale: number = Dimensions.get('window').fontScale;
++const fontScaleListeners: Set<() => void> = new Set();
++let fontScaleSubscribed = false;
++
++function subscribeToFontScale(listener: () => void): () => void {
++  fontScaleListeners.add(listener);
++  if (!fontScaleSubscribed) {
++    fontScaleSubscribed = true;
++    Dimensions.addEventListener('change', ({window}) => {
++      if (window.fontScale !== currentFontScale) {
++        currentFontScale = window.fontScale;
++        fontScaleListeners.forEach(notify => notify());
++      }
++    });
++  }
++  return () => {
++    fontScaleListeners.delete(listener);
++  };
++}
++
++function getFontScale(): number {
++  return currentFontScale;
++}
++
+ type TextPressabilityProps = Readonly<{
+   onLongPress?: ?(event: GestureResponderEvent) => unknown,
+   onPress?: ?(event: GestureResponderEvent) => unknown,
+diff --git a/Libraries/Text/TextNativeComponent.js b/Libraries/Text/TextNativeComponent.js
+index 11c86911333771eb2a1ff95490bc962a8913e902..f5f99b36ad8e34189becfb685a36c667a4f00f8c 100644
+--- a/Libraries/Text/TextNativeComponent.js
++++ b/Libraries/Text/TextNativeComponent.js
+@@ -48,6 +48,8 @@ const textViewConfig = {
+     dataDetectorType: true,
+     android_hyphenationFrequency: true,
+     lineBreakStrategyIOS: true,
++    // Chessticize patch (#637): inert; see `subscribeToFontScale` in Text.js.
++    fontScaleRevision: true,
+   },
+   directEventTypes: {
+     topTextLayout: {
 diff --git a/sdks/hermes-engine/hermes-engine.podspec b/sdks/hermes-engine/hermes-engine.podspec
-index 2459dfe..c7bdf10 100644
+index 58e003985c6dc3cd664d434339bf68ec09bce5bd..a3e7f78dad3c09b2f4b096b34711d9434e873662 100644
 --- a/sdks/hermes-engine/hermes-engine.podspec
 +++ b/sdks/hermes-engine/hermes-engine.podspec
 @@ -88,12 +88,11 @@ Pod::Spec.new do |spec|

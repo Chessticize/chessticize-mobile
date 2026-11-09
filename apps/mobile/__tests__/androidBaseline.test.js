@@ -300,7 +300,7 @@ describe('Android launch baseline', () => {
 
     expect(manifest).toContain('android:resizeableActivity="true"');
     expect(manifest).toContain('android:windowSoftInputMode="adjustResize"');
-    expect(manifest).toContain('android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"');
+    expect(manifest).toContain('android:configChanges="fontScale|keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"');
     expect(manifest).not.toContain('android:screenOrientation');
   });
 
