@@ -404,7 +404,7 @@ export function PersonalBestChallengeHub({
 
   return (
     <View
-      style={[styles.hubScreen, { width: Math.min(680, Math.max(0, viewportWidth - 32)) }]}
+      style={styles.hubScreen}
       testID="personal-best-hub"
     >
       <SurvivalTopBar
@@ -1065,10 +1065,7 @@ export function PersonalBestRecordsScreen({
       accessibilityLabel={recordsAreEmpty
         ? "Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level."
         : `Survival bests by level. ${recordSummary}. Puzzle and Arrow Duel records are separate.`}
-      style={[
-        styles.recordsScreen,
-        { width: Math.min(680, Math.max(0, viewportWidth - 32)) }
-      ]}
+      style={styles.recordsScreen}
       testID="personal-best-records-screen"
     >
       <SurvivalTopBar
@@ -1427,10 +1424,13 @@ const useStyles = makeStyles((theme) => ({
   hubIntro: {
     gap: theme.spacing.inline
   },
+  // Fill the container (not the window) up to 680 pt so Split View and
+  // other insets never clip the page.
   hubScreen: {
     alignSelf: "center",
     gap: theme.spacing.section,
-    maxWidth: 680
+    maxWidth: 680,
+    width: "100%"
   },
   hubSection: {
     gap: theme.spacing.group
@@ -1557,10 +1557,13 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: "300",
     lineHeight: 36
   },
+  // Fill the container (not the window) up to 680 pt so Split View and
+  // other insets never clip the page.
   recordsScreen: {
     alignSelf: "center",
     gap: theme.spacing.section,
-    maxWidth: 680
+    maxWidth: 680,
+    width: "100%"
   },
   resultBadge: {
     alignItems: "center",
