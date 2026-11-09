@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { LabTextSize, LARGEST_ACCESSIBILITY_FONT_SCALE } from "./LabTextSize.tsx";
+import { LabTextSize, ACCESSIBILITY_LARGE_FONT_SCALE } from "./LabTextSize.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
@@ -145,11 +145,11 @@ export const AttemptDetail: Story = {
   }
 };
 
-export const AttemptDetailLargestText: Story = {
-  name: "Replay puzzle · largest text",
+export const AttemptDetailAccessibilityLarge: Story = {
+  name: "Replay puzzle · accessibility large text",
   args: { scenarioId: "history-attempt-detail" },
   render: (args) => (
-    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+    <LabTextSize fontScale={ACCESSIBILITY_LARGE_FONT_SCALE}>
       <LabScenario {...args} />
     </LabTextSize>
   ),

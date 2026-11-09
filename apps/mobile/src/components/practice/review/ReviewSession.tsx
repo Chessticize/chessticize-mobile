@@ -1790,7 +1790,7 @@ function AnalysisLineContent({
   const styles = useStyles();
   return (
     <>
-      <AppText numberOfLines={1} style={styles.analysisEvalText} variant="numeralRow">{score}</AppText>
+      <AppText numberOfLines={1} style={[styles.analysisEvalText, styles.tabularText]} variant="headline">{score}</AppText>
       <AppText numberOfLines={1} style={styles.analysisMoveText} variant="headline">{move}</AppText>
       <AppText numberOfLines={1} style={styles.analysisLineLabel} tone="secondary" variant="footnote">{label}</AppText>
     </>

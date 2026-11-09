@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { LabTextSize, LARGEST_ACCESSIBILITY_FONT_SCALE } from "./LabTextSize.tsx";
+import { LabTextSize, ACCESSIBILITY_LARGE_FONT_SCALE } from "./LabTextSize.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
@@ -170,11 +170,11 @@ export const ReviewSession: Story = {
   }
 };
 
-export const ReviewSessionLargestText: Story = {
-  name: "Review session · largest text",
+export const ReviewSessionAccessibilityLarge: Story = {
+  name: "Review session · accessibility large text",
   args: { scenarioId: "review-session" },
   render: (args) => (
-    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+    <LabTextSize fontScale={ACCESSIBILITY_LARGE_FONT_SCALE}>
       <LabScenario {...args} />
     </LabTextSize>
   ),
