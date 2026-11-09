@@ -138,11 +138,12 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     if (
       needsPortraitRestore
       && device.getPlatform() !== 'android'
+      && onlyOrientation === undefined
       && iosAppSupportsOrientation('portrait')
     ) {
       // Leave the emulator in its natural orientation before the shell applies
       // the next profile's portrait-shaped size override. The landscape-only
-      // iPad validation build cannot rotate back, so it skips this restore.
+      // iPad validation build and explicit Device Hub posture captures skip this restore.
       await setAdaptiveOrientation('portrait');
     }
   });
