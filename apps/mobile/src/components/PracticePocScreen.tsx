@@ -51,7 +51,6 @@ import type {
   PuzzleSide,
   PuzzleFeedback,
   PracticeRunRecord,
-  ReviewReminderDecision,
   ReviewQueueItem,
   ReviewQueueState,
   SessionReplayItem,
@@ -70,14 +69,8 @@ import {
   type PracticeService
 } from "../../../../packages/storage/src/practice-service.ts";
 import type {
-  ReviewQueueDuePromotionResult,
-  ReviewReminderPreference
+  ReviewQueueDuePromotionResult
 } from "../../../../packages/storage/src/practice-store.ts";
-import {
-  ProgressV2SyncCancelledError,
-  fingerprintOpaqueToken,
-  syncPracticeProgressV2
-} from "../../../../packages/storage/src/progress-sync-v2.ts";
 import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import {
   getBundledCorePackManifest,
@@ -85,28 +78,6 @@ import {
   shouldRandomizePuzzleSelection,
   type MobilePuzzleSource
 } from "../platform/mobilePractice.ts";
-import {
-  computeReviewReminderDecision,
-  reminderScheduleKey,
-  type ReviewReminderPermissionStatus,
-  type ReviewReminderScheduleResult
-} from "../platform/reviewReminderScheduler.ts";
-import {
-  captureProgressForSupport,
-  PROGRESS_V2_RELEASE_PHASE,
-  resolveProgressV2ActivePhase,
-  type ICloudAccountStatus
-} from "../platform/iCloudProgressSync.ts";
-import {
-  captureICloudSyncFailure,
-  formatAndroidSupportOverviewDiagnostic,
-  formatICloudSyncFailureDiagnostic,
-  formatICloudSyncOverviewDiagnostic,
-  iCloudSyncAttemptLabel,
-  type ICloudSyncFailureDiagnostic,
-  type ICloudSyncDiagnosticMetadata,
-  type SupportDiagnosticMetadata
-} from "../platform/iCloudSyncDiagnostics.ts";
 import type {
   MobilePlatformCapabilities
 } from "../platform/mobilePlatformCapabilities.ts";
@@ -144,7 +115,6 @@ import type {
   MobileSystemBackSource
 } from "../navigation/mobileSystemBack.ts";
 import type {
-  MoveFeedbackPreferences,
   MoveFeedbackPreviewer
 } from "./MoveFeedbackSettingsSection.tsx";
 import {
@@ -248,7 +218,7 @@ export type {
   RunReorderPickupFeedback,
   SprintRulesGuidePresentation
 } from "./practice/home/PracticeHome.tsx";
-import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
+import { makeStyles, useTheme, type Theme } from "../theme/index.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
 import {
   CUSTOM_INITIAL_RATING_MIN,
@@ -262,15 +232,12 @@ import {
   sleep
 } from "./practice/shared/practiceUtils.ts";
 import {
-  iCloudAccountStatusMessage,
-  localReminderTarget,
-  progressSyncStatusMessage,
   ReviewReminderPermissionPrompt,
-  reviewReminderScheduleStatusLabel,
   scheduledReviewAttemptCount,
   SettingsPanel,
   StockfishDiagnosticsPanel
 } from "./practice/settings/SettingsPanel.tsx";
+import { useSettingsController } from "./practice/settings/useSettingsController.tsx";
 import type {
   CustomThemeSelection,
   ThemeCatalogPresentation
@@ -355,7 +322,7 @@ import {
   ReviewSession,
   withAttemptClarity
 } from "./practice/review/ReviewSession.tsx";
-import { reviewCountLabel, ReviewPanel } from "./practice/review/ReviewPanel.tsx";
+import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -656,14 +623,12 @@ export function PracticePocScreen({
   const seedTacticalHistory = platformCapabilities.testControls?.seedTacticalHistory;
   const simulationProfile = platformCapabilities.testControls?.simulationProfile;
   const stockfish = platformCapabilities.stockfish;
-  const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
   const reminderPlatform = platformCapabilities.reminders.platform;
   const moveFeedbackClient = platformCapabilities.moveFeedback.client;
   const appStoreReviewRequestClient = platformCapabilities.appReview.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
-  const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
   const boardRef = useRef<ChessboardRef | null>(null);
   const practiceMainScrollRef = useRef<ScrollView | null>(null);
   const [practiceScrollHandler, setPracticeScrollHandler] = useState<ScrollView | null>(null);
@@ -1156,6 +1121,49 @@ export function PracticePocScreen({
     // refreshState reads mutable service state; rerunning for its render-local identity would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configurePuzzleSource, puzzleSource, service]);
+
+  // Called here so its iCloud startup effect keeps its place in the effect order.
+  const {
+    appearance,
+    dismissReviewReminderPermissionPrompt,
+    effectiveErrorDetails,
+    effectiveSupportBundle,
+    iCloudSyncEnabled,
+    iCloudSyncInProgress,
+    iCloudSyncStatus,
+    maybeShowReviewReminderPermissionPrompt,
+    moveFeedbackPreferences,
+    notificationPermissionStatus,
+    openReviewReminderSystemSettings,
+    refreshReviewReminder,
+    requestReviewReminderPermission,
+    reviewReminderPermissionPromptVisible,
+    reviewReminderPreference,
+    reviewReminderScheduleStatus,
+    runICloudProgressSync,
+    saveAppearance,
+    saveICloudSyncEnabled,
+    saveMoveFeedbackPreferences,
+    saveReviewReminderPreference,
+    scheduleDevReviewReminderNotification,
+    setICloudSyncEnabled,
+    setICloudSyncStatus,
+    setNotificationPermissionStatus,
+    setReviewReminderPreference,
+    setSettingsAdvancedRatingsOpen,
+    settingsAdvancedRatingsOpen
+  } = useSettingsController({
+    currentTimeMs,
+    deferBackRelevantTransition,
+    emitTrace,
+    iCloudSyncErrorDetails,
+    iCloudSyncSupportBundle,
+    nowIso,
+    nowMsRef,
+    platformCapabilities,
+    refreshState,
+    setSettingsRevision
+  });
 
   useEffect(() => {
     let canceled = false;

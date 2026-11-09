@@ -1,3 +1,91 @@
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReviewReminderDecision } from "../../../../../../packages/core/src/index.ts";
+import type { ReviewReminderPreference } from "../../../../../../packages/storage/src/practice-store.ts";
+import {
+  fingerprintOpaqueToken,
+  ProgressV2SyncCancelledError,
+  syncPracticeProgressV2
+} from "../../../../../../packages/storage/src/progress-sync-v2.ts";
+import {
+  captureProgressForSupport,
+  PROGRESS_V2_RELEASE_PHASE,
+  resolveProgressV2ActivePhase,
+  type ICloudAccountStatus
+} from "../../../platform/iCloudProgressSync.ts";
+import {
+  captureICloudSyncFailure,
+  formatAndroidSupportOverviewDiagnostic,
+  formatICloudSyncFailureDiagnostic,
+  formatICloudSyncOverviewDiagnostic,
+  iCloudSyncAttemptLabel,
+  type ICloudSyncDiagnosticMetadata,
+  type ICloudSyncFailureDiagnostic,
+  type SupportDiagnosticMetadata
+} from "../../../platform/iCloudSyncDiagnostics.ts";
+import type { MobilePlatformCapabilities } from "../../../platform/mobilePlatformCapabilities.ts";
+import {
+  computeReviewReminderDecision,
+  reminderScheduleKey,
+  type ReviewReminderPermissionStatus,
+  type ReviewReminderScheduleResult
+} from "../../../platform/reviewReminderScheduler.ts";
+import { useAppearance, type AppearancePreference } from "../../../theme/index.ts";
+import type {
+  ICloudSyncErrorDetailsPresentation,
+  ICloudSyncSupportBundlePresentation
+} from "../../ICloudSyncErrorDetails.tsx";
+import type { MoveFeedbackPreferences } from "../../MoveFeedbackSettingsSection.tsx";
+import { reviewCountLabel } from "../review/ReviewPanel.tsx";
+import { errorMessage } from "../shared/practiceUtils.ts";
+import {
+  iCloudAccountStatusMessage,
+  localReminderTarget,
+  progressSyncStatusMessage,
+  reviewReminderScheduleStatusLabel
+} from "./SettingsPanel.tsx";
+
+// Settings-owned state and actions for PracticePocScreen (#685 phase 2):
+// review reminders, iCloud progress sync and its support diagnostics,
+// appearance, move feedback and the advanced ratings disclosure. The screen
+// passes in the orchestration it still owns (state refresh, back-gesture
+// deferral, tracing and the clock) and keeps rendering SettingsPanel.
+export type SettingsControllerTraceEvent = {
+  type: "move-ignored";
+  reason: string;
+};
+
+export type SettingsControllerInput = {
+  currentTimeMs: () => number;
+  deferBackRelevantTransition: (key: string, resumeAfterCancel: () => void) => boolean;
+  emitTrace: (event: SettingsControllerTraceEvent) => void;
+  iCloudSyncErrorDetails: ICloudSyncErrorDetailsPresentation | undefined;
+  iCloudSyncSupportBundle: ICloudSyncSupportBundlePresentation | undefined;
+  nowIso: () => string;
+  nowMsRef: React.RefObject<number>;
+  platformCapabilities: MobilePlatformCapabilities;
+  refreshState: () => void;
+  setSettingsRevision: React.Dispatch<React.SetStateAction<number>>;
+};
+
+export function useSettingsController({
+  currentTimeMs,
+  deferBackRelevantTransition,
+  emitTrace,
+  iCloudSyncErrorDetails,
+  iCloudSyncSupportBundle,
+  nowIso,
+  nowMsRef,
+  platformCapabilities,
+  refreshState,
+  setSettingsRevision
+}: SettingsControllerInput) {
+  const service = platformCapabilities.storage.practiceService;
+  const scheduler = platformCapabilities.reminders.scheduler;
+  const notificationClient = platformCapabilities.reminders.notificationClient;
+  const progressProtection = platformCapabilities.progressProtection;
+  const iCloudSyncClient = platformCapabilities.progressSync.client;
+  const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
   const reminderScheduleKeyRef = useRef<string | null>(null);
 
   const reviewReminderPromptDismissedRef = useRef(false);
@@ -431,3 +519,35 @@
       return { scheduled: false };
     }
   }
+
+  return {
+    appearance,
+    dismissReviewReminderPermissionPrompt,
+    effectiveErrorDetails,
+    effectiveSupportBundle,
+    iCloudSyncEnabled,
+    iCloudSyncInProgress,
+    iCloudSyncStatus,
+    maybeShowReviewReminderPermissionPrompt,
+    moveFeedbackPreferences,
+    notificationPermissionStatus,
+    openReviewReminderSystemSettings,
+    refreshReviewReminder,
+    requestReviewReminderPermission,
+    reviewReminderPermissionPromptVisible,
+    reviewReminderPreference,
+    reviewReminderScheduleStatus,
+    runICloudProgressSync,
+    saveAppearance,
+    saveICloudSyncEnabled,
+    saveMoveFeedbackPreferences,
+    saveReviewReminderPreference,
+    scheduleDevReviewReminderNotification,
+    setICloudSyncEnabled,
+    setICloudSyncStatus,
+    setNotificationPermissionStatus,
+    setReviewReminderPreference,
+    setSettingsAdvancedRatingsOpen,
+    settingsAdvancedRatingsOpen
+  };
+}
