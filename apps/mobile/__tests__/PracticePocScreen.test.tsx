@@ -7887,6 +7887,22 @@ describe("PracticePocScreen", () => {
       .toBe("Resume paused Focused Run");
   });
 
+  it("hides the Practice large title while a Practice sub-page draws its own top bar", () => {
+    const home = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    expect(findByTestId(home, "app-shell-header")).toBeTruthy();
+    press(home, "practice-mode-custom");
+    expect(findByTestId(home, "custom-sprint-setup")).toBeTruthy();
+    expect(home.root.findAllByProps({ testID: "app-shell-header" })).toHaveLength(0);
+    press(home, "custom-close");
+    expect(findByTestId(home, "app-shell-header")).toBeTruthy();
+
+    const profile = renderLabScenario("practice-tactical-profile-solve-rate");
+    expect(findByTestId(profile, "tactical-profile-screen")).toBeTruthy();
+    expect(profile.root.findAllByProps({ testID: "app-shell-header" })).toHaveLength(0);
+    press(profile, "tactical-profile-back");
+    expect(findByTestId(profile, "app-shell-header")).toBeTruthy();
+  });
+
   it("opens custom setup from the compact custom row instead of starting a scored sprint", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 

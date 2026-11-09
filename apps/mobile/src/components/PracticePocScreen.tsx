@@ -4783,7 +4783,22 @@ export function PracticePocScreen({
   }, [systemBack]);
 
   const appChromeVisible = topLevelChromeVisible;
-  const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
+  // Practice sub-pages draw their own back/close and title top bar, like
+  // Survival and Sprint Result (#609), so the Practice large title is hidden
+  // while one is open.
+  const practiceSubPageAvailable = !isSessionGuideVisible && !isOpenSession && state === null;
+  const tacticalProfileFlowVisible = practiceSubPageAvailable
+    && resolvedTacticalProfilePresentation?.screen !== undefined
+    && resolvedTacticalProfilePresentation.screen !== "home";
+  const practiceRunEditorVisible = practiceSubPageAvailable
+    && activeRunManagementPresentation !== undefined
+    && activeRunManagementPresentation.screen !== "home";
+  const customSprintSetupVisible = practiceSubPageAvailable
+    && !activeRunManagementPresentation
+    && mode === "custom";
+  const practiceSubPageVisible = tab === "practice"
+    && (tacticalProfileFlowVisible || practiceRunEditorVisible || customSprintSetupVisible);
+  const appHeaderVisible = appChromeVisible && !contentOwnsHeader && !practiceSubPageVisible;
   // Stockfish diagnostics (dev only) open from Settings, so they keep the
   // Settings tab selected.
   const hostTab: TopLevelTab = tab === "analysis" ? "settings" : tab;
@@ -5565,10 +5580,7 @@ export function PracticePocScreen({
                   </View>
                 ) : null}
 
-                {!isSessionGuideVisible && !isOpenSession && state === null && (
-                  resolvedTacticalProfilePresentation?.screen !== undefined
-                  && resolvedTacticalProfilePresentation.screen !== "home"
-                ) ? (
+                {tacticalProfileFlowVisible && resolvedTacticalProfilePresentation ? (
                   <TacticalProfileFlow presentation={resolvedTacticalProfilePresentation} />
                 ) : null}
 
@@ -5626,7 +5638,7 @@ export function PracticePocScreen({
                   />
                 ) : null}
 
-                {!isSessionGuideVisible && !isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
+                {practiceRunEditorVisible && activeRunManagementPresentation ? (
                   <PracticeRunEditor
                     arrowDuelOpponentReplyGlobalEnabled={
                       arrowDuelOpponentReplyGlobalEnabled
@@ -5694,7 +5706,7 @@ export function PracticePocScreen({
                   />
                 ) : null}
 
-                {!isSessionGuideVisible && !isOpenSession && state === null && !activeRunManagementPresentation && mode === "custom" ? (
+                {customSprintSetupVisible ? (
                   <CustomSprintSetup
                     durationSeconds={customDurationSeconds}
                     perPuzzleSeconds={customPerPuzzleSeconds}
