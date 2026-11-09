@@ -983,7 +983,7 @@ describe('Detox suite configuration', () => {
     const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible(visibilityPercent)');
     // The full-screen Sprint Result owns its own scroll view (#609).
     const chooseScroll = helper.indexOf("existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll'");
-    const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top')");
+    const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top', 0.5, 0.5)");
     const requireVisible = helper.indexOf('.toBeVisible(visibilityPercent)', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
@@ -1021,7 +1021,7 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const raceProtectedActionStart = helper.indexOf('try {');
-    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5)");
     const requireVisible = helper.indexOf('.toBeVisible()');
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
     const tapGuideAction = helper.indexOf("element(by.id('practice-session-guide-start')).tap()");
@@ -1234,7 +1234,7 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const submitName = helper.indexOf("element(by.id('practice-run-name-input')).tapReturnKey()");
-    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5)");
     const tapPublicTitle = helper.indexOf("element(by.id('practice-run-editor-title')).tap()");
 
     expect(submitName).toBeGreaterThan(0);
