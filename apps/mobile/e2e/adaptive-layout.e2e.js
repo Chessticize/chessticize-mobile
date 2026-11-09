@@ -88,7 +88,8 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       // state captured above. A previous-attempt notice used to recenter the
       // whole rail; compare its live native frames with the no-notice rail.
       const feedbackOrientation = includeLandscape ? 'landscape' : initialOrientation;
-      puzzleID = await captureAndroidPreviousAttemptNotice(feedbackOrientation);
+      await captureAndroidPreviousAttemptNotice(feedbackOrientation);
+      puzzleID = await elementText('session-current-puzzle-id');
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
@@ -325,7 +326,6 @@ async function captureAndroidPreviousAttemptNotice(orientation) {
     await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
     await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
     await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
-    return elementText('session-current-puzzle-id');
   });
 }
 
