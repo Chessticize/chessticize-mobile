@@ -549,7 +549,7 @@ export function SessionStatusBar({
                 styles.sessionAbandonContent,
                 stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
                 leaveConfirmationMinHeight === undefined ? null : {
-                  minHeight: Math.min(leaveConfirmationMinHeight, Math.max(0, (confirmationMaxHeight ?? leaveConfirmationMinHeight + 2) - 2))
+                  minHeight: Math.max(0, Math.min(leaveConfirmationMinHeight, confirmationMaxHeight ?? leaveConfirmationMinHeight) - 2)
                 }
               ]}
               nestedScrollEnabled
