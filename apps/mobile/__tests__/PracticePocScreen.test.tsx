@@ -2886,6 +2886,33 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(badge.props.style).minWidth).toBeUndefined();
   });
 
+  it("moves the first Sprint dismiss button below the title when the scaled button would squeeze it", () => {
+    const render = (fontScale: number) => {
+      setPracticeViewport({
+        fontScale,
+        height: 914,
+        insets: { top: 32, right: 0, bottom: 24, left: 0 },
+        scale: 2.625,
+        width: 412
+      });
+      const renderer = renderLabScenario("practice-first-sprint-guide");
+      act(() => {
+        findByTestId(renderer, "practice-sprint-rules-list").props.onLayout({
+          nativeEvent: { layout: { height: 600, width: 340, x: 0, y: 0 } }
+        });
+      });
+      return {
+        button: flattenTestStyle(findByTestId(renderer, "practice-sprint-rules-dismiss").props.style),
+        header: flattenTestStyle(findByTestId(renderer, "practice-sprint-rules-header").props.style)
+      };
+    };
+
+    expect(render(1).header.flexDirection).toBe("row");
+    const large = render(2);
+    expect(large.header.flexDirection).toBe("column");
+    expect(large.button.alignSelf).toBe("flex-start");
+  });
+
   it("uses the selected saved Run to calculate the first Sprint pass target", () => {
     const renderer = renderScreen({
       runManagementEnabled: true,
