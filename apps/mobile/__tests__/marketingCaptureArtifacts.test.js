@@ -20,6 +20,9 @@ const {
   writeCombinedCaptureManifest,
   writeDeviceCaptureManifest,
 } = require('../e2e/marketingCaptureArtifacts');
+const {
+  resolveMarketingCampaign,
+} = require('../e2e/marketingCampaign');
 
 describe('App Store marketing capture artifacts', () => {
   it('accepts any dedicated iPad profile for screenshot-free landscape validation', () => {
@@ -111,6 +114,117 @@ describe('App Store marketing capture artifacts', () => {
       readFileSync(sourcePath)
     );
     expect(record.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('writes the 1.6 campaign as a separate schema-v2 receipt without legacy copy keys', () => {
+    const campaign = resolveMarketingCampaign(story, 'mobile-1.6-en-us');
+    const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-campaign-'));
+    const sourcePath = join(outputRoot, 'source.png');
+    const png = new PNG({ width: 2, height: 3 });
+    png.data.fill(255);
+    writeFileSync(sourcePath, PNG.sync.write(png));
+    const target = {
+      acceptedSizes: [{ width: 2, height: 3 }],
+      deviceFamily: 'iphone',
+      deviceName: 'Unit Test iPhone Pro Max',
+      displayGroup: '6.9-inch',
+      orientation: 'portrait',
+      outputDirectoryName: 'iphone-6.9-inch-portrait',
+    };
+    const sourceCommit = 'c'.repeat(40);
+    const records = campaign.frames.map((frame) => captureMarketingScreenshot({
+      frame,
+      outputRoot,
+      screenshotPath: sourcePath,
+      sourceCommit,
+      story: campaign,
+      target,
+    }));
+    const manifestPath = writeDeviceCaptureManifest({
+      outputRoot,
+      records,
+      sourceCommit,
+      story: campaign,
+      target,
+    });
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+    expect(manifest).toMatchObject({
+      schemaVersion: 2,
+      campaign: {
+        id: 'mobile-1.6-en-us',
+        publicVersion: '1.6.0',
+        status: 'capture-plan',
+      },
+    });
+    expect(manifest.storyId).toBeUndefined();
+    expect(manifest.frames.map((frame) => frame.captureId)).toEqual([
+      'practice-home',
+      'dark-arrow-duel',
+      'tactical-profile',
+      'focused-run',
+      'survival',
+      'review',
+    ]);
+    expect(manifest.frames[0].copyKey).toBeUndefined();
+    expect(manifest.frames[0].sourceState).toBe('practice--home');
+    expect(manifest.frames[1]).toMatchObject({
+      appearance: 'dark',
+      moment: 'opponent-reply',
+      storyId: 'practice--arrow-duel-prompt',
+    });
+  });
+
+  it('finalizes the 1.6 campaign with its exact campaign and release-frame contract', () => {
+    const campaign = resolveMarketingCampaign(story, 'mobile-1.6-en-us');
+    const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-campaign-combined-'));
+    const sourceCommit = 'd'.repeat(40);
+    const targets = {
+      iphone: {
+        acceptedSizes: [{ width: 2, height: 3 }], deviceFamily: 'iphone',
+        deviceName: 'Unit Test iPhone Pro Max', displayGroup: '6.9-inch',
+        orientation: 'portrait', outputDirectoryName: 'iphone-6.9-inch-portrait',
+      },
+      ipad: {
+        acceptedSizes: [{ width: 3, height: 2 }], deviceFamily: 'ipad',
+        deviceName: 'Unit Test iPad Pro 13-inch', displayGroup: '13-inch',
+        orientation: 'landscape', outputDirectoryName: 'ipad-13-inch-landscape',
+      },
+    };
+    for (const target of Object.values(targets)) {
+      const sourcePath = join(outputRoot, `${target.deviceFamily}-source.png`);
+      const size = target.acceptedSizes[0];
+      writeFileSync(sourcePath, PNG.sync.write(new PNG(size)));
+      writeDeviceCaptureManifest({
+        outputRoot,
+        records: campaign.frames.map((frame) => captureMarketingScreenshot({
+          frame, outputRoot, screenshotPath: sourcePath, sourceCommit, story: campaign, target,
+        })),
+        sourceCommit, story: campaign, target,
+      });
+    }
+    const manifest = JSON.parse(readFileSync(writeCombinedCaptureManifest({
+      acceptedSizesByFamily: {
+        iphone: targets.iphone.acceptedSizes,
+        ipad: targets.ipad.acceptedSizes,
+      },
+      outputRoot,
+      story: campaign,
+    }), 'utf8'));
+
+    expect(manifest).toMatchObject({
+      schemaVersion: 2,
+      campaign: { id: 'mobile-1.6-en-us', publicVersion: '1.6.0', status: 'capture-plan' },
+    });
+    expect(manifest.storyId).toBeUndefined();
+    expect(manifest.frames[2]).toMatchObject({
+      frameId: 'tactical-profile', captureId: 'tactical-profile',
+      previewActions: ['training-focus-open-profile'],
+    });
+    expect(manifest.frames[3]).toMatchObject({
+      frameId: 'focused-run', captureId: 'focused-run',
+      requiredVisibleTestIds: ['focused-run-rating-anchor', 'focused-run-allocation-bar'],
+    });
   });
 
   it('writes one ordered device manifest and requires a full source SHA', () => {

@@ -29,8 +29,13 @@ const {
   resolveGooglePlayCaptureTarget,
   writeGooglePlayDeviceCaptureManifest,
 } = require('./googlePlayMarketingCaptureArtifacts');
+const { resolveMarketingCampaign } = require('./marketingCampaign');
 
-const story = require('../../../config/app-store-marketing-story-v1.json');
+const marketingStory = require('../../../config/app-store-marketing-story-v1.json');
+const story = resolveMarketingCampaign(
+  marketingStory,
+  process.env.CHESSTICIZE_MARKETING_CAMPAIGN
+);
 const ROOT_CLIPPED_SCROLL_CONTAINERS = new Set([
   'practice-run-editor',
   'settings-about-section',
@@ -151,6 +156,28 @@ async function launchMarketingFrame(frame) {
 
 async function prepareFrame(frame) {
   switch (frame.id) {
+    case 'practice-home':
+      await waitFor(element(by.id('practice-home'))).toBeVisible().withTimeout(30000);
+      return;
+    case 'dark-arrow-duel':
+      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('arrow-duel-reply-challenge')))
+        .toBeVisible()
+        .withTimeout(10000);
+      return;
+    case 'tactical-profile':
+      await waitFor(element(by.id('tactical-profile-screen'))).toBeVisible().withTimeout(30000);
+      return;
+    case 'focused-run':
+      await waitFor(element(by.id('focused-run-preview'))).toBeVisible().withTimeout(30000);
+      return;
+    case 'survival':
+      await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(30000);
+      return;
+    case 'review':
+      await openTab('review-tab', 'review-due-card');
+      await element(by.id('practice-main-scroll')).scrollTo('top');
+      return;
     case 'build-tactical-intuition':
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
       return;
@@ -244,6 +271,27 @@ async function prepareCustomRun() {
 }
 
 async function assertCompositionViewport(frame) {
+  if (frame.id === 'tactical-profile') {
+    await waitFor(element(by.id('tactical-profile-recommendations')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await waitFor(element(by.id('tactical-profile-early-estimate')))
+      .toBeVisible()
+      .withTimeout(10000);
+    return;
+  }
+  if (frame.id === 'focused-run') {
+    await waitFor(element(by.id('focused-run-rating-anchor')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await waitFor(element(by.id('focused-run-allocation-bar')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await waitFor(element(by.id('tactical-profile-early-estimate')))
+      .toBeVisible()
+      .withTimeout(10000);
+    return;
+  }
   if (frame.id === 'focus-your-practice') {
     for (const testID of [
       'practice-run-name-input',
@@ -296,7 +344,7 @@ async function prepareRatingTrend() {
 }
 
 async function assertFrameContract(frame) {
-  for (const testID of frame.source.requiredVisibleTestIds) {
+  for (const testID of frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []) {
     await waitFor(element(by.id(testID))).toExist().withTimeout(10000);
   }
   await assertStableText(frame);
@@ -304,6 +352,16 @@ async function assertFrameContract(frame) {
 }
 
 async function assertStableText(frame) {
+  if (frame.id === 'practice-home' || frame.id === 'survival' || frame.id === 'review') {
+    return;
+  }
+  if (frame.id === 'dark-arrow-duel') {
+    await waitFor(element(by.id('session-progress'))).toBeVisible().withTimeout(10000);
+    return;
+  }
+  if (frame.id === 'tactical-profile' || frame.id === 'focused-run') {
+    return;
+  }
   const stable = frame.source.stableText;
   switch (frame.id) {
     case 'build-tactical-intuition':
@@ -387,7 +445,7 @@ async function assertForbiddenState(frame) {
     'settings-stockfish-diagnostics',
   ]);
   for (const testID of forbiddenTestIDs) {
-    if (frame.source.requiredVisibleTestIds.includes(testID)) {
+    if ((frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []).includes(testID)) {
       continue;
     }
     await expect(element(by.id(testID))).not.toExist();

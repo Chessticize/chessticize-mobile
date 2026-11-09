@@ -621,21 +621,23 @@ function writeGooglePlayDeviceCaptureManifest({
     target,
   });
   const manifest = {
-    schemaVersion: 1,
+    schemaVersion: story.schemaVersion,
     platform: 'google-play',
     status: artifact.captureMode === 'public-ui-exact-artifact'
       ? 'exact-artifact-capture'
       : 'preview-only',
-    storyId: story.storyId,
+    ...(story.campaign ? {} : { storyId: story.storyId }),
     contractIssue: story.issue,
     contractSchemaVersion: story.schemaVersion,
     locale: story.locale,
     sourceBuild: {
+      ...story.sourceBuild,
       sourceCommit,
       puzzlePack: {
         ...story.sourceBuild.puzzlePack,
       },
     },
+    ...(story.campaign ? { campaign: { ...story.campaign } } : {}),
     artifact,
     ...(installedSession ? { installedSession } : {}),
     target: manifestTarget(target),
@@ -694,14 +696,15 @@ function writeCombinedGooglePlayCaptureManifest({
 
   const expectedFrames = expectedStoryFrames(story);
   const combined = {
-    schemaVersion: 1,
+    schemaVersion: story.schemaVersion,
     platform: 'google-play',
     status: reference.status,
-    storyId: story.storyId,
+    ...(story.campaign ? {} : { storyId: story.storyId }),
     contractIssue: story.issue,
     contractSchemaVersion: story.schemaVersion,
     locale: story.locale,
     sourceBuild: reference.sourceBuild,
+    ...(story.campaign ? { campaign: { ...story.campaign } } : {}),
     artifact: reference.artifact,
     targets: Object.fromEntries(deviceFamilies.map((deviceFamily) => [
       deviceFamily,
@@ -719,6 +722,7 @@ function writeCombinedGooglePlayCaptureManifest({
       copyKey: frame.copyKey,
       headline: frame.headline,
       supporting: frame.supporting,
+      ...(story.campaign ? releaseFrameReceipt(frame) : {}),
       captures: Object.fromEntries(deviceFamilies.map((deviceFamily) => [
         deviceFamily,
         manifests[deviceFamily].frames.find(
@@ -748,13 +752,14 @@ function assertCombinedGooglePlayCaptureManifest({
   const deviceFamilies = GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES;
   const expectedFrames = expectedStoryFrames(story);
   if (
-    manifest?.schemaVersion !== 1
+    manifest?.schemaVersion !== story.schemaVersion
     || manifest.platform !== 'google-play'
     || !['preview-only', 'exact-artifact-capture'].includes(manifest.status)
-    || manifest.storyId !== story.storyId
+    || (story.campaign ? manifest.storyId !== undefined : manifest.storyId !== story.storyId)
     || manifest.contractIssue !== story.issue
     || manifest.contractSchemaVersion !== story.schemaVersion
     || manifest.locale !== story.locale
+    || JSON.stringify(manifest.campaign ?? null) !== JSON.stringify(story.campaign ?? null)
     || !EXACT_SHA_PATTERN.test(manifest.sourceBuild?.sourceCommit ?? '')
     || JSON.stringify(Object.keys(manifest.targets ?? {}).sort())
       !== JSON.stringify(deviceFamilies.slice().sort())
@@ -777,6 +782,8 @@ function assertCombinedGooglePlayCaptureManifest({
       || frame.copyKey !== expected.copyKey
       || frame.headline !== expected.headline
       || frame.supporting !== expected.supporting
+      || (story.campaign && JSON.stringify(releaseFrameReceipt(frame))
+        !== JSON.stringify(releaseFrameReceipt(expected)))
       || JSON.stringify(Object.keys(frame.captures ?? {}).sort())
         !== JSON.stringify(deviceFamilies.slice().sort())
     ) {
@@ -797,11 +804,12 @@ function assertCombinedGooglePlayCaptureManifest({
         schemaVersion: manifest.schemaVersion,
         platform: manifest.platform,
         status: manifest.status,
-        storyId: manifest.storyId,
+        ...(manifest.storyId === undefined ? {} : { storyId: manifest.storyId }),
         contractIssue: manifest.contractIssue,
         contractSchemaVersion: manifest.contractSchemaVersion,
         locale: manifest.locale,
         sourceBuild: manifest.sourceBuild,
+        ...(manifest.campaign ? { campaign: manifest.campaign } : {}),
         artifact: manifest.artifact,
         ...(installedSession ? { installedSession } : {}),
         target,
@@ -824,13 +832,14 @@ function assertGooglePlayDeviceManifest({
     manifest.target?.deviceFamily
   ];
   if (
-    manifest.schemaVersion !== 1
+    manifest.schemaVersion !== story.schemaVersion
     || manifest.platform !== 'google-play'
     || !contract
-    || manifest.storyId !== story.storyId
+    || (story.campaign ? manifest.storyId !== undefined : manifest.storyId !== story.storyId)
     || manifest.contractIssue !== story.issue
     || manifest.contractSchemaVersion !== story.schemaVersion
     || manifest.locale !== story.locale
+    || JSON.stringify(manifest.campaign ?? null) !== JSON.stringify(story.campaign ?? null)
     || !EXACT_SHA_PATTERN.test(manifest.sourceBuild?.sourceCommit ?? '')
     || manifest.target.displayGroup !== contract.displayGroup
     || manifest.target.orientation !== contract.orientation
@@ -933,6 +942,8 @@ function assertGooglePlayCaptureSet({
       || record.displayGroup !== target.displayGroup
       || record.orientation !== target.orientation
       || record.sourceCommit !== sourceCommit
+      || (story.campaign && JSON.stringify(releaseFrameReceipt(record))
+        !== JSON.stringify(releaseFrameReceipt(expectedFrames[index])))
     )
   ) {
     throw new Error(
@@ -1253,6 +1264,19 @@ function expectedStoryFrames(story) {
   return story.frames
     .slice()
     .sort((left, right) => left.order - right.order);
+}
+
+function releaseFrameReceipt(frame) {
+  return {
+    appearance: frame.appearance,
+    headline: frame.headline,
+    highlights: frame.highlights,
+    storyId: frame.storyId,
+    requiredVisibleTestIds: frame.requiredVisibleTestIds,
+    captureAnchorTestId: frame.captureAnchorTestId,
+    ...(frame.moment === undefined ? {} : { moment: frame.moment }),
+    ...(frame.previewActions === undefined ? {} : { previewActions: frame.previewActions }),
+  };
 }
 
 function orderedFrames(records) {

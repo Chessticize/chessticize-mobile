@@ -108,6 +108,7 @@ function captureMarketingScreenshot({
     frameId: frame.id,
     captureId: frame.captureId,
     copyKey: frame.copyKey,
+    ...(story.campaign ? releaseFrameReceipt(frame) : {}),
     locale: story.locale,
     deviceFamily: target.deviceFamily,
     deviceName: target.deviceName,
@@ -118,7 +119,7 @@ function captureMarketingScreenshot({
       height: png.height,
     },
     sourceCommit,
-    sourceState: frame.source.screen,
+    sourceState: frame.source?.screen,
     puzzlePack: {
       ...story.sourceBuild.puzzlePack,
     },
@@ -157,8 +158,8 @@ function writeDeviceCaptureManifest({
   }
 
   const manifest = {
-    schemaVersion: 1,
-    storyId: story.storyId,
+    schemaVersion: story.schemaVersion,
+    ...(story.campaign ? {} : { storyId: story.storyId }),
     contractIssue: story.issue,
     contractSchemaVersion: story.schemaVersion,
     captureClock: {
@@ -168,6 +169,7 @@ function writeDeviceCaptureManifest({
       ...story.sourceBuild,
       sourceCommit,
     },
+    ...(story.campaign ? { campaign: { ...story.campaign } } : {}),
     target: {
       deviceFamily: target.deviceFamily,
       deviceName: target.deviceName,
@@ -231,8 +233,8 @@ function writeCombinedCaptureManifest({
   }
 
   const manifest = {
-    schemaVersion: 1,
-    storyId: story.storyId,
+    schemaVersion: story.schemaVersion,
+    ...(story.campaign ? {} : { storyId: story.storyId }),
     contractIssue: story.issue,
     contractSchemaVersion: story.schemaVersion,
     locale: story.locale,
@@ -243,6 +245,7 @@ function writeCombinedCaptureManifest({
       ...story.sourceBuild,
       sourceCommit,
     },
+    ...(story.campaign ? { campaign: { ...story.campaign } } : {}),
     targets: Object.fromEntries(families.map((deviceFamily) => [
       deviceFamily,
       manifests[deviceFamily].target,
@@ -252,6 +255,7 @@ function writeCombinedCaptureManifest({
       frameId: frame.id,
       captureId: frame.captureId,
       copyKey: frame.copyKey,
+      ...(story.campaign ? releaseFrameReceipt(frame) : {}),
       headline: frame.headline,
       supporting: frame.supporting,
       captures: Object.fromEntries(families.map((deviceFamily) => [
@@ -277,14 +281,15 @@ function assertDeviceManifest({
 }) {
   const contract = story.deviceTargets[deviceFamily];
   if (
-    manifest.schemaVersion !== 1
-    || manifest.storyId !== story.storyId
+    manifest.schemaVersion !== story.schemaVersion
+    || (story.campaign ? manifest.storyId !== undefined : manifest.storyId !== story.storyId)
     || manifest.contractIssue !== story.issue
     || manifest.contractSchemaVersion !== story.schemaVersion
     || manifest.sourceBuild?.sourceCommit !== sourceCommit
     || manifest.target?.deviceFamily !== deviceFamily
     || manifest.target?.displayGroup !== contract.displayGroup
     || manifest.target?.orientation !== contract.primaryOrientation
+    || JSON.stringify(manifest.campaign ?? null) !== JSON.stringify(story.campaign ?? null)
   ) {
     throw new Error(
       `Marketing ${deviceFamily} manifest does not match the approved story contract.`
@@ -307,6 +312,8 @@ function assertDeviceManifest({
       || record.displayGroup !== contract.displayGroup
       || record.orientation !== contract.primaryOrientation
       || record.sourceCommit !== sourceCommit
+      || (story.campaign && JSON.stringify(releaseFrameReceipt(record))
+        !== JSON.stringify(releaseFrameReceipt(expectedFrames[index])))
     )
   ) {
     throw new Error(
@@ -344,6 +351,19 @@ function assertDeviceManifest({
       );
     }
   }
+}
+
+function releaseFrameReceipt(frame) {
+  return {
+    appearance: frame.appearance,
+    headline: frame.headline,
+    highlights: frame.highlights,
+    storyId: frame.storyId,
+    requiredVisibleTestIds: frame.requiredVisibleTestIds,
+    captureAnchorTestId: frame.captureAnchorTestId,
+    ...(frame.moment === undefined ? {} : { moment: frame.moment }),
+    ...(frame.previewActions === undefined ? {} : { previewActions: frame.previewActions }),
+  };
 }
 
 function resolveCaptureArtifactPath(outputRoot, recordedPath) {

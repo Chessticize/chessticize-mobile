@@ -1,5 +1,6 @@
 import {
   appStoreMarketingCaptureFrameIds,
+  appStoreMarketingReleaseCampaignFrameIds,
   appStoreMarketingCaptureStory,
   loadAppStoreMarketingCaptureFixture
 } from "../src/testing/appStoreMarketingCapture.ts";
@@ -25,6 +26,61 @@ describe("App Store marketing capture fixture", () => {
     ]);
     expect(() => loadFixture("unknown-frame"))
       .toThrow('Unknown App Store marketing capture frame "unknown-frame"');
+  });
+
+  it("keeps the 1.6 campaign separate from the approved v1 story and derives its profile from simulated play", () => {
+    expect(appStoreMarketingReleaseCampaignFrameIds()).toEqual([
+      "practice-home",
+      "dark-arrow-duel",
+      "tactical-profile",
+      "focused-run",
+      "survival",
+      "review"
+    ]);
+
+    const profile = loadFixture("tactical-profile");
+    const focusedRun = loadFixture("focused-run");
+    const arrowDuel = loadFixture("dark-arrow-duel");
+
+    expect(profile.fixture.campaign).toEqual({
+      id: "mobile-1.6-en-us",
+      publicVersion: "1.6.0",
+      status: "capture-plan"
+    });
+    expect(profile.fixture.appearance).toBe("light");
+    expect(arrowDuel.fixture.appearance).toBe("dark");
+    expect(arrowDuel.fixture.initialActiveState?.currentPuzzle).toMatchObject({
+      kind: "arrow_duel",
+      phase: "reply",
+      selectedMove: expect.any(String),
+      replyStartedAt: expect.any(String),
+      replyDeadlineAt: expect.any(String)
+    });
+    expect(profile.practiceService.countHistory()).toBeGreaterThan(0);
+    expect(profile.practiceService.listReviewQueue()).not.toHaveLength(0);
+    expect(profile.practiceService.getTacticalProfileSnapshot(
+      appStoreMarketingCaptureStory().captureClock.instant
+    )).toMatchObject({
+      phase: expect.any(String),
+      evaluation: {
+        signals: expect.arrayContaining([
+          expect.objectContaining({
+            status: "recommended",
+            theme: "fork"
+          })
+        ])
+      }
+    });
+    expect(profile.fixture.tacticalProfilePresentation).toMatchObject({
+      screen: "profile",
+      assurance: "provisional"
+    });
+    expect(focusedRun.fixture.tacticalProfilePresentation).toMatchObject({
+      screen: "focused_run",
+      focusedRun: expect.objectContaining({
+        taskFamily: "line"
+      })
+    });
   });
 
   it("loads one deterministic fictional user without weakness recommendations", () => {
