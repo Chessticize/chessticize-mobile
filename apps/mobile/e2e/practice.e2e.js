@@ -144,6 +144,46 @@ describe('Practice POC', () => {
     if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('portrait');
   });
 
+  it('keeps the paused Sprint confirmation visible without the paused card underneath', async () => {
+    if (process.env.CHESSTICIZE_ABANDON_CONFIRMATION_LANDSCAPE === '1') {
+      if (device.getPlatform() === 'android') await setAndroidDisplayOrientation('landscape');
+      else await device.setOrientation('landscape');
+    }
+    await startPracticeMode('standard');
+    await waitForVisibleInPracticeScroll('session-board');
+    await element(by.id('session-pause')).tap();
+    await waitForVisibleInPracticeScroll('paused-session-resume', 100);
+    expectFrameContained(
+      await frameFor(element(by.id('paused-session-panel'))),
+      await frameFor(element(by.id('adaptive-layout'))),
+      'Paused Sprint panel'
+    );
+    await device.takeScreenshot('paused-before-abandon');
+
+    await element(by.id('paused-session-abandon')).tap();
+    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('paused-session-panel'))).not.toExist();
+    await waitForVisibleInPracticeScroll('session-abandon-confirm');
+    expectFrameContained(
+      await frameFor(element(by.id('session-abandon-confirmation'))),
+      await frameFor(element(by.id('adaptive-layout'))),
+      'Paused Sprint confirmation'
+    );
+    await device.takeScreenshot('paused-abandon-confirmation');
+
+    await element(by.id('session-abandon-cancel')).tap();
+    await waitForVisibleInPracticeScroll('paused-session-resume', 100);
+    expectFrameContained(
+      await frameFor(element(by.id('paused-session-panel'))),
+      await frameFor(element(by.id('adaptive-layout'))),
+      'Paused Sprint panel'
+    );
+    await device.takeScreenshot('paused-after-cancel');
+    await element(by.id('paused-session-resume')).tap();
+    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+    await device.takeScreenshot('paused-after-resume');
+  });
+
   it('opens the empty Survival records state from a fresh profile', async () => {
     await waitForVisibleInPracticeScroll('personal-best-home-card');
     await element(by.id('personal-best-home-card')).tap();
