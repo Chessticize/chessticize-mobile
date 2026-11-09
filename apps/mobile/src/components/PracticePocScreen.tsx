@@ -318,6 +318,7 @@ import {
   withAttemptClarity
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
+import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -5942,6 +5943,7 @@ function shouldFlipBoard(currentPuzzle: CurrentPuzzleState): boolean {
 }
 
 const useStyles = makeStyles((theme) => ({
+  ...pickPracticeStyles(theme, ["historyPanel", "historyPanelWide", "reviewDueHiddenMetric"]),
   accessibilityAnnouncement: {
     height: 1,
     left: -10000,
@@ -6126,7 +6128,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 15,
     fontWeight: "800"
   },
-  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewForecastCount: {
     color: theme.colors.text.ink,
     fontSize: 16,
@@ -6278,14 +6279,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     gap: 4
-  },
-  historyPanel: {
-    gap: theme.spacing.row
-  },
-  historyPanelWide: {
-    alignSelf: "center",
-    maxWidth: 980,
-    width: "100%"
   },
   historyQuickFilterRow: {
     alignItems: "center",

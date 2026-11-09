@@ -32,6 +32,7 @@ import { AppText, Button, Icon, type IconName, IconTile, ListRow, Section } from
 import { RunRemovalConfirmation } from "../runEditor/PracticeRunEditor.tsx";
 import { customThemeLabel } from "../shared/themeCatalog.ts";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 export type RunReorderPickupFeedback = {
   haptic: "medium";
@@ -2152,13 +2153,7 @@ function ordinalWord(value: number): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  accessibleMoveModalBackdrop: {
-    alignItems: "center",
-    backgroundColor: theme.colors.scrimSoft,
-    flex: 1,
-    justifyContent: "center",
-    padding: 20
-  },
+  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "feedbackHandoffActions", "feedbackHandoffConfirmation", "helperText", "homeRowCopy", "primaryButton", "primaryButtonText", "secondaryButton", "secondaryButtonText", "sectionLabel"]),
   practiceHome: {
     gap: theme.spacing.section
   },
@@ -2264,12 +2259,6 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: theme.spacing.row,
     minHeight: theme.metrics.minTarget,
-    minWidth: 0
-  },
-  homeRowCopy: {
-    flex: 1,
-    flexShrink: 1,
-    gap: 2,
     minWidth: 0
   },
   homeRowMeta: {
@@ -2471,11 +2460,6 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: 6
   },
-  sectionLabel: {
-    color: theme.colors.text.ink,
-    fontSize: 15,
-    fontWeight: "800"
-  },
   practiceModeDetailProbe: {
     height: 0,
     opacity: 0,
@@ -2497,59 +2481,11 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: 10
   },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
-    flex: 1,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  primaryButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  secondaryButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  secondaryButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
-  },
-  feedbackHandoffConfirmation: {
-    backgroundColor: theme.colors.surfaceRaised,
-    // Dark surfaceRaised matches the dimmed Home, so the card needs an edge.
-    borderColor: theme.colors.border.default,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: theme.shape.sheet,
-    gap: theme.spacing.row,
-    maxWidth: 430,
-    padding: 24,
-    width: "100%"
-  },
   startConflictCard: {
     flexGrow: 0,
     flexShrink: 1
   },
   startConflictContent: {
     gap: theme.spacing.row
-  },
-  feedbackHandoffActions: {
-    gap: theme.spacing.group,
-    marginTop: 4
   },
 }));

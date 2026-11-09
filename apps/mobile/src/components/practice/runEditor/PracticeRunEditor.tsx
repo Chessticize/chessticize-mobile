@@ -38,6 +38,7 @@ import {
   formatSprintDurationLabel
 } from "../shared/practiceUtils.ts";
 import { SprintStartHeader } from "../shared/SprintStartHeader.tsx";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 const PRACTICE_RUN_DURATION_OPTIONS = [
   3 * 60,
@@ -816,12 +817,7 @@ function PracticeRunEloRow({
 }
 
 const useStyles = makeStyles((theme) => ({
-  homeRowCopy: {
-    flex: 1,
-    flexShrink: 1,
-    gap: 2,
-    minWidth: 0
-  },
+  ...pickPracticeStyles(theme, ["customConfigValue", "customSetupPanel", "editorRowLabel", "homeRowCopy", "settingsSection"]),
   homeRemovalConfirmation: {
     backgroundColor: theme.colors.surface,
     borderTopColor: theme.colors.border.default,
@@ -935,19 +931,8 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     gap: 6
   },
-  editorRowLabel: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
   editorInputError: {
     borderColor: theme.colors.danger.s600
-  },
-  customSetupPanel: {
-    alignSelf: "center",
-    gap: theme.spacing.section,
-    maxWidth: 760,
-    width: "100%"
   },
   runTimingSectionCopy: {
     gap: 2,
@@ -987,15 +972,5 @@ const useStyles = makeStyles((theme) => ({
   runTimingValue: {
     minWidth: 44,
     textAlign: "center"
-  },
-  customConfigValue: {
-    flexShrink: 1,
-    marginLeft: "auto",
-    textAlign: "right"
-  },
-  // Still used by the run timing editor and packs panel, which have not moved
-  // to the ui/ primitives yet.
-  settingsSection: {
-    gap: 8
   },
 }));

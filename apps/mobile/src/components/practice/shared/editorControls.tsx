@@ -4,6 +4,7 @@ import { makeStyles, useTheme } from "../../../theme/index.ts";
 import { Icon } from "../../ui/index.tsx";
 import { useUiHaptics } from "../../../platform/uiHaptics.ts";
 import { typography as baseTypography } from "../../../theme/scales.ts";
+import { pickPracticeStyles } from "./practiceStyles.tsx";
 
 // A grouped-row switch (51 x 31 pt track) with a 44 pt tall hit target. A
 // toggle plays selection feedback (#609).
@@ -137,6 +138,7 @@ export function useNumericFieldScale(): number {
 }
 
 const useStyles = makeStyles((theme) => ({
+  ...pickPracticeStyles(theme, ["disabledButton"]),
   // Editor rows keep the copy and its control on one line; with large text
   // they stack, the copy spanning the row and the control trailing below it.
   editorInlineRow: {
@@ -188,9 +190,6 @@ const useStyles = makeStyles((theme) => ({
     height: 32,
     justifyContent: "center",
     width: 36
-  },
-  disabledButton: {
-    opacity: 0.36
   },
   historyToggleTrack: {
     backgroundColor: theme.colors.fillMuted,

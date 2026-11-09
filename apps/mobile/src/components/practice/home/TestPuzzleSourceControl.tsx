@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import type { SimulatedHistoryScenarioId } from "../../../../../../packages/storage/src/simulation/scenarios.ts";
 import type { MobilePuzzleSource } from "../../../platform/mobilePractice.ts";
 import { makeStyles } from "../../../theme/index.ts";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 export const SIMULATED_HISTORY_SCENARIOS: ReadonlyArray<{ scenario: SimulatedHistoryScenarioId; label: string }> = [
   { scenario: "slow-fork-speed", label: "Slow fork" },
@@ -162,6 +163,7 @@ function OptionButton({
 }
 
 const useStyles = makeStyles((theme) => ({
+  ...pickPracticeStyles(theme, ["helperText", "optionButton", "optionButtonActive", "optionButtonText", "optionButtonTextActive", "optionRow"]),
   testPanel: {
     backgroundColor: theme.colors.surfaceRaised,
     borderColor: theme.colors.border.strong,
@@ -169,39 +171,6 @@ const useStyles = makeStyles((theme) => ({
     borderWidth: 1,
     gap: 10,
     padding: 12
-  },
-  optionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  optionButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexBasis: "30%",
-    flexGrow: 1,
-    height: 36,
-    justifyContent: "center",
-    paddingHorizontal: 10
-  },
-  optionButtonActive: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600
-  },
-  optionButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  optionButtonTextActive: {
-    color: theme.colors.accent.s700
-  },
-  helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
   },
   simulationNotice: {
     color: theme.colors.warning.s600,

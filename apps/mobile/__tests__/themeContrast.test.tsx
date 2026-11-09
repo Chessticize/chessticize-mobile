@@ -63,14 +63,22 @@ function contrast(theme: Theme, foreground: string, background: string): number 
   return (a + 0.05) / (b + 0.05);
 }
 
-// Splits `makeStyles((theme) => ({ name: { ... }, ... }))` into entry bodies.
+// Splits `makeStyles((theme) => ({ name: { ... }, ... }))` into entry bodies. The
+// practice modules' shared entries are declared with `namedStyles({ ... })` in
+// practice/shared/practiceStyles.tsx and are read the same way.
+const STYLE_SHEET_OPENERS = ["makeStyles((theme) => (", "namedStyles("];
+
 function styleEntries(source: string): string[] {
-  const start = source.indexOf("makeStyles((theme) => ({");
+  return STYLE_SHEET_OPENERS.flatMap((opener) => sheetEntries(source, opener));
+}
+
+function sheetEntries(source: string, opener: string): string[] {
+  const start = source.indexOf(`${opener}{`);
   if (start < 0) return [];
   const entries: string[] = [];
   let depth = 0;
   let entryStart = -1;
-  for (let i = start + "makeStyles((theme) => (".length; i < source.length; i += 1) {
+  for (let i = start + opener.length; i < source.length; i += 1) {
     const char = source[i];
     if (char === "{") {
       depth += 1;

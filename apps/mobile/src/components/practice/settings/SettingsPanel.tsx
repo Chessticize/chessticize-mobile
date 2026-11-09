@@ -65,6 +65,7 @@ import type { PracticeService } from "../../../../../../packages/storage/src/pra
 import { ChevronGlyph, CloseGlyph } from "../shared/Glyphs.tsx";
 import { normalizeUci } from "../../../backend/premove.ts";
 import { ANALYSIS_DEPTH, errorMessage, FABRIC_SAFE_HIDDEN_TEXT_STYLE, safeTestId } from "../shared/practiceUtils.ts";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
 
@@ -1708,66 +1709,17 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  accessibleMoveModalBackdrop: {
-    alignItems: "center",
-    backgroundColor: theme.colors.scrimSoft,
-    flex: 1,
-    justifyContent: "center",
-    padding: 20
-  },
+  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "disabledButton", "feedbackHandoffActions", "feedbackHandoffConfirmation", "helperText", "historyHeaderRow", "listText", "optionButton", "optionButtonActive", "optionButtonText", "optionButtonTextActive", "optionRow", "reviewDueHiddenMetric", "secondaryButton", "secondaryButtonText", "sectionLabel", "settingsRowCopy", "settingsRowPressed", "settingsSection"]),
   sectionHeaderRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between"
-  },
-  historyHeaderRow: {
-    alignItems: "center",
-    columnGap: theme.spacing.row,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    minHeight: theme.metrics.minTarget,
-    rowGap: theme.spacing.inline
   },
   screenTitle: {
     color: theme.colors.text.ink,
     fontSize: 22,
     fontWeight: "800",
     lineHeight: 28
-  },
-  sectionLabel: {
-    color: theme.colors.text.ink,
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
-  optionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  optionButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexBasis: "30%",
-    flexGrow: 1,
-    height: 36,
-    justifyContent: "center",
-    paddingHorizontal: 10
-  },
-  optionButtonActive: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600
-  },
-  optionButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  optionButtonTextActive: {
-    color: theme.colors.accent.s700
   },
   primarySmallButton: {
     alignItems: "center",
@@ -1781,23 +1733,6 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.onAccent,
     fontSize: 12,
     fontWeight: "800"
-  },
-  secondaryButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  secondaryButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  disabledButton: {
-    opacity: 0.36
   },
   listPanel: {
     backgroundColor: theme.colors.surface,
@@ -1895,16 +1830,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 10,
     lineHeight: 14
   },
-  listText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "600"
-  },
-  helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
-  },
   historyRowTitle: {
     color: theme.colors.text.heading,
     fontSize: 13,
@@ -1925,11 +1850,6 @@ const useStyles = makeStyles((theme) => ({
     flexBasis: "48%",
     flexGrow: 1,
     minWidth: 300
-  },
-  // Still used by the run timing editor and packs panel, which have not moved
-  // to the ui/ primitives yet.
-  settingsSection: {
-    gap: 8
   },
   settingsSectionCard: {
     backgroundColor: theme.colors.surface,
@@ -1959,21 +1879,6 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: theme.spacing.row
   },
-  feedbackHandoffConfirmation: {
-    backgroundColor: theme.colors.surfaceRaised,
-    // Dark surfaceRaised matches the dimmed Home, so the card needs an edge.
-    borderColor: theme.colors.border.default,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: theme.shape.sheet,
-    gap: theme.spacing.row,
-    maxWidth: 430,
-    padding: 24,
-    width: "100%"
-  },
-  feedbackHandoffActions: {
-    gap: theme.spacing.group,
-    marginTop: 4
-  },
   feedbackHandoffContinueButton: {
     alignItems: "center",
     alignSelf: "stretch",
@@ -1988,15 +1893,6 @@ const useStyles = makeStyles((theme) => ({
   },
   settingsRow: {
     justifyContent: "space-between"
-  },
-  settingsRowPressed: {
-    backgroundColor: theme.colors.surfaceStrong
-  },
-  settingsRowCopy: {
-    flex: 1,
-    flexShrink: 1,
-    gap: 2,
-    minWidth: 0
   },
   // Label and value share the first line; an explanation spans the full row
   // below them so long copy never runs in a narrow column.
