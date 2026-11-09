@@ -22,6 +22,48 @@ async function readJson(url) {
   return JSON.parse(await readFile(url, "utf8"));
 }
 
+test("1.6 capture plan covers both stores, real destinations, navigation and dark appearance", async () => {
+  const story = await readJson(storyUrl);
+  const plan = story.releaseCampaign;
+  assert.equal(plan.publicVersion, "1.6.0");
+  assert.equal(plan.issue, 683);
+  assert.equal(plan.status, "capture-plan");
+  assert.deepEqual(plan.platforms, ["app-store", "google-play"]);
+  assert.equal(plan.legacyStoryId, story.storyId);
+  assert.equal(plan.captureRequirements.realNativeUi, true);
+  assert.equal(plan.captureRequirements.fictionalDataOnly, true);
+  assert.equal(plan.captureRequirements.includeNativeNavigation, true);
+  assert.equal(plan.captureRequirements.secondaryMarketingCopy, false);
+  assert.equal(plan.captureRequirements.finalExportsRequireNewCaptureManifest, true);
+  assert.deepEqual(plan.frames.map(({ order }) => order), [1, 2, 3, 4, 5, 6]);
+  assert.equal(new Set(plan.frames.map(({ id }) => id)).size, 6);
+  const highlights = new Set(plan.frames.flatMap(({ highlights }) => highlights));
+  for (const highlight of ["fresh-design", "practice-home", "native-navigation", "dark-mode", "tactical-profile", "focused-run", "survival"]) {
+    assert.ok(highlights.has(highlight), `Missing release highlight ${highlight}`);
+  }
+  assert.ok(plan.frames.some(({ appearance }) => appearance === "dark"));
+  assert.equal(plan.deviceTargets.ipad.orientation, "landscape");
+  assert.equal(plan.deviceTargets.ipad.navigation, "top-bar");
+  assert.equal(plan.deviceTargets.iphoneDuo.navigation, "adaptive-columns");
+  assert.equal(plan.deviceTargets.androidPhone.navigation, "bottom-bar");
+  assert.equal(plan.deviceTargets.androidTablet.navigation, "side-rail");
+
+  const registry = await readFile(new URL("apps/mobile-lab/src/scenarioRegistry.ts", repositoryRoot), "utf8");
+  const componentTree = await readComponentTree("apps/mobile/src/components/PracticePocScreen.tsx");
+  const source = [...componentTree.values()].join("\n");
+  for (const frame of plan.frames) {
+    assert.ok(frame.headline.length > 0 && frame.headline.length <= story.copyLimits.headlineCharacters);
+    assert.equal("supporting" in frame, false);
+    assert.ok(["light", "dark"].includes(frame.appearance));
+    assert.ok(registry.includes(`"${frame.storyId}"`), `Missing product-clone story ${frame.storyId}`);
+    for (const id of [...frame.requiredVisibleTestIds, ...(frame.previewActions ?? [])]) {
+      // Some public controls select their stable ID through a conditional
+      // startTestID prop; the maintained component tree must still own it.
+      assert.ok(source.includes(`"${id}"`), `Missing real control ${id}`);
+    }
+  }
+});
+
 test("App Store marketing story defines the canonical six-frame order and copy", async () => {
   const story = await readJson(storyUrl);
   const expectedFrameIds = [

@@ -172,3 +172,33 @@ the main product proof.
 - All visible product states are reachable in the current production UI.
 - The iPad set uses the real 13-inch landscape layout for all six frames.
 - Marketing generation remains separate from release QA.
+
+## 1.6 release capture plan
+
+The `releaseCampaign` section of the same JSON contract prepares the 1.6
+sequence for both App Store and Google Play. It covers Practice Home and native
+navigation, dark Arrow Duel, Tactical Profile, a Focused Run preview, Survival,
+and scheduled Review. Each frame has one English headline, an appearance,
+an existing product-clone story, and the real controls that must be visible.
+There is no secondary marketing paragraph.
+
+The existing `frames` sequence remains the approved v1 capture/composition
+contract. A `capture-plan` is not an approved capture manifest or an exported
+asset set: the release coordinator must capture the new real native states,
+prepare matching headline templates, inspect the contact sheets, and bind the
+new files and templates by hash before composition or listing handoff. Never
+mark old v1 screenshots as the 1.6 campaign. Lab stories are visual references,
+not substitutes for native store screenshots. The fixture must represent one
+coherent fictional player, with any early-estimate disclosure left visible.
+
+Capture iPhone portrait, iPad landscape, and Android phone portrait for the
+store set. Retain separate iPhone Duo and Android tablet navigation evidence;
+those checks do not add a required store display group. Practice Home must
+show the actual native bottom bar, iPad top bar, Duo adaptive columns, or
+Android tablet side rail as appropriate. Both platforms share this story
+configuration; there is no separate Google Play story file.
+
+The approved layout and manifest validation remain in place while this plan
+is prepared. Final captures and new headline-template hashes are separate
+release deliverables, and store upload/submission require explicit owner
+approval.
