@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
+import { LabTextSize, LARGEST_ACCESSIBILITY_FONT_SCALE } from "./LabTextSize.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
@@ -141,6 +142,22 @@ export const AttemptDetail: Story = {
     await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
     await clickTestId(canvasElement, "review-analysis-button");
     await waitForTestId(canvasElement, "review-theme-rail");
+  }
+};
+
+export const AttemptDetailLargestText: Story = {
+  name: "Replay puzzle · largest text",
+  args: { scenarioId: "history-attempt-detail" },
+  render: (args) => (
+    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+      <LabScenario {...args} />
+    </LabTextSize>
+  ),
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-attempt-history-unclear");
+    await waitForTestId(canvasElement, "review-session");
+    await waitForTestId(canvasElement, "review-schedule-control");
   }
 };
 

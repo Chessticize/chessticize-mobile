@@ -45,6 +45,8 @@ import {
 } from "../../../platform/moveFeedback.ts";
 import type { MobileStockfishCapabilities } from "../../../platform/mobilePlatformCapabilities.ts";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { typography as baseTypography } from "../../../theme/scales.ts";
+import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import {
   arrowFromTo,
   type BoardMove,
@@ -85,7 +87,6 @@ import {
 import { boardMoveToUci, consumeSuppressedBoardMove } from "../../boardMoveSuppression.ts";
 import { fenAfterMove, fenAfterMoves, normalizeUci } from "../../../backend/premove.ts";
 import { ArrowDuelReplyChallengePrompt, PracticePrompt } from "../session/PracticePrompt.tsx";
-import { ChevronGlyph, CloseGlyph, FlipGlyph, SearchGlyph } from "../shared/Glyphs.tsx";
 import { arePracticeTestControlsEnabled } from "../../../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../../../platform/testLaunchConfig.ts";
 import { CHESS_PIECE_SPRITE } from "../shared/chessPieceSprite.ts";
@@ -100,8 +101,43 @@ import {
   USER_FEEDBACK_BEFORE_AUTO_MS
 } from "../shared/sessionTiming.ts";
 import { chessboardColorsFor } from "../shared/chessboardColors.ts";
+import {
+  AppText,
+  Badge,
+  Button,
+  Icon,
+  type IconName,
+  IconTile,
+  Section,
+  useListRowStyle
+} from "../../ui/index.tsx";
 
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
+
+// The top bar title and progress grow at most 1.5x with the text size, as the
+// Sprint Result top bar does, so the board keeps its room at accessibility sizes.
+const REVIEW_HEADER_MAX_TEXT_SCALE = 1.5;
+// Top bar text at the capped text size. The size is computed from the base
+// type roles and the system text scale (rather than maxFontSizeMultiplier) so
+// the Interaction Lab's simulated text sizes honor the same cap.
+function useReviewHeaderTextStyles(): {
+  subtitle: { fontSize: number; lineHeight: number };
+  title: { fontSize: number; lineHeight: number };
+} {
+  const { fontScale } = usePracticeViewport();
+  const scale = Math.min(Math.max(fontScale, 1), REVIEW_HEADER_MAX_TEXT_SCALE);
+  const scaled = (role: { fontSize: number; lineHeight: number }) => ({
+    fontSize: Math.round(role.fontSize * scale * 10) / 10,
+    lineHeight: Math.ceil(role.lineHeight * scale)
+  });
+  return { subtitle: scaled(baseTypography.footnote), title: scaled(baseTypography.headline) };
+}
+
+// Narrowest top bar whose title keeps about 140 pt between two paired button
+// groups (2 x 96 pt plus gaps).
+const REVIEW_HEADER_PAIRED_MIN_WIDTH = 348;
+// The countdown uses the session HUD's numeral cap.
+const REVIEW_TIMER_MAX_TEXT_SCALE = 2;
 
 export type ReviewBackCommand = {
   id: number;
@@ -214,6 +250,7 @@ export function ReviewSession({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const headerTextStyles = useReviewHeaderTextStyles();
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
   const reviewResultRecordedRef = useRef(false);
@@ -1130,7 +1167,6 @@ export function ReviewSession({
     <ReviewScheduleControl
       key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
       actionVisible
-      compact
       context={reviewContext}
       currentTimeMs={currentTimeMs}
       initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
@@ -1213,29 +1249,55 @@ export function ReviewSession({
       )}
     </View>
   );
+  // Session and History Replay page between puzzles from the trailing side of
+  // the top bar. The leading side matches its width so the title stays
+  // centered, unless that would squeeze the title in a narrow landscape rail.
+  const reviewHasPuzzleNavigation = currentEntry.source === "session" || currentEntry.source === "history";
+  const reviewHeaderWidth = adaptiveLayout.usesSessionRail
+    ? adaptiveLayout.sessionRailWidth
+    : adaptiveLayout.contentWidth - UI_PADDING * 2;
+  const reviewPairsHeaderSides = reviewHasPuzzleNavigation
+    && reviewHeaderWidth >= REVIEW_HEADER_PAIRED_MIN_WIDTH;
+  const reviewTimerExpired = reviewRemainingSeconds === 0;
   const reviewHeaderNode = (
     <View key="review-header" style={styles.reviewHeaderRow} testID="review-header">
       <View style={styles.reviewTopNav}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={analysisEnabled
-            ? "Close analysis"
-            : isReplay ? "Exit replay" : "Exit review"}
-          testID="review-exit"
-          style={styles.iconButton}
-          onPress={analysisEnabled
-            ? closeAnalysis
-            : () => onReturnToOwner(currentEntry.source)}
+        <View
+          style={[styles.reviewTopNavSide, reviewPairsHeaderSides ? styles.reviewTopNavSidePaired : null]}
+          testID="review-header-leading"
         >
-          <CloseGlyph />
-        </Pressable>
+          <ReviewCircleButton
+            accessibilityLabel={analysisEnabled
+              ? "Close analysis"
+              : isReplay ? "Exit replay" : "Exit review"}
+            icon="close"
+            testID="review-exit"
+            onPress={analysisEnabled
+              ? closeAnalysis
+              : () => onReturnToOwner(currentEntry.source)}
+          />
+        </View>
         <View style={styles.reviewTitleBlock}>
-          <Text style={styles.panelTitle} testID="review-title">
+          <AppText
+            accessibilityRole="header"
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.centeredText, headerTextStyles.title]}
+            testID="review-title"
+            variant="headline"
+          >
             {isReplay ? "Replay" : "Review"}
-          </Text>
-          <Text testID="review-progress" style={styles.helperText}>
+          </AppText>
+          <AppText
+            allowFontScaling={false}
+            numberOfLines={2}
+            style={[styles.centeredText, styles.tabularText, headerTextStyles.subtitle]}
+            testID="review-progress"
+            tone="secondary"
+            variant="footnote"
+          >
             {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
-          </Text>
+          </AppText>
           {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
             <>
               <Text testID="review-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
@@ -1255,58 +1317,45 @@ export function ReviewSession({
         </View>
         <View
           style={[
-            styles.iconButtonRow,
-            currentEntry.source === "due" ? styles.reviewHeaderDueActionsPlaceholder : null
+            styles.reviewTopNavSide,
+            styles.reviewTopNavSideTrailing,
+            reviewHasPuzzleNavigation ? styles.reviewTopNavSidePaired : null
           ]}
           testID="review-header-actions"
         >
-          {currentEntry.source === "session" || currentEntry.source === "history" ? (
+          {reviewHasPuzzleNavigation ? (
             <>
-              <Pressable
-                accessibilityRole="button"
+              <ReviewCircleButton
                 accessibilityLabel={isReplay ? "Previous replay puzzle" : "Previous review puzzle"}
-                accessibilityState={{ disabled: !canReviewPrevious }}
                 disabled={!canReviewPrevious}
+                icon="chevronLeft"
                 testID="review-previous"
-                style={[styles.iconButton, !canReviewPrevious ? styles.disabledButton : null]}
                 onPress={() => navigateReview(entryIndex - 1)}
-              >
-                <ChevronGlyph direction="left" />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
+              />
+              <ReviewCircleButton
                 accessibilityLabel={isReplay ? "Next replay puzzle" : "Next review puzzle"}
-                accessibilityState={{ disabled: !canReviewNext }}
                 disabled={!canReviewNext}
+                icon="chevronRight"
                 testID="review-next"
-                style={[styles.iconButton, !canReviewNext ? styles.disabledButton : null]}
                 onPress={() => navigateReview(entryIndex + 1)}
-              >
-                <ChevronGlyph direction="right" />
-              </Pressable>
+              />
             </>
           ) : null}
         </View>
       </View>
       <View style={styles.reviewContextStrip} testID="review-context-strip">
         {currentEntry.source === "session" && !isReplay ? (
-          <View style={styles.reviewContextPill} testID="review-source-pill">
-            <Text style={styles.reviewContextPillText}>Sprint review</Text>
-          </View>
+          <Badge label="Sprint review" testID="review-source-pill" tone="neutral" />
         ) : null}
         {reviewRemainingSeconds !== null && !reviewReplyPromptActive ? (
-          <View
-            style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}
-            testID="review-timer-slot"
-          >
+          <View style={styles.reviewTimerSlot} testID="review-timer-slot">
             <Text
+              maxFontSizeMultiplier={REVIEW_TIMER_MAX_TEXT_SCALE}
               numberOfLines={1}
               testID="review-timer"
-              style={reviewRemainingSeconds === 0
-                ? [styles.reviewContextPillText, styles.errorText]
-                : styles.reviewTimerText}
+              style={[styles.reviewTimerText, reviewTimerExpired ? styles.reviewTimerTextExpired : null]}
             >
-              {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
+              {reviewTimerExpired ? "Time expired" : formatDuration(reviewRemainingSeconds)}
             </Text>
           </View>
         ) : null}
@@ -1327,79 +1376,74 @@ export function ReviewSession({
         {hasAnalysisPanelContent ? (
           <View style={styles.analysisPanel} testID="review-analysis-panel">
             {!analysisEnabled && guidedEvalLines.length > 0 ? (
-              <View testID="review-guided-eval-list">
+              <Section rows testID="review-guided-eval-list">
                 {guidedEvalLines.map((line, index) => (
                   <View
                     key={`${line.move}-${index}`}
                     style={styles.analysisLineRow}
                     testID={`review-guided-eval-line-${index}`}
                   >
-                    <Text style={styles.analysisEvalText}>{line.score}</Text>
-                    <Text style={styles.analysisMoveText} numberOfLines={1}>
-                      {line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
-                    </Text>
-                    <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
+                    <AnalysisLineContent
+                      label={line.label}
+                      move={line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
+                      score={line.score}
+                    />
                   </View>
                 ))}
-              </View>
+              </Section>
             ) : null}
             {analysisEnabled || currentEntry.source !== "due" || reviewResultRecorded ? (
               <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
                 {analysisEnabled ? (
                   <>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
-                      <CloseGlyph />
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Analysis back"
-                      accessibilityState={{ disabled: !canAnalysisBack }}
-                      disabled={!canAnalysisBack}
-                      testID="review-analysis-back"
-                      style={[styles.iconButton, !canAnalysisBack ? styles.disabledButton : null]}
-                      onPress={stepAnalysisBack}
+                    <View style={styles.analysisToolbarButtons}>
+                      <ReviewCircleButton accessibilityLabel="Close analysis" icon="close" testID="review-close-analysis" onPress={closeAnalysis} />
+                      <ReviewCircleButton
+                        accessibilityLabel="Analysis back"
+                        disabled={!canAnalysisBack}
+                        icon="chevronLeft"
+                        testID="review-analysis-back"
+                        onPress={stepAnalysisBack}
+                      />
+                      <ReviewCircleButton
+                        accessibilityLabel="Analysis forward"
+                        disabled={!canAnalysisForward}
+                        icon="chevronRight"
+                        testID="review-analysis-forward"
+                        onPress={stepAnalysisForward}
+                      />
+                      <ReviewCircleButton accessibilityLabel="Reset analysis" icon="reset" testID="review-analysis-reset" onPress={resetAnalysisPosition} />
+                      <ReviewCircleButton accessibilityLabel="Flip board" icon="flip" testID="review-analysis-flip" onPress={() => setManualBoardFlip((current) => !current)} />
+                    </View>
+                    <AppText
+                      numberOfLines={1}
+                      style={[styles.analysisEngineStatus, styles.tabularText]}
+                      testID="review-analysis-engine-status"
+                      tone="secondary"
+                      variant="footnote"
                     >
-                      <ChevronGlyph direction="left" />
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Analysis forward"
-                      accessibilityState={{ disabled: !canAnalysisForward }}
-                      disabled={!canAnalysisForward}
-                      testID="review-analysis-forward"
-                      style={[styles.iconButton, !canAnalysisForward ? styles.disabledButton : null]}
-                      onPress={stepAnalysisForward}
-                    >
-                      <ChevronGlyph direction="right" />
-                    </Pressable>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
-                      <Text style={styles.iconButtonText}>↺</Text>
-                    </Pressable>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
-                      <FlipGlyph />
-                    </Pressable>
-                    <Text testID="review-analysis-engine-status" style={styles.analysisEngineStatus} numberOfLines={1}>
                       {analysisEngineLabel}
-                    </Text>
+                    </AppText>
                   </>
                 ) : (
                   <>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisPrimaryButton} onPress={openAnalysis}>
-                      <SearchGlyph />
-                      <Text style={styles.analysisPrimaryButtonText}>Analysis</Text>
-                    </Pressable>
+                    <Button
+                      accessibilityLabel="Analyze position"
+                      icon="search"
+                      label="Analysis"
+                      size="compact"
+                      testID="review-analysis-button"
+                      variant="secondary"
+                      onPress={openAnalysis}
+                    />
                     {currentEntry.source !== "due" ? (
-                      <Pressable
-                        accessibilityRole="button"
+                      <ReviewCircleButton
                         accessibilityLabel="Reset puzzle"
-                        accessibilityState={{ disabled: reviewBoardLocked }}
                         disabled={reviewBoardLocked}
+                        icon="reset"
                         testID="review-reset-puzzle"
-                        style={[styles.iconButton, reviewBoardLocked ? styles.disabledButton : null]}
                         onPress={resetReviewPuzzle}
-                      >
-                        <Text style={styles.iconButtonText}>↺</Text>
-                      </Pressable>
+                      />
                     ) : null}
                   </>
                 )}
@@ -1408,53 +1452,58 @@ export function ReviewSession({
             {analysisEnabled ? (
               <>
                 {analysisEngineStatus === "error" ? (
-                  <View style={styles.analysisError} testID="review-analysis-error">
-                    <Text style={styles.errorText}>Stockfish couldn't start. Check the bundled engine and try again.</Text>
-                    <Pressable
-                      accessibilityRole="button"
+                  <Section testID="review-analysis-error">
+                    <AppText tone="negative" variant="subheadline">
+                      Stockfish couldn't start. Check the bundled engine and try again.
+                    </AppText>
+                    <Button
                       accessibilityLabel="Retry Stockfish analysis"
+                      label="Retry analysis"
+                      size="compact"
                       testID="review-analysis-retry"
-                      style={styles.secondaryButton}
+                      variant="secondary"
                       onPress={() => {
                         setAnalysisEngineStatus("thinking");
                         setAnalysisRetryCount((count) => count + 1);
                       }}
-                    >
-                      <Text style={styles.secondaryButtonText}>Retry analysis</Text>
-                    </Pressable>
-                  </View>
+                    />
+                  </Section>
                 ) : null}
-                {analysisLines.map((line, index) => (
-                  <Pressable
-                    key={`${line.move}-${index}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${line.score} ${formatAnalysisLineMoveLabel(line, index)} ${line.label}`}
-                    accessibilityState={{ disabled: !line.move }}
-                    disabled={!line.move}
-                    style={styles.analysisLineRow}
-                    testID={`review-analysis-line-${index}`}
-                    onPress={() => {
-                      if (line.move) {
-                        void playAnalysisCandidateMove(line.move);
-                      }
-                    }}
-                  >
-                    <Text style={styles.analysisEvalText}>{line.score}</Text>
-                    <Text style={styles.analysisMoveText} numberOfLines={1}>
-                      {formatAnalysisLineMoveLabel(line, index)}
-                    </Text>
-                    <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
-                  </Pressable>
-                ))}
+                {analysisLines.length > 0 ? (
+                  <Section rows testID="review-analysis-lines">
+                    {analysisLines.map((line, index) => (
+                      <Pressable
+                        key={`${line.move}-${index}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${line.score} ${formatAnalysisLineMoveLabel(line, index)} ${line.label}`}
+                        accessibilityState={{ disabled: !line.move }}
+                        disabled={!line.move}
+                        style={({ pressed }) => [styles.analysisLineRow, pressed && line.move ? styles.rowPressed : null]}
+                        testID={`review-analysis-line-${index}`}
+                        onPress={() => {
+                          if (line.move) {
+                            void playAnalysisCandidateMove(line.move);
+                          }
+                        }}
+                      >
+                        <AnalysisLineContent
+                          label={line.label}
+                          move={formatAnalysisLineMoveLabel(line, index)}
+                          score={line.score}
+                        />
+                      </Pressable>
+                    ))}
+                  </Section>
+                ) : null}
               </>
             ) : null}
           </View>
         ) : null}
         {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
-          <View style={styles.reviewContextActions} testID="review-context-actions-rail">
+          <Section rows testID="review-context-actions-rail">
             {reviewScheduleControlNode}
             {historyUnclearActionNode}
-          </View>
+          </Section>
         ) : null}
       </View>
     ) : null;
@@ -1681,18 +1730,127 @@ export function ReviewSession({
         ) : reviewAnalysisColumnNode}
       </View>
       {!adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
-        <View style={styles.reviewContextActions} testID="review-context-actions-bottom">
+        <Section rows testID="review-context-actions-bottom">
           {reviewScheduleControlNode}
           {historyUnclearActionNode}
-        </View>
+        </Section>
       ) : null}
     </View>
   );
 }
 
+// A 44-pt circular navigation or board-tool button with a symbol glyph, as in
+// the Sprint Result and Survival top bars. Glyphs keep their size so they stay
+// inside the circle at every text size.
+function ReviewCircleButton({
+  accessibilityLabel,
+  disabled = false,
+  icon,
+  testID,
+  onPress
+}: {
+  accessibilityLabel: string;
+  disabled?: boolean;
+  icon: IconName;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={4}
+      style={({ pressed }) => [
+        styles.circleButton,
+        pressed && !disabled ? styles.pressed : null,
+        disabled ? styles.disabledButton : null
+      ]}
+      testID={testID}
+      onPress={onPress}
+    >
+      <Icon color={appTheme.colors.accent.s600} name={icon} size={17} weight="semibold" />
+    </Pressable>
+  );
+}
+
+// One engine line: the evaluation first, then the numbered move, then its label.
+function AnalysisLineContent({
+  label,
+  move,
+  score
+}: {
+  label: string;
+  move: string;
+  score: string;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <>
+      <AppText numberOfLines={1} style={styles.analysisEvalText} variant="numeralRow">{score}</AppText>
+      <AppText numberOfLines={1} style={styles.analysisMoveText} variant="headline">{move}</AppText>
+      <AppText numberOfLines={1} style={styles.analysisLineLabel} tone="secondary" variant="footnote">{label}</AppText>
+    </>
+  );
+}
+
+// A grouped row: a leading tile, the row's copy, and a trailing text action
+// that moves below the copy when both do not fit on one line.
+function ReviewActionRow({
+  accessibilityLabel,
+  children,
+  icon,
+  iconTone,
+  testID
+}: React.PropsWithChildren<{
+  accessibilityLabel?: string;
+  icon: IconName;
+  iconTone: "accent" | "warning";
+  testID: string;
+}>): React.JSX.Element {
+  const styles = useStyles();
+  const rowStyle = useListRowStyle();
+  return (
+    <View accessibilityLabel={accessibilityLabel} style={rowStyle} testID={testID}>
+      <IconTile name={icon} tone={iconTone} />
+      <View style={styles.actionRowContent}>{children}</View>
+    </View>
+  );
+}
+
+function RowTextAction({
+  accessibilityLabel,
+  destructive = false,
+  label,
+  testID,
+  onPress
+}: {
+  accessibilityLabel: string;
+  destructive?: boolean;
+  label: string;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      hitSlop={4}
+      style={({ pressed }) => [styles.rowTextAction, pressed ? styles.pressed : null]}
+      testID={testID}
+      onPress={onPress}
+    >
+      <AppText numberOfLines={2} tone={destructive ? "negative" : "accent"} variant="headline">{label}</AppText>
+    </Pressable>
+  );
+}
+
 function ReviewScheduleControl({
   actionVisible = true,
-  compact = false,
   context,
   currentTimeMs,
   initiatingAttemptId,
@@ -1702,7 +1860,6 @@ function ReviewScheduleControl({
   service
 }: {
   actionVisible?: boolean;
-  compact?: boolean;
   context: ReviewContext;
   currentTimeMs: () => number;
   initiatingAttemptId?: string;
@@ -1754,29 +1911,24 @@ function ReviewScheduleControl({
   }
 
   return (
-    <View
-      style={[styles.reviewScheduleControl, compact ? styles.reviewScheduleControlCompact : null]}
-      testID="review-schedule-control"
-    >
-      <View style={styles.reviewScheduleControlCopy}>
-        <Text style={styles.reviewScheduleState} testID="review-schedule-state">
+    <ReviewActionRow icon="clock" iconTone="accent" testID="review-schedule-control">
+      <View style={styles.actionRowCopy}>
+        <AppText testID="review-schedule-state" variant="headline">
           {review ? reviewDueLabel(review, currentTimeMs()) : "Not scheduled for Review"}
-        </Text>
-        {failure ? <Text style={styles.errorText} testID="review-schedule-error">{failure}</Text> : null}
+        </AppText>
+        {failure ? (
+          <AppText testID="review-schedule-error" tone="negative" variant="footnote">{failure}</AppText>
+        ) : null}
       </View>
       {actionVisible ? (
         <>
-          <Pressable
-            accessibilityRole="button"
+          <RowTextAction
             accessibilityLabel={review ? "Remove this puzzle from Review" : "Add this puzzle to Review"}
-            style={styles.reviewScheduleAction}
+            destructive={review !== undefined}
+            label={review ? "Remove from Review" : "Add to Review"}
             testID={review ? "review-schedule-remove" : "review-schedule-add"}
             onPress={review ? () => setConfirmationVisible(true) : addToReview}
-          >
-            <Text style={review ? styles.reviewScheduleRemoveText : styles.reviewScheduleAddText}>
-              {review ? "Remove from Review" : "Add to Review"}
-            </Text>
-          </Pressable>
+          />
           <Modal
             animationType="fade"
             onRequestClose={() => setConfirmationVisible(false)}
@@ -1784,45 +1936,44 @@ function ReviewScheduleControl({
             visible={confirmationVisible}
           >
             <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
-              <View
+              <ScrollView
                 accessibilityViewIsModal
+                contentContainerStyle={styles.reviewScheduleConfirmationContent}
                 style={styles.reviewScheduleConfirmation}
                 testID="review-schedule-removal-confirmation"
               >
-                <Text style={styles.panelTitle}>Remove from Review?</Text>
-                <Text style={styles.helperText}>
+                <AppText accessibilityRole="header" variant="title">Remove from Review?</AppText>
+                <AppText tone="secondary" variant="body">
                   Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
-                </Text>
-                {failure ? <Text style={styles.errorText}>{failure}</Text> : null}
-                <View style={styles.confirmationActionRow}>
-                  <Pressable
-                    accessibilityRole="button"
+                </AppText>
+                {failure ? <AppText tone="negative" variant="footnote">{failure}</AppText> : null}
+                <View style={styles.confirmationActions}>
+                  <Button
+                    accessibilityLabel="Confirm removing this puzzle from Review"
+                    label="Remove from Review"
+                    stretch
+                    testID="review-schedule-removal-confirm"
+                    variant="destructive"
+                    onPress={confirmRemoval}
+                  />
+                  <Button
                     accessibilityLabel="Cancel removing this puzzle from Review"
-                    style={styles.secondaryButton}
+                    label="Cancel"
+                    stretch
                     testID="review-schedule-removal-cancel"
+                    variant="secondary"
                     onPress={() => {
                       setConfirmationVisible(false);
                       setFailure(null);
                     }}
-                  >
-                    <Text style={styles.secondaryButtonText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Confirm removing this puzzle from Review"
-                    style={styles.destructiveButton}
-                    testID="review-schedule-removal-confirm"
-                    onPress={confirmRemoval}
-                  >
-                    <Text style={styles.destructiveButtonText}>Remove from Review</Text>
-                  </Pressable>
+                  />
                 </View>
-              </View>
+              </ScrollView>
             </SafeAreaModalBackdrop>
           </Modal>
         </>
       ) : null}
-    </View>
+    </ReviewActionRow>
   );
 }
 
@@ -1846,6 +1997,7 @@ export function HistoryAttemptReplayUnavailable({
   service: PracticeService;
 }): React.JSX.Element {
   const styles = useStyles();
+  const headerTextStyles = useReviewHeaderTextStyles();
   const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
@@ -1854,36 +2006,54 @@ export function HistoryAttemptReplayUnavailable({
     >
       <View style={styles.reviewHeaderRow}>
         <View style={styles.reviewTopNav}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Exit replay"
-            testID="review-exit"
-            style={styles.iconButton}
-            onPress={onReturn}
-          >
-            <CloseGlyph />
-          </Pressable>
-          <View style={styles.reviewTitleBlock}>
-            <Text style={styles.panelTitle} testID="review-title">
-              Replay
-            </Text>
-            <Text style={styles.helperText}>Replay unavailable</Text>
+          <View style={styles.reviewTopNavSide}>
+            <ReviewCircleButton accessibilityLabel="Exit replay" icon="close" testID="review-exit" onPress={onReturn} />
           </View>
+          <View style={styles.reviewTitleBlock}>
+            <AppText
+              accessibilityRole="header"
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.centeredText, headerTextStyles.title]}
+              testID="review-title"
+              variant="headline"
+            >
+              Replay
+            </AppText>
+            <AppText
+              allowFontScaling={false}
+              style={[styles.centeredText, headerTextStyles.subtitle]}
+              tone="secondary"
+              variant="footnote"
+            >
+              Replay unavailable
+            </AppText>
+          </View>
+          <View style={[styles.reviewTopNavSide, styles.reviewTopNavSideTrailing]} />
         </View>
       </View>
-      <Text style={styles.errorText} testID="history-replay-unavailable">
-        {historyReplayUnavailableMessage(replayAvailability)}
-      </Text>
-      {reviewContext ? (
-        <ReviewScheduleControl
-          context={reviewContext}
-          currentTimeMs={currentTimeMs}
-          initiatingAttemptId={attempt.unclear ? attempt.id : undefined}
-          onReviewChanged={onReviewChanged}
-          service={service}
-        />
+      <Section>
+        <View style={styles.unavailableMessage}>
+          <IconTile name="warning" tone="warning" />
+          <AppText style={styles.unavailableMessageText} testID="history-replay-unavailable" variant="body">
+            {historyReplayUnavailableMessage(replayAvailability)}
+          </AppText>
+        </View>
+      </Section>
+      {reviewContext || attempt.unclear ? (
+        <Section rows>
+          {reviewContext ? (
+            <ReviewScheduleControl
+              context={reviewContext}
+              currentTimeMs={currentTimeMs}
+              initiatingAttemptId={attempt.unclear ? attempt.id : undefined}
+              onReviewChanged={onReviewChanged}
+              service={service}
+            />
+          ) : null}
+          {attempt.unclear ? <HistoryUnclearAction onClear={onClearUnclear} /> : null}
+        </Section>
       ) : null}
-      {attempt.unclear ? <HistoryUnclearAction onClear={onClearUnclear} /> : null}
     </View>
   );
 }
@@ -1897,24 +2067,22 @@ function HistoryUnclearAction({
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <View
+    <ReviewActionRow
       accessibilityLabel="This attempt is marked unclear"
-      style={styles.historyAttemptUnclearBanner}
+      icon="help"
+      iconTone="warning"
       testID="history-attempt-unclear"
     >
-      <View style={styles.historyAttemptUnclearCopy}>
-        <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
+      <View style={styles.actionRowCopy}>
+        <AppText variant="headline">Marked as unclear</AppText>
       </View>
-      <Pressable
-        accessibilityRole="button"
+      <RowTextAction
         accessibilityLabel={actionLabel === "Mark clear" ? "Mark attempt clear" : "Clear unclear mark"}
-        style={styles.historyAttemptClearButton}
+        label={actionLabel}
         testID="history-attempt-clear-unclear"
         onPress={onClear}
-      >
-        <Text style={styles.historyAttemptClearButtonText}>{actionLabel}</Text>
-      </Pressable>
-    </View>
+      />
+    </ReviewActionRow>
   );
 }
 
@@ -2154,9 +2322,9 @@ const useStyles = makeStyles((theme) => ({
     zIndex: 60
   },
   puzzleTimeoutOverlayTitle: {
+    ...theme.typography.title,
     color: theme.colors.text.onAccent,
-    fontSize: 22,
-    fontWeight: "900"
+    fontWeight: "700"
   },
   boardSurface: {
     borderColor: theme.colors.border.default,
@@ -2169,97 +2337,84 @@ const useStyles = makeStyles((theme) => ({
     alignSelf: "center",
     gap: 6
   },
-  secondaryButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  secondaryButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  destructiveButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.danger.s600,
-    borderRadius: 8,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  destructiveButtonText: {
-    color: theme.colors.text.onTone,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  iconButtonRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  iconButton: {
+  circleButton: {
     alignItems: "center",
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 38,
+    borderRadius: theme.shape.capsule,
+    height: theme.metrics.minTarget,
     justifyContent: "center",
-    width: 38
+    width: theme.metrics.minTarget
   },
-  iconButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 18,
-    fontWeight: "800",
-    lineHeight: 22
+  pressed: {
+    opacity: 0.7
+  },
+  rowPressed: {
+    backgroundColor: theme.colors.surfaceStrong
   },
   disabledButton: {
-    opacity: 0.36
+    opacity: 0.4
   },
-  errorText: {
-    color: theme.colors.danger.s800,
-    fontSize: 14,
-    fontWeight: "700"
+  centeredText: {
+    textAlign: "center"
   },
-  panelTitle: {
-    color: theme.colors.text.ink,
-    fontSize: 18,
-    fontWeight: "800"
+  tabularText: {
+    fontVariant: ["tabular-nums"]
   },
   reviewSessionPanel: {
-    gap: 12
+    gap: theme.spacing.row
   },
   reviewSessionPanelWide: {
     alignSelf: "center",
     width: "100%"
   },
   reviewHeaderRow: {
-    gap: 8
+    gap: theme.spacing.group
   },
   reviewTopNav: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between"
+    gap: theme.spacing.inline
+  },
+  // The leading and trailing groups share one width so the title stays
+  // centered: one button wide, or two when Replay pages between puzzles.
+  reviewTopNavSide: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.inline,
+    width: theme.metrics.minTarget
+  },
+  reviewTopNavSidePaired: {
+    width: theme.metrics.minTarget * 2 + theme.spacing.inline
+  },
+  reviewTopNavSideTrailing: {
+    justifyContent: "flex-end"
   },
   reviewTitleBlock: {
-    alignItems: "center",
     flex: 1,
-    gap: 2
-  },
-  reviewHeaderDueActionsPlaceholder: {
-    width: 38
+    gap: 2,
+    minWidth: 0
   },
   reviewContextStrip: {
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: theme.spacing.group,
     justifyContent: "center"
+  },
+  // The countdown keeps one width as its digits change, so the strip and
+  // the board below never shift.
+  reviewTimerSlot: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 78
+  },
+  reviewTimerText: {
+    ...theme.typography.numeral,
+    color: theme.colors.text.primary,
+    textAlign: "center"
+  },
+  reviewTimerTextExpired: {
+    color: theme.colors.danger.s600
   },
   reviewThemeCatalogRail: {
     alignItems: "center",
@@ -2267,226 +2422,110 @@ const useStyles = makeStyles((theme) => ({
     maxWidth: "100%",
     minWidth: 0,
   },
-  reviewContextPill: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    minHeight: 30,
-    paddingHorizontal: 10
-  },
-  reviewContextPillDanger: {
-    borderColor: theme.colors.danger.s300
-  },
-  reviewTimerPill: {
-    justifyContent: "center",
-    minHeight: 38,
-    minWidth: 78
-  },
-  reviewTimerText: {
-    color: theme.colors.text.ink,
-    fontFamily: "menlo",
-    fontSize: 21,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: 0.2
-  },
-  reviewContextPillText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
   reviewBoardLayout: {
-    gap: 12
+    gap: theme.spacing.row
   },
   reviewBoardLane: {
     alignItems: "center",
     flex: 1,
-    gap: 12,
+    gap: theme.spacing.row,
     justifyContent: "center",
     minWidth: 0
   },
   reviewAnalysisColumn: {
-    gap: 12
+    gap: theme.spacing.row
   },
   analysisPanel: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 6,
-    padding: 12
-  },
-  analysisError: {
-    backgroundColor: theme.colors.danger.s50,
-    borderColor: theme.colors.danger.s200,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 10
+    gap: theme.spacing.row
   },
   reviewAnalysisPanelWide: {
     flexGrow: 0,
     flexShrink: 0
   },
-  reviewContextActions: {
-    gap: 12
-  },
   analysisToolbar: {
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: theme.spacing.inline
   },
-  analysisPrimaryButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
+  analysisToolbarButtons: {
     flexDirection: "row",
-    gap: 8,
-    minHeight: 40,
-    paddingHorizontal: 12
-  },
-  analysisPrimaryButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "800"
+    gap: theme.spacing.inline
   },
   analysisEngineStatus: {
-    color: theme.colors.text.tertiary,
-    fontFamily: "Menlo",
-    fontSize: 11,
-    fontWeight: "700",
-    marginLeft: "auto"
+    flexShrink: 1,
+    marginLeft: "auto",
+    textAlign: "right"
   },
+  // Engine lines are compact single-line rows that still meet the 44 pt
+  // target.
   analysisLineRow: {
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: theme.colors.surface,
     flexDirection: "row",
-    gap: 8,
-    minHeight: 34,
-    paddingHorizontal: 9,
-    paddingVertical: 7
+    gap: theme.spacing.row,
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 16,
+    paddingVertical: 8
   },
   analysisEvalText: {
-    color: theme.colors.text.strong,
-    fontFamily: "Menlo",
-    fontSize: 12,
-    fontWeight: "800",
-    minWidth: 44
+    minWidth: 52
   },
   analysisMoveText: {
-    color: theme.colors.text.ink,
-    fontFamily: "Menlo",
-    fontSize: 13,
-    fontWeight: "800",
     flexShrink: 1
   },
   analysisLineLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700",
-    marginLeft: "auto"
+    flexShrink: 1,
+    marginLeft: "auto",
+    textAlign: "right"
   },
-  helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
-  },
-  historyAttemptUnclearBanner: {
+  actionRowContent: {
     alignItems: "center",
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s500,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-    padding: 10
-  },
-  historyAttemptUnclearCopy: {
-    alignItems: "center",
+    columnGap: theme.spacing.row,
     flex: 1,
     flexDirection: "row",
-    gap: 8
-  },
-  historyAttemptUnclearTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  historyAttemptClearButton: {
-    alignItems: "center",
-    minHeight: 32,
-    justifyContent: "center",
-    paddingHorizontal: 8
-  },
-  historyAttemptClearButtonText: {
-    color: theme.colors.warning.s700,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  reviewScheduleControl: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    padding: 10
+    minWidth: 0
   },
-  reviewScheduleControlCompact: {
-    marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8
+  actionRowCopy: {
+    flexBasis: 100,
+    flexGrow: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
   },
-  reviewScheduleControlCopy: {
-    flex: 1,
-    gap: 2
-  },
-  reviewScheduleState: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  reviewScheduleAction: {
-    alignItems: "center",
+  rowTextAction: {
     justifyContent: "center",
-    minHeight: 34,
-    paddingHorizontal: 6
+    minHeight: theme.metrics.minTarget
   },
-  reviewScheduleAddText: {
-    color: theme.colors.accent.s600,
-    fontSize: 12,
-    fontWeight: "900"
+  unavailableMessage: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.row
   },
-  reviewScheduleRemoveText: {
-    color: theme.colors.danger.s700,
-    fontSize: 12,
-    fontWeight: "900"
+  unavailableMessageText: {
+    flex: 1,
+    flexShrink: 1
   },
   reviewScheduleConfirmation: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 14,
-    gap: 12,
-    maxWidth: 440,
-    padding: 18,
+    backgroundColor: theme.colors.surfaceRaised,
+    // Dark surfaceRaised matches the dimmed screen, so the card needs an edge.
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.sheet,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexGrow: 0,
+    flexShrink: 1,
+    maxWidth: 430,
     width: "100%"
   },
-  confirmationActionRow: {
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "flex-end"
+  reviewScheduleConfirmationContent: {
+    gap: theme.spacing.row,
+    padding: 24
+  },
+  confirmationActions: {
+    gap: theme.spacing.group,
+    marginTop: 4
   },
   arrowLayer: {
     position: "absolute",

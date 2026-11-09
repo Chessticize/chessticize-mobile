@@ -42,6 +42,35 @@ export const LAB_DEVICE_VIEWPORTS = {
     height: 820,
     insets: { top: 0, right: 0, bottom: 20, left: 0 }
   },
+  // Full-screen iPad Pro 11-inch and 13-inch (M5) windows in both
+  // orientations, for checking layouts on the two iPad sizes.
+  ipad11Portrait: {
+    width: 834,
+    height: 1194,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  ipad11Landscape: {
+    width: 1194,
+    height: 834,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  ipad13Portrait: {
+    width: 1032,
+    height: 1376,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  ipad13Landscape: {
+    width: 1376,
+    height: 1032,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  // iPhone Duo outer display, with the measured 84-point hardware column on
+  // the right (adaptivePracticeLayout.test.tsx).
+  duoOuter: {
+    width: 466,
+    height: 678,
+    insets: { top: 0, right: 84, bottom: 34, left: 0 }
+  },
   // iPad Split View and Stage Manager windows. The simulator cannot resize
   // these headlessly, so the Lab is where their layouts are reviewed. Sizes
   // match the windows in adaptivePracticeLayout.test.tsx.
