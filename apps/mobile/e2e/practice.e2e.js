@@ -1,5 +1,7 @@
 const fs = require('fs');
+const { execFileSync } = require('node:child_process');
 const zlib = require('zlib');
+const { runAndroidAdbShell } = require('./androidAdbShell');
 const {
   dismissRunNameKeyboard,
   dragAndroidElementToElement,
@@ -40,6 +42,16 @@ const {
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 const SURVIVAL_RECORDS_CAPTURE_ORIENTATION =
   process.env.CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION;
+const REVIEW_ACTIONS_LARGE_TEXT = process.env.CHESSTICIZE_REVIEW_ACTIONS_LARGE_TEXT === '1';
+
+function setReviewActionTextSize(large) {
+  if (device.getPlatform() === 'ios') {
+    execFileSync('xcrun', ['simctl', 'ui', device.id, 'content_size',
+      large ? 'accessibility-extra-extra-extra-large' : 'large']);
+  } else {
+    runAndroidAdbShell(['settings', 'put', 'system', 'font_scale', large ? '2.0' : '1.0']);
+  }
+}
 
 if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION
   && !['portrait', 'landscape'].includes(SURVIVAL_RECORDS_CAPTURE_ORIENTATION)) {
@@ -106,6 +118,7 @@ async function waitForRunOrder(sourceTestID, targetTestID, timeoutMs = 5000) {
 
 describe('Practice POC', () => {
   beforeEach(async () => {
+    if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
     // These smoke tests use explicit waitFor checks and screenshot assertions.
     // React Native, Skia, and native engine startup can keep Detox synchronization
     // busy after the first visible frame, so launch args disable synchronization
@@ -123,6 +136,10 @@ describe('Practice POC', () => {
     } else if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
       await device.setOrientation('portrait');
     }
+  });
+
+  afterEach(() => {
+    if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
   });
 
   it('opens the empty Survival records state from a fresh profile', async () => {
@@ -466,6 +483,14 @@ describe('Practice POC', () => {
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
+    // Keep fixture creation outside this focused visual check at the normal
+    // size. Change the real system setting on the open replay, without a
+    // relaunch, so the row actions themselves run at accessibility maximum.
+    if (REVIEW_ACTIONS_LARGE_TEXT) {
+      setReviewActionTextSize(true);
+      await sleep(1000);
+    }
+
     if (expectsRegularLayout) {
       await waitForVisibleInPracticeScroll('review-schedule-add');
       await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
@@ -551,6 +576,7 @@ describe('Practice POC', () => {
       .withTimeout(10000);
 
     // Enrollment atomically cleared the marker, and removal does not restore it.
+    if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
