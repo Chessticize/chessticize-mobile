@@ -346,6 +346,7 @@ async function expectRegularLandscapeRailAnchored(orientation, state) {
   }
 
   const ids = [
+    'session-shell-nav',
     'session-status-metrics',
     'practice-prompt-stack',
     'session-puzzle-timing',
