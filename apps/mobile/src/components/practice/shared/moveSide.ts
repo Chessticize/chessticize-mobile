@@ -1,0 +1,1 @@
+type MoveSide = "w" | "b";
