@@ -23,23 +23,19 @@ function contrastRatio(foreground: string, background: string): number {
       ?.slice(0, 3)
       .map(Number);
     assert.ok(channels, `Expected an rgb color, received ${color}`);
-    return channels
+    assert.equal(channels.length, 3, `Expected three rgb channels, received ${color}`);
+    const [red, green, blue] = channels
       .map((channel) => {
         const normalized = channel / 255;
         return normalized <= 0.04045
           ? normalized / 12.92
           : ((normalized + 0.055) / 1.055) ** 2.4;
-      })
-      .reduce(
-        (total, channel, index) =>
-          total + channel * [0.2126, 0.7152, 0.0722][index],
-        0
-      );
+      }) as [number, number, number];
+    return red * 0.2126 + green * 0.7152 + blue * 0.0722;
   };
-  const [lighter, darker] = [luminance(foreground), luminance(background)].sort(
-    (left, right) => right - left
-  );
-  return (lighter + 0.05) / (darker + 0.05);
+  const first = luminance(foreground);
+  const second = luminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
 async function colorsFor(page: Page): Promise<Colors> {
