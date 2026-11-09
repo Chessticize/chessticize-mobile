@@ -45,18 +45,27 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
     // so the native tab host must not restore the previous tab selection (#612).
     supportFragmentManager.fragmentFactory = RNScreensFragmentFactory()
     super.onCreate(null)
-    syncNavigationBarIcons()
+    syncSystemBars()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
-    syncNavigationBarIcons()
+    syncSystemBars()
   }
 
-  /** Dark navigation bar icons on the light system appearance, light icons on dark. */
-  private fun syncNavigationBarIcons() {
-    val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-    WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = !night
+  /**
+   * Dark status and navigation bar icons on a light app appearance, light icons on dark. The
+   * app's in-app override wins once JavaScript reports it; before that the bars follow the
+   * system appearance, like the launch window.
+   */
+  internal fun syncSystemBars() {
+    val systemNight =
+      resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    val dark = AppSystemBarAppearance.barsDark(systemNight)
+    WindowCompat.getInsetsController(window, window.decorView).apply {
+      isAppearanceLightNavigationBars = !dark
+      isAppearanceLightStatusBars = !dark
+    }
   }
 
   override fun onNewIntent(intent: Intent) {

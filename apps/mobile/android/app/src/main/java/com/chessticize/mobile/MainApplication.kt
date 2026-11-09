@@ -20,6 +20,7 @@ class MainApplication : Application(), ReactApplication {
         add(MoveFeedbackPackage())
         add(NativeStockfishEnginePackage())
         add(ReviewReminderNotificationsPackage())
+        add(SystemBarsPackage())
       }
     getDefaultReactHost(
       context = applicationContext,

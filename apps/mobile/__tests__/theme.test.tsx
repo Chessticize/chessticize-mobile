@@ -1,7 +1,12 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { darkTheme, lightTheme, makeStyles, ThemeProvider, themeForAppearance, useTheme } from "../src/theme";
-import type { Theme } from "../src/theme";
+import type { AppearancePreference, Theme } from "../src/theme";
+import {
+  createNativeSystemBarAppearanceClient,
+  type SystemBarAppearanceClient,
+  type SystemBarScheme
+} from "../src/platform/systemBarAppearance";
 
 const useStyles = makeStyles((theme) => ({
   card: { backgroundColor: theme.colors.surface, borderRadius: theme.radius[8] }
@@ -58,6 +63,63 @@ describe("appearance", () => {
       renderer!.update(<ThemeProvider appearance="dark">{probe}</ThemeProvider>);
     });
     expect(seen[seen.length - 1]).toBe(darkTheme);
+  });
+
+  it("reports the effective scheme to the system bars, including an override opposite to the system", () => {
+    const reported: SystemBarScheme[] = [];
+    const systemBars: SystemBarAppearanceClient = { setAppearance: (scheme) => reported.push(scheme) };
+    const tree = (appearance: AppearancePreference) => (
+      <ThemeProvider appearance={appearance} systemBars={systemBars}>
+        <Probe onRender={() => undefined} />
+      </ThemeProvider>
+    );
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(tree("system"));
+    });
+    expect(reported).toEqual(["light"]);
+
+    act(() => {
+      reactNativeMock.__setColorScheme("dark");
+    });
+    expect(reported).toEqual(["light", "dark"]);
+
+    act(() => {
+      renderer!.update(tree("light"));
+    });
+    expect(reported).toEqual(["light", "dark", "light"]);
+
+    // The system flipping back to light leaves a Dark override in charge.
+    act(() => {
+      renderer!.update(tree("dark"));
+    });
+    act(() => {
+      reactNativeMock.__setColorScheme("light");
+    });
+    expect(reported).toEqual(["light", "dark", "light", "dark"]);
+
+    act(() => {
+      renderer!.update(tree("dark"));
+    });
+    expect(reported).toEqual(["light", "dark", "light", "dark"]);
+  });
+
+  it("leaves the system bars alone under a provider with an explicit theme", () => {
+    const reported: SystemBarScheme[] = [];
+    render(
+      <ThemeProvider theme={darkTheme} systemBars={{ setAppearance: (scheme) => reported.push(scheme) }}>
+        <Probe onRender={() => undefined} />
+      </ThemeProvider>
+    );
+    expect(reported).toEqual([]);
+  });
+
+  it("forwards the scheme to the native system bar module only when it exists", () => {
+    expect(createNativeSystemBarAppearanceClient(undefined)).toBeNull();
+    expect(createNativeSystemBarAppearanceClient({})).toBeNull();
+    const setAppearance = jest.fn();
+    createNativeSystemBarAppearanceClient({ setAppearance })?.setAppearance("dark");
+    expect(setAppearance).toHaveBeenCalledWith("dark");
   });
 
   it("uses a dark status bar style for light and a light one for dark", () => {
