@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  ScrollView,
   type StyleProp,
   StyleSheet,
   Text,
@@ -671,9 +672,10 @@ function FeedbackSupportCard({
           visible
         >
           <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
-            <View
+            <ScrollView
               accessibilityViewIsModal
-              style={styles.feedbackHandoffConfirmation}
+              contentContainerStyle={styles.feedbackHandoffContent}
+              style={[styles.feedbackHandoffConfirmation, styles.feedbackHandoffCard]}
               testID="settings-feedback-handoff-confirmation"
             >
               <Badge label="EXTERNAL BROWSER" tone="accent" />
@@ -713,7 +715,7 @@ function FeedbackSupportCard({
                   }}
                 />
               </View>
-            </View>
+            </ScrollView>
           </SafeAreaModalBackdrop>
         </AppModal>
       ) : null}
@@ -1947,6 +1949,15 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     gap: 2,
     minWidth: 180
+  },
+  // Scrolls when large text makes the hand-off taller than the screen, so its
+  // buttons stay reachable.
+  feedbackHandoffCard: {
+    flexGrow: 0,
+    flexShrink: 1
+  },
+  feedbackHandoffContent: {
+    gap: theme.spacing.row
   },
   confirmationActionsStacked: {
     flexDirection: "column",
