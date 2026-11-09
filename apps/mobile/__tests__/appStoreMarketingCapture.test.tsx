@@ -5,6 +5,7 @@ import {
   loadAppStoreMarketingCaptureFixture
 } from "../src/testing/appStoreMarketingCapture.ts";
 import { createMobilePracticeService } from "../src/platform/mobilePractice.ts";
+import { reviewQueueForecast } from "../../../packages/core/src/index.ts";
 
 function loadFixture(frameId: string) {
   const practiceService = createMobilePracticeService();
@@ -15,6 +16,20 @@ function loadFixture(frameId: string) {
 }
 
 describe("App Store marketing capture fixture", () => {
+  it("keeps the 1.6 user's scheduled Review current through real completed reviews", () => {
+    const { practiceService } = loadFixture("review");
+    const now = appStoreMarketingCaptureStory().captureClock.instant;
+    expect(reviewQueueForecast(practiceService.listReviewQueue(), now)).toMatchObject({
+      overdueCount: 0,
+      todayCount: practiceService.listReviewQueue().length - 2
+    });
+    expect(practiceService.listCompletedReviewsForDay(now)).toHaveLength(2);
+    const presentation = practiceService.getReviewTodayPresentation(now);
+    expect(presentation.completedItems).toHaveLength(2);
+    expect(presentation.dueItems.length).toBeGreaterThan(0);
+    expect(presentation.dueItems.every((item) => !item.overdue)).toBe(true);
+  });
+
   it("accepts only the approved six-frame story", () => {
     expect(appStoreMarketingCaptureFrameIds()).toEqual([
       "build-tactical-intuition",

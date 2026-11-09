@@ -100,6 +100,9 @@ The command captures the six `releaseCampaign.frames` in order:
 real public screens, retains the provisional early-estimate disclosure, and
 checks the native Home navigation, dark appearance, Arrow Duel reply state,
 and fully visible capture controls before writing each raw image.
+The fictional player completes yesterday's scheduled reviews and two reviews
+on capture day through the real service. The scheduler supplies the due dates,
+so the Review frame has current work without an overdue backlog.
 
 The capture tooling and test-only fixture adapters are available. There is no
 substitute or fallback from v1: a 1.6 capture manifest exists only after this

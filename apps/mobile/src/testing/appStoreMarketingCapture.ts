@@ -290,6 +290,7 @@ function loadReleaseCampaignFixture({
     seed: "marketing-1.6-release-campaign",
     plan: { arrowDuelShare: 0, runs: 12 }
   });
+  completeCampaignScheduledReviews(practiceService, captureInstant);
   const snapshot = practiceService.getTacticalProfileSnapshot(captureInstant);
   if (!snapshot) {
     throw new Error("1.6 marketing Tactical Profile fixture is unavailable");
@@ -337,6 +338,32 @@ function loadReleaseCampaignFixture({
       tacticalProfilePresentation
     } : {})
   };
+}
+
+function completeCampaignScheduledReviews(service: PracticeService, captureInstant: string): void {
+  // Continue the same fictional user's real Review journey after their mixed
+  // Runs: clear yesterday's queue, then complete two of today's reviews. The
+  // scheduler owns every resulting due date; no capture-only queue is invented.
+  const queue = service.listReviewQueue();
+  const captureMs = Date.parse(captureInstant);
+  const complete = (review: ReviewQueueState, completedAtMs: number) => {
+    const puzzle = service.getPuzzle(review.puzzleId);
+    const expectedMove = puzzle?.solutionMoves[1] ?? puzzle?.solutionMoves[0];
+    if (!expectedMove) {
+      throw new Error(`1.6 marketing Review puzzle is unavailable: ${review.puzzleId}`);
+    }
+    service.recordReviewAttempt({
+      puzzleId: review.puzzleId,
+      mode: review.mode,
+      ratingKey: review.ratingKey,
+      result: "correct",
+      submittedMove: expectedMove,
+      expectedMove,
+      startedAt: new Date(completedAtMs - 10_000).toISOString()
+    }, new Date(completedAtMs).toISOString());
+  };
+  queue.forEach((review, index) => complete(review, captureMs - 24 * 60 * 60 * 1_000 - index * 30_000));
+  queue.slice(0, 2).forEach((review, index) => complete(review, captureMs - (index + 1) * 60_000));
 }
 
 function tacticalProfileCapturePresentation(
