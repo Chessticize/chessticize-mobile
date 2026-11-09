@@ -5058,8 +5058,8 @@ export function PracticePocScreen({
                           style={[
                             styles.activeSessionControlRail,
                             adaptiveLayout.sessionCentersRow
-                              ? styles.activeSessionControlRailCentered
-                              : null,
+                              ? null
+                              : styles.activeSessionControlRailCompact,
                             {
                               minHeight: boardSize,
                               width: adaptiveLayout.sessionRailWidth
@@ -5067,12 +5067,42 @@ export function PracticePocScreen({
                           ]}
                           testID="active-session-control-rail-content"
                         >
-                          {sessionLayout.status}
-                          {sessionLayout.prompt}
-                          {sessionLayout.timing}
-                          {sessionLayout.score}
-                          {sessionLayout.error}
-                          {sessionLayout.bottomFeedback}
+                          {adaptiveLayout.sessionCentersRow ? (
+                            <>
+                              <View
+                                style={[
+                                  styles.activeSessionControlRailCore,
+                                  styles.activeSessionControlRailCoreCentered
+                                ]}
+                                testID="active-session-control-rail-core"
+                              >
+                                {sessionLayout.status}
+                                {sessionLayout.prompt}
+                                {sessionLayout.timing}
+                                {sessionLayout.score}
+                                {sessionLayout.error}
+                              </View>
+                              <View
+                                style={[
+                                  styles.activeSessionControlRailFeedbackSlot,
+                                  { minHeight: adaptiveLayout.sessionRailFeedbackReserveHeight },
+                                  { width: adaptiveLayout.sessionRailWidth }
+                                ]}
+                                testID="active-session-control-rail-feedback-slot"
+                              >
+                                {sessionLayout.bottomFeedback}
+                              </View>
+                            </>
+                          ) : (
+                            <>
+                              {sessionLayout.status}
+                              {sessionLayout.prompt}
+                              {sessionLayout.timing}
+                              {sessionLayout.score}
+                              {sessionLayout.error}
+                              {sessionLayout.bottomFeedback}
+                            </>
+                          )}
                         </View>
                       </ScrollView>
                     ) : null}
@@ -6246,11 +6276,20 @@ const useStyles = makeStyles((theme) => ({
     paddingBottom: 4
   },
   activeSessionControlRail: {
-    flexGrow: 1,
+    flexGrow: 1
+  },
+  activeSessionControlRailCompact: {
     gap: 10
   },
-  activeSessionControlRailCentered: {
+  activeSessionControlRailCore: {
+    gap: 10
+  },
+  activeSessionControlRailCoreCentered: {
+    flexGrow: 1,
     justifyContent: "center"
+  },
+  activeSessionControlRailFeedbackSlot: {
+    flexShrink: 0
   },
   activeSessionBottomFeedback: {
     alignSelf: "center"

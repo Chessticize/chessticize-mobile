@@ -318,6 +318,7 @@ describe("buildPracticeAdaptiveLayout", () => {
     expect(layout.className).toBe("regularLandscape");
     expect(layout.sessionCentersRow).toBe(true);
     expect({ board: layout.boardSize, rail: layout.sessionRailWidth }).toEqual(expected);
+    expect(layout.sessionRailFeedbackReserveHeight).toBe(73);
     // The board is the largest square the row allows: bound by the safe height
     // or by the width left after the rail, minimum gap and padding.
     expect(layout.boardSize).toBe(Math.min(
@@ -340,6 +341,20 @@ describe("buildPracticeAdaptiveLayout", () => {
 
     expect(layout.sessionCentersRow).toBe(centers);
     expect(layout.boardSize).toBe(board);
+  });
+
+  it("reserves capped feedback space in a regular landscape rail at large text", () => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 3.571,
+      height: 669,
+      insets: { top: 0, right: 84, bottom: 20, left: 0 },
+      width: 951
+    });
+
+    expect(layout.sessionRailFeedbackReserveHeight).toBe(
+      compactPortraitFeedbackHeight(layout.sessionRailWidth, 3.571)
+    );
+    expect(layout.sessionRailFeedbackReserveHeight).toBe(104);
   });
 
   // Window sizes and Safe Area insets measured with the iOS 27.1 Release app

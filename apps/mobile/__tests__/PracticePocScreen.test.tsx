@@ -6686,16 +6686,24 @@ describe("PracticePocScreen", () => {
     );
     if (centered) {
       // The board lane holds only the board, so centring the row centres the
-      // board; the rail's content block is centred beside it.
+      // board. The rail reserves feedback below a separately centred core so
+      // a previous-attempt notice cannot recenter the session controls.
       expect(content).toEqual(expect.objectContaining({
         justifyContent: "center",
         padding: 16,
         paddingBottom: 16
       }));
-      expect(rail.justifyContent).toBe("center");
+      expect(rail.justifyContent).toBeUndefined();
+      expect(flattenTestStyle(
+        findByTestId(renderer, "active-session-control-rail-core").props.style
+      ).justifyContent).toBe("center");
+      expect(flattenTestStyle(
+        findByTestId(renderer, "active-session-control-rail-feedback-slot").props.style
+      ).minHeight).toBeGreaterThan(0);
     } else {
       expect(content.justifyContent).toBe("flex-start");
       expect(rail.justifyContent).toBeUndefined();
+      expect(() => findByTestId(renderer, "active-session-control-rail-feedback-slot")).toThrow();
     }
   });
 
