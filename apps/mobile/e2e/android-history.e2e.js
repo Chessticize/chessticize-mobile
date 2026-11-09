@@ -1,5 +1,4 @@
 const {
-  elementText,
   failStandardSprint,
   historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
@@ -7,6 +6,8 @@ const {
   tapHistoryChip,
   playBoardMove,
   waitForElementTextContaining,
+  waitForHistoryActiveFilterLabel,
+  waitForHistoryActiveFilterLabelAbsent,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
 } = require('./helpers');
@@ -39,9 +40,9 @@ describe('Android Practice History', () => {
       await tapHistoryChip('history-range-filters', 'history-range-max');
       await element(by.id('history-rating-standard 5/20')).tap();
       await element(by.id('history-result-wrong')).tap();
-      await waitForElementTextContaining('history-active-filter-summary', 'All Time', 10000);
-      await waitForElementTextContaining('history-active-filter-summary', 'Standard', 10000);
-      await waitForElementTextContaining('history-active-filter-summary', 'Result: Wrong', 10000);
+      await waitForHistoryActiveFilterLabel('All Time');
+      await waitForHistoryActiveFilterLabel('Standard · 20s pace');
+      await waitForHistoryActiveFilterLabel('Result: Wrong');
 
       await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
       const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
@@ -56,8 +57,8 @@ describe('Android Practice History', () => {
 
       await device.pressBack();
       await waitFor(element(by.id('history-panel'))).toExist().withTimeout(10000);
-      await waitForElementTextContaining('history-active-filter-summary', 'All Time', 10000);
-      await waitForElementTextContaining('history-active-filter-summary', 'Result: Wrong', 10000);
+      await waitForHistoryActiveFilterLabel('All Time');
+      await waitForHistoryActiveFilterLabel('Result: Wrong');
 
       await device.terminateApp();
       await launchWithDisabledSynchronization({
@@ -67,12 +68,10 @@ describe('Android Practice History', () => {
       });
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
       await openTab('history-tab', 'history-action-header');
-      await waitForElementTextContaining('history-active-filter-summary', '7 days', 10000);
-      await waitForElementTextContaining('history-active-filter-summary', 'All puzzles', 10000);
-      const relaunchedSummary = await elementText('history-active-filter-summary');
-      if (relaunchedSummary.includes('Result: Wrong') || relaunchedSummary.includes('All Time')) {
-        throw new Error(`History filters leaked across process relaunch: ${relaunchedSummary}`);
-      }
+      await waitForHistoryActiveFilterLabel('7 days');
+      await waitForHistoryActiveFilterLabel('All puzzles');
+      await waitForHistoryActiveFilterLabelAbsent('Result: Wrong', 2000);
+      await waitForHistoryActiveFilterLabelAbsent('All Time', 2000);
 
       await device.terminateApp();
       await launchWithDisabledSynchronization({
@@ -91,7 +90,8 @@ describe('Android Practice History', () => {
       await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
       await waitFor(element(by.id('review-board-state'))).toHaveText('ready').withTimeout(10000);
       await playBoardMove('review-board', 'e6f7');
-      await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(5000);
+      // The feedback overlay lasts only the 800 ms feedback snapshot before the
+      // Review advances, so assert the lasting advance instead.
       await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(30000);
       await element(by.id('review-exit')).tap();
 
@@ -114,7 +114,7 @@ describe('Android Practice History', () => {
       await waitFor(element(by.id('review-analysis-button'))).toExist().withTimeout(10000);
       await device.pressBack();
       await waitFor(element(by.id('history-panel'))).toExist().withTimeout(10000);
-      await waitForElementTextContaining('history-active-filter-summary', 'Review', 10000);
+      await waitForHistoryActiveFilterLabel('Source: Review');
     });
   });
 });

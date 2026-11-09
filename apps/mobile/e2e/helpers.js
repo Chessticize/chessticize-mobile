@@ -1095,6 +1095,21 @@ async function tapHistoryChip(rowTestID, chipTestID) {
   await element(by.id(chipTestID)).tap();
 }
 
+// The active-filter summary is a row of label views, not one text node, and the
+// platforms flatten them into siblings of the summary, so an ancestor match
+// finds nothing. Each label text carries a testID keyed by its own text.
+function historyActiveFilterLabel(label) {
+  return element(by.id(`history-active-filter-label-${label}`));
+}
+
+async function waitForHistoryActiveFilterLabel(label, timeoutMs = 10000) {
+  await waitFor(historyActiveFilterLabel(label)).toExist().withTimeout(timeoutMs);
+}
+
+async function waitForHistoryActiveFilterLabelAbsent(label, timeoutMs = 10000) {
+  await waitFor(historyActiveFilterLabel(label)).not.toExist().withTimeout(timeoutMs);
+}
+
 async function openStandardHistoryTrend() {
   await openTab('history-tab', 'history-filter-toggle');
   if (!(await detoxElementIsVisible('history-rating-standard 5/20'))) {
@@ -1178,6 +1193,8 @@ module.exports = {
   waitForVisibleInPracticeScroll,
   waitForHistoryFiltersCollapsed,
   tapHistoryChip,
+  waitForHistoryActiveFilterLabel,
+  waitForHistoryActiveFilterLabelAbsent,
   tapUntilAnyExists,
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,

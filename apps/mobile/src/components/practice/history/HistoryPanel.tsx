@@ -504,7 +504,10 @@ function HistoryActiveFilterStrip({
             style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
             testID={`history-active-filter-${index}`}
           >
-            <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
+            <Text
+              style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}
+              testID={`history-active-filter-label-${label}`}
+            >
               {label}
             </Text>
           </View>
