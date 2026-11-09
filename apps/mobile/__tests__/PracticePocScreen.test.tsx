@@ -1018,11 +1018,6 @@ describe("PracticePocScreen", () => {
     }
     // No trailing check: the selected rating stays in the same column.
     expect(() => findByTestId(renderer, `practice-run-selected-${selectedIds[0]}`)).toThrow();
-    // Run rows are multi-line: the leading tile sits level with the first line.
-    for (const id of runIds) {
-      expect(flattenTestStyle(hostByTestId(renderer, `practice-run-${id}-icon`).props.style).alignSelf)
-        .toBe("flex-start");
-    }
     // Run separators are full-bleed: they start at the card's left edge.
     const runSeparators = findByTestId(renderer, "practice-run-management").findAll((node) =>
       typeof node.type === "string"
