@@ -269,6 +269,15 @@ h3 {
   box-shadow: 0 14px 34px rgba(31, 78, 132, 0.12);
 }
 
+.button-store-peer {
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
 .button-kicker {
   margin-bottom: 3px;
   font-size: 0.66rem;
@@ -733,6 +742,10 @@ footer {
   .install-actions,
   .install-actions .button {
     width: 100%;
+  }
+
+  .install-actions .button-store-peer {
+    width: auto;
   }
 
   .story-grid {
