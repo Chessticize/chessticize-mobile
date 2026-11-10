@@ -1,67 +1,79 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Chessticize is a free, ad-free, open-source chess puzzle trainer that works offline on iPhone, iPad, and Android."
-    >
-    <meta name="theme-color" content="#f7fbff">
-    <link rel="canonical" href="https://chessticize.com/">
-    <link rel="icon" href="./assets/app-icon-192.png" sizes="192x192">
-    <link rel="stylesheet" href="./styles.css">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Chessticize — Chess Puzzle Practice">
+      content="Chessticize is a free, private chess puzzle trainer for focused offline practice."
+    />
+    <meta name="theme-color" content="#f7fbff" />
+    <link rel="canonical" href="https://chessticize.com/" />
+    <link rel="icon" href="./assets/app-icon-192.png" sizes="192x192" />
+    <link rel="stylesheet" href="./styles.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Chessticize — Chess Puzzle Practice" />
     <meta
       property="og:description"
-      content="Short, rating-matched puzzle Sprints, Arrow Duel, Custom Runs, and scheduled Review—all private, ad-free, and available offline."
-    >
+      content="Short puzzle Sprints, Arrow Duel, and scheduled Review for private, offline chess practice."
+    />
     <meta
       property="og:image"
-      content="https://chessticize.com/assets/screenshots/iphone-01.webp"
-    >
-    <title>Chessticize — Chess puzzles that build tactical intuition</title>
+      content="https://chessticize.com/assets/screenshots/phone-practice-home.webp"
+    />
+    <title>Chessticize — Focused chess puzzle practice</title>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-
     <header class="site-header">
-      <a class="brand" href="./" aria-label="Chessticize home">
-        <img src="./assets/app-icon-192.png" width="42" height="42" alt="">
-        <span>Chessticize</span>
-      </a>
+      <a class="brand" href="./" aria-label="Chessticize home"
+        ><img
+          src="./assets/app-icon-192.png"
+          width="42"
+          height="42"
+          alt=""
+        /><span>Chessticize</span></a
+      >
       <nav aria-label="Primary navigation">
-        <a href="#puzzle-story">How it works</a>
-        <a href="#privacy">Privacy</a>
-        <a href="./support/">Support</a>
-        <a href="https://app.chessticize.com">Play online</a>
-        <a class="nav-source" href="https://github.com/Chessticize/chessticize-mobile">Source</a>
+        <a href="#review">Review</a><a href="#practice">Focused practice</a
+        ><a href="#privacy">Privacy</a><a href="./support/">Support</a
+        ><a href="https://app.chessticize.com">Play online</a
+        ><a
+          class="nav-source"
+          href="https://github.com/Chessticize/chessticize-mobile"
+          >Source</a
+        >
       </nav>
     </header>
-
-    <main id="main">
-      <aside class="notice section-shell" aria-labelledby="notice-title">
-        <div class="notice-lead">
-          <h2 id="notice-title">The web app has moved</h2>
-          <a class="button button-primary" href="https://app.chessticize.com">
-            Open the web app
-          </a>
-        </div>
+    <aside class="online-notice section-shell" aria-label="Web app update">
+      <p>
+        Looking for online play? The web app is now at
+        <a href="https://app.chessticize.com">app.<wbr />chessticize.com</a>.
+      </p>
+      <details class="notice">
+        <summary>Read the update</summary>
         <div class="notice-body">
+          <a class="button button-primary" href="https://app.chessticize.com"
+            >Open the web app</a
+          >
           <p>
-            Hi everyone! I've been using the offline app myself lately and figured
-            nobody was using the website anymore, so I was about to shut it down.
-            Then I checked and was so happy to find some of you actually use it.
-            <strong>Thank you so much for using it, and sorry about the sudden
-            outage!</strong>
+            Hi everyone! I've been using the offline app myself lately and
+            figured nobody was using the website anymore, so I was about to shut
+            it down. Then I checked and was so happy to find some of you
+            actually use it.
+            <strong
+              >Thank you so much for using it, and sorry about the sudden
+              outage!</strong
+            >
           </p>
           <p>
-            It's now at <a href="https://app.chessticize.com">app.chessticize.com</a>,
-            and I'll keep it maintained and updated as best I can. Found a bug or
+            It's now at
+            <a href="https://app.chessticize.com">app.chessticize.com</a>, and
+            I'll keep it maintained and updated as best I can. Found a bug or
             want a feature? Come chat in
-            <a href="https://github.com/Chessticize/chessticize-web/discussions">the
-            chessticize-web Discussions</a>.
+            <a href="https://github.com/Chessticize/chessticize-web/discussions"
+              >the chessticize-web Discussions</a
+            >.
           </p>
           <p>
             Chessticize is a one-person hobby project, so please bear with the
@@ -69,300 +81,230 @@
             give it a try too.
           </p>
         </div>
-      </aside>
-
-      <section class="hero section-shell">
+      </details>
+    </aside>
+    <main id="main">
+      <section id="puzzle-story" class="hero section-shell" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">Free · Offline · Ad-free · Open source</p>
-          <h1>Chess puzzles that build tactical intuition.</h1>
+          <h1 id="hero-title">Chess puzzles for focused practice.</h1>
           <p class="hero-lede">
-            Solve short, rating-matched puzzle Sprints. Learn to reject tempting
-            blunders in Arrow Duel. Choose your own themes and pace. Review
-            every puzzle that deserves another look.
+            Solve short, rating-matched puzzle Sprints. Compare moves in Arrow
+            Duel, then revisit missed puzzles with scheduled Review.
           </p>
+          <p class="hero-fact">Free. Offline. No ads or account.</p>
           <div class="install-actions" aria-label="Install Chessticize">
             <a
               class="store-badge-link"
               href="https://apps.apple.com/us/app/chessticize/id6788610123"
               aria-label="Download Chessticize on the App Store"
-            >
-              <img
+              ><img
                 class="store-badge store-badge-apple"
                 src="./assets/download-on-the-app-store.svg"
                 width="120"
                 height="40"
                 alt=""
-              >
-            </a>
+            /></a>
             <a
               class="store-badge-link"
               href="https://play.google.com/store/apps/details?id=com.chessticize.mobile"
               aria-label="Get Chessticize on Google Play"
-            >
-              <img
+              ><img
                 class="store-badge store-badge-google"
                 src="./assets/get-it-on-google-play.png"
                 width="155"
                 height="60"
                 alt=""
-              >
-            </a>
-            <a class="button button-light button-store-peer"
-              href="https://app.chessticize.com">
-              <strong>Play online</strong>
-            </a>
+            /></a>
+            <a
+              class="button button-light button-store-peer"
+              href="https://app.chessticize.com"
+              ><strong>Play online</strong></a
+            >
           </div>
-          <p class="install-note">
-            Works offline. No ads. No Chessticize account. No developer data
-            collection.
+        </div>
+        <div
+          class="hero-phones"
+          aria-label="Chessticize on iPhone: Practice and Arrow Duel"
+        >
+          <img
+            src="./assets/screenshots/phone-practice-home.webp"
+            width="660"
+            height="1434"
+            alt="Chessticize Practice home on iPhone"
+            fetchpriority="high"
+          />
+          <img
+            src="./assets/screenshots/phone-dark-arrow-duel.webp"
+            width="660"
+            height="1434"
+            alt="Chessticize Arrow Duel puzzle on iPhone in dark appearance"
+            fetchpriority="high"
+          />
+        </div>
+      </section>
+      <section
+        id="review"
+        class="review-section section-shell"
+        aria-labelledby="review-title"
+      >
+        <div class="section-copy">
+          <h2 id="review-title">
+            Scheduled Review brings back the puzzles worth another look.
+          </h2>
+          <p>
+            Missed and unclear puzzles come back when they are due. Replay a
+            position freely when you want to see the line again without changing
+            its Review schedule.
           </p>
         </div>
-
-        <figure class="hero-visual">
-          <div class="hero-glow" aria-hidden="true"></div>
+        <figure class="phone-frame review-phone">
           <img
-            src="./assets/screenshots/iphone-01.webp"
-            width="560"
-            height="1217"
-            alt="Chessticize running a Standard puzzle Sprint on iPhone"
-            fetchpriority="high"
-          >
+            src="./assets/screenshots/phone-review.webp"
+            width="660"
+            height="1434"
+            alt="Chessticize Review showing scheduled puzzles due on iPhone"
+            loading="lazy"
+          />
         </figure>
       </section>
-
-      <section class="proof-strip" aria-label="Product highlights">
-        <p><strong>Rating-matched</strong> puzzle Sprints</p>
-        <p><strong>Blunder prevention</strong> with Arrow Duel</p>
-        <p><strong>Scheduled</strong> puzzle Review</p>
-        <p><strong>Offline</strong><br>No ads</p>
-      </section>
-
-      <section id="puzzle-story" class="story section-shell">
-        <div class="section-heading">
-          <p class="eyebrow">One clear puzzle loop</p>
-          <h2>Practice, choose, revisit, repeat.</h2>
-          <p>
-            Each screen below is a real product state, using sanitized data from
-            one fictional player.
-          </p>
-        </div>
-
-        <div class="story-grid">
-          <article class="story-card">
-            <img
-              src="./assets/screenshots/iphone-02.webp"
-              width="560"
-              height="1217"
-              alt="Arrow Duel showing two candidate moves on a chess puzzle"
-              loading="lazy"
-            >
-            <div>
-              <span>01</span>
-              <h3>Choose the Best Move</h3>
-              <p>Arrow Duel trains you to reject a tempting blunder before you play it.</p>
-            </div>
-          </article>
-
-          <article class="story-card">
-            <img
-              src="./assets/screenshots/iphone-03.webp"
-              width="560"
-              height="1217"
-              alt="Custom Run controls for puzzle themes, pace, duration, and difficulty"
-              loading="lazy"
-            >
-            <div>
-              <span>02</span>
-              <h3>Focus Your Practice</h3>
-              <p>Choose puzzle themes, pace, and difficulty for what you want to practice.</p>
-            </div>
-          </article>
-
-          <article class="story-card">
-            <img
-              src="./assets/screenshots/iphone-04.webp"
-              width="560"
-              height="1217"
-              alt="A scheduled Review queue with four chess puzzles remaining"
-              loading="lazy"
-            >
-            <div>
-              <span>03</span>
-              <h3>Make Every Mistake Count</h3>
-              <p>Scheduled Review brings missed and unclear puzzles back when they are due.</p>
-            </div>
-          </article>
-
-          <article class="story-card">
-            <img
-              src="./assets/screenshots/iphone-05.webp"
-              width="560"
-              height="1217"
-              alt="Chess puzzle Rating trend and recent Run history"
-              loading="lazy"
-            >
-            <div>
-              <span>04</span>
-              <h3>See Your Progress</h3>
-              <p>Follow your Ratings and recent puzzle Runs over time.</p>
-            </div>
-          </article>
-
-          <article class="story-card">
-            <img
-              src="./assets/screenshots/iphone-06.webp"
-              width="560"
-              height="1217"
-              alt="Settings showing privacy, public source, license, and bundled puzzle data details"
-              loading="lazy"
-            >
-            <div>
-              <span>05</span>
-              <h3>Private. Offline. Open Source.</h3>
-              <p>No ads. No Chessticize account. No developer data collection.</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="feature-section section-shell">
-        <div class="section-heading">
-          <p class="eyebrow">Puzzle practice with intent</p>
-          <h2>You choose what the next Run should train.</h2>
-        </div>
-        <div class="feature-grid">
-          <article>
-            <span class="feature-mark">15</span>
-            <h3>Puzzle Sprint</h3>
+      <section
+        id="practice"
+        class="practice-section"
+        aria-labelledby="practice-title"
+      >
+        <div class="section-shell practice-layout">
+          <div class="section-copy practice-copy">
+            <h2 id="practice-title">
+              Focused Runs start with an early estimate, then your choices.
+            </h2>
             <p>
-              Solve a compact, rating-matched set against a pace and mistake
-              limit. Standard and Arrow Duel keep separate Ratings.
+              Preview a Focused Run from an early estimate in your Tactical
+              Profile, or choose the themes, pace, and difficulty yourself.
             </p>
-          </article>
-          <article>
-            <span class="feature-mark">↗</span>
-            <h3>Arrow Duel</h3>
-            <p>
-              Compare the best move with a tempting alternative. Learn to spot
-              the choice that looks natural but fails.
-            </p>
-          </article>
-          <article>
-            <span class="feature-mark">◎</span>
-            <h3>Custom Runs</h3>
-            <p>
-              Pick puzzle themes, pace, duration, and starting difficulty
-              yourself. You stay in control of what each Run practices.
-            </p>
-          </article>
-          <article>
-            <span class="feature-mark">↻</span>
-            <h3>Review and Replay</h3>
-            <p>
-              Missed and unclear puzzles return on a schedule. Replay positions
-              freely without changing your Rating or Review schedule.
-            </p>
-          </article>
-          <article>
-            <span class="feature-mark">925</span>
-            <h3>Ratings and History</h3>
-            <p>
-              Follow separate Standard and Arrow Duel Ratings and recent Runs,
-              then reopen the exact puzzles you want to inspect.
-            </p>
-          </article>
-          <article>
-            <span class="feature-mark">OFF</span>
-            <h3>Works fully offline</h3>
-            <p>
-              Puzzle Sprints, Custom Runs, Review, and optional analysis all
-              work without an internet connection. No ads or Chessticize account
-              required.
-            </p>
-          </article>
-        </div>
-        <p class="platform-note">
-          <strong>Also on iPad.</strong> Keep progress in sync across your Apple
-          devices with optional private iCloud Sync.
-        </p>
-      </section>
-
-      <section id="privacy" class="trust-section">
-        <div class="section-shell trust-grid">
-          <div>
-            <p class="eyebrow">Private by design</p>
-            <h2>Your puzzle practice is not our dataset.</h2>
           </div>
-          <div class="trust-copy">
+          <div
+            class="practice-phones"
+            aria-label="Tactical Profile and Focused Run on iPhone"
+          >
+            <figure class="phone-frame">
+              <img
+                src="./assets/screenshots/phone-tactical-profile.webp"
+                width="660"
+                height="1434"
+                alt="Chessticize Tactical Profile on iPhone, including the early estimate disclosure"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="phone-frame focused-run-phone">
+              <img
+                src="./assets/screenshots/phone-focused-run.webp"
+                width="660"
+                height="1434"
+                alt="Chessticize Focused Run preview on iPhone"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+        </div>
+      </section>
+      <section
+        id="privacy"
+        class="private-section"
+        aria-labelledby="private-title"
+      >
+        <div class="section-shell private-layout">
+          <div class="section-copy private-copy">
+            <h2 id="private-title">
+              Private practice with more room for the board.
+            </h2>
             <p>
-              Chessticize has no ads, analytics, tracking, or Chessticize
-              account. Puzzle practice and optional analysis run on your device.
-            </p>
-            <p>
-              Progress starts on your device. Private iCloud Sync can merge
-              progress across your Apple devices and can be turned off;
-              Chessticize does not operate a sync server or receive that data.
+              Chessticize works offline on mobile with no ads or Chessticize
+              account. On iPhone and iPad, optional private iCloud Sync can keep
+              your progress together across your Apple devices and can be turned
+              off at any time.
             </p>
             <div class="inline-links">
-              <a href="https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md">
-                Read the privacy policy
-              </a>
-              <a href="https://github.com/Chessticize/chessticize-mobile/blob/main/LICENSE">
-                Read the GPL license
-              </a>
+              <a
+                href="https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md"
+                >Read the privacy policy</a
+              ><a
+                href="https://github.com/Chessticize/chessticize-mobile/blob/main/LICENSE"
+                >Read the GPL license</a
+              >
             </div>
+          </div>
+          <div
+            class="wide-screens"
+            aria-label="Chessticize on iPad and iPhone Duo"
+          >
+            <figure class="wide-frame ipad-frame">
+              <img
+                src="./assets/screenshots/ipad-dark-arrow-duel.webp"
+                width="1440"
+                height="1080"
+                alt="Chessticize Arrow Duel board on iPad in dark appearance"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="wide-frame duo-frame">
+              <img
+                src="./assets/screenshots/duo-dark-arrow-duel.webp"
+                width="1440"
+                height="1013"
+                alt="Chessticize Arrow Duel board across the iPhone Duo inner display"
+                loading="lazy"
+              />
+            </figure>
           </div>
         </div>
       </section>
-
-      <section class="community section-shell">
-        <div class="community-card">
-          <div>
-            <p class="eyebrow">Built in public</p>
-            <h2>Use the app. Inspect the source. Shape what comes next.</h2>
-            <p>
-              Chessticize is free software. Report a puzzle or product problem,
-              request a feature, or contribute directly on GitHub.
-            </p>
-          </div>
-          <div class="community-actions">
-            <a class="button button-primary" href="./support/">
-              <strong>Get support</strong>
-            </a>
-            <a
-              class="button button-light"
-              href="https://github.com/Chessticize/chessticize-mobile"
-            >
-              <strong>View source</strong>
-            </a>
-          </div>
+      <section
+        class="close-section section-shell"
+        aria-labelledby="close-title"
+      >
+            <div><h2 id="close-title">Help shape Chessticize.</h2></div>
+        <div class="close-actions">
+          <a class="button button-primary" href="./support/"
+            ><strong>Get support</strong></a
+          ><a
+            class="button button-light"
+            href="https://github.com/Chessticize/chessticize-mobile"
+            ><strong>View source</strong></a
+          >
         </div>
       </section>
     </main>
-
     <footer>
       <div class="section-shell footer-grid">
         <div>
-          <a class="brand footer-brand" href="./">
-            <img src="./assets/app-icon-192.png" width="36" height="36" alt="">
-            <span>Chessticize</span>
-          </a>
+          <a class="brand footer-brand" href="./"
+            ><img
+              src="./assets/app-icon-192.png"
+              width="36"
+              height="36"
+              alt=""
+            /><span>Chessticize</span></a
+          >
           <p>Private, offline, ad-free chess puzzle practice.</p>
         </div>
         <nav aria-label="Footer navigation">
-          <a href="https://apps.apple.com/us/app/chessticize/id6788610123">App Store</a>
-          <a href="https://play.google.com/store/apps/details?id=com.chessticize.mobile">
-            Google Play
-          </a>
-          <a href="./android/">Android APK</a>
-          <a href="https://app.chessticize.com">Play online</a>
-          <a href="./support/">Support</a>
-          <a href="https://github.com/Chessticize/chessticize-mobile/discussions">Discussions</a>
-          <a href="./accessibility/">Accessibility</a>
-          <a href="https://github.com/Chessticize/chessticize-mobile">Source</a>
-          <a href="https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md">
-            Privacy
-          </a>
+          <a href="https://apps.apple.com/us/app/chessticize/id6788610123"
+            >App Store</a
+          ><a
+            href="https://play.google.com/store/apps/details?id=com.chessticize.mobile"
+            >Google Play</a
+          ><a href="./android/">Android APK</a
+          ><a href="https://app.chessticize.com">Play online</a
+          ><a href="./support/">Support</a
+          ><a
+            href="https://github.com/Chessticize/chessticize-mobile/discussions"
+            >Discussions</a
+          ><a href="./accessibility/">Accessibility</a
+          ><a href="https://github.com/Chessticize/chessticize-mobile">Source</a
+          ><a
+            href="https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md"
+            >Privacy</a
+          >
         </nav>
       </div>
     </footer>
