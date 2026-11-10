@@ -347,7 +347,8 @@ footer nav a:hover {
 }
 .phone-frame {
   position: relative;
-  container-type: inline-size;
+  /* One outer curve clips the screen at the padding edge, preserving the bezel. */
+  overflow: hidden;
   min-width: 0;
   margin: 0;
   border: clamp(3px, 0.45vw, 6px) solid #08090b;
@@ -372,7 +373,6 @@ footer nav a:hover {
 }
 .phone-frame img {
   width: 100%;
-  border-radius: 13cqw;
 }
 
 .practice-section {
