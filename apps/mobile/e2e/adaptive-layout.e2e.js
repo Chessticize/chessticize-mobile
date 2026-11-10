@@ -51,7 +51,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await captureHome(initialOrientation);
 
     await selectTestPuzzleSource('familiar15');
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
     await sleep(300);
     await walkArrowDuelGuideAndExit(initialOrientation);
     await startStandardSprintThroughContainedGuide(initialOrientation);
@@ -196,13 +196,13 @@ async function assertFirstUseSprintRulesGuideLayout() {
 }
 
 async function selectAndStartRun(mode) {
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   await waitForVisibleInPracticeScroll(`practice-run-${mode}`);
   await element(by.id(`practice-run-select-${mode}`)).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   if (await existsNow('practice-sprint-rules-dismiss')) {
     await element(by.id('practice-sprint-rules-dismiss')).tap();
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   }
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
@@ -571,7 +571,7 @@ async function launchForOrientation(orientation) {
   });
   await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
   await setAdaptiveOrientation(orientation);
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
 }
 
 async function setAdaptiveOrientation(orientation) {
