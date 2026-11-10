@@ -156,10 +156,20 @@ footer nav a:hover {
 }
 
 .online-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 24px;
+  align-items: center;
   padding-block: 12px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.94rem;
+}
+.online-notice > .button {
+  justify-self: end;
+}
+.online-notice .notice {
+  grid-column: 1 / -1;
 }
 .online-notice p {
   margin: 0;
@@ -187,8 +197,7 @@ footer nav a:hover {
   grid-template-columns: minmax(0, 1.02fr) minmax(440px, 0.98fr);
   gap: clamp(36px, 5vw, 78px);
   align-items: center;
-  min-height: calc(100vh - 70px);
-  padding-block: clamp(40px, 5vw, 64px);
+  padding-block: clamp(24px, 3.3vw, 48px) clamp(48px, 6vw, 80px);
 }
 .hero-copy {
   padding-block: 16px;
@@ -469,9 +478,6 @@ footer nav a:hover {
   color: var(--blue-deep);
   font-weight: 650;
 }
-.notice .button {
-  justify-self: start;
-}
 
 footer {
   padding: 0 0 48px;
@@ -607,6 +613,13 @@ footer nav {
 }
 
 @media (max-width: 700px) {
+  .online-notice {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .online-notice > .button {
+    justify-self: start;
+    margin-top: 12px;
+  }
   body {
     font-size: 1rem;
   }
@@ -629,9 +642,8 @@ footer nav {
   }
   .hero {
     grid-template-columns: 1fr;
-    min-height: calc(100vh - 64px);
     gap: 26px;
-    padding-block: 36px 40px;
+    padding-block: 28px 40px;
   }
   .hero-copy {
     padding: 0;

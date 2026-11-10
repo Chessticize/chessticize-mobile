@@ -80,8 +80,16 @@ test("landing notice action and focused skip links have readable rendered contra
     const page = await browser.newPage();
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto(`${server.url}/index.html`, { waitUntil: "networkidle" });
-    const colors = await page
-      .locator(".notice .button-primary")
+    const action = page.getByRole("link", {
+      name: "Open the web app",
+      exact: true,
+    });
+    assert.equal(
+      await action.isVisible(),
+      true,
+      "web app button is visible while the update is collapsed"
+    );
+    const colors = await action
       .evaluate((element) => {
         const style = getComputedStyle(element);
         return { color: style.color, background: style.backgroundColor };
@@ -122,6 +130,22 @@ test("landing visuals, anchors, and migration disclosure reflow in a real browse
         false,
         "the full update starts collapsed"
       );
+      assert.equal(
+        await page
+          .getByRole("link", { name: "Open the web app", exact: true })
+          .isVisible(),
+        true,
+        "web app button must remain visible outside the disclosure"
+      );
+      if (viewport.width >= 1024) {
+        const notice = await page.locator(".online-notice").boundingBox();
+        const phones = await page.locator(".hero-phones").boundingBox();
+        assert.ok(notice && phones);
+        assert.ok(
+          phones.y - (notice.y + notice.height) <= 72,
+          "desktop hero must follow the notice without a large empty band"
+        );
+      }
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth
