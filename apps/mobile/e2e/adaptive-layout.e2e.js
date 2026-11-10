@@ -288,8 +288,8 @@ async function expectRegularLandscapeSessionCentered(orientation) {
   const boardFrame = await frameFor(element(by.id('session-board')));
   const topGap = boardFrame.y - screenFrame.y;
   const bottomGap = screenFrame.y + screenFrame.height - (boardFrame.y + boardFrame.height);
-  // Test builds render the hidden puzzle-ID text above the board, and the
-  // board wrapper's 3-point gap shifts the board by that much in test runs.
+  // Hidden test metadata is out of flow; it must not add the board wrapper's
+  // gap or shift this geometry relative to the shipped screen.
   if (Math.abs(topGap - bottomGap) > 4) {
     throw new Error(
       `${deviceLabel} ${orientation} session board is not vertically centred: `

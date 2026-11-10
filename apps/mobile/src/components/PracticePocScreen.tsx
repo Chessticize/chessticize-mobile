@@ -4466,7 +4466,10 @@ export function PracticePocScreen({
   const sessionBoardNode = shouldShowSessionBoard ? (
     <View key="session-board" style={styles.boardWrapper}>
       {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
-        <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+        <Text
+          testID="session-current-puzzle-id"
+          style={[styles.reviewDueHiddenMetric, styles.sessionTestMetadata]}
+        >
           {displayedPuzzle?.puzzle.id ?? ""}
         </Text>
       ) : null}
@@ -5635,62 +5638,62 @@ export function PracticePocScreen({
         testID="practice-gesture-root"
       >
         <View ref={practiceRootRef} onLayout={measureActiveAbandonAnchor} style={styles.predictiveBackStage}>
-        {mobileBackPreview ? (
-          <View
-            accessible={false}
-            style={styles.predictiveBackDestination}
-            testID="mobile-back-destination-preview"
-          >
-            <Text style={styles.predictiveBackEyebrow}>Back to</Text>
-            <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
-              {mobileBackPreview.label}
-            </Text>
-            <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
-              {mobileBackPreview.testID}
-            </Text>
-          </View>
-        ) : null}
-        <NativeTabHost
-          chromeHidden={!appChromeVisible}
-          colorScheme={appTheme.name}
-          colors={{
-            accent: appTheme.colors.accent.s600,
-            androidBarBackground: appTheme.colors.surface,
-            androidIndicator: appTheme.colors.accent.s100,
-            androidInactive: appTheme.colors.text.secondary,
-            background: appTheme.colors.surfaceRaised,
-            badgeBackground: appTheme.colors.danger.s600,
-            badgeDangerBackground: appTheme.colors.danger.s600,
-            badgeText: appTheme.colors.text.onAccent
-          }}
-          dueReviewCount={dueTodayCount}
-          overdueReviewCount={overdueCount}
-          selectedTab={hostTab}
-          onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
-          renderTab={(candidate) => candidate === hostTab ? (
-            <>
-              {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
-              {appShell}
-            </>
+          {mobileBackPreview ? (
+            <View
+              accessible={false}
+              style={styles.predictiveBackDestination}
+              testID="mobile-back-destination-preview"
+            >
+              <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+              <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
+                {mobileBackPreview.label}
+              </Text>
+              <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
+                {mobileBackPreview.testID}
+              </Text>
+            </View>
           ) : null}
-        />
-        {practiceExitConfirmationVisible && isActive && state && !personalBestActivePresentation ? (
-          <SessionAbandonConfirmation
-            maxHeight={activeAbandonAnchor?.maxHeight ?? height}
-            minHeight={adaptiveLayout.promptFrameHeight + 4}
-            stack={adaptiveLayout.sessionColumnWidth < 320}
-            state={state}
-            style={[
-              styles.activeAbandonOverlay,
-              activeAbandonAnchor ?? { left: 0, top: 0, width: adaptiveLayout.sessionColumnWidth, opacity: 0 }
-            ]}
-            onCancel={() => setPracticeExitConfirmationVisible(false)}
-            onAbandon={() => {
-              setPracticeExitConfirmationVisible(false);
-              abandonSprint();
+          <NativeTabHost
+            chromeHidden={!appChromeVisible}
+            colorScheme={appTheme.name}
+            colors={{
+              accent: appTheme.colors.accent.s600,
+              androidBarBackground: appTheme.colors.surface,
+              androidIndicator: appTheme.colors.accent.s100,
+              androidInactive: appTheme.colors.text.secondary,
+              background: appTheme.colors.surfaceRaised,
+              badgeBackground: appTheme.colors.danger.s600,
+              badgeDangerBackground: appTheme.colors.danger.s600,
+              badgeText: appTheme.colors.text.onAccent
             }}
+            dueReviewCount={dueTodayCount}
+            overdueReviewCount={overdueCount}
+            selectedTab={hostTab}
+            onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
+            renderTab={(candidate) => candidate === hostTab ? (
+              <>
+                {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
+                {appShell}
+              </>
+            ) : null}
           />
-        ) : null}
+          {practiceExitConfirmationVisible && isActive && state && !personalBestActivePresentation ? (
+            <SessionAbandonConfirmation
+              maxHeight={activeAbandonAnchor?.maxHeight ?? height}
+              minHeight={adaptiveLayout.promptFrameHeight + 4}
+              stack={adaptiveLayout.sessionColumnWidth < 320}
+              state={state}
+              style={[
+                styles.activeAbandonOverlay,
+                activeAbandonAnchor ?? { left: 0, top: 0, width: adaptiveLayout.sessionColumnWidth, opacity: 0 }
+              ]}
+              onCancel={() => setPracticeExitConfirmationVisible(false)}
+              onAbandon={() => {
+                setPracticeExitConfirmationVisible(false);
+                abandonSprint();
+              }}
+            />
+          ) : null}
         </View>
       </GestureHandlerRootView>
     </UiHapticsProvider>
@@ -6323,9 +6326,16 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 0
   },
   activeAbandonOverlay: {
-    elevation: 50,
+    elevation: 12,
     position: "absolute",
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { height: 3, width: 0 },
+    shadowOpacity: theme.name === "dark" ? 0.4 : 0.14,
+    shadowRadius: 8,
     zIndex: 50
+  },
+  sessionTestMetadata: {
+    position: "absolute"
   },
   activeSessionControlRailScroll: {
     flexGrow: 0,
