@@ -28,36 +28,46 @@ at any depth. It references its stylesheet and icon at both `/` and the legacy
 
 ## Preparing the 1.6 refresh
 
-The landing page uses the existing approved, sanitized product screenshots while
-the final 1.6 marketing set is prepared. They continue to illustrate established
-puzzle-practice states and must be replaced only through
-`pnpm landing-page:assets` once the approved 1.6 source pack is available. That
-command preserves the current filenames and updates the manifest, so no page
-markup changes are needed for the asset swap.
+The landing page uses approved, sanitized native 1.6 captures. The committed
+WebP files are derivatives only: the original PNG captures stay in ignored
+`scratch/` storage. `site/assets/marketing-assets.json` records each derivative,
+its output hash, logical source collection, source hash, and capture commit.
+It deliberately records no local absolute paths.
+
+The current capture collection is App source commit
+`b2ba55b8d8e1b443c82490b9e1508d733ecc9207` for iPhone, iPad, and the
+genuine iPhone Duo inner display. The Duo capture also records its separate
+runner commit `2c0ce5e82c6ed67c608cfd5543120d7ab6d222d6`; that is capture-runner
+provenance, not the App source. These are not a claim that captures were made
+from a later release or `main`.
 
 ## Updating the marketing images
 
-The committed website images are web-sized derivatives of the approved,
-sanitized App Store compositions. The App Store originals remain under the
+The committed website images are web-sized derivatives of approved, sanitized
+native captures. The raw capture PNGs and their manifests remain under the
 ignored `scratch/` workspace and are not committed.
 
 After generating and approving a new marketing set:
 
 ```sh
 pnpm landing-page:assets -- \
-  --source-root /absolute/path/to/marketing-hybrid-a-original-bg-v1
+  --source-root /absolute/path/to/app-store-raw-b2ba-normal-final \
+  --duo-source-root /absolute/path/to/duo-inner-b2ba-final
 ```
 
 The source directory must contain:
 
-- `iphone-6.9-inch-portrait/marketing-01-standard-sprint.png` through
-  `marketing-06-trust.png`;
-- the matching `ipad-13-inch-landscape` images; and
-- `preview-iphone-contact-sheet.png`.
+- `iphone-6.9-inch-portrait/{practice-home,dark-arrow-duel,tactical-profile,focused-run,survival,review}.png`;
+- the matching six `ipad-13-inch-landscape/` captures;
+- `iphone-duo-inner-landscape/dark-arrow-duel.png` under the Duo source root; and
+- `manifest.json` in the App Store capture root and `manifest-iphoneDuo.json`
+  in the Duo root. The generator stops before it changes site assets if a
+  manifest path, source commit, or SHA-256 does not match its input PNG.
 
-The command rewrites the optimized WebP images, the site icon, and
-`site/assets/marketing-assets.json`. Review the diff and open the landing page
-locally before committing:
+The command rewrites the optimized WebP images, a non-captioned contact sheet,
+the site icon, and `site/assets/marketing-assets.json`. It removes only the
+previously generator-owned `iphone-0*` and `ipad-0*` poster derivatives.
+Review the diff and open the landing page locally before committing:
 
 ```sh
 python3 -m http.server 4173 --directory site
@@ -95,6 +105,7 @@ python3 -m http.server 4173 --directory site
 
 The generated `site/android/index.html` is ignored; the template and renderer
 are the committed sources.
+
 - App Store Connect uses the homepage as the Marketing URL, `support/` as the
   Support URL, and `accessibility/` as the Accessibility URL. The complete
   privacy policy remains the repository-hosted `docs/PRIVACY_POLICY.md`; the

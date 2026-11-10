@@ -287,11 +287,12 @@ const publicLandingCopy = [
 ].join("\n");
 assert.match(landingPage, /chess puzzle trainer/i);
 assert.match(landingPage, /rating-matched puzzle Sprints/);
-assert.match(landingPage, /Custom Runs/);
 assert.match(landingPage, /scheduled Review/);
-assert.doesNotMatch(publicLandingCopy, /Tactical Profile/i);
+assert.match(landingPage, /Chess puzzles for focused practice\./);
+assert.match(landingPage, /Tactical Profile/);
+assert.match(landingPage, /early estimate/);
 assert.doesNotMatch(publicLandingCopy, /\badaptive practice\b/i);
-assert.doesNotMatch(publicLandingCopy, /\bweakness(?:es)?\b/i);
+assert.doesNotMatch(publicLandingCopy, /confident weakness|guaranteed weakness/i);
 assert.doesNotMatch(publicLandingCopy, /<script\b/i);
 assert.doesNotMatch(
   publicLandingCopy,
@@ -322,9 +323,20 @@ assert.match(androidDownloadPageRenderer, /AbortSignal\.timeout\(30_000\)/);
 assert.match(androidDownloadPageModule, /assets\.length !== 3/);
 assert.match(androidDownloadPageModule, /com\.chessticize\.mobile/);
 assert.match(landingPageAssetGenerator, /--source-root/);
-assert.equal(landingPageAssetManifest.schemaVersion, 1);
-assert.equal(landingPageAssetManifest.assets.length, 11);
-assert.match(landingPageTest, /ships optimized, reproducible marketing images/);
+assert.equal(landingPageAssetManifest.schemaVersion, 2);
+assert.equal(landingPageAssetManifest.sourceCollection, "mobile-1.6-current");
+assert.equal(landingPageAssetManifest.assets.length, 15);
+assert.ok(
+  landingPageAssetManifest.sources.some(
+    ({ appSourceCommit }) => appSourceCommit === "b2ba55b8d8e1b443c82490b9e1508d733ecc9207"
+  )
+);
+assert.ok(
+  landingPageAssetManifest.sources.some(
+    ({ captureRunnerCommit }) => captureRunnerCommit === "2c0ce5e82c6ed67c608cfd5543120d7ab6d222d6"
+  )
+);
+assert.match(landingPageTest, /verifiable provenance/);
 
 // Guidance is validated through reachable links above. Do not freeze prose,
 // approval gates, or workflow choices with regex assertions; executable marker,
