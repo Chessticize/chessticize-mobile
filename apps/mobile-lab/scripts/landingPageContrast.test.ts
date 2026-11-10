@@ -165,6 +165,26 @@ test("landing visuals, anchors, and migration disclosure reflow in a real browse
           );
         }, index);
       }
+      const phones = page.locator(".phone-frame");
+      assert.equal(await phones.count(), 5, "all iPhone captures share the device frame");
+      for (const phone of await phones.all()) {
+        const hardware = await phone.evaluate((element) => {
+          const island = getComputedStyle(element, "::before");
+          const image = element.querySelector("img")!;
+          return {
+            content: island.content,
+            color: island.backgroundColor,
+            width: parseFloat(island.width) / image.clientWidth,
+            bottom: (parseFloat(island.top) + parseFloat(island.height)) / image.clientHeight,
+          };
+        });
+        assert.equal(hardware.content, '""');
+        assert.equal(hardware.color, "rgb(0, 0, 0)");
+        assert.ok(hardware.width > 0.27 && hardware.width < 0.30,
+          "Dynamic Island scales with the screen width");
+        assert.ok(hardware.bottom < 0.04,
+          "Dynamic Island stays in the status-bar safe area");
+      }
       for (const href of ["#review", "#practice", "#privacy"]) {
         assert.equal(await page.locator(`a[href="${href}"]`).count(), 1);
       }

@@ -315,11 +315,9 @@ footer nav a:hover {
   gap: clamp(10px, 1.8vw, 24px);
   min-width: 0;
 }
-.hero-phones img {
+.hero-phones .phone-frame {
   width: min(48%, 270px);
-  border: 7px solid #182d49;
-  border-radius: 30px;
-  box-shadow: 0 18px 46px rgba(25, 64, 107, 0.2);
+  flex-shrink: 0;
 }
 
 .section-copy > p:last-child {
@@ -348,13 +346,33 @@ footer nav a:hover {
   justify-self: center;
 }
 .phone-frame {
+  position: relative;
+  container-type: inline-size;
+  min-width: 0;
   margin: 0;
+  border: clamp(3px, 0.45vw, 6px) solid #08090b;
+  border-radius: 16% / 7.5%;
+  background: #08090b;
+  box-shadow: 0 0 0 1px #74777c, 0 0 0 2px #292b30,
+    0 20px 48px rgba(25, 64, 107, 0.18);
+}
+/* Native captures omit the hardware cutout. Keep it in their status-bar safe area. */
+.phone-frame::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 0.8%;
+  left: 50%;
+  width: 28.6%;
+  height: 2.6%;
+  border-radius: 999px;
+  background: #000;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 .phone-frame img {
   width: 100%;
-  border: 7px solid #1a304c;
-  border-radius: 31px;
-  box-shadow: 0 20px 48px rgba(25, 64, 107, 0.18);
+  border-radius: 13cqw;
 }
 
 .practice-section {
@@ -369,6 +387,7 @@ footer nav a:hover {
   align-items: center;
 }
 .practice-phones {
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(16px, 3vw, 36px);
@@ -576,7 +595,7 @@ footer nav {
     grid-template-columns: minmax(0, 1fr) minmax(350px, 0.9fr);
     gap: 32px;
   }
-  .hero-phones img {
+  .hero-phones .phone-frame {
     width: min(48%, 215px);
   }
   .review-section,
@@ -667,13 +686,12 @@ footer nav {
     white-space: nowrap;
   }
   .hero-phones {
+    width: 100%;
     max-width: 300px;
     margin: 0 auto;
   }
-  .hero-phones img {
+  .hero-phones .phone-frame {
     width: min(44%, 132px);
-    border-width: 5px;
-    border-radius: 22px;
   }
   .review-section {
     grid-template-columns: 1fr;
@@ -683,10 +701,6 @@ footer nav {
   }
   .review-phone {
     width: min(78vw, 290px);
-  }
-  .phone-frame img {
-    border-width: 5px;
-    border-radius: 24px;
   }
   .practice-section {
     padding-block: 78px;
@@ -761,10 +775,9 @@ footer nav {
   .button-primary:hover {
     background: #c2dfff;
   }
-  .hero-phones img,
-  .phone-frame img {
-    border-color: #071527;
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.38);
+  .phone-frame {
+    box-shadow: 0 0 0 1px #74777c, 0 0 0 2px #292b30,
+      0 20px 48px rgba(0, 0, 0, 0.38);
   }
   .practice-section {
     background: #102641;

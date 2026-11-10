@@ -47,6 +47,11 @@ runner commit `2c0ce5e82c6ed67c608cfd5543120d7ab6d222d6`; that is capture-runner
 provenance, not the App source. These are not a claim that captures were made
 from a later release or `main`.
 
+The five portrait iPhone captures share a CSS device frame with a black bezel,
+rounded screen corners, and a proportional Dynamic Island inside the captured
+status-bar safe area. The hardware overlay does not change the source images
+or their provenance hashes. iPad and Duo captures keep their separate frames.
+
 ## Updating the marketing images
 
 The committed website images are web-sized derivatives of approved, sanitized
