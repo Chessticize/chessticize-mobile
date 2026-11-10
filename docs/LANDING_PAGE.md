@@ -20,6 +20,11 @@ shared links keep working. The web app (`app.chessticize.com`) is live and
 linked as "Play online" from the homepage header, hero actions, and footer, and
 from `site/404.html`.
 
+A compact notice above the homepage hero links directly to the web app. Its
+"Read the update" disclosure keeps the complete owner-written migration message
+available but collapsed by default. The header, hero, and footer "Play online"
+actions remain available independently of the disclosure.
+
 Pages use relative asset and link paths so they work from the domain root. Only
 `404.html` needs root-absolute paths because it is served for any missing URL
 at any depth. It references its stylesheet and icon at both `/` and the legacy
