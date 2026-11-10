@@ -40,7 +40,11 @@ These proofs check the template crop, not the final live App Store rendering.
 
 ## App Store Connect delivery
 
-The pair is uploaded to the app's Asset Library as `CREATIVE_ASSETS`. Apple
+The pair was uploaded to the app's Asset Library as `CREATIVE_ASSETS` and
+submitted together on 2026-11-10. Both API states were verified as
+`WAITING_FOR_REVIEW`; ASC displayed **2 Items Submitted**. The standalone
+submission is [fb78cb6e-f568-4119-838c-fe01077fac8e](https://appstoreconnect.apple.com/apps/6788610123/distribution/reviewsubmissions/details/fb78cb6e-f568-4119-838c-fe01077fac8e).
+The public placements have not been enabled. Apple
 recognized the dedicated Header (21:9) and Search Results (3:2) specifications.
 The current API key permits reads but rejected creative-image reservation with
 403, so the logged-in App Store Connect UI was used for upload.

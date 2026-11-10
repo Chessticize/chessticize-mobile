@@ -33,7 +33,8 @@
       "safeAreaProof": "header-safe-area.jpg",
       "appleTemplateSha256": "4200f416adcf3affb70d5847c1d0554fc39b7405110ec527bdea92bfb82f93b0",
       "appleSpecId": "1eb43b80-e0b7-4d96-bd32-47a42a8c5fed",
-      "ascAssetId": "22800019-4a1f-884b-8007-a5bee6e6a453"
+      "ascAssetId": "22800019-4a1f-884b-8007-a5bee6e6a453",
+      "ascStateAtSubmission": "WAITING_FOR_REVIEW"
     },
     {
       "placement": "search-results",
@@ -63,7 +64,16 @@
       "safeAreaProof": "search-results-safe-area.jpg",
       "appleTemplateSha256": "7bb57a3c33cc4402d1c82e85a0211cf0f2f2b1c05cf7f36e4710092226dea056",
       "appleSpecId": "d2ffa3b7-6c55-5cdf-8512-229d92791333",
-      "ascAssetId": "7f400019-4a1f-884b-802f-f872fe02ff50"
+      "ascAssetId": "7f400019-4a1f-884b-802f-f872fe02ff50",
+      "ascStateAtSubmission": "WAITING_FOR_REVIEW"
     }
-  ]
+  ],
+  "ascDelivery": {
+    "checkedDate": "2026-11-10",
+    "submissionId": "fb78cb6e-f568-4119-838c-fe01077fac8e",
+    "state": "WAITING_FOR_REVIEW",
+    "platform": "IOS",
+    "placementPublished": false,
+    "devicePreviewVerified": false
+  }
 }
