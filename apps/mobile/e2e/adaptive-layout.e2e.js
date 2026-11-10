@@ -40,6 +40,7 @@ const onlyOrientation = process.env.CHESSTICIZE_ADAPTIVE_ONLY_ORIENTATION;
 // is the dark inner display, so the run can name the display to capture.
 const iosScreenshotDisplay = process.env.CHESSTICIZE_ADAPTIVE_IOS_SCREENSHOT_DISPLAY;
 const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();
+const regularLandscapeRailFrames = new Map();
 
 describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
   it('captures representative layouts and preserves the active puzzle through rotation', async () => {
@@ -50,16 +51,18 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await captureHome(initialOrientation);
 
     await selectTestPuzzleSource('familiar15');
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
     await sleep(300);
     await walkArrowDuelGuideAndExit(initialOrientation);
     await startStandardSprintThroughContainedGuide(initialOrientation);
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await waitFor(element(by.id('session-current-puzzle-id'))).toExist().withTimeout(10000);
     await waitForSettledSprintLayout(initialOrientation);
+    await resetCompactLandscapeRail();
 
-    const puzzleID = await elementText('session-current-puzzle-id');
+    let puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
+    await expectRegularLandscapeRailAnchored(initialOrientation, 'no-notice');
     await expectSessionControlsContained(initialOrientation);
     await expectAbandonConfirmationFloats(initialOrientation);
     await expectRegularLandscapeSessionCentered(initialOrientation);
@@ -68,11 +71,13 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await setAdaptiveOrientation('landscape');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       await waitForSettledSprintLayout('landscape');
+      await resetCompactLandscapeRail();
       const rotatedPuzzleID = await elementText('session-current-puzzle-id');
       if (rotatedPuzzleID !== puzzleID) {
         throw new Error(`Rotation replaced the active puzzle: ${puzzleID} -> ${rotatedPuzzleID}`);
       }
       await captureSprint('landscape', { waitForPieces: true });
+      await expectRegularLandscapeRailAnchored('landscape', 'no-notice');
       // Rotation is the resize Detox can drive on iOS and Android. The same
       // containment contract applies to iPhone Duo fold/unfold and Split View
       // resizes, which the simulator cannot yet perform headlessly.
@@ -80,17 +85,27 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await expectRegularLandscapeSessionCentered('landscape');
     }
 
+    let androidCapturedRegularLandscapeFeedback = false;
+    if (device.getPlatform() === 'android') {
+      // Keep the public wrong-move journey in the same regular-landscape
+      // state captured above. A previous-attempt notice used to recenter the
+      // whole rail; compare its live native frames with the no-notice rail.
+      const feedbackOrientation = includeLandscape ? 'landscape' : initialOrientation;
+      androidCapturedRegularLandscapeFeedback = await isRegularLandscape();
+      if (androidCapturedRegularLandscapeFeedback) {
+        await captureAndroidPreviousAttemptNotice(feedbackOrientation);
+      }
+    }
+
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
-    if (device.getPlatform() === 'android' && needsPortraitRestore) {
-      // API 36 large-screen activities ignore requested-orientation hints, so
-      // the evidence harness rotates the physical display. Return to the
-      // natural orientation and reacquire the public app root before tapping
-      // the real board; otherwise the rotated base window can remain the
-      // unfocused Espresso root while board input is submitted. A foldable's
-      // natural portrait viewport can report a few physical pixels of rounding
-      // overflow. This portrait state is not captured as evidence, so allow a
-      // bounded 16-physical-pixel tolerance while reacquiring focus; every
-      // captured layout keeps the default strict containment check.
+    if (
+      device.getPlatform() === 'android'
+      && needsPortraitRestore
+      && !androidCapturedRegularLandscapeFeedback
+    ) {
+      // Compact Android sessions retain their existing portrait wrong-move
+      // journey. API 36 large-screen activities ignore requested-orientation
+      // hints, so reacquire the public root after returning from landscape.
       await setAdaptiveOrientation('portrait');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 });
@@ -101,29 +116,8 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       }
     }
 
-    if (device.getPlatform() === 'android') {
-      await withAndroidUiDiagnostics(async () => {
-        // Familiar 15's first Standard puzzle is a versioned product fixture:
-        // c2b3 is legal but wrong, while alternate mate c2b1 is accepted.
-        // Submit the move through the real board so every adaptive profile
-        // retains coordinate-mapping evidence after the public move chooser
-        // was removed from the product.
-        await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-        await playBoardMove('session-board', 'c2b3');
-        // The transient feedback overlay can finish before Detox begins its
-        // next poll. The persistent public score proves the real board move.
-        await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
-        await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
-
-        // A terminal wrong result advances the sprint to Familiar 15 puzzle two;
-        // c4b5 is its maintained legal-wrong fixture move (also used by the full
-        // public-UI sprint failure journey). Submit that move through the real
-        // board to retain coordinate-mapping evidence on every display profile.
-        await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-        await playBoardMove('session-board', 'c4b5');
-        await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
-        await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
-      });
+    if (device.getPlatform() === 'android' && !androidCapturedRegularLandscapeFeedback) {
+      await completeAndroidWrongMoves();
     }
 
     if (device.getPlatform() === 'ios') {
@@ -139,17 +133,19 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await playBoardMove('session-board', 'c4b5');
       await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
       await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
+      await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
       await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
     }
 
     if (
       needsPortraitRestore
       && device.getPlatform() !== 'android'
+      && onlyOrientation === undefined
       && iosAppSupportsOrientation('portrait')
     ) {
       // Leave the emulator in its natural orientation before the shell applies
       // the next profile's portrait-shaped size override. The landscape-only
-      // iPad validation build cannot rotate back, so it skips this restore.
+      // iPad validation build and explicit Device Hub posture captures skip this restore.
       await setAdaptiveOrientation('portrait');
     }
   });
@@ -200,13 +196,13 @@ async function assertFirstUseSprintRulesGuideLayout() {
 }
 
 async function selectAndStartRun(mode) {
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   await waitForVisibleInPracticeScroll(`practice-run-${mode}`);
   await element(by.id(`practice-run-select-${mode}`)).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   if (await existsNow('practice-sprint-rules-dismiss')) {
     await element(by.id('practice-sprint-rules-dismiss')).tap();
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   }
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
@@ -273,12 +269,47 @@ async function expectSessionControlsContained(orientation, feedbackTestIDs = [])
     'session-pause',
     ...feedbackTestIDs
   ]) {
+    await revealCompactLandscapeSessionControl(testID);
     const frame = await frameForIfPresent(testID);
     if (!frame) {
       throw new Error(`${deviceLabel} ${orientation} session is missing ${testID}`);
     }
     expectFrameContained(frame, screenFrame, `${deviceLabel} ${orientation} ${testID}`);
   }
+}
+
+// Compact landscape deliberately scrolls the rail when large text exceeds its
+// height. The guide ends at the score target, so verify each control in its
+// actual clipped viewport instead of treating that final scroll offset as a
+// simultaneous-visibility contract. Every control must still be fully visible.
+async function resetCompactLandscapeRail() {
+  if (await isCompactLandscape()) {
+    await element(by.id('active-session-control-rail')).scrollTo('top', 0.5, 0.5);
+  }
+}
+
+async function isCompactLandscape() {
+  const attributes = await element(by.id('adaptive-layout')).getAttributes();
+  return (Array.isArray(attributes) ? attributes[0] : attributes).label === 'Layout compactLandscape';
+}
+
+async function revealCompactLandscapeSessionControl(testID) {
+  if (testID === 'session-board' || !await isCompactLandscape()) return;
+  const rail = await frameFor(element(by.id('active-session-control-rail')));
+  const screen = await frameFor(element(by.id('adaptive-layout')));
+  const top = Math.max(rail.y, screen.y);
+  const bottom = Math.min(rail.y + rail.height, screen.y + screen.height);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const frame = await frameFor(element(by.id(testID)));
+    const above = frame.y < top - 1;
+    const below = frame.y + frame.height > bottom + 1;
+    if (!above && !below) {
+      await expect(element(by.id(testID))).toBeVisible(100);
+      return;
+    }
+    await element(by.id('active-session-control-rail')).scroll(40, above ? 'up' : 'down', 0.5, 0.5);
+  }
+  throw new Error(`${testID} could not be fully revealed inside the compact session rail`);
 }
 
 // Regular landscape sessions (iPad, iPhone Duo inner display) centre the
@@ -294,23 +325,97 @@ async function expectRegularLandscapeSessionCentered(orientation) {
   const boardFrame = await frameFor(element(by.id('session-board')));
   const topGap = boardFrame.y - screenFrame.y;
   const bottomGap = screenFrame.y + screenFrame.height - (boardFrame.y + boardFrame.height);
-  // Test builds render the hidden puzzle-ID text above the board, and the
-  // board wrapper's 3-point gap shifts the board by that much in test runs.
+  // Hidden test metadata is out of flow; it must not add the board wrapper's
+  // gap or shift this geometry relative to the shipped screen.
   if (Math.abs(topGap - bottomGap) > 4) {
     throw new Error(
       `${deviceLabel} ${orientation} session board is not vertically centred: `
       + `top=${topGap} bottom=${bottomGap} board=${JSON.stringify(boardFrame)}`
     );
   }
-  const railTop = await frameFor(element(by.id('session-shell-nav')));
-  const railBottom = await frameFor(element(by.id('session-score-strip')));
-  const railAbove = railTop.y - boardFrame.y;
-  const railBelow = boardFrame.y + boardFrame.height - (railBottom.y + railBottom.height);
-  if (Math.abs(railAbove - railBelow) > 4) {
-    throw new Error(
-      `${deviceLabel} ${orientation} session rail is not centred beside the board: `
-      + `above=${railAbove} below=${railBelow}`
-    );
+  // The core leaves the post-answer feedback reserve below it. Its visual
+  // chrome is therefore intentionally above the board's exact midpoint; the
+  // no-notice/notice rail-anchor check records and compares those frames.
+}
+
+async function captureAndroidPreviousAttemptNotice(orientation) {
+  await completeAndroidWrongMoves();
+  await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
+  await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
+  await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
+  await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
+}
+
+async function completeAndroidWrongMoves() {
+  await withAndroidUiDiagnostics(async () => {
+    // Familiar 15's first Standard puzzle is a versioned product fixture:
+    // c2b3 is legal but wrong, while alternate mate c2b1 is accepted.
+    // Submit the move through the real board so every adaptive profile retains
+    // coordinate-mapping evidence after the public move chooser was removed.
+    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+    await playBoardMove('session-board', 'c2b3');
+    // The transient feedback overlay can finish before Detox begins its next
+    // poll. The persistent public score proves the real board move.
+    await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
+
+    // A terminal wrong result advances the sprint to Familiar 15 puzzle two;
+    // c4b5 is its maintained legal-wrong fixture move. The following puzzle's
+    // notice must occupy the reserved feedback slot without moving the rail.
+    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+    await playBoardMove('session-board', 'c4b5');
+    await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
+  });
+}
+
+async function isRegularLandscape() {
+  const layoutAttributes = await element(by.id('adaptive-layout')).getAttributes();
+  const layoutLabel = (Array.isArray(layoutAttributes) ? layoutAttributes[0] : layoutAttributes).label;
+  return layoutLabel === 'Layout regularLandscape';
+}
+
+async function expectRegularLandscapeRailAnchored(orientation, state) {
+  const layoutAttributes = await element(by.id('adaptive-layout')).getAttributes();
+  const layoutLabel = (Array.isArray(layoutAttributes) ? layoutAttributes[0] : layoutAttributes).label;
+  if (layoutLabel !== 'Layout regularLandscape') {
+    return;
+  }
+
+  const ids = [
+    'session-shell-nav',
+    'session-status-metrics',
+    'practice-prompt-stack',
+    'session-puzzle-timing',
+    'session-score-strip'
+  ];
+  const frames = {};
+  for (const testID of ids) {
+    frames[testID] = await frameFor(element(by.id(testID)));
+  }
+  const key = `${orientation}`;
+  const prior = regularLandscapeRailFrames.get(key);
+  const record = `rail-anchor ${deviceLabel} ${orientation} state=${state} frames=${JSON.stringify(frames)}`;
+  console.log(`[adaptive-rail-anchor] ${record}`);
+  const evidencePath = process.env.CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE;
+  if (evidencePath) {
+    fs.appendFileSync(evidencePath, `${record}\n`, 'utf8');
+  }
+
+  if (!prior) {
+    regularLandscapeRailFrames.set(key, frames);
+    return;
+  }
+
+  for (const testID of ids) {
+    const before = prior[testID];
+    const after = frames[testID];
+    if (Math.abs(before.y - after.y) > 1) {
+      throw new Error(
+        `${deviceLabel} ${orientation} ${testID} moved when ${state} appeared: `
+        + `${JSON.stringify(before)} -> ${JSON.stringify(after)}`
+      );
+    }
   }
 }
 
@@ -318,17 +423,27 @@ async function expectRegularLandscapeSessionCentered(orientation) {
 // growing the session stack, so opening it must not move the board or the
 // counts, and its own actions must stay on screen at every width.
 async function expectAbandonConfirmationFloats(orientation) {
+  await revealCompactLandscapeSessionControl('session-abandon');
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   const boardBefore = await frameFor(element(by.id('session-board')));
   const countsBefore = await frameFor(element(by.id('session-score-strip')));
   await element(by.id('session-abandon')).tap();
   await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
-  for (const testID of ['session-abandon-confirmation', 'session-abandon-cancel', 'session-abandon-confirm']) {
+  console.log(`[adaptive-abandon] opened counts=${JSON.stringify(await frameFor(element(by.id('session-score-strip'))))}`);
+  const confirmationFrame = await frameFor(element(by.id('session-abandon-confirmation')));
+  expectFrameContained(confirmationFrame, screenFrame, `${deviceLabel} ${orientation} abandon panel`);
+  await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-abandon-confirmation-top`);
+  // At accessibility sizes the copy and actions can exceed the available
+  // height. Scroll the panel itself; the underlying board must stay still.
+  for (const testID of ['session-abandon-cancel', 'session-abandon-confirm']) {
+    await revealAbandonAction(testID, confirmationFrame);
     expectFrameContained(
       await frameFor(element(by.id(testID))),
-      screenFrame,
-      `${deviceLabel} ${orientation} ${testID}`
+      confirmationFrame,
+      `${deviceLabel} ${orientation} ${testID} inside the panel`
     );
+    await expect(element(by.id(testID))).toBeVisible(100);
+    await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-${testID}-visible`);
   }
   const boardOpen = await frameFor(element(by.id('session-board')));
   const countsOpen = await frameFor(element(by.id('session-score-strip')));
@@ -344,8 +459,20 @@ async function expectAbandonConfirmationFloats(orientation) {
     }
   }
   await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-abandon-confirmation`);
+  await revealAbandonAction('session-abandon-cancel', confirmationFrame);
   await element(by.id('session-abandon-cancel')).tap();
   await waitFor(element(by.id('session-abandon-confirmation'))).not.toExist().withTimeout(10000);
+}
+
+async function revealAbandonAction(testID, panel) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const frame = await frameFor(element(by.id(testID)));
+    const above = frame.y < panel.y - 1;
+    const below = frame.y + frame.height > panel.y + panel.height + 1;
+    if (!above && !below) return;
+    await element(by.id('session-abandon-scroll')).scroll(80, above ? 'up' : 'down', 0.5, 0.5);
+  }
+  throw new Error(`${testID} could not be revealed inside the abandon panel`);
 }
 
 async function existsNow(testID) {
@@ -444,7 +571,7 @@ async function launchForOrientation(orientation) {
   });
   await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
   await setAdaptiveOrientation(orientation);
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
 }
 
 async function setAdaptiveOrientation(orientation) {

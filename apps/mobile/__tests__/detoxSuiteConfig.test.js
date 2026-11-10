@@ -2133,7 +2133,11 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain('tapAndroidUiNode');
     expect(spec).not.toContain('waitForAndroidUiState');
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
-    const submitFirstWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    const completeAndroidWrongMoves = spec.indexOf('async function completeAndroidWrongMoves()');
+    const submitFirstWrongBoardMove = spec.indexOf(
+      "playBoardMove('session-board', 'c2b3')",
+      completeAndroidWrongMoves
+    );
     expect(spec).not.toContain(
       "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
     );
@@ -2145,7 +2149,10 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('move-feedback-overlay'))).not.toExist()",
       verifyFirstWrongMoveResult
     );
-    const submitSecondWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
+    const submitSecondWrongBoardMove = spec.indexOf(
+      "playBoardMove('session-board', 'c4b5')",
+      submitFirstWrongBoardMove
+    );
     const restorePortrait = spec.indexOf(
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
@@ -2159,7 +2166,8 @@ describe('Detox suite configuration', () => {
       settleRestoredPortrait
     );
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
-    expect(submitFirstWrongBoardMove).toBeGreaterThan(verifyRestoredPuzzle);
+    expect(completeAndroidWrongMoves).toBeGreaterThan(verifyRestoredPuzzle);
+    expect(submitFirstWrongBoardMove).toBeGreaterThan(completeAndroidWrongMoves);
     expect(verifyFirstWrongMoveResult).toBeGreaterThan(submitFirstWrongBoardMove);
     expect(waitForFeedbackToSettle).toBeGreaterThan(verifyFirstWrongMoveResult);
     expect(submitSecondWrongBoardMove).toBeGreaterThan(waitForFeedbackToSettle);

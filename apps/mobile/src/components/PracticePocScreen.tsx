@@ -294,6 +294,7 @@ import {
   PuzzleTimingIndicator,
   SessionScoreStrip,
   SessionStatusBar,
+  SessionAbandonConfirmation,
   type SessionTimingState
 } from "./practice/session/SessionStatusBar.tsx";
 import {
@@ -963,6 +964,11 @@ export function PracticePocScreen({
   const [sessionGuideTargetRevision, setSessionGuideTargetRevision] = useState(0);
   const sessionGuideTargetRef = useRef<View>(null);
   const sessionRailScrollRef = useRef<ScrollView>(null);
+  const practiceRootRef = useRef<View>(null);
+  const activeSessionMetricsRef = useRef<View>(null);
+  const [activeAbandonAnchor, setActiveAbandonAnchor] = useState<{
+    left: number; top: number; width: number; maxHeight: number;
+  } | null>(null);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
@@ -1058,6 +1064,27 @@ export function PracticePocScreen({
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
   const isOpenSession = isActive || isPaused;
+  const measureActiveAbandonAnchor = useCallback(() => {
+    if (!isActive) return;
+    practiceRootRef.current?.measureInWindow((rootX, rootY, _rootWidth, rootHeight) => {
+      activeSessionMetricsRef.current?.measureInWindow((x, y, metricsWidth, metricsHeight) => {
+        if (rootHeight <= 0 || metricsWidth <= 0 || metricsHeight <= 0) return;
+        const top = y + metricsHeight + 8 - rootY;
+        const next = {
+          left: x - rootX,
+          top,
+          width: metricsWidth,
+          maxHeight: Math.max(1, Math.floor(rootHeight - layoutInsets.bottom - top))
+        };
+        setActiveAbandonAnchor((current) => current
+          && current.left === next.left && current.top === next.top
+          && current.width === next.width && current.maxHeight === next.maxHeight ? current : next);
+      });
+    });
+  }, [isActive, layoutInsets.bottom]);
+  useEffect(() => {
+    measureActiveAbandonAnchor();
+  }, [fontScale, height, measureActiveAbandonAnchor, practiceExitConfirmationVisible, width]);
   const isFinished = state !== null && !isOpenSession;
   const storedSprintResultSummary = useMemo<SprintResultSummary | undefined>(() => {
     void aggregateRevision;
@@ -4381,6 +4408,8 @@ export function PracticePocScreen({
         ? "Open Survival leave options"
         : "Abandon sprint"}
       compactMetrics={sessionUsesRail}
+      metricsRef={activeSessionMetricsRef}
+      onMetricsLayout={measureActiveAbandonAnchor}
       // The overlay starts 8 points below the HUD; the prompt card follows the
       // HUD after the 10-point rail or 12-point stack gap. Four extra points
       // cover the card to its bottom edge in either layout.
@@ -4437,7 +4466,10 @@ export function PracticePocScreen({
   const sessionBoardNode = shouldShowSessionBoard ? (
     <View key="session-board" style={styles.boardWrapper}>
       {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
-        <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+        <Text
+          testID="session-current-puzzle-id"
+          style={[styles.reviewDueHiddenMetric, styles.sessionTestMetadata]}
+        >
           {displayedPuzzle?.puzzle.id ?? ""}
         </Text>
       ) : null}
@@ -5042,6 +5074,9 @@ export function PracticePocScreen({
                     {sessionLayoutUsesRail ? (
                       <ScrollView
                         ref={sessionRailScrollRef}
+                        // The confirmation owns scrolling while open; a gesture
+                        // inside it must not nudge the underlying HUD or counts.
+                        scrollEnabled={!practiceExitConfirmationVisible}
                         style={[
                           styles.activeSessionControlRailScroll,
                           {
@@ -5062,8 +5097,8 @@ export function PracticePocScreen({
                           style={[
                             styles.activeSessionControlRail,
                             adaptiveLayout.sessionCentersRow
-                              ? styles.activeSessionControlRailCentered
-                              : null,
+                              ? null
+                              : styles.activeSessionControlRailCompact,
                             {
                               minHeight: boardSize,
                               width: adaptiveLayout.sessionRailWidth
@@ -5071,12 +5106,42 @@ export function PracticePocScreen({
                           ]}
                           testID="active-session-control-rail-content"
                         >
-                          {sessionLayout.status}
-                          {sessionLayout.prompt}
-                          {sessionLayout.timing}
-                          {sessionLayout.score}
-                          {sessionLayout.error}
-                          {sessionLayout.bottomFeedback}
+                          {adaptiveLayout.sessionCentersRow ? (
+                            <>
+                              <View
+                                style={[
+                                  styles.activeSessionControlRailCore,
+                                  styles.activeSessionControlRailCoreCentered
+                                ]}
+                                testID="active-session-control-rail-core"
+                              >
+                                {sessionLayout.status}
+                                {sessionLayout.prompt}
+                                {sessionLayout.timing}
+                                {sessionLayout.score}
+                                {sessionLayout.error}
+                              </View>
+                              <View
+                                style={[
+                                  styles.activeSessionControlRailFeedbackSlot,
+                                  { minHeight: adaptiveLayout.sessionRailFeedbackReserveHeight },
+                                  { width: adaptiveLayout.sessionRailWidth }
+                                ]}
+                                testID="active-session-control-rail-feedback-slot"
+                              >
+                                {sessionLayout.bottomFeedback}
+                              </View>
+                            </>
+                          ) : (
+                            <>
+                              {sessionLayout.status}
+                              {sessionLayout.prompt}
+                              {sessionLayout.timing}
+                              {sessionLayout.score}
+                              {sessionLayout.error}
+                              {sessionLayout.bottomFeedback}
+                            </>
+                          )}
                         </View>
                       </ScrollView>
                     ) : null}
@@ -5572,45 +5637,64 @@ export function PracticePocScreen({
         style={styles.predictiveBackStage}
         testID="practice-gesture-root"
       >
-        {mobileBackPreview ? (
-          <View
-            accessible={false}
-            style={styles.predictiveBackDestination}
-            testID="mobile-back-destination-preview"
-          >
-            <Text style={styles.predictiveBackEyebrow}>Back to</Text>
-            <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
-              {mobileBackPreview.label}
-            </Text>
-            <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
-              {mobileBackPreview.testID}
-            </Text>
-          </View>
-        ) : null}
-        <NativeTabHost
-          chromeHidden={!appChromeVisible}
-          colorScheme={appTheme.name}
-          colors={{
-            accent: appTheme.colors.accent.s600,
-            androidBarBackground: appTheme.colors.surface,
-            androidIndicator: appTheme.colors.accent.s100,
-            androidInactive: appTheme.colors.text.secondary,
-            background: appTheme.colors.surfaceRaised,
-            badgeBackground: appTheme.colors.danger.s600,
-            badgeDangerBackground: appTheme.colors.danger.s600,
-            badgeText: appTheme.colors.text.onAccent
-          }}
-          dueReviewCount={dueTodayCount}
-          overdueReviewCount={overdueCount}
-          selectedTab={hostTab}
-          onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
-          renderTab={(candidate) => candidate === hostTab ? (
-            <>
-              {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
-              {appShell}
-            </>
+        <View ref={practiceRootRef} onLayout={measureActiveAbandonAnchor} style={styles.predictiveBackStage}>
+          {mobileBackPreview ? (
+            <View
+              accessible={false}
+              style={styles.predictiveBackDestination}
+              testID="mobile-back-destination-preview"
+            >
+              <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+              <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
+                {mobileBackPreview.label}
+              </Text>
+              <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
+                {mobileBackPreview.testID}
+              </Text>
+            </View>
           ) : null}
-        />
+          <NativeTabHost
+            chromeHidden={!appChromeVisible}
+            colorScheme={appTheme.name}
+            colors={{
+              accent: appTheme.colors.accent.s600,
+              androidBarBackground: appTheme.colors.surface,
+              androidIndicator: appTheme.colors.accent.s100,
+              androidInactive: appTheme.colors.text.secondary,
+              background: appTheme.colors.surfaceRaised,
+              badgeBackground: appTheme.colors.danger.s600,
+              badgeDangerBackground: appTheme.colors.danger.s600,
+              badgeText: appTheme.colors.text.onAccent
+            }}
+            dueReviewCount={dueTodayCount}
+            overdueReviewCount={overdueCount}
+            selectedTab={hostTab}
+            onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
+            renderTab={(candidate) => candidate === hostTab ? (
+              <>
+                {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
+                {appShell}
+              </>
+            ) : null}
+          />
+          {practiceExitConfirmationVisible && isActive && state && !personalBestActivePresentation ? (
+            <SessionAbandonConfirmation
+              maxHeight={activeAbandonAnchor?.maxHeight ?? height}
+              minHeight={adaptiveLayout.promptFrameHeight + 4}
+              stack={adaptiveLayout.sessionColumnWidth < 320}
+              state={state}
+              style={[
+                styles.activeAbandonOverlay,
+                activeAbandonAnchor ?? { left: 0, top: 0, width: adaptiveLayout.sessionColumnWidth, opacity: 0 }
+              ]}
+              onCancel={() => setPracticeExitConfirmationVisible(false)}
+              onAbandon={() => {
+                setPracticeExitConfirmationVisible(false);
+                abandonSprint();
+              }}
+            />
+          ) : null}
+        </View>
       </GestureHandlerRootView>
     </UiHapticsProvider>
   );
@@ -6241,6 +6325,18 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center",
     minWidth: 0
   },
+  activeAbandonOverlay: {
+    elevation: 12,
+    position: "absolute",
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { height: 3, width: 0 },
+    shadowOpacity: theme.name === "dark" ? 0.4 : 0.14,
+    shadowRadius: 8,
+    zIndex: 50
+  },
+  sessionTestMetadata: {
+    position: "absolute"
+  },
   activeSessionControlRailScroll: {
     flexGrow: 0,
     flexShrink: 0,
@@ -6250,11 +6346,20 @@ const useStyles = makeStyles((theme) => ({
     paddingBottom: 4
   },
   activeSessionControlRail: {
-    flexGrow: 1,
+    flexGrow: 1
+  },
+  activeSessionControlRailCompact: {
     gap: 10
   },
-  activeSessionControlRailCentered: {
+  activeSessionControlRailCore: {
+    gap: 10
+  },
+  activeSessionControlRailCoreCentered: {
+    flexGrow: 1,
     justifyContent: "center"
+  },
+  activeSessionControlRailFeedbackSlot: {
+    flexShrink: 0
   },
   activeSessionBottomFeedback: {
     alignSelf: "center"
