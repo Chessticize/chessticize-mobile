@@ -548,21 +548,32 @@ source tag, signed AAB, corresponding-source Release, Play upload, or APK
 mirror until the 1.5.2 release branch is frozen, its build-specific note is
 approved, and the protected candidate/source workflow succeeds.
 
+## Android 1.6.1 candidate preparation
+
+Android 1.6.1 uses version code 23 and adds Google Play rating invitations from
+PR #723. Reuse its focused native and public-UI milestone evidence; packaging,
+signing, R8, ABI/alignment, and source identity are checked against the new
+signed candidate. Actual Play rating-sheet appearance remains unverified in
+the unsigned-in test emulator. No AAB, Play submission, or mirror is implied by
+this preparation record; observe those states from the release workflows and
+Play before reporting them complete.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.6.0`)
-- Android version code: `apps/mobile/release-version.json` (`22`)
+- Public version: `apps/mobile/release-version.json` (`1.6.1`)
+- Android version code: `apps/mobile/release-version.json` (`23`)
 - iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
-- Open-development target: `apps/mobile/development-version.json` (`1.6.0`;
-  Debug/E2E only, not a store identity)
+- Open-development target: `apps/mobile/development-version.json`
+  (Debug/E2E only, independent of the Android store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.6.0-build-22`
+- Required source tag before any Play track upload: `android-v1.6.1-build-23`
 
-Android `versionCode` must increase for every later Play upload. The public
-version must continue to match iOS. Settings reads `versionName` and
-`versionCode` from the installed Android artifact and the corresponding bundle
+Android `versionCode` must increase for every later Play upload. This Android-only
+release preserves the separate iOS public version `1.6.0` and iOS build `2`; it
+does not allocate or distribute an iOS candidate. Settings reads `versionName`
+and `versionCode` from the installed Android artifact and the corresponding bundle
 keys on iOS; no user-visible version fallback is hardcoded in JavaScript.
 Prepare candidate identities only on the coordinated release branch and advance
 the development target only on `main`, as defined by

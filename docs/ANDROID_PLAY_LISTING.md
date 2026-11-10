@@ -122,7 +122,13 @@ Android may copy the allowlisted local progress database through encrypted
 cloud backup or device-to-device transfer. That is a platform system service;
 Chessticize does not receive the data. Re-audit these answers against the
 runtime dependency graph, merged release manifest, backup rules, and exact AAB
-before completing Play Data safety. A closed, open, or Production track still
+before completing Play Data safety. From Android 1.6.1, also account for the
+optional Google Play rating flow described in
+[Android Privacy Disclosure](ANDROID_PRIVACY_DISCLOSURE.md#optional-google-play-reviews)
+and Google's [SDK data-safety guidance](https://developer.android.com/guide/playcore/in-app-review#data-safety).
+The existing answers describe Chessticize's local training data and telemetry;
+verify their treatment of store-owned, user-submitted reviews in the current
+Console form. A closed, open, or Production track still
 requires a completed Data safety form and privacy-policy link even when no data
 is collected. Internal-only testing is exempt, but this release proceeds beyond
 Internal and therefore the form is required.

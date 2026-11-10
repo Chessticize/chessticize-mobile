@@ -25,6 +25,21 @@ or remote telemetry SDK. It does not upload gameplay, ratings, history, or
 device identifiers to a Chessticize service. Google Play platform signals such
 as Android Vitals are outside the app's data pipeline.
 
+## Optional Google Play reviews
+
+Android uses `com.google.android.play:review:2.0.2` to invoke Google Play's own
+review flow. Eligibility and the last-attempt version/time remain local; no
+practice history is passed to that API. Google Play processes any rating and
+free-text review the user chooses to submit in its own process. Submitted
+reviews can be public, or private to the developer for a closed test track;
+users can delete them through Google Play or their Google Account. The app
+receives no rating, submission, or sheet-display result.
+
+See Google's [In-App Review data-safety guidance](https://developer.android.com/guide/playcore/in-app-review#data-safety)
+and the public [privacy policy](PRIVACY_POLICY.md). Review the current Play Data
+Safety form against this optional store-owned flow when submitting 1.6.1; do
+not treat the platform review UI as an app analytics or gameplay-upload feature.
+
 ## Release review
 
 Before release, verify the exact artifact's backup rules, measure the real
