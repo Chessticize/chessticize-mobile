@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --ink: #102442;
-  --muted: #50647d;
+  --muted: #41546d;
   --line: #d9e3ee;
   --blue: #146dd6;
   --blue-deep: #0c4f9d;
@@ -382,6 +382,11 @@ footer nav a:hover {
   color: var(--blue-deep);
   font-size: 0.9rem;
   font-weight: 680;
+}
+.inline-links a:hover,
+.notice-body a:not(.button):hover,
+.info-card a:not(.button):not(.store-badge-link):hover {
+  text-decoration-thickness: 2px;
 }
 .wide-screens {
   display: grid;
