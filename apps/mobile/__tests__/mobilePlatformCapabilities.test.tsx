@@ -44,7 +44,7 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.applicationMetadata).toBe(installedApplicationMetadata);
   });
 
-  it('composes Android with shared storage and the native Stockfish transport', () => {
+  it('composes Android with shared storage and native platform clients', async () => {
     (NativeModules as Record<string, unknown>).ReviewReminderNotifications = {
       addListener: jest.fn(),
       removeListeners: jest.fn(),
@@ -61,6 +61,10 @@ describe('mobile platform capabilities', () => {
       discardSupportBundleWorkspace: jest.fn(),
       finishSupportBundle: jest.fn(),
       shareSupportBundle: jest.fn(),
+    };
+    const requestReview = jest.fn(async () => true);
+    (NativeModules as Record<string, unknown>).AppStoreReviewRequest = {
+      requestReview,
     };
     const service = createMobilePracticeService('random1000');
     const capabilities = composeAndroidMobilePlatformCapabilities(
@@ -79,13 +83,15 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.reminders.platform).toBe('android');
     expect(capabilities.reminders.scheduler).not.toBeNull();
     expect(capabilities.reminders.notificationClient).not.toBeNull();
-    expect(capabilities.appReview.client).toBeNull();
+    await expect(capabilities.appReview.client?.requestReview()).resolves.toBe(true);
+    expect(requestReview).toHaveBeenCalledTimes(1);
     expect(capabilities.applicationMetadata).toEqual({
       ...installedApplicationMetadata,
       releasePageUrl: 'https://github.com/Chessticize/chessticize-mobile/releases',
     });
     delete (NativeModules as Record<string, unknown>).ReviewReminderNotifications;
     delete (NativeModules as Record<string, unknown>).AndroidSupportDiagnostics;
+    delete (NativeModules as Record<string, unknown>).AppStoreReviewRequest;
   });
 
   it('exposes the manual GitHub Releases link only through Android capabilities', () => {

@@ -13,6 +13,7 @@ class MainApplication : Application(), ReactApplication {
     val packages =
       PackageList(this).packages.apply {
         add(AndroidSupportDiagnosticsPackage())
+        add(AppStoreReviewRequestPackage())
         add(ApplicationMetadataPackage())
         add(BundledPuzzlePackInstallerPackage())
         add(ChessticizeTestLaunchConfigPackage())
