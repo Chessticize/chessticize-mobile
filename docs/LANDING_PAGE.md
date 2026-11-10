@@ -48,8 +48,8 @@ provenance, not the App source. These are not a claim that captures were made
 from a later release or `main`.
 
 The five portrait iPhone captures share a CSS device frame with a black bezel,
-rounded screen corners, and a proportional Dynamic Island inside the captured
-status-bar safe area. The hardware overlay does not change the source images
+screen corners clipped by the device frame, and a proportional Dynamic Island
+inside the captured status-bar safe area. The hardware overlay does not change the source images
 or their provenance hashes. iPad and Duo captures keep their separate frames.
 
 ## Updating the marketing images
@@ -140,4 +140,13 @@ content, asset, route, or deployment change:
 ```sh
 pnpm --filter ChessticizeMobile test -- landingPage.test.js --runInBand
 pnpm process:validate
+```
+
+For device-frame changes, run the rendered corner regression (Chrome by default)
+and responsive browser checks. After installing Playwright WebKit, select it
+with `CHESSTICIZE_LANDING_WEBKIT=1` for Safari-engine corner coverage:
+
+```sh
+pnpm --filter ChessticizeMobileLab exec tsx --test scripts/landingPhoneFrame.test.ts scripts/landingPageContrast.test.ts
+CHESSTICIZE_LANDING_WEBKIT=1 pnpm --filter ChessticizeMobileLab exec tsx --test scripts/landingPhoneFrame.test.ts
 ```
