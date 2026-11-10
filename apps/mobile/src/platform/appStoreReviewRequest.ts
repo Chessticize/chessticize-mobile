@@ -1,7 +1,7 @@
 import { NativeModules } from "react-native";
 
 export interface AppStoreReviewRequestClient {
-  /** Resolves true only when the native boundary actually invokes StoreKit. */
+  /** Resolves true only when the native platform review flow is invoked. */
   requestReview(): Promise<boolean>;
 }
 

@@ -3,8 +3,8 @@ import {
   createNativeAppStoreReviewRequestClient
 } from "../src/platform/appStoreReviewRequest";
 
-describe("App Store review request boundary", () => {
-  it("forwards one request to the native StoreKit module", async () => {
+describe("native review request boundary", () => {
+  it("forwards one request to the native platform module", async () => {
     const requestReview = jest.fn(async () => true);
     const client = createNativeAppStoreReviewRequestClient({ requestReview });
 
@@ -13,7 +13,7 @@ describe("App Store review request boundary", () => {
     expect(requestReview).toHaveBeenCalledTimes(1);
   });
 
-  it("reports when the native boundary could not call StoreKit", async () => {
+  it("reports when the native boundary could not launch the platform flow", async () => {
     const client = createNativeAppStoreReviewRequestClient({
       requestReview: async () => false
     });

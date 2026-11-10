@@ -76,6 +76,16 @@ the complete license texts shipped in this repository.
   same icons are Apple SF Symbols drawn through the system API; no SF Symbols
   artwork is redistributed.
 
+## Google Play In-App Review
+
+- Package: `com.google.android.play:review`
+- Version shipped: `2.0.2`
+- Source: https://developer.android.com/guide/playcore/in-app-review/kotlin-java
+- Terms: https://developer.android.com/guide/playcore/license
+- Notes: Android invokes Google Play's system-owned review flow after a local
+  puzzle milestone. The flow may finish without showing a sheet or receiving a
+  review; Chessticize does not use its outcome for product behavior.
+
 ## react-native-chessboard
 
 - Package: `react-native-chessboard`
