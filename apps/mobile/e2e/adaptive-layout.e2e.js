@@ -58,6 +58,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await waitFor(element(by.id('session-current-puzzle-id'))).toExist().withTimeout(10000);
     await waitForSettledSprintLayout(initialOrientation);
+    await resetCompactLandscapeRail();
 
     let puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
@@ -70,6 +71,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await setAdaptiveOrientation('landscape');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       await waitForSettledSprintLayout('landscape');
+      await resetCompactLandscapeRail();
       const rotatedPuzzleID = await elementText('session-current-puzzle-id');
       if (rotatedPuzzleID !== puzzleID) {
         throw new Error(`Rotation replaced the active puzzle: ${puzzleID} -> ${rotatedPuzzleID}`);
@@ -267,12 +269,47 @@ async function expectSessionControlsContained(orientation, feedbackTestIDs = [])
     'session-pause',
     ...feedbackTestIDs
   ]) {
+    await revealCompactLandscapeSessionControl(testID);
     const frame = await frameForIfPresent(testID);
     if (!frame) {
       throw new Error(`${deviceLabel} ${orientation} session is missing ${testID}`);
     }
     expectFrameContained(frame, screenFrame, `${deviceLabel} ${orientation} ${testID}`);
   }
+}
+
+// Compact landscape deliberately scrolls the rail when large text exceeds its
+// height. The guide ends at the score target, so verify each control in its
+// actual clipped viewport instead of treating that final scroll offset as a
+// simultaneous-visibility contract. Every control must still be fully visible.
+async function resetCompactLandscapeRail() {
+  if (await isCompactLandscape()) {
+    await element(by.id('active-session-control-rail')).scrollTo('top', 0.5, 0.5);
+  }
+}
+
+async function isCompactLandscape() {
+  const attributes = await element(by.id('adaptive-layout')).getAttributes();
+  return (Array.isArray(attributes) ? attributes[0] : attributes).label === 'Layout compactLandscape';
+}
+
+async function revealCompactLandscapeSessionControl(testID) {
+  if (testID === 'session-board' || !await isCompactLandscape()) return;
+  const rail = await frameFor(element(by.id('active-session-control-rail')));
+  const screen = await frameFor(element(by.id('adaptive-layout')));
+  const top = Math.max(rail.y, screen.y);
+  const bottom = Math.min(rail.y + rail.height, screen.y + screen.height);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const frame = await frameFor(element(by.id(testID)));
+    const above = frame.y < top - 1;
+    const below = frame.y + frame.height > bottom + 1;
+    if (!above && !below) {
+      await expect(element(by.id(testID))).toBeVisible(100);
+      return;
+    }
+    await element(by.id('active-session-control-rail')).scroll(40, above ? 'up' : 'down', 0.5, 0.5);
+  }
+  throw new Error(`${testID} could not be fully revealed inside the compact session rail`);
 }
 
 // Regular landscape sessions (iPad, iPhone Duo inner display) centre the
@@ -386,6 +423,7 @@ async function expectRegularLandscapeRailAnchored(orientation, state) {
 // growing the session stack, so opening it must not move the board or the
 // counts, and its own actions must stay on screen at every width.
 async function expectAbandonConfirmationFloats(orientation) {
+  await revealCompactLandscapeSessionControl('session-abandon');
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   const boardBefore = await frameFor(element(by.id('session-board')));
   const countsBefore = await frameFor(element(by.id('session-score-strip')));
