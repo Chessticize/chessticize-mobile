@@ -1,10 +1,8 @@
 package com.chessticize.mobile
 
 import android.app.Activity
-import android.content.Intent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.android.play.core.review.ReviewInfo
@@ -178,11 +176,6 @@ class AppStoreReviewRequestModuleIntegrationTest {
     }
   }
 
-  private fun launchScenario(): ActivityScenario<AppReviewTestActivity> =
-    ActivityScenario.launch<AppReviewTestActivity>(
-      Intent(
-        InstrumentationRegistry.getInstrumentation().context,
-        AppReviewTestActivity::class.java,
-      ),
-    )
+  private fun launchScenario(): ActivityScenario<MainActivity> =
+    ActivityScenario.launch(MainActivity::class.java)
 }
