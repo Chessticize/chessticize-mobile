@@ -698,9 +698,15 @@ assert.notEqual(invalidScope.status, 0);
 assert.match(invalidScope.stderr, /Set CHESSTICIZE_E2E_SCOPE to flows, practice, or full/);
 
 // Setup must not request the removed SDK tools package before pinned installs.
-assert.match(
-  read(".github/workflows/mobile-android-release-candidate.yml"),
-  /uses: android-actions\/setup-android@v3\n\s+with:\n(?:\s+#[^\n]*\n)*\s+packages: platform-tools\s*\n/
-);
+for (const workflow of [
+  ".github/workflows/mobile-android-release-candidate.yml",
+  ".github/workflows/mobile-android-github-release.yml"
+]) {
+  assert.match(
+    read(workflow),
+    /uses: android-actions\/setup-android@v3\n\s+with:\n(?:\s+#[^\n]*\n)*\s+packages: platform-tools\s*\n/,
+    `${workflow} must not request the removed SDK tools package`
+  );
+}
 
 console.log("Development process validation passed.");
