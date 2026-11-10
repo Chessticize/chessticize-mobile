@@ -155,6 +155,23 @@ footer nav a:hover {
   border-radius: 999px;
 }
 
+.online-notice {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+.online-notice p {
+  margin: 0;
+}
+.online-notice > p a {
+  color: var(--blue-deep);
+  font-weight: 650;
+}
+.online-notice > p a:hover {
+  text-decoration-thickness: 2px;
+}
+
 .eyebrow {
   margin: 0 0 14px;
   color: var(--blue);
@@ -426,22 +443,21 @@ footer nav a:hover {
 }
 
 .notice {
-  margin-bottom: 70px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  margin-top: 4px;
   color: var(--muted);
 }
 .notice summary {
-  padding: 21px 0;
+  padding: 6px 0;
   color: var(--ink);
-  font-weight: 670;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
 }
 .notice-body {
   display: grid;
   gap: 16px;
   max-width: 780px;
-  padding: 4px 0 30px;
+  padding: 12px 0 16px;
 }
 .notice-body p {
   margin: 0;
@@ -680,9 +696,6 @@ footer nav {
   .close-actions,
   .close-actions .button {
     width: 100%;
-  }
-  .notice {
-    margin-bottom: 46px;
   }
   .footer-grid {
     flex-direction: column;

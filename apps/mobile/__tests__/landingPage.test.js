@@ -51,9 +51,13 @@ describe('public landing page', () => {
     expect(homepage).not.toMatch(/confident weakness|guaranteed weakness/i);
   });
 
-  it('keeps the migration notice complete but out of the opening hierarchy', () => {
-    expect(homepage).toMatch(
-      /<details class="notice section-shell">[\s\S]*?<summary>The web app has moved<\/summary>/,
+  it('keeps an online-play shortcut visible while the complete update is collapsed', () => {
+    const onlineNotice = homepage.match(/<aside class="online-notice[\s\S]*?<\/aside>/)?.[0];
+    expect(onlineNotice).toMatch(/Looking for online play\? The web app is now at/);
+    expect(onlineNotice).toContain('href="https://app.chessticize.com"');
+    expect(homepage.indexOf('class="online-notice')).toBeLessThan(homepage.indexOf('<main'));
+    expect(onlineNotice).toMatch(
+      /<details class="notice">[\s\S]*?<summary>Read the update<\/summary>/,
     );
     expect(homepage).toContain(
       "Hi everyone! I've been using the offline app myself lately",
@@ -65,7 +69,7 @@ describe('public landing page', () => {
     expect(homepage).toContain('chessticize-web Discussions');
     expect(
       homepage.match(/href="https:\/\/app\.chessticize\.com"/g),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
   });
 
   it('keeps install, support, privacy, license, source, and accessibility routes available', () => {

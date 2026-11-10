@@ -113,6 +113,16 @@ test("landing visuals, anchors, and migration disclosure reflow in a real browse
       const page = await browser.newPage({ viewport });
       await page.goto(`${server.url}/index.html`, { waitUntil: "networkidle" });
       assert.equal(
+        await page.locator(".online-notice > p a").isVisible(),
+        true,
+        "online play must be reachable without opening the update"
+      );
+      assert.equal(
+        await page.locator(".notice-body").isVisible(),
+        false,
+        "the full update starts collapsed"
+      );
+      assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth
         ),
