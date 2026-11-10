@@ -89,14 +89,12 @@ export const LAB_DEVICE_VIEWPORTS = {
     height: 600,
     insets: { top: 24, right: 0, bottom: 20, left: 0 }
   },
-  // iPhone Duo inner display in landscape: 2853 x 2007 pixels at 3x from the
-  // simulator display profile. simctl cannot capture the unfolded display, so
-  // the right status-bar and camera column uses the outer display's measured
-  // 84 points and the bottom uses the landscape home indicator.
+  // Active Run measured on the unfolded iOS 27.1 simulator: 2853 x 2007
+  // pixels at 3x, right hardware column 84 points, bottom safe area 34.
   duoInnerLandscape: {
     width: 951,
     height: 669,
-    insets: { top: 0, right: 84, bottom: 20, left: 0 }
+    insets: { top: 0, right: 84, bottom: 34, left: 0 }
   },
   // The other inner-display poses. Insets are not yet measured (Device Hub
   // drives fold and Split View), so these use the iPad-style status bar and

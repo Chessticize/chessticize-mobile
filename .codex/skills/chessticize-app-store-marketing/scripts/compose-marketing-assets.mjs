@@ -31,6 +31,20 @@ const DEFAULT_LAYOUT_CONFIG = path.join(
   "assets",
   "app-store-marketing-layout-v2.json",
 );
+const CAMPAIGN_LAYOUT_CONFIGS = {
+  "mobile-1.6-en-us": {
+    "app-store": path.join(
+      SKILL_ROOT,
+      "assets",
+      "app-store-marketing-layout-mobile-1.6-en-us-v3.json",
+    ),
+    "google-play": path.join(
+      SKILL_ROOT,
+      "assets",
+      "google-play-marketing-layout-mobile-1.6-en-us-v3.json",
+    ),
+  },
+};
 const DEFAULT_PLATFORM = "app-store";
 const SUPPORTED_FONT_FAMILY = "sans-serif";
 const EXPECTED_FRAME_COUNT = 6;
@@ -47,6 +61,16 @@ const FRAME_CONTRACT_KEYS = [
   "headline",
   "supporting",
 ];
+const CAMPAIGN_FRAME_CONTRACT_KEYS = ["frameId", "captureId", "headline"];
+const CAMPAIGN_STATE_KEYS = [
+  "appearance",
+  "storyId",
+  "captureAnchorTestId",
+  "highlights",
+  "moment",
+  "previewActions",
+  "requiredVisibleTestIds",
+];
 
 function fail(message) {
   throw new Error(`[marketing-composition] ${message}`);
@@ -61,6 +85,7 @@ function parseOptionValue(argv, index, option) {
 }
 
 export function parseArgs(argv) {
+  let layoutConfigProvided = false;
   const options = {
     deviceFamily: "all",
     layoutConfig: DEFAULT_LAYOUT_CONFIG,
@@ -89,6 +114,11 @@ export function parseArgs(argv) {
         break;
       case "--layout-config":
         options.layoutConfig = parseOptionValue(argv, index, option);
+        layoutConfigProvided = true;
+        index += 1;
+        break;
+      case "--campaign":
+        options.campaign = parseOptionValue(argv, index, option);
         index += 1;
         break;
       case "--locale":
@@ -131,6 +161,27 @@ export function parseArgs(argv) {
   if (!/^[a-z0-9][a-z0-9.-]*$/u.test(options.platform)) {
     fail("--platform must be a safe platform identifier");
   }
+  if (options.campaign) {
+    const campaignLayouts = CAMPAIGN_LAYOUT_CONFIGS[options.campaign];
+    const campaignLayout = campaignLayouts?.[options.platform];
+    if (!campaignLayout) {
+      fail(`unsupported campaign for platform: ${options.campaign}`);
+    }
+    const platformDefault =
+      options.platform === "google-play"
+        ? path.join(
+            SKILL_ROOT,
+            "assets",
+            "google-play-marketing-layout-v2.json",
+          )
+        : DEFAULT_LAYOUT_CONFIG;
+    if (
+      !layoutConfigProvided ||
+      path.resolve(options.layoutConfig) === path.resolve(platformDefault)
+    ) {
+      options.layoutConfig = campaignLayout;
+    }
+  }
   if (!["all", "portrait", "landscape"].includes(options.orientation)) {
     fail("--orientation must be one of: all, portrait, landscape");
   }
@@ -145,6 +196,7 @@ function printUsage() {
     --output-dir <composed-output-directory> \\
     [--manifest <manifest.json>] \\
     [--layout-config <layout.json>] \\
+    [--campaign mobile-1.6-en-us] \\
     [--locale en-US] \\
     [--platform app-store|google-play] \\
     [--device-family all|<config-preset>] \\
@@ -168,6 +220,42 @@ async function readJson(filePath, label) {
   } catch (error) {
     fail(`${label} is not valid JSON: ${error.message}`);
   }
+}
+
+async function loadLayoutConfig(filePath) {
+  const configPath = path.resolve(filePath);
+  const config = await readJson(configPath, "layout config");
+  if (config.extends === undefined) {
+    return config;
+  }
+  if (
+    typeof config.extends !== "string" ||
+    config.extends === "" ||
+    path.isAbsolute(config.extends)
+  ) {
+    fail("layout config extends must be a non-empty relative path");
+  }
+  const basePath = path.resolve(path.dirname(configPath), config.extends);
+  if (!isPathInside(path.dirname(configPath), basePath)) {
+    fail("layout config extends escapes the assets directory");
+  }
+  const base = await readJson(basePath, "base layout config");
+  if (base.extends !== undefined || base.schemaVersion !== 1) {
+    fail("layout config must extend one schema v1 base layout");
+  }
+  const mergedPresets = Object.fromEntries(
+    Object.entries(base.presets ?? {}).map(([family, preset]) => [
+      family,
+      { ...preset, ...(config.presets?.[family] ?? {}) },
+    ]),
+  );
+  for (const family of Object.keys(config.presets ?? {})) {
+    if (!mergedPresets[family]) {
+      fail(`layout config extends unknown preset: ${family}`);
+    }
+  }
+  const { extends: _extends, presets: _presets, ...overrides } = config;
+  return { ...base, ...overrides, presets: mergedPresets };
 }
 
 function stableJson(value) {
@@ -323,16 +411,23 @@ function validateCanonicalFrames(config, compositionMode) {
     fail(`layout config must define exactly ${EXPECTED_FRAME_COUNT} frames`);
   }
   const seenFrameIds = new Set();
+  const contractKeys =
+    config.schemaVersion === 2
+      ? CAMPAIGN_FRAME_CONTRACT_KEYS
+      : FRAME_CONTRACT_KEYS;
   for (let index = 0; index < config.frames.length; index += 1) {
     const frame = config.frames[index];
     const expectedOrder = index + 1;
     if (frame.order !== expectedOrder) {
       fail(`layout frame ${expectedOrder} has order ${frame.order}`);
     }
-    for (const key of [...FRAME_CONTRACT_KEYS, "fileName"]) {
+    for (const key of [...contractKeys, "fileName"]) {
       if (typeof frame[key] !== "string" || frame[key].trim() === "") {
         fail(`layout frame ${expectedOrder} is missing ${key}`);
       }
+    }
+    if (config.schemaVersion === 2 && frame.frameId !== frame.captureId) {
+      fail(`campaign layout frame ${expectedOrder} must use its id as captureId`);
     }
     if (
       frame.fileName !== path.basename(frame.fileName) ||
@@ -344,6 +439,41 @@ function validateCanonicalFrames(config, compositionMode) {
       fail(`layout config has duplicate frameId: ${frame.frameId}`);
     }
     seenFrameIds.add(frame.frameId);
+  }
+}
+
+function validateCampaignConfig(config) {
+  if (config.schemaVersion !== 2) {
+    return;
+  }
+  const campaign = googlePlayStory.releaseCampaign;
+  if (
+    !config.campaign ||
+    config.campaign.id !== campaign?.id ||
+    config.campaign.publicVersion !== campaign?.publicVersion ||
+    config.campaign.status !== campaign?.status
+  ) {
+    fail("campaign layout does not match the release campaign contract");
+  }
+  for (let index = 0; index < config.frames.length; index += 1) {
+    const layoutFrame = config.frames[index];
+    const campaignFrame = campaign.frames[index];
+    if (!campaignFrame) {
+      fail(`campaign layout has an unexpected frame ${index + 1}`);
+    }
+    if (
+      layoutFrame.order !== campaignFrame.order ||
+      layoutFrame.frameId !== campaignFrame.id ||
+      layoutFrame.captureId !== campaignFrame.id ||
+      layoutFrame.headline !== campaignFrame.headline
+    ) {
+      fail(`campaign layout frame ${index + 1} does not match release copy`);
+    }
+    for (const key of CAMPAIGN_STATE_KEYS) {
+      if (JSON.stringify(layoutFrame[key]) !== JSON.stringify(campaignFrame[key])) {
+        fail(`campaign layout frame ${index + 1} ${key} does not match release state`);
+      }
+    }
   }
 }
 
@@ -406,12 +536,14 @@ function validateGooglePlayPolicy(config, compositionMode, presets) {
   ) {
     fail("Google Play frame count is outside the store policy");
   }
+  const canonicalAltTextFile =
+    config.schemaVersion === 2
+      ? "config/google-play-metadata-en-us-mobile-1.6-v2.json"
+      : "config/google-play-metadata-en-us-v1.json";
   if (
     !config.altTextContract ||
-    config.altTextContract.repositoryFile !==
-      "config/google-play-metadata-en-us-v1.json" ||
-    config.altTextContract.collection !==
-      "previewAssets.screenshots.frames"
+    config.altTextContract.repositoryFile !== canonicalAltTextFile ||
+    config.altTextContract.collection !== "previewAssets.screenshots.frames"
   ) {
     fail("Google Play layout must reference the canonical alt-text contract");
   }
@@ -539,7 +671,7 @@ function validateGooglePlayCaptureIdentity(config, manifest) {
 }
 
 function validateLayoutConfig(config) {
-  if (config.schemaVersion !== 1) {
+  if (![1, 2].includes(config.schemaVersion)) {
     fail(`unsupported layout schema version: ${config.schemaVersion}`);
   }
   const compositionMode = config.compositionMode ?? "flat-device-frame";
@@ -550,6 +682,7 @@ function validateLayoutConfig(config) {
     fail("layout config must define layoutId, contractStoryId, and locale");
   }
   validateCanonicalFrames(config, compositionMode);
+  validateCampaignConfig(config);
   for (const section of [
     "palette",
     "typography",
@@ -706,6 +839,10 @@ function validateLayoutConfig(config) {
         !Number.isInteger(photographicDevice.barrierDilation) ||
         photographicDevice.barrierDilation < 0 ||
         photographicDevice.barrierDilation > 4 ||
+        (photographicDevice.screenMaskBleed !== undefined &&
+          (!Number.isInteger(photographicDevice.screenMaskBleed) ||
+            photographicDevice.screenMaskBleed < 0 ||
+            photographicDevice.screenMaskBleed > 4)) ||
         !isFiniteRatio(photographicDevice.screenAspectTolerance, {
           max: 0.1,
         }) ||
@@ -749,14 +886,22 @@ function selectDeviceFamilies(config, options) {
   return matches;
 }
 
-function validateFrameContract(frame, expectedOrder) {
+function validateFrameContract(frame, expectedOrder, schemaVersion) {
   if (frame.order !== expectedOrder) {
     fail(`frame ${expectedOrder} has order ${frame.order}`);
   }
-  for (const key of FRAME_CONTRACT_KEYS) {
+  const contractKeys =
+    schemaVersion === 2 ? CAMPAIGN_FRAME_CONTRACT_KEYS : FRAME_CONTRACT_KEYS;
+  for (const key of contractKeys) {
     if (typeof frame[key] !== "string" || frame[key].trim() === "") {
       fail(`frame ${expectedOrder} is missing ${key}`);
     }
+  }
+  if (
+    schemaVersion === 2 &&
+    (Object.hasOwn(frame, "copyKey") || Object.hasOwn(frame, "supporting"))
+  ) {
+    fail(`campaign frame ${expectedOrder} must not carry legacy copy fields`);
   }
 }
 
@@ -872,6 +1017,11 @@ export async function validateManifest({
     manifest.platform === "google-play" &&
     manifest.status === "exact-artifact-capture"
   ) {
+    if (config.schemaVersion === 2) {
+      fail(
+        "exact Google Play campaign capture requires the campaign-aware provenance verifier",
+      );
+    }
     try {
       assertCombinedGooglePlayCaptureManifest({
         manifest,
@@ -882,13 +1032,28 @@ export async function validateManifest({
       fail(`exact Google Play capture provenance failed: ${error.message}`);
     }
   }
-  if (manifest.schemaVersion !== 1) {
+  if (manifest.schemaVersion !== config.schemaVersion) {
     fail(`unsupported capture manifest schema version: ${manifest.schemaVersion}`);
   }
-  if (manifest.storyId !== config.contractStoryId) {
+  if (
+    (config.schemaVersion === 1 && manifest.storyId !== config.contractStoryId) ||
+    (config.schemaVersion === 2 &&
+      manifest.storyId !== undefined &&
+      manifest.storyId !== config.contractStoryId)
+  ) {
     fail(
       `capture story ${manifest.storyId} does not match ${config.contractStoryId}`,
     );
+  }
+  if (
+    config.schemaVersion === 2 &&
+    (
+      manifest.campaign?.id !== config.campaign.id ||
+      manifest.campaign?.publicVersion !== config.campaign.publicVersion ||
+      manifest.campaign?.status !== config.campaign.status
+    )
+  ) {
+    fail("capture campaign does not match the layout campaign contract");
   }
   if (manifest.locale !== locale || config.locale !== locale) {
     fail(
@@ -911,14 +1076,27 @@ export async function validateManifest({
   for (let index = 0; index < manifest.frames.length; index += 1) {
     const frame = manifest.frames[index];
     const expectedOrder = index + 1;
-    validateFrameContract(frame, expectedOrder);
+    validateFrameContract(frame, expectedOrder, config.schemaVersion);
     const canonicalFrame = config.frames?.[index];
     if (canonicalFrame) {
-      for (const key of FRAME_CONTRACT_KEYS) {
+      const contractKeys =
+        config.schemaVersion === 2
+          ? CAMPAIGN_FRAME_CONTRACT_KEYS
+          : FRAME_CONTRACT_KEYS;
+      for (const key of contractKeys) {
         if (frame[key] !== canonicalFrame[key]) {
           fail(
             `frame ${expectedOrder} ${key} does not match the layout contract`,
           );
+        }
+      }
+      if (config.schemaVersion === 2) {
+        for (const key of CAMPAIGN_STATE_KEYS) {
+          if (JSON.stringify(frame[key]) !== JSON.stringify(canonicalFrame[key])) {
+            fail(
+              `frame ${expectedOrder} ${key} does not match the campaign contract`,
+            );
+          }
         }
       }
     }
@@ -957,12 +1135,22 @@ export async function validateManifest({
       ) {
         fail(`${family} target raw dimensions do not match its capture`);
       }
-      for (const key of ["order", "frameId", "captureId", "copyKey"]) {
+      const captureContractKeys =
+        config.schemaVersion === 2
+          ? ["order", "frameId", "captureId"]
+          : ["order", "frameId", "captureId", "copyKey"];
+      for (const key of captureContractKeys) {
         if (capture[key] !== frame[key]) {
           fail(
             `frame ${expectedOrder} ${family} capture has mismatched ${key}`,
           );
         }
+      }
+      if (
+        config.schemaVersion === 2 &&
+        (Object.hasOwn(capture, "copyKey") || Object.hasOwn(capture, "supporting"))
+      ) {
+        fail(`frame ${expectedOrder} ${family} capture must not carry legacy copy fields`);
       }
       if (capture.locale !== locale) {
         fail(`frame ${expectedOrder} ${family} locale is ${capture.locale}`);
@@ -1653,6 +1841,55 @@ function buildExactScreenMask(component, screenRect, contract) {
     );
   }
 
+  let pixelCount = tail;
+  const screenMaskBleed = contract.screenMaskBleed ?? 0;
+  if (screenMaskBleed > 0) {
+    const source = filled.slice();
+    const bleedMinX = Math.max(
+      component.bounds.minX,
+      screenRect.left - screenMaskBleed,
+    );
+    const bleedMaxX = Math.min(
+      component.bounds.maxX,
+      screenRect.left + screenRect.width - 1 + screenMaskBleed,
+    );
+    const bleedMinY = Math.max(component.bounds.minY, screenRect.top - screenMaskBleed);
+    const bleedMaxY = Math.min(
+      component.bounds.maxY,
+      screenRect.top + screenRect.height - 1 + screenMaskBleed,
+    );
+    for (let y = bleedMinY; y <= bleedMaxY; y += 1) {
+      for (let x = bleedMinX; x <= bleedMaxX; x += 1) {
+        const pixel = y * width + x;
+        if (source[pixel]) continue;
+        for (
+          let offsetY = -screenMaskBleed;
+          offsetY <= screenMaskBleed;
+          offsetY += 1
+        ) {
+          for (
+            let offsetX = -screenMaskBleed;
+            offsetX <= screenMaskBleed;
+            offsetX += 1
+          ) {
+            const sourceX = x + offsetX;
+            const sourceY = y + offsetY;
+            if (
+              sourceX >= bleedMinX && sourceX <= bleedMaxX &&
+              sourceY >= bleedMinY && sourceY <= bleedMaxY &&
+              source[sourceY * width + sourceX]
+            ) {
+              filled[pixel] = 1;
+              pixelCount += 1;
+              break;
+            }
+          }
+          if (filled[pixel]) break;
+        }
+      }
+    }
+  }
+
   const rgba = Buffer.alloc(width * height * 4, 255);
   for (let pixel = 0; pixel < width * height; pixel += 1) {
     rgba[pixel * 4 + 3] = filled[pixel] ? 255 : 0;
@@ -1661,7 +1898,7 @@ function buildExactScreenMask(component, screenRect, contract) {
     buffer: rgba,
     channels: 4,
     height,
-    pixelCount: tail,
+    pixelCount,
     width,
   };
 }
@@ -1804,6 +2041,7 @@ async function composePhotographicFrame(item, backgroundTemplate) {
       crop,
       detectedScreen,
       exactMaskPixelCount: exactMask.pixelCount,
+      screenMaskBleed: contract.screenMaskBleed ?? 0,
       maskStrategy: "closed-bezel-flood-fill",
       normalizedScreen,
       outputDevice: safeAreas.outputDevice,
@@ -1987,12 +2225,18 @@ function outputDirectoryName(preset) {
   return `${preset.deviceFamily}-${preset.displayGroup}-${preset.orientation}`;
 }
 
-function outputFileName(item) {
+function outputFileName(item, config) {
   const expectedPrefix = `marketing-${String(item.frame.order).padStart(2, "0")}-`;
+  const expectedFileName =
+    config.schemaVersion === 2
+      ? `${item.frame.captureId}.png`
+      : undefined;
   if (
     typeof item.capture.fileName !== "string" ||
     item.capture.fileName !== path.basename(item.capture.fileName) ||
-    !item.capture.fileName.startsWith(expectedPrefix) ||
+    (config.schemaVersion === 2
+      ? item.capture.fileName !== expectedFileName
+      : !item.capture.fileName.startsWith(expectedPrefix)) ||
     path.extname(item.capture.fileName).toLowerCase() !== ".png"
   ) {
     fail(
@@ -2253,6 +2497,7 @@ function photographicDeviceConsistency(deviceFamilies, composedByFamily, config)
 }
 
 export async function composeMarketingAssets(rawOptions) {
+  const layoutConfigProvided = Object.hasOwn(rawOptions ?? {}, "layoutConfig");
   const options = {
     deviceFamily: "all",
     layoutConfig: DEFAULT_LAYOUT_CONFIG,
@@ -2265,6 +2510,27 @@ export async function composeMarketingAssets(rawOptions) {
   if (!options.captureRoot || !options.outputDir) {
     fail("captureRoot and outputDir are required");
   }
+  if (options.campaign) {
+    const campaignLayout =
+      CAMPAIGN_LAYOUT_CONFIGS[options.campaign]?.[options.platform];
+    if (!campaignLayout) {
+      fail(`unsupported campaign for platform: ${options.campaign}`);
+    }
+    const platformDefault =
+      options.platform === "google-play"
+        ? path.join(
+            SKILL_ROOT,
+            "assets",
+            "google-play-marketing-layout-v2.json",
+          )
+        : DEFAULT_LAYOUT_CONFIG;
+    if (
+      !layoutConfigProvided ||
+      path.resolve(options.layoutConfig) === path.resolve(platformDefault)
+    ) {
+      options.layoutConfig = campaignLayout;
+    }
+  }
   const [resolvedCaptureRoot, prospectiveOutputDir] = await Promise.all([
     realpath(path.resolve(options.captureRoot)).catch((error) => {
       fail(`could not resolve raw capture directory: ${error.message}`);
@@ -2276,7 +2542,7 @@ export async function composeMarketingAssets(rawOptions) {
     options.manifest ?? path.join(options.captureRoot, "manifest.json");
   const layoutConfigPath = path.resolve(options.layoutConfig);
   const [config, manifest, manifestSha256] = await Promise.all([
-    readJson(layoutConfigPath, "layout config"),
+    loadLayoutConfig(layoutConfigPath),
     readJson(path.resolve(manifestPath), "capture manifest"),
     sha256File(path.resolve(manifestPath)),
   ]);
@@ -2325,7 +2591,7 @@ export async function composeMarketingAssets(rawOptions) {
     const composed = await composeFrame(item, config, backgroundTemplate);
     const relativeFile = path.join(
       outputDirectoryName(item.preset),
-      outputFileName(item),
+      outputFileName(item, config),
     );
     if (!options.previewOnly) {
       artifacts.push({
@@ -2416,7 +2682,8 @@ export async function composeMarketingAssets(rawOptions) {
   }
 
   const outputManifest = {
-    schemaVersion: 1,
+    schemaVersion: config.schemaVersion,
+    ...(config.schemaVersion === 2 ? { campaign: config.campaign } : {}),
     layoutId: config.layoutId,
     locale: options.locale,
     mode: options.previewOnly ? "preview-only" : "full-export",
@@ -2448,6 +2715,7 @@ export async function composeMarketingAssets(rawOptions) {
       captureManifestSha256: manifestSha256,
       sourceCommit: manifest.sourceBuild?.sourceCommit,
       storyId: manifest.storyId,
+      ...(config.schemaVersion === 2 ? { campaign: manifest.campaign } : {}),
     },
     deviceFamilies,
     backgroundTemplates: [...backgroundTemplates.values()].map(

@@ -593,11 +593,11 @@ for (const rcFreezePolicy of [
   );
 }
 
-assert.equal(releaseVersion.publicVersion, "1.5.2");
-assert.equal(releaseVersion.androidVersionCode, 20);
+assert.equal(releaseVersion.publicVersion, "1.6.0");
+assert.equal(releaseVersion.androidVersionCode, 22);
 assert.deepEqual(developmentVersion, {
   schemaVersion: 1,
-  plannedPublicVersion: "1.6.0"
+  plannedPublicVersion: "1.6.1"
 });
 assert.match(releaseVersioning, /development-version\.json` is the public version/);
 assert.match(releaseVersioning, /release-version\.json` is the exact cross-platform candidate/);
@@ -696,5 +696,17 @@ const invalidScope = spawnSync(localE2eRunner, [], {
 });
 assert.notEqual(invalidScope.status, 0);
 assert.match(invalidScope.stderr, /Set CHESSTICIZE_E2E_SCOPE to flows, practice, or full/);
+
+// Setup must not request the removed SDK tools package before pinned installs.
+for (const workflow of [
+  ".github/workflows/mobile-android-release-candidate.yml",
+  ".github/workflows/mobile-android-github-release.yml"
+]) {
+  assert.match(
+    read(workflow),
+    /uses: android-actions\/setup-android@v3\n\s+with:\n(?:\s+#[^\n]*\n)*\s+packages: platform-tools\s*\n/,
+    `${workflow} must not request the removed SDK tools package`
+  );
+}
 
 console.log("Development process validation passed.");

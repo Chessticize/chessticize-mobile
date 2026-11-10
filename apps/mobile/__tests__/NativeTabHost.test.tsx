@@ -31,7 +31,12 @@ const colors: NativeTabHostColors = {
 
 function InsetsProbe({ tab }: { tab: TopLevelTab }): React.JSX.Element {
   const insets = useTabContentInsets();
-  return <Text testID={`content-${tab}`}>{`${insets.top} ${insets.right} ${insets.bottom} ${insets.left}`}</Text>;
+  return (
+    <>
+      <Text testID={`content-${tab}`}>{`${insets.top} ${insets.right} ${insets.bottom} ${insets.left}`}</Text>
+      <Text testID={`content-${tab}-top-tab-overlay`}>{`${insets.topTabBarOverlay}`}</Text>
+    </>
+  );
 }
 
 function Harness({
@@ -185,6 +190,21 @@ describe("NativeTabHost", () => {
     }
   });
 
+  it("reports the floating iPad top-bar overlay separately from safe-area geometry", () => {
+    (Platform as { isPad?: boolean }).isPad = true;
+    act(() => {
+      safeArea.__setSafeAreaInsets({ top: 24, bottom: 20 });
+      reactNative.__setWindowDimensions({ height: 1032, width: 1376 });
+    });
+    const renderer = render(<Harness />);
+    expect(textOf(renderer, "content-practice-top-tab-overlay")).toBe("true");
+
+    act(() => {
+      reactNative.__setWindowDimensions({ height: 1032, width: 684 });
+    });
+    expect(textOf(renderer, "content-practice-top-tab-overlay")).toBe("false");
+  });
+
   // The react-native-screens patch (patches/react-native-screens@4.30.1.patch)
   // copies tabBarItemTestID onto the iOS UITab, which the iPad floating tab bar
   // reads; iPad uses the plain tab bar mode.
@@ -242,7 +262,13 @@ describe("NativeTabHost", () => {
     act(() => {
       renderer.update(<TabContentInsetsReporter key="review" onChange={onChange} />);
     });
-    expect(onChange).toHaveBeenLastCalledWith({ bottom: 34, left: 0, right: 0, top: 62 });
+    expect(onChange).toHaveBeenLastCalledWith({
+      bottom: 34,
+      left: 0,
+      right: 0,
+      top: 62,
+      topTabBarOverlay: false
+    });
   });
 
   it("uses Material bottom navigation on Android", () => {

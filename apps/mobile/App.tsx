@@ -100,6 +100,7 @@ function App() {
             sprintGuidanceEnabled
             puzzleSelectionId={puzzleSelectionId}
             puzzleSelectionSeed={puzzleSelectionSeed}
+            personalBestChallengeDesignPreview={marketingCaptureFixture?.personalBestChallengeDesignPreview}
             runManagementEnabled
             settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
               ? 420
@@ -109,6 +110,7 @@ function App() {
               : undefined}
             standardTargetCorrect={standardTargetCorrect}
             systemBack={systemBack}
+            tacticalProfilePresentation={marketingCaptureFixture?.tacticalProfilePresentation}
             themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
           />
         ) : (

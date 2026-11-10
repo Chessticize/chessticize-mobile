@@ -9,6 +9,7 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { PNG } = require('pngjs');
 const story = require('../../../config/app-store-marketing-story-v1.json');
+const { resolveMarketingCampaign } = require('../e2e/marketingCampaign');
 const {
   captureMarketingScreenshot,
 } = require('../e2e/marketingCaptureArtifacts');
@@ -582,6 +583,57 @@ describe('Google Play marketing capture artifacts', () => {
       inspectApk: () => installedApkInspection({ versionCode: 10 }),
       run: createAdbRunner(),
     })).toThrow('version');
+  });
+
+  it('writes the 1.6 campaign as a schema-v2 Android receipt without legacy copy fields', () => {
+    const campaign = resolveMarketingCampaign(story, 'mobile-1.6-en-us');
+    const outputRoot = mkdtempSync(join(tmpdir(), 'play-campaign-capture-'));
+    const sourceCommit = 'f'.repeat(40);
+    const artifact = previewArtifact();
+    const target = resolveGooglePlayCaptureTarget(targetEnvironment('android-phone'));
+    const sourcePath = join(outputRoot, 'source.png');
+    const png = new PNG({
+      width: target.rawPixelDimensions.width,
+      height: target.rawPixelDimensions.height,
+    });
+    png.data.fill(255);
+    writeFileSync(sourcePath, PNG.sync.write(png));
+    const records = campaign.frames.map((frame) => captureMarketingScreenshot({
+      frame,
+      outputRoot,
+      screenshotPath: sourcePath,
+      sourceCommit,
+      story: campaign,
+      target,
+    }));
+    writeGooglePlayDeviceCaptureManifest({
+      artifact,
+      outputRoot,
+      records,
+      sourceCommit,
+      story: campaign,
+      target,
+    });
+
+    const manifest = JSON.parse(readFileSync(writeCombinedGooglePlayCaptureManifest({
+      outputRoot,
+      story: campaign,
+    }), 'utf8'));
+    expect(manifest).toMatchObject({
+      schemaVersion: 2,
+      campaign: {
+        id: 'mobile-1.6-en-us',
+        publicVersion: '1.6.0',
+        status: 'capture-plan',
+      },
+    });
+    expect(manifest.storyId).toBeUndefined();
+    expect(manifest.sourceBuild.kind).toBe('integrated-main-preparation');
+    expect(manifest.frames[0].copyKey).toBeUndefined();
+    expect(manifest.frames[1]).toMatchObject({
+      captureId: 'dark-arrow-duel',
+      moment: 'opponent-reply',
+    });
   });
 
   it('writes and re-verifies the required phone-only Play manifest', () => {

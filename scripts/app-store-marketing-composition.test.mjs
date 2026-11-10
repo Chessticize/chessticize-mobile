@@ -19,6 +19,7 @@ import {
   calculateLayout,
   composeMarketingAssets,
   parseArgs,
+  validateManifest,
   wrapHeadline,
 } from "../.codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs";
 
@@ -26,6 +27,11 @@ const PHOTO_LAYOUT_URL = new URL(
   "../.codex/skills/chessticize-app-store-marketing/assets/app-store-marketing-layout-v2.json",
   import.meta.url,
 );
+const CAMPAIGN_LAYOUT_URL = new URL(
+  "../.codex/skills/chessticize-app-store-marketing/assets/app-store-marketing-layout-mobile-1.6-en-us-v3.json",
+  import.meta.url,
+);
+const STORY_URL = new URL("../config/app-store-marketing-story-v1.json", import.meta.url);
 
 const FAMILY_CONTRACTS = {
   iphone: {
@@ -42,6 +48,81 @@ const FAMILY_CONTRACTS = {
 
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+function materializeCampaignLayout(base, override) {
+  return {
+    ...base,
+    ...override,
+    presets: Object.fromEntries(
+      Object.entries(base.presets).map(([family, preset]) => [
+        family,
+        { ...preset, ...(override.presets[family] ?? {}) },
+      ]),
+    ),
+  };
+}
+
+async function createCampaignManifest(root, config, family) {
+  const captureRoot = path.join(root, "capture");
+  await mkdir(captureRoot, { recursive: true });
+  const preset = config.presets[family];
+  const frames = [];
+  for (const frameContract of config.frames) {
+    const dimensions = preset.acceptedSourceSizes[0];
+    const relativeFile = path.join(
+      `${family}-${preset.displayGroup}-${preset.orientation}`,
+      frameContract.fileName,
+    );
+    const absoluteFile = path.join(captureRoot, relativeFile);
+    await mkdir(path.dirname(absoluteFile), { recursive: true });
+    const buffer = await sharp({
+      create: {
+        width: dimensions.width,
+        height: dimensions.height,
+        channels: 3,
+        background: { r: 30, g: 65, b: 96 },
+      },
+    }).png().toBuffer();
+    await writeFile(absoluteFile, buffer);
+    const capture = {
+      order: frameContract.order,
+      frameId: frameContract.frameId,
+      captureId: frameContract.captureId,
+      locale: config.locale,
+      deviceFamily: family,
+      displayGroup: preset.displayGroup,
+      orientation: preset.orientation,
+      pixelDimensions: dimensions,
+      sourceCommit: "1234567890123456789012345678901234567890",
+      file: relativeFile,
+      fileName: frameContract.fileName,
+      sha256: sha256(buffer),
+    };
+    frames.push({
+      ...frameContract,
+      captures: { [family]: capture },
+    });
+  }
+  return {
+    captureRoot,
+    manifest: {
+      schemaVersion: 2,
+      campaign: config.campaign,
+      locale: config.locale,
+      sourceBuild: {
+        sourceCommit: "1234567890123456789012345678901234567890",
+      },
+      targets: {
+        [family]: {
+          deviceFamily: family,
+          displayGroup: preset.displayGroup,
+          orientation: preset.orientation,
+        },
+      },
+      frames,
+    },
+  };
 }
 
 async function exists(filePath) {
@@ -334,6 +415,7 @@ async function createPhotographicFixture(root) {
     config.presets[family].photographicDevice = {
       darkThreshold: 58,
       barrierDilation: 1,
+      screenMaskBleed: 0,
       screenAspectTolerance: 0.04,
       maskAreaMinRatio: 0.6,
       maskAreaMaxRatio: 1.08,
@@ -467,6 +549,80 @@ test("default Photo Studio A scene templates are immutable and hash-bound", asyn
   assert.equal(hashes.size, 12);
 });
 
+test("1.6 campaign binds its new capture contract and title templates", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-marketing-1-6-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const [base, override, story] = await Promise.all([
+    readFile(PHOTO_LAYOUT_URL, "utf8").then(JSON.parse),
+    readFile(CAMPAIGN_LAYOUT_URL, "utf8").then(JSON.parse),
+    readFile(STORY_URL, "utf8").then(JSON.parse),
+  ]);
+  const config = materializeCampaignLayout(base, override);
+
+  assert.equal(override.schemaVersion, 2);
+  assert.deepEqual(override.campaign, {
+    id: "mobile-1.6-en-us",
+    publicVersion: "1.6.0",
+    status: "capture-plan",
+  });
+  assert.deepEqual(
+    config.frames.map(({ captureId, frameId, headline }) => ({ captureId, frameId, headline })),
+    story.releaseCampaign.frames.map(({ id, headline }) => ({
+      captureId: id,
+      frameId: id,
+      headline,
+    })),
+  );
+  let fixture;
+  for (const family of ["iphone", "ipad"]) {
+    for (const template of Object.values(config.presets[family].backgroundTemplates)) {
+      const buffer = await readFile(new URL(template.file, CAMPAIGN_LAYOUT_URL));
+      assert.equal(sha256(buffer), template.sha256);
+    }
+
+    fixture = await createCampaignManifest(root, config, family);
+    const validated = await validateManifest({
+      captureRoot: fixture.captureRoot,
+      config,
+      deviceFamilies: [family],
+      locale: "en-US",
+      manifest: fixture.manifest,
+    });
+    assert.equal(validated.length, 6);
+
+    const manifestPath = path.join(fixture.captureRoot, "manifest.json");
+    await writeFile(manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
+    const composed = await composeMarketingAssets({
+      campaign: "mobile-1.6-en-us",
+      captureRoot: fixture.captureRoot,
+      deviceFamily: family,
+      manifest: manifestPath,
+      outputDir: path.join(root, `output-${family}`),
+      platform: "app-store",
+      previewOnly: true,
+    });
+    assert.equal(composed.manifest.schemaVersion, 2);
+    assert.deepEqual(composed.manifest.campaign, override.campaign);
+    assert.deepEqual(composed.manifest.source.campaign, override.campaign);
+    assert.deepEqual(
+      composed.manifest.contactSheets.map(({ kind }) => kind),
+      family === "iphone" ? ["overview", "corner-audit"] : ["overview"],
+    );
+  }
+
+  fixture.manifest.frames[0].headline = "Build Tactical Intuition";
+  await assert.rejects(
+    validateManifest({
+      captureRoot: fixture.captureRoot,
+      config,
+      deviceFamilies: ["iphone"],
+      locale: "en-US",
+      manifest: fixture.manifest,
+    }),
+    /headline does not match the layout contract/u,
+  );
+});
+
 test("full export is deterministic and preserves the six-frame device contracts", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-marketing-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -549,6 +705,7 @@ test("photographic export uses exact bezel masks and enforces device consistency
       artifact.deviceGeometry.maskStrategy,
       "closed-bezel-flood-fill",
     );
+    assert.equal(artifact.deviceGeometry.screenMaskBleed, 0);
     assert.ok(artifact.deviceGeometry.exactMaskPixelCount > 0);
     assert.ok(artifact.deviceGeometry.outputScreen.width > 0);
     assert.ok(artifact.deviceGeometry.outputScreen.height > 0);
@@ -612,6 +769,29 @@ test("photographic export rejects a screen opening with the wrong aspect", async
       outputDir: path.join(root, "output"),
     }),
     /photographic screen aspect/,
+  );
+});
+
+test("photographic export rejects an invalid screen-mask bleed", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-photo-mask-bleed-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPhotographicFixture(root);
+  fixture.config.presets.ipad.photographicDevice.screenMaskBleed = 5;
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(fixture.config, null, 2)}\n`,
+  );
+
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      deviceFamily: "ipad",
+      layoutConfig: fixture.configPath,
+      outputDir: path.join(root, "output"),
+    }),
+    /invalid photographic device contract/,
   );
 });
 

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "extends": "app-store-marketing-layout-v2.json",
+  "layoutId": "chessticize-photo-studio-a-mobile-1.6-en-us-v3",
+  "campaign": {
+    "id": "mobile-1.6-en-us",
+    "publicVersion": "1.6.0",
+    "status": "capture-plan"
+  },
+  "frames": [
+    {
+      "order": 1,
+      "frameId": "practice-home",
+      "captureId": "practice-home",
+      "headline": "Find Your Next Puzzle",
+      "fileName": "practice-home.png",
+      "appearance": "light",
+      "highlights": ["fresh-design", "practice-home", "native-navigation"],
+      "storyId": "practice--home",
+      "requiredVisibleTestIds": ["practice-home", "practice-run-start", "training-focus-card"],
+      "captureAnchorTestId": "practice-home"
+    },
+    {
+      "order": 2,
+      "frameId": "dark-arrow-duel",
+      "captureId": "dark-arrow-duel",
+      "headline": "Choose the Best Move",
+      "fileName": "dark-arrow-duel.png",
+      "appearance": "dark",
+      "highlights": ["dark-mode", "arrow-duel"],
+      "storyId": "practice--arrow-duel-prompt",
+      "requiredVisibleTestIds": ["session-board", "session-progress"],
+      "moment": "opponent-reply",
+      "captureAnchorTestId": "active-session-shell"
+    },
+    {
+      "order": 3,
+      "frameId": "tactical-profile",
+      "captureId": "tactical-profile",
+      "headline": "Find Your Training Focus",
+      "fileName": "tactical-profile.png",
+      "appearance": "light",
+      "highlights": ["tactical-profile"],
+      "storyId": "practice--tactical-profile-ranked",
+      "requiredVisibleTestIds": ["tactical-profile-active-mode", "tactical-profile-recommendations"],
+      "previewActions": ["training-focus-open-profile"],
+      "captureAnchorTestId": "tactical-profile-screen"
+    },
+    {
+      "order": 4,
+      "frameId": "focused-run",
+      "captureId": "focused-run",
+      "headline": "Practice What You Need",
+      "fileName": "focused-run.png",
+      "appearance": "light",
+      "highlights": ["focused-run"],
+      "storyId": "practice--tactical-profile-focused-run",
+      "requiredVisibleTestIds": ["focused-run-rating-anchor", "focused-run-allocation-bar"],
+      "captureAnchorTestId": "focused-run-preview"
+    },
+    {
+      "order": 5,
+      "frameId": "survival",
+      "captureId": "survival",
+      "headline": "Beat Your Best",
+      "fileName": "survival.png",
+      "appearance": "dark",
+      "highlights": ["survival"],
+      "storyId": "practice--personal-best-hub",
+      "requiredVisibleTestIds": ["personal-best-hub", "personal-best-type-selector", "personal-best-hub-start"],
+      "captureAnchorTestId": "personal-best-hub"
+    },
+    {
+      "order": 6,
+      "frameId": "review",
+      "captureId": "review",
+      "headline": "Make Every Mistake Count",
+      "fileName": "review.png",
+      "appearance": "light",
+      "highlights": ["scheduled-review"],
+      "storyId": "review--due-queue",
+      "requiredVisibleTestIds": ["review-due-card", "review-start-due", "review-forecast"],
+      "captureAnchorTestId": "review-panel"
+    }
+  ],
+  "visualDirection": {
+    "name": "Photo Studio A",
+    "composition": "product-first-photographic-device",
+    "background": "warm-white-icy-blue-chessboard-mobile-1.6-v3",
+    "productProof": "immutable-native-capture-in-exact-generated-device-silhouette"
+  },
+  "presets": {
+    "iphone": {
+      "backgroundTemplates": {
+        "practice-home": { "file": "photo-studio-frame-16-01-iphone-portrait-v3.png", "sha256": "c8de5ccd4e28b287ca7707f600c6ff1170e4c73af6d61b21dd4ac167a689de46", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "dark-arrow-duel": { "file": "photo-studio-frame-02-iphone-portrait-v2.png", "sha256": "6811e1fd62442ef5e55c4352493fe430e223553d3d2836273279b7edd76faa3f", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "tactical-profile": { "file": "photo-studio-frame-16-03-iphone-portrait-v3.png", "sha256": "7d2928825cb9e00c750d4d9153409c76d212bef2a2794d309a27f1a5bdf5fe21", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "focused-run": { "file": "photo-studio-frame-16-04-iphone-portrait-v3.png", "sha256": "578665c82f744b5668a0b4aa153c28cfc3f4a2e33a8edb5ca852704a316735e0", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "survival": { "file": "photo-studio-frame-16-05-iphone-portrait-v3.png", "sha256": "e5063ed964675183f5f0fdceb59d4d9d2b792c25bdd775a560038b7a8e5ff1b5", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "review": { "file": "photo-studio-frame-04-iphone-portrait-v2.png", "sha256": "a3daa639ca678171358edd9e716ac6ed51c97d67272ef59c6e50400bb52d79c0", "pixelDimensions": { "width": 853, "height": 1844 }, "fit": "cover", "generatedWith": "openai-imagegen" }
+      }
+    },
+    "ipad": {
+      "backgroundTemplates": {
+        "practice-home": { "file": "photo-studio-frame-16-01-ipad-landscape-v3.png", "sha256": "1d4903a3a9f306ba9fdb3458ec4027c460a0ce2f4bfe0db1af11fbc0bf3be915", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "dark-arrow-duel": { "file": "photo-studio-frame-02-ipad-landscape-v2.png", "sha256": "8b49879518de63ee793f4150ec9a5c1909f4d800f2fcd2a6870c2a155d2000f1", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "tactical-profile": { "file": "photo-studio-frame-16-03-ipad-landscape-v3.png", "sha256": "234b6a470172ed768d55fb3d9448f45997cffb62972152ca3a2ccf84a80c7fdc", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "focused-run": { "file": "photo-studio-frame-16-04-ipad-landscape-v3.png", "sha256": "ea6cdae95b8e742d87124a5b5376556917188dbc6bd73e025cfc6737e87395a1", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "survival": { "file": "photo-studio-frame-16-05-ipad-landscape-v3.png", "sha256": "d8d274ae09d43aeb5f17585109d07cce5e2c23d4ee21cdcc3242ba927ebc6343", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" },
+        "review": { "file": "photo-studio-frame-04-ipad-landscape-v2.png", "sha256": "acdd3a58806cc941509124840dc0bfddd94f921c649b1f0735712f0a0497015a", "pixelDimensions": { "width": 1536, "height": 1024 }, "fit": "cover", "generatedWith": "openai-imagegen" }
+      }
+    }
+  }
+}

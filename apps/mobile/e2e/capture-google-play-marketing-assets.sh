@@ -6,6 +6,7 @@ APP_DIR="$(cd "$E2E_DIR/.." && pwd)"
 REPOSITORY_ROOT="$(cd "$APP_DIR/../.." && pwd)"
 SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 E2E_APK="$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk"
+MARKETING_CAMPAIGN="${CHESSTICIZE_MARKETING_CAMPAIGN:-}"
 
 if [[ -z "$SDK_ROOT" ]]; then
   echo "Set ANDROID_HOME or ANDROID_SDK_ROOT before Google Play capture." >&2
@@ -79,6 +80,7 @@ capture_device_family() {
     cd "$APP_DIR"
     CHESSTICIZE_CAPTURE_MARKETING_ASSETS=1 \
     CHESSTICIZE_MARKETING_PLATFORM=google-play \
+    CHESSTICIZE_MARKETING_CAMPAIGN="$MARKETING_CAMPAIGN" \
     CHESSTICIZE_MARKETING_DEVICE_FAMILY="$device_family" \
     CHESSTICIZE_ANDROID_MARKETING_DEVICE_PROFILE="$profile" \
     CHESSTICIZE_ANDROID_MARKETING_API_LEVEL="$api_level" \
@@ -102,7 +104,12 @@ require_environment CHESSTICIZE_MARKETING_ANDROID_PHONE_PROFILE
 SOURCE_COMMIT="$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
 assert_clean_source_state "$SOURCE_COMMIT"
 
-configured_output_root="${CHESSTICIZE_MARKETING_OUTPUT_ROOT:-scratch/store-assets/google-play/$SOURCE_COMMIT}"
+if [[ -n "$MARKETING_CAMPAIGN" ]]; then
+  default_output_root="scratch/store-assets/google-play/$MARKETING_CAMPAIGN/$SOURCE_COMMIT"
+else
+  default_output_root="scratch/store-assets/google-play/$SOURCE_COMMIT"
+fi
+configured_output_root="${CHESSTICIZE_MARKETING_OUTPUT_ROOT:-$default_output_root}"
 if [[ "$configured_output_root" = /* ]]; then
   OUTPUT_ROOT="$configured_output_root"
 else
@@ -131,6 +138,7 @@ capture_device_family \
   1080x1920
 
 assert_clean_source_state "$SOURCE_COMMIT"
+CHESSTICIZE_MARKETING_CAMPAIGN="$MARKETING_CAMPAIGN" \
 CHESSTICIZE_MARKETING_OUTPUT_ROOT="$OUTPUT_ROOT" \
   node "$E2E_DIR/finalize-google-play-marketing-capture.js"
 

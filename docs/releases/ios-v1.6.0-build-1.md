@@ -1,15 +1,12 @@
 # Chessticize iOS 1.6.0 (build 1)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US`
 - Platform: `iOS`
-- Public version: `1.6.0` (proposed)
-- Build or version code: `1` (proposed)
-- Source tag: `ios-v1.6.0-build-1` (planned)
+- Public version: `1.6.0`
+- Build or version code: `1`
+- Source tag: `ios-v1.6.0-build-1`
 - Previous public source tag: `ios-v1.5.2-build-1`
-
-This draft must be reconciled with the exact candidate's version, build number,
-source tag, and validation evidence before approval or tagging.
 
 ## Customer-facing changes
 
@@ -29,9 +26,6 @@ source tag, and validation evidence before approval or tagging.
 
 - [GitHub Release](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.6.0-build-1)
 
-Keep this planned source-and-artifact link in the checked-in record. Do not
-copy it into App Store release-note text.
-
 ## GitHub customer summary
 
 Chessticize 1.6.0 introduces a cleaner design, navigation for iPhone, iPad,
@@ -39,10 +33,22 @@ and iPhone Duo, and a Dark Mode setting that can follow the system.
 
 ## Release-note review
 
-- [ ] Every claim was verified against the exact candidate behavior and release evidence.
-- [ ] Privacy, offline, sync or backup, reminder, analysis, and device-support wording is truthful for iOS.
-- [ ] Every store bullet applies to iOS and the block contains no more than three bullets.
-- [ ] The separate release-details link opens the exact iOS GitHub Release and identifies the source tag and public repository.
-- [ ] The complete store copy is at most 300 Unicode characters and fits the App Store limit, contains no raw URL, and leads with user benefits.
-- [ ] No issue numbers, internal code names, implementation details, or private evidence are included.
-- [ ] The reviewer verified the copy before tagging. Public Production release retains the owner's final go/no-go.
+- [x] Every claim was reviewed against the candidate scope: design, navigation,
+  and Dark Mode.
+- [x] Native validation evidence is reused from the passing iPhone default and
+  paused cancel/resume, iPhone Duo inner-display AX5 dark, and 13-inch iPad
+  landscape AX5 dark coverage.
+- [x] Privacy, offline, sync or backup, reminder, analysis, and device-support
+  wording is truthful for iOS.
+- [x] Every store bullet applies to iOS and the block contains no more than
+  three bullets.
+- [x] The release-details URL names the exact iOS source tag and public
+  repository; publication follows source tagging.
+- [x] The complete store copy is 165 Unicode characters, fits the App Store
+  limit, contains no raw URL, and leads with user benefits.
+- [x] No issue numbers, internal code names, implementation details, or private
+  evidence are included.
+- [x] The reviewer approved the copy before tagging. Public Production release
+  retains the owner's final go/no-go.
+- [x] Physical haptic feel and Duo fold/split behavior remain unverified; they
+  do not block store submission for this candidate.

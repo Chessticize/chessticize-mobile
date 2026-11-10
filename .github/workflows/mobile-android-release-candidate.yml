@@ -41,6 +41,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The obsolete tools package is no longer served by Google.
+          packages: platform-tools
 
       - name: Require protected release inputs
         env:

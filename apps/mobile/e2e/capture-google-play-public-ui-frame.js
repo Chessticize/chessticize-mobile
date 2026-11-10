@@ -2,6 +2,7 @@
 
 const { resolve } = require('node:path');
 const story = require('../../../config/app-store-marketing-story-v1.json');
+const { resolveMarketingCampaign } = require('./marketingCampaign');
 const {
   sourceCommitForCapture,
 } = require('./marketingCaptureArtifacts');
@@ -17,7 +18,11 @@ function main(environment = process.env) {
   const captureId = String(
     environment.CHESSTICIZE_MARKETING_CAPTURE_ID ?? ''
   ).trim();
-  const frame = story.frames.find(
+  const campaign = resolveMarketingCampaign(
+    story,
+    environment.CHESSTICIZE_MARKETING_CAMPAIGN
+  );
+  const frame = campaign.frames.find(
     (candidate) => candidate.captureId === captureId
   );
   if (!frame) {
@@ -48,7 +53,7 @@ function main(environment = process.env) {
     frame,
     repositoryRoot,
     sourceCommit,
-    story,
+    story: campaign,
     target,
   });
   process.stdout.write(

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { formatCompactDuration, modeLabel, STACKED_ACTIONS_FONT_SCALE } from "../shared/practiceUtils.ts";
 import type { SprintMode, SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { PersonalBestChallengeDesignPreview } from "../../PersonalBestChallengeDesign.tsx";
@@ -452,68 +452,121 @@ export function SessionStatusBar({
             />
           </View>
         </View>
-      ) : confirmAbandon ? (
-        <View
-          style={[
-            styles.sessionLeaveConfirmationOverlay,
-            styles.sessionAbandonConfirm,
-            stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
-            leaveConfirmationMinHeight === undefined
-              ? null
-              : { minHeight: leaveConfirmationMinHeight }
-          ]}
-          testID="session-abandon-confirmation"
-        >
-          <View
-            style={[
-              styles.sessionAbandonCopy,
-              stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
-            ]}
-          >
-            <Text style={styles.listText}>
-              {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
-            </Text>
-            <Text style={styles.helperText}>
-              {isTacticalFocus
-                ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
-                : "This ends the Sprint and records it as abandoned."}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.sessionAbandonActions,
-              stacksLeaveConfirmation ? styles.sessionAbandonActionsStacked : null,
-              stacksLeaveActions ? styles.leaveActionsStacked : null
-            ]}
-          >
-            <Button
-              accessibilityLabel={isTacticalFocus
-                ? "Cancel abandoning Focused Run"
-                : "Cancel abandon sprint"}
-              label="Cancel"
-              size="compact"
-              stretch={stacksLeaveActions}
-              testID="session-abandon-cancel"
-              variant="secondary"
-              onPress={() => onConfirmAbandonChange(false)}
-            />
-            <Button
-              accessibilityLabel={isTacticalFocus
-                ? "Confirm abandoning Focused Run"
-                : "Confirm abandon sprint"}
-              label="Abandon"
-              size="compact"
-              stretch={stacksLeaveActions}
-              testID="session-abandon-confirm"
-              variant="destructive"
-              onPress={() => {
-                onConfirmAbandonChange(false);
-                onAbandon?.();
-              }}
-            />
-          </View>
-        </View>
+      ) : confirmAbandon && state.status === "paused" ? (
+        <SessionAbandonConfirmation
+          minHeight={leaveConfirmationMinHeight}
+          stack={stacksLeaveConfirmation}
+          state={state}
+          style={[styles.sessionLeaveConfirmationOverlay, styles.sessionLeaveConfirmationInFlow]}
+          onCancel={() => onConfirmAbandonChange(false)}
+          onAbandon={() => {
+            onConfirmAbandonChange(false);
+            onAbandon?.();
+          }}
+        />
       ) : null}
+    </View>
+  );
+}
+
+// Active confirmations are mounted at the screen root, above native scroll
+// clipping ancestors. Paused confirmations remain in their normal-flow slot.
+export function SessionAbandonConfirmation({
+  maxHeight,
+  minHeight,
+  stack = false,
+  state,
+  style,
+  onAbandon,
+  onCancel
+}: {
+  maxHeight?: number;
+  minHeight?: number;
+  stack?: boolean;
+  state: SprintState;
+  style?: StyleProp<ViewStyle>;
+  onAbandon: () => void;
+  onCancel: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  const { fontScale } = usePracticeViewport();
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const stacksLeaveActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
+  const stacksLeaveConfirmation = stack || stacksLeaveActions;
+  const content = (
+    <>
+      <View
+        style={[
+          styles.sessionAbandonCopy,
+          stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
+        ]}
+      >
+        <Text style={styles.listText} testID="session-abandon-title">
+          {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
+        </Text>
+        <Text style={styles.helperText} testID="session-abandon-description">
+          {isTacticalFocus
+            ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
+            : "This ends the Sprint and records it as abandoned."}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.sessionAbandonActions,
+          stacksLeaveConfirmation ? styles.sessionAbandonActionsStacked : null,
+          stacksLeaveActions ? styles.leaveActionsStacked : null
+        ]}
+      >
+        <Button
+          accessibilityLabel={isTacticalFocus
+            ? "Cancel abandoning Focused Run"
+            : "Cancel abandon sprint"}
+          label="Cancel"
+          size="compact"
+          stretch={stacksLeaveActions}
+          testID="session-abandon-cancel"
+          variant="secondary"
+          onPress={onCancel}
+        />
+        <Button
+          accessibilityLabel={isTacticalFocus
+            ? "Confirm abandoning Focused Run"
+            : "Confirm abandon sprint"}
+          label="Abandon"
+          size="compact"
+          stretch={stacksLeaveActions}
+          testID="session-abandon-confirm"
+          variant="destructive"
+          onPress={onAbandon}
+        />
+      </View>
+    </>
+  );
+  const contentStyle = [
+    styles.sessionAbandonContent,
+    stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
+    minHeight === undefined ? null : {
+      minHeight: Math.max(0, Math.min(minHeight, maxHeight ?? minHeight) - 2)
+    }
+  ];
+  return (
+    <View
+      accessibilityViewIsModal={maxHeight !== undefined}
+      style={[styles.sessionAbandonConfirm, style, maxHeight === undefined ? null : { maxHeight }]}
+      testID="session-abandon-confirmation"
+    >
+      {maxHeight === undefined ? (
+        <View style={contentStyle}>{content}</View>
+      ) : (
+        <ScrollView
+          bounces={false}
+          contentContainerStyle={contentStyle}
+          style={styles.sessionAbandonScroll}
+          testID="session-abandon-scroll"
+        >
+          {content}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -671,6 +724,12 @@ const useStyles = makeStyles((theme) => ({
     top: "100%",
     zIndex: 12
   },
+  // A paused Sprint has no board or prompt to cover. Its confirmation owns
+  // normal flow so native scroll bounds include the complete card.
+  sessionLeaveConfirmationInFlow: {
+    position: "relative",
+    top: 0
+  },
   sessionNavRow: {
     alignItems: "center",
     borderBottomColor: theme.colors.border.default,
@@ -762,11 +821,17 @@ const useStyles = makeStyles((theme) => ({
   // A neutral surface keeps the tinted destructive Abandon button distinct;
   // the danger border still marks the sheet as a warning.
   sessionAbandonConfirm: {
-    alignItems: "center",
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.danger.s300,
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 1
+  },
+  sessionAbandonScroll: {
+    borderRadius: 8,
+    flexGrow: 0
+  },
+  sessionAbandonContent: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 10,
     justifyContent: "space-between",
@@ -783,7 +848,9 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center"
   },
   sessionAbandonCopyStacked: {
-    flex: 0
+    flex: 0,
+    flexBasis: "auto",
+    flexShrink: 0
   },
   sessionAbandonActionsStacked: {
     justifyContent: "flex-end"

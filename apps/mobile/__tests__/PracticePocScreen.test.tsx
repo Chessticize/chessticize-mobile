@@ -6590,6 +6590,83 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("lets an iPad top-tab page scroll behind the glass while its initial content stays clear", () => {
+    const platform = ReactNative.Platform as unknown as { isPad?: boolean };
+    const previousIsPad = platform.isPad;
+    platform.isPad = true;
+    try {
+      setPracticeViewport({
+        width: 1180,
+        height: 820,
+        scale: 2,
+        insets: { top: 24, right: 0, bottom: 20, left: 0 }
+      });
+      const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+      const shell = findByTestId(renderer, "safe-area-shell");
+      const scroll = findByTestId(renderer, "practice-main-scroll");
+
+      // The scroll view reaches the window top. Its content begins below the
+      // 24-point system inset and 72-point floating native tab bar instead.
+      expect(flattenTestStyle(shell.props.style).paddingTop).toBe(0);
+      expect(flattenTestStyle(scroll.props.contentContainerStyle).paddingTop).toBe(96);
+      expect(scroll.findByProps({ testID: "app-shell-header" })).toBeTruthy();
+
+      // Settings uses the same scroll-owned large-title header. Review owns
+      // its header but receives the same initial top clearance.
+      press(renderer, "settings-tab");
+      const settingsScroll = findByTestId(renderer, "practice-main-scroll");
+      expect(settingsScroll.findByProps({ testID: "app-shell-header" })).toBeTruthy();
+      expect(flattenTestStyle(settingsScroll.props.contentContainerStyle).paddingTop).toBe(96);
+      press(renderer, "review-tab");
+      const reviewScroll = findByTestId(renderer, "practice-main-scroll");
+      expect(() => reviewScroll.findByProps({ testID: "app-shell-header" })).toThrow();
+      expect(flattenTestStyle(reviewScroll.props.contentContainerStyle).paddingTop).toBe(96);
+    } finally {
+      if (previousIsPad === undefined) {
+        delete platform.isPad;
+      } else {
+        platform.isPad = previousIsPad;
+      }
+    }
+  });
+
+  it.each([
+    { platform: "ios", insetTop: 47 },
+    { platform: "android", insetTop: 24 }
+  ] as const)("keeps the Practice title in the main scroll on $platform without changing its safe-area start", ({ insetTop, platform: targetPlatform }) => {
+    const nativePlatform = ReactNative.Platform as unknown as { isPad?: boolean; OS: string };
+    const previousIsPad = nativePlatform.isPad;
+    const previousPlatform = nativePlatform.OS;
+    nativePlatform.OS = targetPlatform;
+    nativePlatform.isPad = false;
+    try {
+      setPracticeViewport({
+        width: 390,
+        height: 844,
+        scale: 3,
+        insets: { top: insetTop, right: 0, bottom: 20, left: 0 }
+      });
+      const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+      const shell = findByTestId(renderer, "safe-area-shell");
+      const practiceScroll = findByTestId(renderer, "practice-main-scroll");
+
+      expect(flattenTestStyle(shell.props.style).paddingTop).toBe(insetTop);
+      expect(practiceScroll.findByProps({ testID: "app-shell-header" })).toBeTruthy();
+
+      press(renderer, "settings-tab");
+      const settingsScroll = findByTestId(renderer, "practice-main-scroll");
+      expect(() => settingsScroll.findByProps({ testID: "app-shell-header" })).toThrow();
+      expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
+    } finally {
+      nativePlatform.OS = previousPlatform;
+      if (previousIsPad === undefined) {
+        delete nativePlatform.isPad;
+      } else {
+        nativePlatform.isPad = previousIsPad;
+      }
+    }
+  });
+
   it.each([
     { label: "Duo inner landscape", width: 951, height: 669, insets: { top: 0, right: 84, bottom: 20, left: 0 }, centered: true, boardSize: 525 },
     { label: "iPad landscape", width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 }, centered: true, boardSize: 640 },
@@ -6609,16 +6686,24 @@ describe("PracticePocScreen", () => {
     );
     if (centered) {
       // The board lane holds only the board, so centring the row centres the
-      // board; the rail's content block is centred beside it.
+      // board. The rail reserves feedback below a separately centred core so
+      // a previous-attempt notice cannot recenter the session controls.
       expect(content).toEqual(expect.objectContaining({
         justifyContent: "center",
         padding: 16,
         paddingBottom: 16
       }));
-      expect(rail.justifyContent).toBe("center");
+      expect(rail.justifyContent).toBeUndefined();
+      expect(flattenTestStyle(
+        findByTestId(renderer, "active-session-control-rail-core").props.style
+      ).justifyContent).toBe("center");
+      expect(flattenTestStyle(
+        findByTestId(renderer, "active-session-control-rail-feedback-slot").props.style
+      ).minHeight).toBeGreaterThan(0);
     } else {
       expect(content.justifyContent).toBe("flex-start");
       expect(rail.justifyContent).toBeUndefined();
+      expect(() => findByTestId(renderer, "active-session-control-rail-feedback-slot")).toThrow();
     }
   });
 
@@ -6707,19 +6792,24 @@ describe("PracticePocScreen", () => {
     expect(collectText(confirmation)).toContain("This ends the Sprint and records it as abandoned.");
     // Out of flow: it is anchored below the HUD it belongs to and drawn above
     // the prompt, board and counts that follow, so none of them move.
-    expect(flattenTestStyle(confirmation.props.style)).toEqual(expect.objectContaining({
-      left: 0,
-      // It fills the prompt card's slot rather than half-covering the card.
-      minHeight: buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width }).promptFrameHeight + 4,
-      position: "absolute",
-      right: 0,
-      top: "100%"
-    }));
+    expect(flattenTestStyle(confirmation.props.style).position).toBe("absolute");
+    // A scrollable confirmation must not live outside a native HUD ancestor's
+    // bounds: Android would draw it but make its buttons unreachable.
+    expect(findByTestId(renderer, "active-session-shell").findAll(
+      (node) => node.props.testID === "session-abandon-confirmation"
+    )).toHaveLength(0);
     expect(flattenTestStyle(findByTestId(renderer, "active-session-shell").props.style).zIndex)
       .toBeGreaterThan(0);
+    if (width > height) {
+      expect(findByTestId(renderer, "active-session-control-rail").props.scrollEnabled).toBe(false);
+    }
     // In a column or rail under 320 points the copy sits above the buttons
     // instead of wrapping to a word per line beside them.
-    expect(flattenTestStyle(confirmation.props.style).flexDirection).toBe(stacked ? "column" : "row");
+    const scroll = findByTestId(renderer, "session-abandon-scroll");
+    expect(flattenTestStyle(scroll.props.contentContainerStyle)).toEqual(expect.objectContaining({
+      minHeight: buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width }).promptFrameHeight + 2,
+      flexDirection: stacked ? "column" : "row"
+    }));
     // The covered prompt card leaves the accessibility tree while covered.
     expect(findByTestId(renderer, "practice-prompt-stack").props.accessibilityElementsHidden).toBe(true);
     expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
@@ -9941,6 +10031,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "session-abandon");
     expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
     expectText(renderer, "Abandon sprint?");
+    expect(findByTestId(renderer, "session-abandon-scroll").props.bounces).toBe(false);
     press(renderer, "session-abandon-cancel");
     expect(() => findByTestId(renderer, "session-abandon-confirmation")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
@@ -10061,6 +10152,16 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Sprint paused");
     expect(() => findByTestId(renderer, "session-board")).toThrow();
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    press(renderer, "paused-session-abandon");
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    // The absolute confirmation owns the paused card's slot. Rendering both
+    // leaves the paused card's border exposed beneath the confirmation.
+    expect(() => findByTestId(renderer, "paused-session-panel")).toThrow();
+    expectText(renderer, "This ends the Sprint and records it as abandoned.");
+
+    press(renderer, "session-abandon-cancel");
+    expect(findByTestId(renderer, "paused-session-panel")).toBeTruthy();
 
     press(renderer, "paused-session-resume");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();

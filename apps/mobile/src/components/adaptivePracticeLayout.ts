@@ -30,6 +30,10 @@ export type AdaptiveLayout = {
   // rail layouts use the rail width.
   sessionColumnWidth: number;
   sessionPackedRowWidth: number;
+  // The rail reserves the tallest post-answer feedback treatment whether it is
+  // currently visible or not. This keeps regular-landscape session chrome
+  // anchored while a previous-attempt notice enters or leaves below it.
+  sessionRailFeedbackReserveHeight: number;
   sessionRailGap: number;
   sessionRailWidth: number;
   usesHomeColumns: boolean;
@@ -229,6 +233,9 @@ export function buildPracticeAdaptiveLayout({
       ? boardSize
       : compactPortraitColumnWidth;
   const promptFrameHeight = promptFrameHeightFor(sessionColumnWidth, fontScale);
+  const sessionRailFeedbackReserveHeight = usesSessionRail
+    ? compactPortraitFeedbackHeight(sessionRailWidth, fontScale)
+    : 0;
   const maximumSessionRailGap = Math.max(
     0,
     sessionContentWidth - PRACTICE_UI_PADDING * 2 - boardSize - sessionRailWidth
@@ -254,6 +261,7 @@ export function buildPracticeAdaptiveLayout({
     sessionCentersRow: isRegularWidth && isLandscape,
     sessionColumnWidth,
     sessionPackedRowWidth: boardSize + sessionRailWidth + sessionRailGap,
+    sessionRailFeedbackReserveHeight,
     sessionRailGap,
     sessionRailWidth,
     usesHomeColumns,

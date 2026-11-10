@@ -147,11 +147,11 @@ async function dragAndroidElementToElement(
 }
 
 async function startSelectedPracticeRun() {
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   if (await detoxElementExists('practice-sprint-rules-dismiss')) {
     await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss', 100);
     await tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3);
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   }
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
@@ -177,7 +177,7 @@ async function completeFirstUseSessionGuides() {
         // a scroll gesture would start, so only scroll when the guide's
         // action is not already on screen.
         if (!(await detoxElementIsVisible('practice-session-guide-start'))) {
-          await element(by.id('practice-main-scroll')).scrollTo('top');
+          await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
           await waitFor(element(by.id('practice-session-guide-start')))
             .toBeVisible()
             .whileElement(by.id('practice-main-scroll'))
@@ -216,7 +216,7 @@ async function completeFirstUseSessionGuides() {
 
 async function dismissRunNameKeyboard() {
   await element(by.id('practice-run-name-input')).tapReturnKey();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   await waitFor(element(by.id('practice-run-editor-title'))).toBeVisible().withTimeout(5000);
   await element(by.id('practice-run-editor-title')).tap();
   await sleep(500);
@@ -736,7 +736,7 @@ async function waitForVisibleInPracticeScroll(testID, visibilityPercent = 75) {
   }
   // The full-screen Sprint Result (#609) owns its own scroll view.
   const scrollID = await existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll';
-  await element(by.id(scrollID)).scrollTo('top');
+  await element(by.id(scrollID)).scrollTo('top', 0.5, 0.5);
   await waitFor(target)
     .toBeVisible(visibilityPercent)
     .whileElement(by.id(scrollID))
@@ -1058,7 +1058,9 @@ async function openTab(tabTestID, contentTestID) {
   // handles the selection (#612). Container panels are taller than the
   // viewport, so assert on a child.
   await waitFor(element(by.id('practice-main-scroll'))).toExist().withTimeout(10000);
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  // iPad content underlaps native top tabs. Start the gesture at the
+  // viewport center so the floating bar cannot intercept it.
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   // The native tab switch animates; let a target near the top settle before
   // scrolling for one further down.
   try {

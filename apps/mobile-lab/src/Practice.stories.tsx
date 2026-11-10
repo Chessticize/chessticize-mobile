@@ -1181,8 +1181,26 @@ export const ExitConfirmation: Story = {
   args: { scenarioId: "practice-exit-confirmation" },
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
-    await clickTestId(canvasElement, "session-abandon");
+    await clickTestId(canvasElement, "session-pause");
+    await waitForTestId(canvasElement, "paused-session-panel");
+    await clickTestId(canvasElement, "paused-session-abandon");
     await waitForTestId(canvasElement, "session-abandon-confirmation");
+    expectTestIdAbsent(canvasElement, "paused-session-panel");
+    for (const copy of ["session-abandon-title", "session-abandon-description"]) {
+      await expectTestIdsNotOverlapping(canvasElement, copy, "session-abandon-cancel");
+      await expectTestIdsNotOverlapping(canvasElement, copy, "session-abandon-confirm");
+    }
+  }
+};
+
+export const ActiveExitConfirmation: Story = {
+  name: "Active session · exit confirmation",
+  args: { scenarioId: "practice-active" },
+  play: async ({ canvasElement }) => {
+    await openPracticeSession(canvasElement);
+    await waitForTestId(canvasElement, "session-abandon");
+    await clickTestId(canvasElement, "session-abandon");
+    await waitForTestId(canvasElement, "session-abandon-scroll");
   }
 };
 

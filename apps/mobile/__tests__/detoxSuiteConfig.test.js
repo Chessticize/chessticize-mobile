@@ -983,7 +983,7 @@ describe('Detox suite configuration', () => {
     const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible(visibilityPercent)');
     // The full-screen Sprint Result owns its own scroll view (#609).
     const chooseScroll = helper.indexOf("existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll'");
-    const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top')");
+    const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top', 0.5, 0.5)");
     const requireVisible = helper.indexOf('.toBeVisible(visibilityPercent)', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
@@ -1021,7 +1021,7 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const raceProtectedActionStart = helper.indexOf('try {');
-    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5)");
     const requireVisible = helper.indexOf('.toBeVisible()');
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
     const tapGuideAction = helper.indexOf("element(by.id('practice-session-guide-start')).tap()");
@@ -1234,7 +1234,7 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const submitName = helper.indexOf("element(by.id('practice-run-name-input')).tapReturnKey()");
-    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5)");
     const tapPublicTitle = helper.indexOf("element(by.id('practice-run-editor-title')).tap()");
 
     expect(submitName).toBeGreaterThan(0);
@@ -1913,6 +1913,36 @@ describe('Detox suite configuration', () => {
     expect(launchHelper.indexOf('setMarketingOrientationBeforeNavigation'))
       .toBeGreaterThan(launchHelper.indexOf('launchWithDisabledSynchronization'));
 
+    const prepareHelperStart = spec.indexOf('async function prepareFrame');
+    const prepareHelperEnd = spec.indexOf('async function assertCompositionViewport', prepareHelperStart);
+    const prepareHelper = spec.slice(prepareHelperStart, prepareHelperEnd);
+    // Campaign screen roots may be taller than the viewport. Readiness uses
+    // existence; the capture controls themselves are later required to be
+    // visible and geometrically contained before a screenshot is taken.
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('practice-home'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('focused-run-preview'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "target.deviceFamily === 'iphone' ? 64 : 72, 'down', 0.5, 0.5"
+    );
+    expect(prepareHelper).toContain(
+      "element(by.id('practice-main-scroll')).scroll(136, 'down', 0.5, 0.5)"
+    );
+    expect(prepareHelper).toContain("target.deviceFamily === 'iphone'");
+    expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
+    expect(spec).toContain('frame.captureAnchorTestId === testID');
+    expect(spec).toContain('TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE');
+    expect(spec).toContain("by.text(TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE)");
+
     const customRunHelperStart = spec.indexOf('async function prepareCustomRun');
     const customRunHelperEnd = spec.indexOf(
       'async function assertCompositionViewport',
@@ -2133,7 +2163,11 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain('tapAndroidUiNode');
     expect(spec).not.toContain('waitForAndroidUiState');
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
-    const submitFirstWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    const completeAndroidWrongMoves = spec.indexOf('async function completeAndroidWrongMoves()');
+    const submitFirstWrongBoardMove = spec.indexOf(
+      "playBoardMove('session-board', 'c2b3')",
+      completeAndroidWrongMoves
+    );
     expect(spec).not.toContain(
       "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
     );
@@ -2145,7 +2179,10 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('move-feedback-overlay'))).not.toExist()",
       verifyFirstWrongMoveResult
     );
-    const submitSecondWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
+    const submitSecondWrongBoardMove = spec.indexOf(
+      "playBoardMove('session-board', 'c4b5')",
+      submitFirstWrongBoardMove
+    );
     const restorePortrait = spec.indexOf(
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
@@ -2159,7 +2196,8 @@ describe('Detox suite configuration', () => {
       settleRestoredPortrait
     );
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
-    expect(submitFirstWrongBoardMove).toBeGreaterThan(verifyRestoredPuzzle);
+    expect(completeAndroidWrongMoves).toBeGreaterThan(verifyRestoredPuzzle);
+    expect(submitFirstWrongBoardMove).toBeGreaterThan(completeAndroidWrongMoves);
     expect(verifyFirstWrongMoveResult).toBeGreaterThan(submitFirstWrongBoardMove);
     expect(waitForFeedbackToSettle).toBeGreaterThan(verifyFirstWrongMoveResult);
     expect(submitSecondWrongBoardMove).toBeGreaterThan(waitForFeedbackToSettle);

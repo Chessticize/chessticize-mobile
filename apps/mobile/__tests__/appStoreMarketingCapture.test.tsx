@@ -1,9 +1,11 @@
 import {
   appStoreMarketingCaptureFrameIds,
+  appStoreMarketingReleaseCampaignFrameIds,
   appStoreMarketingCaptureStory,
   loadAppStoreMarketingCaptureFixture
-} from "../src/testing/appStoreMarketingCapture.ts";
+} from "../src/testing/appStoreMarketingCapture.tsx";
 import { createMobilePracticeService } from "../src/platform/mobilePractice.ts";
+import { reviewQueueForecast } from "../../../packages/core/src/index.ts";
 
 function loadFixture(frameId: string) {
   const practiceService = createMobilePracticeService();
@@ -14,6 +16,20 @@ function loadFixture(frameId: string) {
 }
 
 describe("App Store marketing capture fixture", () => {
+  it("keeps the 1.6 user's scheduled Review current through real completed reviews", () => {
+    const { practiceService } = loadFixture("review");
+    const now = appStoreMarketingCaptureStory().captureClock.instant;
+    expect(reviewQueueForecast(practiceService.listReviewQueue(), now)).toMatchObject({
+      overdueCount: 0,
+      todayCount: practiceService.listReviewQueue().length - 2
+    });
+    expect(practiceService.listCompletedReviewsForDay(now)).toHaveLength(2);
+    const presentation = practiceService.getReviewTodayPresentation(now);
+    expect(presentation.completedItems).toHaveLength(2);
+    expect(presentation.dueItems.length).toBeGreaterThan(0);
+    expect(presentation.dueItems.every((item) => !item.overdue)).toBe(true);
+  });
+
   it("accepts only the approved six-frame story", () => {
     expect(appStoreMarketingCaptureFrameIds()).toEqual([
       "build-tactical-intuition",
@@ -25,6 +41,67 @@ describe("App Store marketing capture fixture", () => {
     ]);
     expect(() => loadFixture("unknown-frame"))
       .toThrow('Unknown App Store marketing capture frame "unknown-frame"');
+  });
+
+  it("keeps the 1.6 campaign separate from the approved v1 story and derives its profile from simulated play", () => {
+    expect(appStoreMarketingReleaseCampaignFrameIds()).toEqual([
+      "practice-home",
+      "dark-arrow-duel",
+      "tactical-profile",
+      "focused-run",
+      "survival",
+      "review"
+    ]);
+
+    const profile = loadFixture("tactical-profile");
+    const focusedRun = loadFixture("focused-run");
+    const arrowDuel = loadFixture("dark-arrow-duel");
+    expect(profile.practiceService.exportLocalData())
+      .toEqual(focusedRun.practiceService.exportLocalData());
+
+    expect(profile.fixture.campaign).toEqual({
+      id: "mobile-1.6-en-us",
+      publicVersion: "1.6.0",
+      status: "capture-plan"
+    });
+    expect(profile.fixture.appearance).toBe("light");
+    expect(arrowDuel.fixture.appearance).toBe("dark");
+    expect(arrowDuel.fixture.initialActiveState?.currentPuzzle).toMatchObject({
+      kind: "arrow_duel",
+      phase: "reply",
+      selectedMove: expect.any(String),
+      replyStartedAt: expect.any(String),
+      replyDeadlineAt: expect.any(String)
+    });
+    expect(profile.practiceService.countHistory()).toBeGreaterThan(0);
+    expect(profile.practiceService.listReviewQueue()).not.toHaveLength(0);
+    expect(profile.practiceService.getTacticalProfileSnapshot(
+      appStoreMarketingCaptureStory().captureClock.instant
+    )).toMatchObject({
+      phase: expect.any(String),
+      evaluation: {
+        signals: expect.arrayContaining([
+          expect.objectContaining({
+            status: "recommended",
+            theme: "fork"
+          })
+        ])
+      }
+    });
+    expect(profile.practiceService.getTacticalProfileSnapshot(
+      appStoreMarketingCaptureStory().captureClock.instant
+    )?.evaluation.signals.map((signal) => ({ theme: signal.theme, status: signal.status })))
+      .toEqual([{ theme: "fork", status: "recommended" }]);
+    expect(profile.fixture.tacticalProfilePresentation).toMatchObject({
+      screen: "profile",
+      assurance: "provisional"
+    });
+    expect(focusedRun.fixture.tacticalProfilePresentation).toMatchObject({
+      screen: "focused_run",
+      focusedRun: expect.objectContaining({
+        taskFamily: "line"
+      })
+    });
   });
 
   it("loads one deterministic fictional user without weakness recommendations", () => {
