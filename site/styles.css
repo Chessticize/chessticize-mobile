@@ -222,6 +222,7 @@ footer nav a:hover {
 }
 .button {
   display: inline-flex;
+  flex-direction: column;
   min-width: 148px;
   max-width: 100%;
   min-height: 50px;

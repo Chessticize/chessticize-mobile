@@ -58,6 +58,15 @@ test("landing notice action and focused skip links have readable rendered contra
         const page = await browser.newPage();
         await page.emulateMedia({ colorScheme });
         await page.goto(`${server.url}${route}`, { waitUntil: "networkidle" });
+        if (route.includes("android")) {
+          const kicker = await page.locator(".button-kicker").boundingBox();
+          const label = await page.locator(".button-kicker + strong").boundingBox();
+          assert.ok(kicker && label);
+          assert.ok(
+            kicker.y + kicker.height <= label.y,
+            `Android ${colorScheme} download label must stay below its kicker`
+          );
+        }
         await page.locator(".skip-link").focus();
         const colors = await colorsFor(page);
         assert.ok(
