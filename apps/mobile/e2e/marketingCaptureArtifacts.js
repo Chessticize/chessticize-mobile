@@ -21,12 +21,15 @@ const IPHONE_6_9_PORTRAIT_SIZES = [
   { width: 1290, height: 2796 },
   { width: 1320, height: 2868 },
 ];
+const IPHONE_DUO_INNER_LANDSCAPE_SIZES = [
+  { width: 2853, height: 2007 },
+];
 
 function resolveMarketingCaptureTarget(environment, story) {
   const deviceFamily = environment.CHESSTICIZE_MARKETING_DEVICE_FAMILY;
-  if (deviceFamily !== 'iphone' && deviceFamily !== 'ipad') {
+  if (deviceFamily !== 'iphone' && deviceFamily !== 'ipad' && deviceFamily !== 'iphoneDuo') {
     throw new Error(
-      'CHESSTICIZE_MARKETING_DEVICE_FAMILY must be iphone or ipad.'
+      'CHESSTICIZE_MARKETING_DEVICE_FAMILY must be iphone, ipad, or iphoneDuo.'
     );
   }
   const deviceName = String(environment.DETOX_IOS_DEVICE ?? '').trim();
@@ -42,6 +45,28 @@ function resolveMarketingCaptureTarget(environment, story) {
     throw new Error(
       `The 13-inch iPad capture requires a 13-inch profile; received "${deviceName}".`
     );
+  }
+  if (deviceFamily === 'iphoneDuo') {
+    const duoContract = story.releaseCampaign?.deviceTargets?.iphoneDuo;
+    if (!story.campaign || !duoContract?.evidenceOnly) {
+      throw new Error('iPhone Duo capture is available only for the evidence-only release campaign.');
+    }
+    if (!/duo/i.test(deviceName)) {
+      throw new Error(
+        `The iPhone Duo capture requires a Duo Simulator profile; received "${deviceName}".`
+      );
+    }
+    return {
+      deviceFamily,
+      deviceName,
+      displayGroup: 'iphone-duo-inner',
+      orientation: 'landscape',
+      navigation: duoContract.navigation,
+      evidenceOnly: true,
+      display: 'inner',
+      outputDirectoryName: 'iphone-duo-inner-landscape',
+      acceptedSizes: IPHONE_DUO_INNER_LANDSCAPE_SIZES,
+    };
   }
 
   const contract = story.deviceTargets[deviceFamily];
@@ -130,6 +155,8 @@ function captureMarketingScreenshot({
 }
 
 function writeDeviceCaptureManifest({
+  captureProvenance,
+  evidenceFrameIds,
   outputRoot,
   records,
   sourceCommit,
@@ -139,18 +166,38 @@ function writeDeviceCaptureManifest({
   const expectedFrames = story.frames
     .slice()
     .sort((left, right) => left.order - right.order);
+  const expectedEvidenceFrames = evidenceFrameIds === undefined
+    ? expectedFrames
+    : evidenceFrameIds.map((frameId) => {
+      const frame = expectedFrames.find((candidate) => candidate.id === frameId);
+      if (!frame) {
+        throw new Error(`Unknown iPhone Duo evidence frame: ${frameId}.`);
+      }
+      return frame;
+    });
+  if (evidenceFrameIds !== undefined && !target.evidenceOnly) {
+    throw new Error('Partial marketing captures are available only for evidence-only targets.');
+  }
+  if (
+    evidenceFrameIds !== undefined
+    && (expectedEvidenceFrames.length === 0 || new Set(evidenceFrameIds).size !== evidenceFrameIds.length)
+  ) {
+    throw new Error('iPhone Duo evidence frames must be a non-empty unique selection.');
+  }
   const ordered = records
     .slice()
     .sort((left, right) => left.order - right.order);
   if (
-    ordered.length !== expectedFrames.length
+    ordered.length !== expectedEvidenceFrames.length
     || ordered.some((record, index) =>
-      record.captureId !== expectedFrames[index].captureId
-      || record.order !== expectedFrames[index].order
+      record.captureId !== expectedEvidenceFrames[index].captureId
+      || record.order !== expectedEvidenceFrames[index].order
     )
   ) {
     throw new Error(
-      `Marketing ${target.deviceFamily} manifest must contain the approved six-frame order.`
+      evidenceFrameIds === undefined
+        ? `Marketing ${target.deviceFamily} manifest must contain the approved six-frame order.`
+        : 'iPhone Duo evidence manifest must contain its approved selected-frame order.'
     );
   }
   if (ordered.some((record) => record.sourceCommit !== sourceCommit)) {
@@ -175,7 +222,18 @@ function writeDeviceCaptureManifest({
       deviceName: target.deviceName,
       displayGroup: target.displayGroup,
       orientation: target.orientation,
+      ...(target.evidenceOnly ? {
+        captureRole: 'evidence-only',
+        display: target.display,
+        navigation: target.navigation,
+      } : {}),
     },
+    ...(captureProvenance === undefined ? {} : { captureProvenance }),
+    ...(evidenceFrameIds === undefined ? {} : {
+      evidenceSelection: {
+        frameIds: evidenceFrameIds,
+      },
+    }),
     frames: ordered,
   };
   mkdirSync(outputRoot, { recursive: true });
@@ -423,6 +481,7 @@ function assertCaptureDimensions(png, target) {
 
 module.exports = {
   IPHONE_6_9_PORTRAIT_SIZES,
+  IPHONE_DUO_INNER_LANDSCAPE_SIZES,
   assertCaptureDimensions,
   captureMarketingScreenshot,
   resolveIosLandscapeValidationTarget,

@@ -73,6 +73,37 @@ describe('App Store marketing capture artifacts', () => {
     }, story)).toThrow('requires a 13-inch profile');
   });
 
+  it('accepts only the true inner iPhone Duo evidence target for the 1.6 campaign', () => {
+    const campaign = resolveMarketingCampaign(story, 'mobile-1.6-en-us');
+    const target = resolveMarketingCaptureTarget({
+      CHESSTICIZE_MARKETING_DEVICE_FAMILY: 'iphoneDuo',
+      DETOX_IOS_DEVICE: 'Chessticize 706 Duo Inner',
+    }, campaign);
+
+    expect(target).toEqual({
+      deviceFamily: 'iphoneDuo',
+      deviceName: 'Chessticize 706 Duo Inner',
+      displayGroup: 'iphone-duo-inner',
+      orientation: 'landscape',
+      navigation: 'adaptive-columns',
+      evidenceOnly: true,
+      display: 'inner',
+      outputDirectoryName: 'iphone-duo-inner-landscape',
+      acceptedSizes: [{ width: 2853, height: 2007 }],
+    });
+    expect(() => assertCaptureDimensions({ width: 2853, height: 2007 }, target)).not.toThrow();
+    expect(() => assertCaptureDimensions({ width: 1398, height: 2034 }, target))
+      .toThrow('must be landscape');
+    expect(() => resolveMarketingCaptureTarget({
+      CHESSTICIZE_MARKETING_DEVICE_FAMILY: 'iphoneDuo',
+      DETOX_IOS_DEVICE: 'iPhone 17 Pro Max',
+    }, campaign)).toThrow('requires a Duo Simulator profile');
+    expect(() => resolveMarketingCaptureTarget({
+      CHESSTICIZE_MARKETING_DEVICE_FAMILY: 'iphoneDuo',
+      DETOX_IOS_DEVICE: 'Chessticize 706 Duo Inner',
+    }, story)).toThrow('available only for the evidence-only release campaign');
+  });
+
   it('copies a full-resolution raw PNG and records deterministic provenance', () => {
     const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-capture-'));
     const sourcePath = join(outputRoot, 'source.png');
@@ -174,6 +205,78 @@ describe('App Store marketing capture artifacts', () => {
       moment: 'opponent-reply',
       storyId: 'practice--arrow-duel-prompt',
     });
+  });
+
+  it('keeps iPhone Duo evidence out of the upload handoff and records reused-App provenance', () => {
+    const campaign = resolveMarketingCampaign(story, 'mobile-1.6-en-us');
+    const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-duo-evidence-'));
+    const sourcePath = join(outputRoot, 'source.png');
+    writeFileSync(sourcePath, PNG.sync.write(new PNG({ width: 2853, height: 2007 })));
+    const target = resolveMarketingCaptureTarget({
+      CHESSTICIZE_MARKETING_DEVICE_FAMILY: 'iphoneDuo',
+      DETOX_IOS_DEVICE: 'Chessticize 706 Duo Inner',
+    }, campaign);
+    const sourceCommit = 'e'.repeat(40);
+    const manifestPath = writeDeviceCaptureManifest({
+      outputRoot,
+      records: campaign.frames.map((frame) => captureMarketingScreenshot({
+        frame, outputRoot, screenshotPath: sourcePath, sourceCommit, story: campaign, target,
+      })),
+      sourceCommit,
+      story: campaign,
+      target,
+      captureProvenance: {
+        appSourceCommit: sourceCommit,
+        testRunnerCommit: 'f'.repeat(40),
+        appInputDigest: '1'.repeat(64),
+        appArtifactName: 'Chessticize.app',
+        appArtifactSha256: '2'.repeat(64),
+      },
+    });
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+    expect(manifest.target).toEqual({
+      deviceFamily: 'iphoneDuo',
+      deviceName: 'Chessticize 706 Duo Inner',
+      displayGroup: 'iphone-duo-inner',
+      orientation: 'landscape',
+      captureRole: 'evidence-only',
+      display: 'inner',
+      navigation: 'adaptive-columns',
+    });
+    expect(manifest.captureProvenance).toMatchObject({
+      appSourceCommit: sourceCommit,
+      testRunnerCommit: 'f'.repeat(40),
+    });
+    expect(manifest.frames).toHaveLength(6);
+    expect(manifest.frames[0].file).toBe('iphone-duo-inner-landscape/practice-home.png');
+  });
+
+  it('allows an explicitly selected strict iPhone Duo evidence frame only', () => {
+    const campaign = resolveMarketingCampaign(story, 'mobile-1.6-en-us');
+    const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-duo-selected-evidence-'));
+    const sourcePath = join(outputRoot, 'source.png');
+    writeFileSync(sourcePath, PNG.sync.write(new PNG({ width: 2853, height: 2007 })));
+    const target = resolveMarketingCaptureTarget({
+      CHESSTICIZE_MARKETING_DEVICE_FAMILY: 'iphoneDuo',
+      DETOX_IOS_DEVICE: 'Chessticize 706 Duo Inner',
+    }, campaign);
+    const sourceCommit = 'a'.repeat(40);
+    const arrowDuel = campaign.frames.find((frame) => frame.id === 'dark-arrow-duel');
+    const record = captureMarketingScreenshot({
+      frame: arrowDuel, outputRoot, screenshotPath: sourcePath, sourceCommit, story: campaign, target,
+    });
+    const manifestPath = writeDeviceCaptureManifest({
+      outputRoot, records: [record], sourceCommit, story: campaign, target,
+      evidenceFrameIds: ['dark-arrow-duel'],
+    });
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    expect(manifest.evidenceSelection).toEqual({ frameIds: ['dark-arrow-duel'] });
+    expect(manifest.frames.map((frame) => frame.frameId)).toEqual(['dark-arrow-duel']);
+    expect(() => writeDeviceCaptureManifest({
+      outputRoot, records: [record], sourceCommit, story: campaign,
+      target: { ...target, evidenceOnly: false }, evidenceFrameIds: ['dark-arrow-duel'],
+    })).toThrow('only for evidence-only targets');
   });
 
   it('finalizes the 1.6 campaign with its exact campaign and release-frame contract', () => {
@@ -388,6 +491,26 @@ describe('App Store marketing capture artifacts', () => {
     expect(wrapper).toContain(
       '"$ORIENTATION_RUNNER" "$IPAD_UDID" "$IPAD_DEVICE_NAME" portrait'
     );
+  });
+
+  it('runs the iPhone Duo set as separate inner-display evidence from an authenticated App', () => {
+    const wrapper = readFileSync(
+      join(__dirname, '../e2e/capture-iphone-duo-marketing-evidence.sh'),
+      'utf8'
+    );
+
+    expect(wrapper).toContain('CHESSTICIZE_MARKETING_DEVICE_FAMILY=iphoneDuo');
+    expect(wrapper).toContain('CHESSTICIZE_DUO_INNER_SCREEN_DISPLAY:-primary-1');
+    expect(wrapper).toContain('CHESSTICIZE_MARKETING_IOS_SCREENSHOT_DISPLAY="$INNER_SCREEN_DISPLAY"');
+    expect(wrapper).toContain('xcrun simctl io "$DUO_DEVICE_UDID" enumerate');
+    expect(wrapper).toContain('content_size large');
+    expect(wrapper).toContain('CHESSTICIZE_MARKETING_CAPTURE_PROVENANCE_FILE');
+    expect(wrapper).toContain('verify-artifact');
+    expect(wrapper).toContain('status_bar "$DUO_DEVICE_UDID" override');
+    expect(wrapper).toContain('xcrun simctl shutdown "$DUO_DEVICE_UDID"');
+    expect(wrapper).toContain('Two simulators are already booted');
+    expect(wrapper).toContain('CHESSTICIZE_DUO_PRECONFIGURED_POSTURE');
+    expect(wrapper).toContain('Duo inner landscape posture must be configured in Device Hub');
   });
 
   it('documents clean-host simulator and Accessibility setup', () => {
