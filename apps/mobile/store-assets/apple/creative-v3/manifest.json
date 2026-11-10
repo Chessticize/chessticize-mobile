@@ -59,8 +59,8 @@
       "height": 1646,
       "channels": 3,
       "alpha": false,
-      "sha256": "b0f079c68ab85f8fc9a5d4a3fc1f8becfcea85f8d1e35d2ed0f276a7f60445ac",
-      "bytes": 3518991,
+      "sha256": "fdb57728f799bf051fa3790f5e3b5c8f7929bb0d22f97e344ceefe755d73bb44",
+      "bytes": 3548640,
       "backgroundSource": "source/header-background.png",
       "safeArea": [
         1097,
@@ -69,9 +69,9 @@
         1154
       ],
       "device": {
-        "x": 2060,
-        "y": 45,
-        "w": 700
+        "x": 2110,
+        "y": 85,
+        "w": 660
       }
     },
     {
@@ -97,6 +97,14 @@
       }
     }
   ],
+  "designApproval": {
+    "searchResults": {
+      "status": "owner-approved",
+      "date": "2026-11-10",
+      "sha256": "69aa63962c3c705daac125549b96aff518e9f94b9758cfbb6520ae16e2828f02"
+    },
+    "header": "in-review"
+  },
   "delivery": {
     "uploaded": false,
     "submitted": false,

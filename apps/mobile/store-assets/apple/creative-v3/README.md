@@ -68,7 +68,12 @@ dependency or native code changes are included.
 
 ## Delivery
 
-These images replace v2 as the current **design review candidates** in the PR.
+Search Results was **owner-approved on 2026-11-10** and is locked at SHA-256
+`69aa63962c3c705daac125549b96aff518e9f94b9758cfbb6520ae16e2828f02`.
+Its PNG and preview files remain unchanged during Header revisions.
+Header remains a design review candidate; its left typography is enlarged
+and the handset shifted right while keeping the complete board in the safe area.
+These images supersede v2 in the PR.
 They have not been uploaded, submitted, selected in live placements or
 published. The rejected v1 standalone asset submission remains withdrawn.
 The existing Android graphic and approved 1.6.0 app have not been changed.
