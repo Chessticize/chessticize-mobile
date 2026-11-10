@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "campaign": "next-move-v1",
+  "createdDate": "2026-11-10",
+  "appId": "6788610123",
+  "appVersionAtCreation": "1.6.0",
+  "assets": [
+    {
+      "placement": "header",
+      "file": "header-3840x1646-v1.png",
+      "sha256": "0a965df31a1595f3a9e62ca80bb59d057ffda464793f35b386a0a6aadb54604f",
+      "bytes": 4300586,
+      "dimensions": [
+        3840,
+        1646
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "colorSpace": "sRGB",
+      "generationTool": "built-in image_gen",
+      "generatedSourceDimensions": [
+        1914,
+        822
+      ],
+      "generatedSourceSha256": "1bc5dc6d0a3df01a0b8faf7f8426c4564912fcaacf28db792c201f5958548230",
+      "export": "Sharp resize to required dimensions; no content retouching",
+      "safeArea": {
+        "left": 1097,
+        "top": 493,
+        "right": 2743,
+        "bottom": 1154
+      },
+      "safeAreaProof": "header-safe-area.jpg",
+      "appleTemplateSha256": "4200f416adcf3affb70d5847c1d0554fc39b7405110ec527bdea92bfb82f93b0",
+      "appleSpecId": "1eb43b80-e0b7-4d96-bd32-47a42a8c5fed",
+      "ascAssetId": "22800019-4a1f-884b-8007-a5bee6e6a453"
+    },
+    {
+      "placement": "search-results",
+      "file": "search-results-3840x2560-v1.png",
+      "sha256": "12d4b462fb5345f52126bca2317fae6a5dd7a8d8cf41ba8987ffa66af430a975",
+      "bytes": 4779744,
+      "dimensions": [
+        3840,
+        2560
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "colorSpace": "sRGB",
+      "generationTool": "built-in image_gen",
+      "generatedSourceDimensions": [
+        1536,
+        1024
+      ],
+      "generatedSourceSha256": "2246aa9fc0ce16e57f3178227147a4a7520af34def52ae02508b931fa6ba02dd",
+      "export": "Sharp resize to required dimensions; no content retouching",
+      "safeArea": {
+        "left": 836,
+        "top": 765,
+        "right": 3004,
+        "bottom": 1795
+      },
+      "safeAreaProof": "search-results-safe-area.jpg",
+      "appleTemplateSha256": "7bb57a3c33cc4402d1c82e85a0211cf0f2f2b1c05cf7f36e4710092226dea056",
+      "appleSpecId": "d2ffa3b7-6c55-5cdf-8512-229d92791333",
+      "ascAssetId": "7f400019-4a1f-884b-802f-f872fe02ff50"
+    }
+  ]
+}
