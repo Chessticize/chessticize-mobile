@@ -1,5 +1,7 @@
 /* global by, describe, device, element, expect, it, waitFor */
 
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
 const { resolve } = require('node:path');
 const {
   accessibilityLabelFromAttributes,
@@ -89,6 +91,7 @@ const outputRoot = resolve(
     ?? resolve(repositoryRoot, 'scratch/store-assets/marketing/raw')
 );
 const sourceCommit = sourceCommitForCapture(repositoryRoot);
+const captureProvenance = loadCaptureProvenance(process.env);
 let target;
 if (verifyIosLandscapeLayout) {
   target = resolveIosLandscapeValidationTarget(process.env);
@@ -97,6 +100,7 @@ if (verifyIosLandscapeLayout) {
 } else {
   target = resolveMarketingCaptureTarget(process.env, story);
 }
+const selectedEvidenceFrameIds = resolveSelectedEvidenceFrameIds(process.env, story, target);
 const androidArtifact = isGooglePlayCapture
   ? resolveGooglePlayArtifactIdentity({
       environment: process.env,
@@ -106,7 +110,7 @@ const androidArtifact = isGooglePlayCapture
   : undefined;
 
 describeMarketingAssets('deterministic store marketing journey', () => {
-  it('validates the approved six-frame story from deterministic product state', async () => {
+  it('validates the approved marketing frames from deterministic product state', async () => {
     if (verifyIosLandscapeLayout && isGooglePlayCapture) {
       throw new Error('iOS landscape layout validation requires the App Store journey.');
     }
@@ -121,7 +125,10 @@ describeMarketingAssets('deterministic store marketing journey', () => {
       throw new Error('App Store marketing capture requires an iOS Simulator.');
     }
     const records = [];
-    for (const frame of story.frames.slice().sort((left, right) => left.order - right.order)) {
+    const frames = selectedEvidenceFrameIds === undefined
+      ? story.frames.slice().sort((left, right) => left.order - right.order)
+      : selectedEvidenceFrameIds.map((frameId) => story.frames.find((frame) => frame.id === frameId));
+    for (const frame of frames) {
       await launchMarketingFrame(frame);
       await prepareFrame(frame);
       await assertFrameContract(frame);
@@ -164,6 +171,8 @@ describeMarketingAssets('deterministic store marketing journey', () => {
       });
     } else {
       writeDeviceCaptureManifest({
+        captureProvenance,
+        evidenceFrameIds: selectedEvidenceFrameIds,
         outputRoot,
         records,
         sourceCommit,
@@ -201,6 +210,24 @@ async function launchMarketingFrame(frame) {
   await waitForStableOrientation(target.orientation);
 }
 
+function resolveSelectedEvidenceFrameIds(environment, campaignStory, captureTarget) {
+  const raw = String(environment.CHESSTICIZE_MARKETING_EVIDENCE_FRAME_IDS ?? '').trim();
+  if (!raw) return undefined;
+  if (!captureTarget.evidenceOnly) {
+    throw new Error('CHESSTICIZE_MARKETING_EVIDENCE_FRAME_IDS is available only for evidence-only targets.');
+  }
+  const frameIds = raw.split(',').map((frameId) => frameId.trim()).filter(Boolean);
+  if (frameIds.length === 0 || new Set(frameIds).size !== frameIds.length) {
+    throw new Error('CHESSTICIZE_MARKETING_EVIDENCE_FRAME_IDS must be a non-empty unique comma-separated list.');
+  }
+  for (const frameId of frameIds) {
+    if (!campaignStory.frames.some((frame) => frame.id === frameId)) {
+      throw new Error(`CHESSTICIZE_MARKETING_EVIDENCE_FRAME_IDS includes unknown frame ${frameId}.`);
+    }
+  }
+  return frameIds;
+}
+
 async function prepareFrame(frame) {
   switch (frame.id) {
     case 'practice-home':
@@ -219,6 +246,12 @@ async function prepareFrame(frame) {
         await element(by.id('practice-main-scroll')).scroll(
           target.deviceFamily === 'iphone' ? 64 : 72, 'down', 0.5, 0.5
         );
+      } else if (target.deviceFamily === 'iphoneDuo') {
+        // The inner landscape panel starts below the wide Duo first fold.
+        // Use the public scroll surface. Detox cannot report 100% coverage for
+        // this grouped scroll card; geometry validation below proves the whole
+        // card and Start remain in the screenshot.
+        await waitForVisibleInPracticeScroll('training-focus-card');
       }
       return;
     case 'dark-arrow-duel':
@@ -777,18 +810,68 @@ async function takeReadyScreenshot(frame) {
     && frame.id !== 'choose-the-best-move'
     && frame.id !== 'dark-arrow-duel'
   ) {
-    return device.takeScreenshot(frame.captureId);
+    return takeMarketingScreenshot(frame.captureId);
   }
   const boardFrame = await frameFor(element(by.id('session-board')));
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   return waitForBoardScreenshotContainsPieces({
     boardFrame,
-    captureScreenshot: (label) => device.takeScreenshot(label),
+    captureScreenshot: (label) => takeMarketingScreenshot(label),
     screenFrame,
     screenshotLabel: frame.captureId,
   }, {
     timeoutMs: 10000,
   });
+}
+
+function takeMarketingScreenshot(label) {
+  const requestedDisplay = process.env.CHESSTICIZE_MARKETING_IOS_SCREENSHOT_DISPLAY;
+  if (device.getPlatform() !== 'ios' || !requestedDisplay) {
+    return device.takeScreenshot(label);
+  }
+  const directory = resolve(outputRoot, `detox-${target.deviceFamily}`, 'display-screenshots');
+  fs.mkdirSync(directory, { recursive: true });
+  const screenshotPath = resolve(directory, `${label}.png`);
+  try {
+    execFileSync('xcrun', [
+      'simctl',
+      'io',
+      device.id,
+      'screenshot',
+      `--display=${requestedDisplay}`,
+      screenshotPath,
+    ], { encoding: 'utf8' });
+  } catch (error) {
+    const stderr = String(error.stderr ?? '').trim();
+    throw new Error(
+      `simctl display screenshot failed for ${requestedDisplay}: ${stderr || error.message}`
+    );
+  }
+  return screenshotPath;
+}
+
+function loadCaptureProvenance(environment) {
+  const file = String(environment.CHESSTICIZE_MARKETING_CAPTURE_PROVENANCE_FILE ?? '').trim();
+  if (!file) return undefined;
+  const provenance = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const source = String(environment.CHESSTICIZE_SOURCE_COMMIT ?? '').trim();
+  if (
+    !/^[0-9a-f]{40}$/i.test(source)
+    || provenance.appSourceSha !== source
+    || !/^[0-9a-f]{40}$/i.test(provenance.testRunnerSha ?? '')
+    || provenance.appBuildInputsUnchanged !== true
+    || !/^[0-9a-f]{64}$/i.test(provenance.artifactSha256 ?? '')
+    || typeof provenance.artifactName !== 'string'
+  ) {
+    throw new Error('Marketing capture provenance must authenticate the reused app artifact.');
+  }
+  return {
+    appSourceCommit: provenance.appSourceSha,
+    testRunnerCommit: provenance.testRunnerSha,
+    appInputDigest: provenance.appInputDigest,
+    appArtifactName: provenance.artifactName,
+    appArtifactSha256: provenance.artifactSha256,
+  };
 }
 
 async function setMarketingOrientationBeforeNavigation() {
