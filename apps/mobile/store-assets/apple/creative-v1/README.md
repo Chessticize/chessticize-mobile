@@ -18,7 +18,8 @@ move-path illustrations rather than in-app UI.
 ## Source and export
 
 Created with built-in `image_gen`; the generation and refinement prompts are
-retained in `prompts.json`. Selected generated resolutions were 1914 × 822 for
+retained in `prompts.json`; the selected original PNGs are preserved in
+`source/`. Selected generated resolutions were 1914 × 822 for
 the Header and 1536 × 1024 for Search Results. Sharp resized each image to the
 required upload dimensions, removed alpha, and exported sRGB RGB PNGs. No
 app UI was generated or retouched. `manifest.json` records the original-image
