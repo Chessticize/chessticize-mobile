@@ -11,7 +11,7 @@ const plannedIOSReleaseNote = fs.readFileSync(
   path.join(
     repoRoot,
     "docs/releases",
-    `${appStoreMetadata.nextVersionWhatsNew.sourceTag}.md`
+    `${appStoreMetadata.currentVersionWhatsNew.sourceTag}.md`
   ),
   "utf8"
 );
@@ -136,13 +136,13 @@ describe("App Store assets document", () => {
 
   it("keeps reusable What's New copy benefit-first and free of raw URLs", () => {
     const template = appStoreMetadata.whatsNewTemplate;
-    const plannedVersion = appStoreMetadata.nextVersionWhatsNew;
+    const plannedVersion = appStoreMetadata.currentVersionWhatsNew;
     const draft = plannedVersion.storeCopy;
 
     expect(template.storeCopy).toBe(storeCopyTemplateBlock());
     expect(template.rules).toContain("Use two or three short bullets and no raw URLs.");
-    expect(plannedVersion.sourceTag).toBe("ios-v1.6.0-build-1");
-    expect(plannedVersion.status).toBe("draft");
+    expect(plannedVersion.sourceTag).toBe("ios-v1.6.0-build-2");
+    expect(plannedVersion.status).toBe("release-candidate");
     expect(template.storeCopy).not.toMatch(/https?:\/\//u);
     expect(draft).not.toMatch(/https?:\/\//u);
     expect(draft).not.toContain("experimental");
