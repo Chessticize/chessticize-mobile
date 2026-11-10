@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "recordedDate": "2026-11-10",
+  "reviewedArtworkCommit": "629d83d6c0ea059c113f68eb3ae73c5c62f59938",
+  "assets": {
+    "header": {
+      "file": "header-3840x1646-v3.png",
+      "sha256": "f3759558dc6154ba73ed62f3b26404493c999bc797140aac0d1b0449d376c666",
+      "ascAssetId": "f4000019-4a1f-884b-8018-0cb9a56eb84f"
+    },
+    "search-results": {
+      "file": "search-results-3840x2560-v3.png",
+      "sha256": "69aa63962c3c705daac125549b96aff518e9f94b9758cfbb6520ae16e2828f02",
+      "ascAssetId": "09c00019-4a1f-884b-8029-2e04dc250a11"
+    }
+  },
+  "designApproval": {
+    "searchResults": {
+      "status": "owner-approved",
+      "date": "2026-11-10",
+      "sha256": "69aa63962c3c705daac125549b96aff518e9f94b9758cfbb6520ae16e2828f02"
+    },
+    "header": {
+      "status": "accepted-after-final-review",
+      "date": "2026-11-10",
+      "sha256": "f3759558dc6154ba73ed62f3b26404493c999bc797140aac0d1b0449d376c666",
+      "authority": "Owner asked to review the latest version and use it if reasonable; final visual review passed."
+    }
+  },
+  "delivery": {
+    "uploaded": true,
+    "submitted": true,
+    "published": false,
+    "ascDevicePreviewVerified": false,
+    "reviewSubmissionId": "beeffbe3-2fed-49cb-a18e-829ab607b974",
+    "reviewSubmissionState": "WAITING_FOR_REVIEW",
+    "submittedDate": "2026-11-10T19:18:38.247Z",
+    "submissionItemCount": 2,
+    "platform": "IOS",
+    "stateEvidence": "App Store Connect displayed 2 Items Submitted; official reviewSubmissions API returned WAITING_FOR_REVIEW with two review items.",
+    "remaining": "After Apple approval, choose the dedicated assets for live 1.6.0, inspect ASC device previews, and publish placements."
+  }
+}

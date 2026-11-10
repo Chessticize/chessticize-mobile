@@ -29,11 +29,12 @@ and checksum in `manifest.json`. It has no account data, personal rating or
 real user history. The screenshot content is scaled and clipped only; no
 pieces, arrows, UI copy, counters or status data are generated or repainted.
 
-**Acceptance limit:** this is an archival UI capture. Its original build
-commit was not retained; it is not evidence of the current 1.6.0 UI or native
-acceptance. Its older guidance copy remains visible. Refresh that capture
-before treating this design candidate as publication-ready current-version
-marketing. No new Simulator was booted or native build performed for this art.
+**Provenance limit:** this is an archival UI capture. Its original build
+commit was not retained; it is not evidence of current 1.6.0 native validation.
+Its older guidance wording remains visible. The owner accepted the latest
+creative pair after final visual review on 2026-11-10. This acceptance concerns
+the marketing artwork; it does not establish current-version native acceptance.
+No new Simulator was booted or native build performed for this art.
 
 ## Composition
 
@@ -75,9 +76,22 @@ dependency or native code changes are included.
 Search Results was **owner-approved on 2026-11-10** and is locked at SHA-256
 `69aa63962c3c705daac125549b96aff518e9f94b9758cfbb6520ae16e2828f02`.
 Its PNG and preview files remain unchanged during Header revisions.
-Header remains a design review candidate; its left typography is enlarged
-and the handset shifted right while keeping the complete board in the safe area.
-These images supersede v2 in the PR.
-They have not been uploaded, submitted, selected in live placements or
-published. The rejected v1 standalone asset submission remains withdrawn.
-The existing Android graphic and approved 1.6.0 app have not been changed.
+Header was accepted after the owner's final-review instruction on 2026-11-10.
+Both accepted files supersede v2 and are recorded in `asc-delivery.json`.
+The renderer retains this receipt and verifies both accepted image hashes.
+
+Both files were uploaded as dedicated creative assets and submitted together:
+
+- Header asset: `f4000019-4a1f-884b-8018-0cb9a56eb84f` (21:9).
+- Search Results asset: `09c00019-4a1f-884b-8029-2e04dc250a11` (3:2).
+- [Standalone review submission](https://appstoreconnect.apple.com/apps/6788610123/distribution/reviewsubmissions/details/beeffbe3-2fed-49cb-a18e-829ab607b974):
+  `WAITING_FOR_REVIEW`, submitted 2026-11-10T19:18:38.247Z. ASC displayed
+  **2 Items Submitted**; the official API confirmed the submission state and
+  exactly two review items.
+
+The assets have **not been approved or published**. For live 1.6.0, Apple
+requires approved assets before selecting them for Header/Search Results and
+publishing the placement updates. ASC device previews remain unverified until
+that selection is available. See [Apple's live-version asset workflow](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-your-app-store-assets).
+The rejected v1 standalone submission remains withdrawn. The Android graphic
+and approved app binary have not been changed.
