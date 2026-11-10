@@ -839,6 +839,10 @@ function validateLayoutConfig(config) {
         !Number.isInteger(photographicDevice.barrierDilation) ||
         photographicDevice.barrierDilation < 0 ||
         photographicDevice.barrierDilation > 4 ||
+        (photographicDevice.screenMaskBleed !== undefined &&
+          (!Number.isInteger(photographicDevice.screenMaskBleed) ||
+            photographicDevice.screenMaskBleed < 0 ||
+            photographicDevice.screenMaskBleed > 4)) ||
         !isFiniteRatio(photographicDevice.screenAspectTolerance, {
           max: 0.1,
         }) ||
@@ -1837,6 +1841,55 @@ function buildExactScreenMask(component, screenRect, contract) {
     );
   }
 
+  let pixelCount = tail;
+  const screenMaskBleed = contract.screenMaskBleed ?? 0;
+  if (screenMaskBleed > 0) {
+    const source = filled.slice();
+    const bleedMinX = Math.max(
+      component.bounds.minX,
+      screenRect.left - screenMaskBleed,
+    );
+    const bleedMaxX = Math.min(
+      component.bounds.maxX,
+      screenRect.left + screenRect.width - 1 + screenMaskBleed,
+    );
+    const bleedMinY = Math.max(component.bounds.minY, screenRect.top - screenMaskBleed);
+    const bleedMaxY = Math.min(
+      component.bounds.maxY,
+      screenRect.top + screenRect.height - 1 + screenMaskBleed,
+    );
+    for (let y = bleedMinY; y <= bleedMaxY; y += 1) {
+      for (let x = bleedMinX; x <= bleedMaxX; x += 1) {
+        const pixel = y * width + x;
+        if (source[pixel]) continue;
+        for (
+          let offsetY = -screenMaskBleed;
+          offsetY <= screenMaskBleed;
+          offsetY += 1
+        ) {
+          for (
+            let offsetX = -screenMaskBleed;
+            offsetX <= screenMaskBleed;
+            offsetX += 1
+          ) {
+            const sourceX = x + offsetX;
+            const sourceY = y + offsetY;
+            if (
+              sourceX >= bleedMinX && sourceX <= bleedMaxX &&
+              sourceY >= bleedMinY && sourceY <= bleedMaxY &&
+              source[sourceY * width + sourceX]
+            ) {
+              filled[pixel] = 1;
+              pixelCount += 1;
+              break;
+            }
+          }
+          if (filled[pixel]) break;
+        }
+      }
+    }
+  }
+
   const rgba = Buffer.alloc(width * height * 4, 255);
   for (let pixel = 0; pixel < width * height; pixel += 1) {
     rgba[pixel * 4 + 3] = filled[pixel] ? 255 : 0;
@@ -1845,7 +1898,7 @@ function buildExactScreenMask(component, screenRect, contract) {
     buffer: rgba,
     channels: 4,
     height,
-    pixelCount: tail,
+    pixelCount,
     width,
   };
 }
@@ -1988,6 +2041,7 @@ async function composePhotographicFrame(item, backgroundTemplate) {
       crop,
       detectedScreen,
       exactMaskPixelCount: exactMask.pixelCount,
+      screenMaskBleed: contract.screenMaskBleed ?? 0,
       maskStrategy: "closed-bezel-flood-fill",
       normalizedScreen,
       outputDevice: safeAreas.outputDevice,

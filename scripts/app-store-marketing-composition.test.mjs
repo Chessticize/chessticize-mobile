@@ -415,6 +415,7 @@ async function createPhotographicFixture(root) {
     config.presets[family].photographicDevice = {
       darkThreshold: 58,
       barrierDilation: 1,
+      screenMaskBleed: 0,
       screenAspectTolerance: 0.04,
       maskAreaMinRatio: 0.6,
       maskAreaMaxRatio: 1.08,
@@ -704,6 +705,7 @@ test("photographic export uses exact bezel masks and enforces device consistency
       artifact.deviceGeometry.maskStrategy,
       "closed-bezel-flood-fill",
     );
+    assert.equal(artifact.deviceGeometry.screenMaskBleed, 0);
     assert.ok(artifact.deviceGeometry.exactMaskPixelCount > 0);
     assert.ok(artifact.deviceGeometry.outputScreen.width > 0);
     assert.ok(artifact.deviceGeometry.outputScreen.height > 0);
@@ -767,6 +769,29 @@ test("photographic export rejects a screen opening with the wrong aspect", async
       outputDir: path.join(root, "output"),
     }),
     /photographic screen aspect/,
+  );
+});
+
+test("photographic export rejects an invalid screen-mask bleed", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-photo-mask-bleed-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPhotographicFixture(root);
+  fixture.config.presets.ipad.photographicDevice.screenMaskBleed = 5;
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(fixture.config, null, 2)}\n`,
+  );
+
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      deviceFamily: "ipad",
+      layoutConfig: fixture.configPath,
+      outputDir: path.join(root, "output"),
+    }),
+    /invalid photographic device contract/,
   );
 });
 
