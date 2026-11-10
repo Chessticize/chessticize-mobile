@@ -1,5 +1,9 @@
 # Next Move: App Store creative assets
 
+> Superseded design: the owner rejected this pair. Its standalone asset
+> submission was canceled on 2026-11-10; ASC showed **Removed**. The original
+> submission record below is historical. See [v2 review candidates](../creative-v2/README.md).
+
 A static Header/Search Results pair for Chessticize. Warm-white porcelain,
 frosted icy-blue pieces, and one saturated blue tactical accent continue the
 Photo Studio A screenshot campaign. These are illustrative brand artworks,
