@@ -697,10 +697,10 @@ const invalidScope = spawnSync(localE2eRunner, [], {
 assert.notEqual(invalidScope.status, 0);
 assert.match(invalidScope.stderr, /Set CHESSTICIZE_E2E_SCOPE to flows, practice, or full/);
 
-console.log("Development process validation passed.");
-
 // Setup must not request the removed SDK tools package before pinned installs.
 assert.match(
   read(".github/workflows/mobile-android-release-candidate.yml"),
   /uses: android-actions\/setup-android@v3\n\s+with:\n(?:\s+#[^\n]*\n)*\s+packages: platform-tools\s*\n/
 );
+
+console.log("Development process validation passed.");
