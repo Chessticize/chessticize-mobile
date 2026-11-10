@@ -79,6 +79,9 @@ describe('public landing page', () => {
       expect(page).toContain(
         'https://github.com/Chessticize/chessticize-mobile',
       );
+      for (const [, anchor] of page.matchAll(/href="\.\.\/#([^"]+)"/g)) {
+        expect(homepage).toContain(`id="${anchor}"`);
+      }
     }
     expect(homepage).toContain(googlePlayUrl);
     expect(homepage).toContain(
