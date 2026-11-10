@@ -551,14 +551,14 @@ approved, and the protected candidate/source workflow succeeds.
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.5.2`)
-- Android version code: `apps/mobile/release-version.json` (`20`)
+- Public version: `apps/mobile/release-version.json` (`1.6.0`)
+- Android version code: `apps/mobile/release-version.json` (`21`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
-- Open-development target: `apps/mobile/development-version.json` (`1.5.2`;
+- Open-development target: `apps/mobile/development-version.json` (`1.6.0`;
   Debug/E2E only, not a store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.5.2-build-20`
+- Required source tag before any Play track upload: `android-v1.6.0-build-21`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and

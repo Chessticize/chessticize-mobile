@@ -48,13 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.5.2-build-1",
-    "status": "release-candidate",
-    "storeCopy": "• Focused Runs now continue normally after your first answer.\n• Close and reopen the app without losing an unfinished Focused Run—it returns paused at the puzzle where you left off."
-  },
-  "nextVersionWhatsNew": {
     "sourceTag": "ios-v1.6.0-build-1",
-    "status": "draft",
+    "status": "release-candidate",
     "storeCopy": "• A fresh, cleaner design for your chess practice.\n• New navigation for iPhone, iPad, and iPhone Duo.\n• Dark mode follows your system, or you can set it in Settings."
   }
 }
