@@ -41,7 +41,14 @@
     "mode": "bundled imagegen CLI edit",
     "quality": "high",
     "prompt": "source/background-prompt.txt",
-    "styleReference": "../../android/feature-graphic-1024x500.png"
+    "styleReference": "../../android/feature-graphic-1024x500.png",
+    "headerRefinement": {
+      "file": "source/header-background.png",
+      "sha256": "4a2410c710f732c4f4f4cd6a0192955a125e63b30ea63ebbf3aae9fa01f25cc4",
+      "model": "gpt-image-2.6-sunburst",
+      "quality": "high",
+      "prompt": "source/header-background-prompt.txt"
+    }
   },
   "composition": "Deterministic SVG/Sharp typesetting, continuous handset/screen masks and Dynamic Island. Immutable native screenshot scaled and clipped only.",
   "assets": [
@@ -52,8 +59,9 @@
       "height": 1646,
       "channels": 3,
       "alpha": false,
-      "sha256": "86ae155010d65f579036450f23c32d3ac5d9d0f03cc2a196e25c7f538d3287e9",
-      "bytes": 2723000,
+      "sha256": "b0f079c68ab85f8fc9a5d4a3fc1f8becfcea85f8d1e35d2ed0f276a7f60445ac",
+      "bytes": 3518991,
+      "backgroundSource": "source/header-background.png",
       "safeArea": [
         1097,
         493,
@@ -61,9 +69,9 @@
         1154
       ],
       "device": {
-        "x": 2120,
-        "y": 150,
-        "w": 620
+        "x": 2060,
+        "y": 45,
+        "w": 700
       }
     },
     {
@@ -73,8 +81,9 @@
       "height": 2560,
       "channels": 3,
       "alpha": false,
-      "sha256": "441d4d3b17c7f384633fe7ab2754db9e40f468e64a0e696c26dff4d8df88e3e7",
-      "bytes": 2339039,
+      "sha256": "69aa63962c3c705daac125549b96aff518e9f94b9758cfbb6520ae16e2828f02",
+      "bytes": 2337783,
+      "backgroundSource": "source/background.png",
       "safeArea": [
         836,
         765,
@@ -83,7 +92,7 @@
       ],
       "device": {
         "x": 2150,
-        "y": 435,
+        "y": 399,
         "w": 800
       }
     }

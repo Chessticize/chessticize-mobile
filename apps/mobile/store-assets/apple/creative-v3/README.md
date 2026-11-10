@@ -43,11 +43,17 @@ used `gpt-image-2.6-sunburst`, quality `high`. The selected plate and prompt are
 retained under `source/`. Typography, the existing app icon, the handset frame,
 screen mask and Dynamic Island are deterministic SVG/Sharp composition.
 Handset and screen use matching continuous-curvature corners and a thin bezel.
+The Header uses a larger handset and headline, plus a separately refined
+Image 2.6 studio plate with the peripheral rook and knight brought inward to
+occupy the horizontal wings. Search retains its accepted background and copy.
 
 The complete phone is visible in both full compositions. Essential copy and
 the **complete 8 × 8 board with both arrows** remain inside the conservative
 Apple safe rectangles. Secondary handset chrome and UI outside the board may
-be cropped. The crop proofs reuse the official template geometry documented
+be cropped. The Search Results handset is raised 36 pixels so the clipped
+progress-counter slash no longer leaves a stray black mark at the safe-area
+top edge; its complete prompt card and board remain visible. The crop proofs
+reuse the official template geometry documented
 in [v1](../creative-v1/README.md); they are not ASC device previews.
 
 Regenerate from the repository root with installed dependencies:

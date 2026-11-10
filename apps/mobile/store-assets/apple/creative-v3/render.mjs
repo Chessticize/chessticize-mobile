@@ -10,6 +10,7 @@ const root=path.resolve(dir,'../../../../../');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const capture=await fs.readFile(path.join(dir,'source/ios-arrow-duel-capture.png'));
 const plate=await fs.readFile(path.join(dir,'source/background.png'));
+const headerPlate=await fs.readFile(path.join(dir,'source/header-background.png'));
 const icon=await fs.readFile(path.join(root,'site/assets/app-icon-192.png'));
 const fixture=JSON.parse(await fs.readFile(path.join(root,'fixtures/puzzles/android-arrow-duel.fixture.json'),'utf8'));
 const metadata=await sharp(capture).metadata();
@@ -37,10 +38,11 @@ function device({x,y,w}){
 }
 const assets=[];
 for(const spec of [
- {name:'header',h:1646,safe:[1097,493,2743,1154],phone:{x:2120,y:150,w:620},text:{x:1130,brandY:555,brandSize:54,headlineY:760,font:125,line:145,subY:1040,subSize:49,icon:72}},
- {name:'search-results',h:2560,safe:[836,765,3004,1795],phone:{x:2150,y:435,w:800},text:{x:890,brandY:900,brandSize:65,headlineY:1170,font:145,line:170,subY:1510,subSize:55,icon:88}}
+ {name:'header',h:1646,safe:[1097,493,2743,1154],phone:{x:2060,y:45,w:700},text:{x:1130,brandY:555,brandSize:58,headlineY:770,font:140,line:165,subY:1080,subSize:50,icon:76}},
+ {name:'search-results',h:2560,safe:[836,765,3004,1795],phone:{x:2150,y:399,w:800},text:{x:890,brandY:900,brandSize:65,headlineY:1170,font:145,line:170,subY:1510,subSize:55,icon:88}}
 ]){
- const bg=await sharp(plate).resize(3840,spec.h,{fit:'cover'}).png().toBuffer();
+ const backgroundSource=spec.name==='header'?'source/header-background.png':'source/background.png';
+ const bg=await sharp(spec.name==='header'?headerPlate:plate).resize(3840,spec.h,{fit:'cover'}).png().toBuffer();
  const t=spec.text;
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="${spec.h}" viewBox="0 0 3840 ${spec.h}">
  <image href="${uri(bg)}" width="3840" height="${spec.h}"/>
@@ -59,8 +61,8 @@ for(const spec of [
  await sharp(path.join(dir,file)).resize({width:1440}).jpeg({quality:92}).toFile(path.join(dir,`${spec.name}-preview.jpg`));
  const output=await fs.readFile(path.join(dir,file)),m=await sharp(output).metadata();
  if(m.width!==3840||m.height!==spec.h||m.channels!==3||m.hasAlpha)throw Error('Invalid export');
- assets.push({placement:spec.name,file,width:m.width,height:m.height,channels:m.channels,alpha:m.hasAlpha,sha256:hash(output),bytes:output.length,safeArea:spec.safe,device:spec.phone});
+ assets.push({placement:spec.name,file,width:m.width,height:m.height,channels:m.channels,alpha:m.hasAlpha,sha256:hash(output),bytes:output.length,backgroundSource,safeArea:spec.safe,device:spec.phone});
 }
 const candidates=fixture.candidates.map(uci=>{const chess=new Chess(fixture.puzzle.initialFen);const move=chess.move({from:uci.slice(0,2),to:uci.slice(2,4)});return {uci,san:move.san,legal:true,role:uci===fixture.correctMove?'correct':'wrong'};});
-await fs.writeFile(path.join(dir,'manifest.json'),JSON.stringify({schemaVersion:1,campaign:'android-direction-apple-v3',createdDate:'2026-11-10',puzzle:{fixture:'fixtures/puzzles/android-arrow-duel.fixture.json',id:fixture.puzzle.id,fen:fixture.puzzle.initialFen,candidates,answerAuthority:'Existing approved Android fixture; chess.js verifies legality, not engine strength.'},sourceCapture:{file:'source/ios-arrow-duel-capture.png',sha256:hash(capture),dimensions:[metadata.width,metadata.height],platform:'native iOS Simulator',capturedDate:'2026-07-25',sourceCommit:null,note:'Retained deterministic iOS test capture of the same 03wH4 position and arrows; source commit not retained. Archival UI, not a new 1.6.0 capture or acceptance claim. No content retouching.'},background:{file:'source/background.png',sha256:hash(plate),model:'gpt-image-2.6-sunburst',mode:'bundled imagegen CLI edit',quality:'high',prompt:'source/background-prompt.txt',styleReference:'../../android/feature-graphic-1024x500.png'},composition:'Deterministic SVG/Sharp typesetting, continuous handset/screen masks and Dynamic Island. Immutable native screenshot scaled and clipped only.',assets,delivery:{uploaded:false,submitted:false,published:false,ascDevicePreviewVerified:false}},null,2)+'\n');
+await fs.writeFile(path.join(dir,'manifest.json'),JSON.stringify({schemaVersion:1,campaign:'android-direction-apple-v3',createdDate:'2026-11-10',puzzle:{fixture:'fixtures/puzzles/android-arrow-duel.fixture.json',id:fixture.puzzle.id,fen:fixture.puzzle.initialFen,candidates,answerAuthority:'Existing approved Android fixture; chess.js verifies legality, not engine strength.'},sourceCapture:{file:'source/ios-arrow-duel-capture.png',sha256:hash(capture),dimensions:[metadata.width,metadata.height],platform:'native iOS Simulator',capturedDate:'2026-07-25',sourceCommit:null,note:'Retained deterministic iOS test capture of the same 03wH4 position and arrows; source commit not retained. Archival UI, not a new 1.6.0 capture or acceptance claim. No content retouching.'},background:{file:'source/background.png',sha256:hash(plate),model:'gpt-image-2.6-sunburst',mode:'bundled imagegen CLI edit',quality:'high',prompt:'source/background-prompt.txt',styleReference:'../../android/feature-graphic-1024x500.png',headerRefinement:{file:'source/header-background.png',sha256:hash(headerPlate),model:'gpt-image-2.6-sunburst',quality:'high',prompt:'source/header-background-prompt.txt'}},composition:'Deterministic SVG/Sharp typesetting, continuous handset/screen masks and Dynamic Island. Immutable native screenshot scaled and clipped only.',assets,delivery:{uploaded:false,submitted:false,published:false,ascDevicePreviewVerified:false}},null,2)+'\n');
 console.log(JSON.stringify({assets,candidates},null,2));
