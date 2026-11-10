@@ -32,10 +32,29 @@ trap cleanup EXIT
 [[ -z "$(git -C "$REPOSITORY_ROOT" status --porcelain=v1 --untracked-files=no)" ]] || fail "The capture runner worktree must be tracked-clean."
 [[ "$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)" != "$APP_SOURCE_SHA" ]] || fail "Duo capture runner must be a host-only commit distinct from the retained app source."
 
-booted_count="$(xcrun simctl list devices booted | grep -c '(Booted)' || true)"
-[[ "$booted_count" -lt 2 ]] || fail "Two simulators are already booted; wait for a slot before booting the Duo device."
-xcrun simctl list devices available | grep -Fq "$DUO_DEVICE_UDID" || fail "Assigned Duo Simulator is unavailable."
 [[ "$PRECONFIGURED_POSTURE" == "0" || "$PRECONFIGURED_POSTURE" == "1" ]] || fail "CHESSTICIZE_DUO_PRECONFIGURED_POSTURE must be 0 or 1."
+xcrun simctl list devices available | grep -Fq "$DUO_DEVICE_UDID" || fail "Assigned Duo Simulator is unavailable."
+
+ios_booted_devices="$(xcrun simctl list devices booted)"
+ios_booted_count="$(printf '%s\n' "$ios_booted_devices" | grep -c '(Booted)' || true)"
+duo_is_booted=0
+if printf '%s\n' "$ios_booted_devices" | grep -Fq "$DUO_DEVICE_UDID"; then
+  duo_is_booted=1
+fi
+if ! command -v adb >/dev/null 2>&1; then
+  fail "adb is required to enforce the machine-wide simulator/emulator limit."
+fi
+android_emulator_count="$(adb devices | awk 'NR > 1 && $1 ~ /^emulator-[0-9]+$/ { count += 1 } END { print count + 0 }')"
+machine_wide_count=$((ios_booted_count + android_emulator_count))
+if [[ "$machine_wide_count" -gt 2 ]]; then
+  fail "More than two simulators/emulators are already booted; wait for a slot."
+fi
+if [[ "$duo_is_booted" == "0" && "$machine_wide_count" -ge 2 ]]; then
+  fail "Two simulators/emulators are already booted; wait for a slot before booting the Duo device."
+fi
+if [[ "$PRECONFIGURED_POSTURE" == "1" && "$duo_is_booted" == "0" ]]; then
+  fail "Duo inner landscape posture must be configured in Device Hub on a booted simulator."
+fi
 
 mkdir -p "$OUTPUT_ROOT"
 node "$APP_DIR/scripts/mobile-app-inputs.js" verify-artifact \
@@ -52,8 +71,7 @@ mkdir -p "$(dirname "$APP_LINK")"
 ln -sfn "$APP_ARTIFACT" "$APP_LINK"
 
 if [[ "$PRECONFIGURED_POSTURE" == "1" ]]; then
-  xcrun simctl list devices booted | grep -Fq "$DUO_DEVICE_UDID" || \
-    fail "Duo inner landscape posture must be configured in Device Hub on a booted simulator."
+  : # The machine-wide guard already proved the assigned Duo is booted.
 else
   xcrun simctl boot "$DUO_DEVICE_UDID" 2>/dev/null || true
   xcrun simctl bootstatus "$DUO_DEVICE_UDID" -b

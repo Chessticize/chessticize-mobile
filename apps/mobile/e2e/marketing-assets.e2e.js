@@ -832,14 +832,21 @@ function takeMarketingScreenshot(label) {
   const directory = resolve(outputRoot, `detox-${target.deviceFamily}`, 'display-screenshots');
   fs.mkdirSync(directory, { recursive: true });
   const screenshotPath = resolve(directory, `${label}.png`);
-  execFileSync('xcrun', [
-    'simctl',
-    'io',
-    device.id,
-    'screenshot',
-    `--display=${requestedDisplay}`,
-    screenshotPath,
-  ], { stdio: 'ignore' });
+  try {
+    execFileSync('xcrun', [
+      'simctl',
+      'io',
+      device.id,
+      'screenshot',
+      `--display=${requestedDisplay}`,
+      screenshotPath,
+    ], { encoding: 'utf8' });
+  } catch (error) {
+    const stderr = String(error.stderr ?? '').trim();
+    throw new Error(
+      `simctl display screenshot failed for ${requestedDisplay}: ${stderr || error.message}`
+    );
+  }
   return screenshotPath;
 }
 

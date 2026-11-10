@@ -508,9 +508,21 @@ describe('App Store marketing capture artifacts', () => {
     expect(wrapper).toContain('verify-artifact');
     expect(wrapper).toContain('status_bar "$DUO_DEVICE_UDID" override');
     expect(wrapper).toContain('xcrun simctl shutdown "$DUO_DEVICE_UDID"');
-    expect(wrapper).toContain('Two simulators are already booted');
+    expect(wrapper).toContain('command -v adb');
+    expect(wrapper).toContain('adb devices');
+    expect(wrapper).toContain('machine_wide_count=$((ios_booted_count + android_emulator_count))');
+    expect(wrapper).toContain('duo_is_booted');
+    expect(wrapper).toContain('Two simulators/emulators are already booted');
+    expect(wrapper).toContain('[[ "$machine_wide_count" -gt 2 ]]');
+    expect(wrapper).toContain('[[ "$duo_is_booted" == "0" && "$machine_wide_count" -ge 2 ]]');
     expect(wrapper).toContain('CHESSTICIZE_DUO_PRECONFIGURED_POSTURE');
     expect(wrapper).toContain('Duo inner landscape posture must be configured in Device Hub');
+    const captureRunner = readFileSync(
+      join(__dirname, '../e2e/marketing-assets.e2e.js'),
+      'utf8'
+    );
+    expect(captureRunner).toContain('String(error.stderr ?? \'\').trim()');
+    expect(captureRunner).toContain('simctl display screenshot failed for ${requestedDisplay}');
   });
 
   it('documents clean-host simulator and Accessibility setup', () => {
