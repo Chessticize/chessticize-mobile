@@ -270,6 +270,7 @@
       "photographicDevice": {
         "darkThreshold": 58,
         "barrierDilation": 1,
+        "screenMaskBleed": 2,
         "screenAspectTolerance": 0.04,
         "maskAreaMinRatio": 0.75,
         "maskAreaMaxRatio": 1.08,
