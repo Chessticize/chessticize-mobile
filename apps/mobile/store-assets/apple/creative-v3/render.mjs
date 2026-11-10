@@ -38,20 +38,24 @@ function device({x,y,w}){
 }
 const assets=[];
 for(const spec of [
- {name:'header',h:1646,safe:[1097,493,2743,1154],phone:{x:2110,y:85,w:660},text:{x:1130,brandY:565,brandSize:65,headlineY:780,font:150,line:175,subY:1090,subSize:56,icon:86}},
+ {name:'header',h:1646,safe:[1097,493,2743,1154],phone:{x:2106,y:70,w:656},text:{x:1128,brandY:586,brandSize:58,headlineY:780,font:136,line:148,subY:1066,subSize:51,icon:78,iconOffset:.76,iconRounded:true,fontFamily:"'Helvetica Neue', Helvetica, Arial, sans-serif",letterSpacing:-2.5}},
  {name:'search-results',h:2560,safe:[836,765,3004,1795],phone:{x:2150,y:399,w:800},text:{x:890,brandY:900,brandSize:65,headlineY:1170,font:145,line:170,subY:1510,subSize:55,icon:88}}
 ]){
  const backgroundSource=spec.name==='header'?'source/header-background.png':'source/background.png';
  const bg=await sharp(spec.name==='header'?headerPlate:plate).resize(3840,spec.h,{fit:'cover'}).png().toBuffer();
- const t=spec.text;
+ const t=spec.text,iy=t.brandY-t.icon*(t.iconOffset??.74),ip=t.iconRounded?rounded(t.x,iy,t.icon,t.icon,t.icon*.225):null;
+ const iconSvg=ip?`<defs><clipPath id="app-icon"><path d="${ip}"/></clipPath><filter id="icon-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#183455" flood-opacity=".12"/></filter></defs>
+ <path d="${ip}" fill="#fff" filter="url(#icon-shadow)"/>
+ <image href="${uri(icon)}" x="${t.x}" y="${iy}" width="${t.icon}" height="${t.icon}" clip-path="url(#app-icon)"/>
+ <path d="${ip}" fill="none" stroke="#101c38" stroke-opacity=".08" stroke-width="1.5"/>`:`<image href="${uri(icon)}" x="${t.x}" y="${iy}" width="${t.icon}" height="${t.icon}"/>`;
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="${spec.h}" viewBox="0 0 3840 ${spec.h}">
  <image href="${uri(bg)}" width="3840" height="${spec.h}"/>
  ${device(spec.phone).svg}
- <image href="${uri(icon)}" x="${t.x}" y="${t.brandY-t.icon*.74}" width="${t.icon}" height="${t.icon}"/>
- <g font-family="Arial, Helvetica, sans-serif" fill="#101c38">
+ ${iconSvg}
+ <g font-family="${t.fontFamily??'Arial, Helvetica, sans-serif'}" fill="#101c38">
  <text x="${t.x+t.icon+22}" y="${t.brandY}" font-size="${t.brandSize}" font-weight="700">Chessticize</text>
- <text x="${t.x}" y="${t.headlineY}" font-size="${t.font}" font-weight="700" letter-spacing="-3">Build Tactical</text>
- <text x="${t.x}" y="${t.headlineY+t.line}" font-size="${t.font}" font-weight="700" letter-spacing="-3">Intuition</text>
+ <text x="${t.x}" y="${t.headlineY}" font-size="${t.font}" font-weight="700" letter-spacing="${t.letterSpacing??-3}">Build Tactical</text>
+ <text x="${t.x}" y="${t.headlineY+t.line}" font-size="${t.font}" font-weight="700" letter-spacing="${t.letterSpacing??-3}">Intuition</text>
  <text x="${t.x}" y="${t.subY}" font-size="${t.subSize}" font-weight="700" fill="#0062CC">Practice. Review. Improve.</text>
  </g></svg>`;
  const file=`${spec.name}-3840x${spec.h}-v3.png`;

@@ -59,8 +59,8 @@
       "height": 1646,
       "channels": 3,
       "alpha": false,
-      "sha256": "fdb57728f799bf051fa3790f5e3b5c8f7929bb0d22f97e344ceefe755d73bb44",
-      "bytes": 3548640,
+      "sha256": "f3759558dc6154ba73ed62f3b26404493c999bc797140aac0d1b0449d376c666",
+      "bytes": 3556108,
       "backgroundSource": "source/header-background.png",
       "safeArea": [
         1097,
@@ -69,9 +69,9 @@
         1154
       ],
       "device": {
-        "x": 2110,
-        "y": 85,
-        "w": 660
+        "x": 2106,
+        "y": 70,
+        "w": 656
       }
     },
     {
