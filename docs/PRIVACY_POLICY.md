@@ -1,6 +1,6 @@
 # Chessticize Mobile Privacy Policy
 
-Effective date: 2026-07-26
+Effective date: 2026-11-09
 
 Chessticize Mobile is an offline-first chess training app. The current app does not
 create Chessticize accounts, does not show ads, does not use analytics SDKs, and
@@ -67,6 +67,20 @@ unless you separately choose a destination that sends it to Chessticize.
 Android Progress Backup may use Android or Google backup network services when
 enabled in the device's system settings. The app does not operate that service
 or add its own backup network connection.
+
+## Store Ratings and Reviews
+
+The app may invite you to rate it using the platform store's own review screen.
+On Android, Google Play handles any star rating and review text you choose to
+submit under its own terms and privacy rules. Submitted reviews can be public
+on Google Play; reviews from a closed test track are shared privately with the
+developer. You can delete a submitted review through your Google Play or Google
+Account controls.
+
+Chessticize checks invitation eligibility using local practice history and stores
+the last request's app version and time locally. It does not send that practice
+history to Google Play, and the review API does not tell the app whether you
+submitted a rating or whether its review screen appeared.
 
 ## Notifications
 
