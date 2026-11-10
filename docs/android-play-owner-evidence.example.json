@@ -5,21 +5,21 @@
     "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
     "applicationId": "com.chessticize.mobile",
     "versionName": "1.6.0",
-    "versionCode": 21
+    "versionCode": 22
   },
   "sourceRelease": {
     "status": "pending",
     "evidenceId": "REPLACE_WITH_GITHUB_RELEASE_EVIDENCE_ID",
-    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.6.0-build-21",
+    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.6.0-build-22",
     "candidate": {
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
       "applicationId": "com.chessticize.mobile",
       "versionName": "1.6.0",
-      "versionCode": 21
+      "versionCode": 22
     },
     "repositoryUrl": "https://github.com/Chessticize/chessticize-mobile",
-    "tagName": "android-v1.6.0-build-21",
+    "tagName": "android-v1.6.0-build-22",
     "tagCommitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
     "tagType": "pending",
     "releaseId": 0,
@@ -29,9 +29,9 @@
       "releaseAssetId": 0,
       "assetName": "android-source-manifest.json",
       "sha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
-      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.6.0-build-21/android-source-manifest.json",
+      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.6.0-build-22/android-source-manifest.json",
       "releaseId": 0,
-      "tagName": "android-v1.6.0-build-21",
+      "tagName": "android-v1.6.0-build-22",
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "workflowRunId": 0,
       "workflowRunReference": "REPLACE_WITH_HTTPS_WORKFLOW_REFERENCE",
@@ -44,11 +44,11 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     },
     "sourceDisclosure": {
-      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.6.0-build-21",
+      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.6.0-build-22",
       "supportDocumentation": {
         "status": "pending",
         "evidenceId": "REPLACE_WITH_SOURCE_SUPPORT_EVIDENCE_ID",
@@ -59,7 +59,7 @@
           "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
           "applicationId": "com.chessticize.mobile",
           "versionName": "1.6.0",
-          "versionCode": 21
+          "versionCode": 22
         }
       }
     }
@@ -76,7 +76,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "workflowRunId": 0,
       "artifactId": 0
@@ -90,7 +90,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     }
   },
@@ -104,7 +104,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     },
     "storeListing": {
@@ -117,7 +117,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     },
     "privacyPolicy": {
@@ -129,7 +129,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     },
     "dataSafety": {
@@ -141,7 +141,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     },
     "supportedDevices": {
@@ -153,7 +153,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       }
     }
   },
@@ -167,7 +167,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "track": "internal",
       "releaseId": "REPLACE_IF_RUN"
@@ -181,7 +181,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "track": "closed",
       "releaseId": "REPLACE_IF_RUN"
@@ -195,7 +195,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "reportId": "REPLACE_WITH_REPORT_ID"
     },
@@ -208,7 +208,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "runId": 0,
       "artifactIds": []
@@ -223,7 +223,7 @@
       "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
       "applicationId": "com.chessticize.mobile",
       "versionName": "1.6.0",
-      "versionCode": 21
+      "versionCode": 22
     },
     "rolloutPercentage": 0,
     "launched": false,
@@ -239,7 +239,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "assetSet": {
         "schemaVersion": 1,
@@ -249,7 +249,7 @@
           "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
           "applicationId": "com.chessticize.mobile",
           "versionName": "1.6.0",
-          "versionCode": 21,
+          "versionCode": 22,
           "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
           "apkSha256": "REPLACE_WITH_EXACT_PLAY_APK_SHA256",
           "signerCertificateSha256": "REPLACE_WITH_PLAY_SIGNER_SHA256"
@@ -311,7 +311,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.6.0",
-        "versionCode": 21
+        "versionCode": 22
       },
       "universalApkBytes": 0,
       "arm64ApkBytes": 0,
