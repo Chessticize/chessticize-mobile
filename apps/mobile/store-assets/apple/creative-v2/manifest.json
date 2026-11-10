@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "campaign": "two-moves-one-win-v2",
+  "createdDate": "2026-11-10",
+  "generation": {
+    "mode": "Bundled imagegen CLI edit",
+    "model": "gpt-image-2.6-sunburst",
+    "quality": "high",
+    "prompts": "source/*prompt.txt and source/*refine.txt",
+    "references": [
+      "source/puzzle-reference.png",
+      "../../android/feature-graphic-1024x500.png"
+    ],
+    "export": "Sharp resize to Apple dimensions, RGB PNG; no content retouching"
+  },
+  "puzzle": {
+    "fen": "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+    "diagramExcerpt": {
+      "files": "e-h",
+      "ranks": "5-8"
+    },
+    "whiteToMove": true,
+    "candidates": [
+      {
+        "uci": "g6g7",
+        "san": "Qg7#",
+        "checkmate": true,
+        "stalemate": false,
+        "legalReplies": []
+      },
+      {
+        "uci": "g6f7",
+        "san": "Qf7",
+        "checkmate": false,
+        "stalemate": true,
+        "legalReplies": []
+      }
+    ],
+    "validation": "chess.js public move / isCheckmate / isStalemate / moves APIs"
+  },
+  "assets": [
+    {
+      "placement": "header",
+      "file": "header-3840x1646-v2.png",
+      "dimensions": [
+        3840,
+        1646
+      ],
+      "channels": 3,
+      "alpha": false,
+      "sha256": "b30c98abea369a5e921dab876442a5cd7706c48bcf00cece4aa0c60ad2aeef09",
+      "bytes": 3037267,
+      "source": "source/header-generated.png",
+      "sourceSha256": "0a86fcebb16ff16d578be513b6d73c883c7e3630ffe3425cf0d843aeb11ccf9f",
+      "safeArea": [
+        1097,
+        493,
+        2743,
+        1154
+      ],
+      "safeAreaProof": "header-safe-area.jpg"
+    },
+    {
+      "placement": "search-results",
+      "file": "search-results-3840x2560-v2.png",
+      "dimensions": [
+        3840,
+        2560
+      ],
+      "channels": 3,
+      "alpha": false,
+      "sha256": "697ef603971323f87fc5c3c118fbe8e79d347344569af1864547972418443c02",
+      "bytes": 3932361,
+      "source": "source/search-results-generated.png",
+      "sourceSha256": "fbb5bc891c742769746fa58ccf23b4146d473d2bf5764062391d424b49b8a8a2",
+      "safeArea": [
+        836,
+        765,
+        3004,
+        1795
+      ],
+      "safeAreaProof": "search-results-safe-area.jpg"
+    }
+  ],
+  "delivery": {
+    "newAssetsUploaded": false,
+    "newAssetsSubmitted": false,
+    "placementsPublished": false,
+    "previousSubmissionId": "fb78cb6e-f568-4119-838c-fe01077fac8e",
+    "previousSubmissionStatus": "Removed, verified in App Store Connect UI 2026-11-10"
+  }
+}
