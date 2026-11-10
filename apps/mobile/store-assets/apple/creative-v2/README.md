@@ -1,5 +1,8 @@
 # Two moves. One win.
 
+> Superseded by [v3](../creative-v3/README.md): the owner selected the Android
+> composition and its original 03wH4 puzzle instead of this three-piece puzzle.
+
 A redesigned Header/Search Results pair built around a real move choice.
 The Android feature graphic informed the cool-white/navy/blue palette and
 emphasis on chess content. This pair uses an annotated chess diagram rather

@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "campaign": "android-direction-apple-v3",
+  "createdDate": "2026-11-10",
+  "puzzle": {
+    "fixture": "fixtures/puzzles/android-arrow-duel.fixture.json",
+    "id": "03wH4",
+    "fen": "2r2b2/p5qk/1p1pR1pp/3Q4/2P4B/1PN5/P4PPP/6K1 w - -",
+    "candidates": [
+      {
+        "uci": "c3e4",
+        "san": "Ne4",
+        "legal": true,
+        "role": "wrong"
+      },
+      {
+        "uci": "h4f6",
+        "san": "Bf6",
+        "legal": true,
+        "role": "correct"
+      }
+    ],
+    "answerAuthority": "Existing approved Android fixture; chess.js verifies legality, not engine strength."
+  },
+  "sourceCapture": {
+    "file": "source/ios-arrow-duel-capture.png",
+    "sha256": "660a7a7a87a69d5720ebf011f9ab1fff5862f9d466bb35ab90d16f531647ebe7",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "platform": "native iOS Simulator",
+    "capturedDate": "2026-07-25",
+    "sourceCommit": null,
+    "note": "Retained deterministic iOS test capture of the same 03wH4 position and arrows; source commit not retained. Archival UI, not a new 1.6.0 capture or acceptance claim. No content retouching."
+  },
+  "background": {
+    "file": "source/background.png",
+    "sha256": "5af26d49bf8682c231b097d7f05ada8d35adf7b277096d91e17d44f8db2dbdc5",
+    "model": "gpt-image-2.6-sunburst",
+    "mode": "bundled imagegen CLI edit",
+    "quality": "high",
+    "prompt": "source/background-prompt.txt",
+    "styleReference": "../../android/feature-graphic-1024x500.png"
+  },
+  "composition": "Deterministic SVG/Sharp typesetting, continuous handset/screen masks and Dynamic Island. Immutable native screenshot scaled and clipped only.",
+  "assets": [
+    {
+      "placement": "header",
+      "file": "header-3840x1646-v3.png",
+      "width": 3840,
+      "height": 1646,
+      "channels": 3,
+      "alpha": false,
+      "sha256": "86ae155010d65f579036450f23c32d3ac5d9d0f03cc2a196e25c7f538d3287e9",
+      "bytes": 2723000,
+      "safeArea": [
+        1097,
+        493,
+        2743,
+        1154
+      ],
+      "device": {
+        "x": 2120,
+        "y": 150,
+        "w": 620
+      }
+    },
+    {
+      "placement": "search-results",
+      "file": "search-results-3840x2560-v3.png",
+      "width": 3840,
+      "height": 2560,
+      "channels": 3,
+      "alpha": false,
+      "sha256": "441d4d3b17c7f384633fe7ab2754db9e40f468e64a0e696c26dff4d8df88e3e7",
+      "bytes": 2339039,
+      "safeArea": [
+        836,
+        765,
+        3004,
+        1795
+      ],
+      "device": {
+        "x": 2150,
+        "y": 435,
+        "w": 800
+      }
+    }
+  ],
+  "delivery": {
+    "uploaded": false,
+    "submitted": false,
+    "published": false,
+    "ascDevicePreviewVerified": false
+  }
+}
