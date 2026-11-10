@@ -14,9 +14,10 @@ const {
 } = require('./helpers');
 const {
   expectFrameContained,
+  expectScreenshotHasDarkChrome,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
-const { waitForAndroidUiState } = require('./androidPublicUiEvidence');
+const { tapAndroidUiNode, waitForAndroidUiState } = require('./androidPublicUiEvidence');
 const {
   captureMarketingScreenshot,
   resolveIosLandscapeValidationTarget,
@@ -29,12 +30,43 @@ const {
   resolveGooglePlayCaptureTarget,
   writeGooglePlayDeviceCaptureManifest,
 } = require('./googlePlayMarketingCaptureArtifacts');
+const { resolveMarketingCampaign } = require('./marketingCampaign');
 
-const story = require('../../../config/app-store-marketing-story-v1.json');
+const marketingStory = require('../../../config/app-store-marketing-story-v1.json');
+const story = resolveMarketingCampaign(
+  marketingStory,
+  process.env.CHESSTICIZE_MARKETING_CAMPAIGN
+);
 const ROOT_CLIPPED_SCROLL_CONTAINERS = new Set([
   'practice-run-editor',
   'settings-about-section',
 ]);
+const CAMPAIGN_SCROLL_SURFACES = new Set([
+  'practice-home',
+  'tactical-profile-screen',
+  'focused-run-preview',
+  'personal-best-hub',
+]);
+const CAMPAIGN_CAPTURE_CONTROLS = {
+  'practice-home': ['practice-run-start', 'training-focus-card'],
+  'dark-arrow-duel': ['session-board', 'session-progress', 'arrow-duel-reply-challenge'],
+  'tactical-profile': [
+    'tactical-profile-active-mode',
+    'tactical-profile-recommendations',
+  ],
+  'focused-run': [
+    'focused-run-rating-anchor',
+    'focused-run-allocation-bar',
+    'tactical-profile-early-estimate',
+  ],
+  survival: ['personal-best-type-selector', 'personal-best-hub-start'],
+  review: ['review-due-card', 'review-start-due', 'review-forecast'],
+};
+const TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE = [
+  'This is an early estimate based on ordinary mixed puzzle-solving Runs.',
+  'It may change as the model is validated with more players.',
+  'Review and focused Runs do not shape discovery.',
+].join(' ');
 const capturePlatform =
   process.env.CHESSTICIZE_MARKETING_PLATFORM ?? 'app-store';
 const isGooglePlayCapture = capturePlatform === 'google-play';
@@ -95,11 +127,20 @@ describeMarketingAssets('deterministic store marketing journey', () => {
       await assertFrameContract(frame);
       await assertNativeResponsiveLayout(frame);
       await assertCompositionViewport(frame);
+      await assertRequiredFrameGeometry(frame);
       if (verifyIosLandscapeLayout) {
-        await assertRequiredFrameGeometry(frame);
         continue;
       }
       const screenshotPath = await takeReadyScreenshot(frame);
+      if (frame.appearance === 'dark') {
+        // Survival's reachable Start position intentionally scrolls the
+        // full-screen hub: its three upper surface samples remain dark while the
+        // lower samples contain the blue action. Arrow Duel retains all four.
+        expectScreenshotHasDarkChrome(
+          screenshotPath,
+          frame.id === 'survival' ? 3 : 4
+        );
+      }
       records.push(captureMarketingScreenshot({
         frame,
         outputRoot,
@@ -142,6 +183,17 @@ async function launchMarketingFrame(frame) {
       chessticizeTestNowMs: String(Date.parse(story.captureClock.instant)),
     },
   });
+  if (device.getPlatform() === 'android' && story.campaign
+    && ['practice-home', 'review'].includes(frame.id)) {
+    // The fictional player has existing history when 1.6 first opens. Finish
+    // the real update notes before querying the underlying Espresso root;
+    // that root correctly has no window focus while the native sheet is up.
+    const { nodes } = await waitForAndroidUiState({
+      presentResourceIds: ['whats-new-continue'],
+    }, { timeoutMs: 180000 });
+    tapAndroidUiNode(nodes['whats-new-continue']);
+    await waitForAndroidUiState({ absentResourceIds: ['whats-new-continue'] });
+  }
   if (!verifyIosLandscapeLayout) {
     await setMarketingOrientationBeforeNavigation();
   }
@@ -151,6 +203,48 @@ async function launchMarketingFrame(frame) {
 
 async function prepareFrame(frame) {
   switch (frame.id) {
+    case 'practice-home':
+      // These campaign roots are scroll surfaces. Detox's visibility matcher
+      // requires coverage of the whole native view, which a deliberately
+      // scrollable screen cannot provide. Existence establishes readiness;
+      // assertRequiredFrameGeometry then proves the meaningful controls and
+      // disclosures are fully inside the capture viewport.
+      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(30000);
+      // Keep both approved Home controls wholly above the native tab bar. On
+      // the calibrated iPhone viewport, 53–74 points is the feasible interval:
+      // 64 clears the bar while preserving Start below the app safe-area top.
+      // Android needs 72 dp to clear the title and reveal the complete
+      // Training focus card including its profile action.
+      if (target.deviceFamily === 'iphone' || target.deviceFamily === 'android-phone') {
+        await element(by.id('practice-main-scroll')).scroll(
+          target.deviceFamily === 'iphone' ? 64 : 72, 'down', 0.5, 0.5
+        );
+      }
+      return;
+    case 'dark-arrow-duel':
+      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('arrow-duel-reply-challenge')))
+        .toBeVisible()
+        .withTimeout(10000);
+      return;
+    case 'tactical-profile':
+      await waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(30000);
+      return;
+    case 'focused-run':
+      await waitFor(element(by.id('focused-run-preview'))).toExist().withTimeout(30000);
+      return;
+    case 'survival':
+      await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000);
+      // Clear Start and the trailing title glyph together on the calibrated
+      // iPhone viewport; the type selector and full disclosure remain visible.
+      if (target.deviceFamily === 'iphone' || target.deviceFamily === 'android-phone') {
+        await element(by.id('practice-main-scroll')).scroll(136, 'down', 0.5, 0.5);
+      }
+      return;
+    case 'review':
+      await openTab('review-tab', 'review-due-card');
+      await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
+      return;
     case 'build-tactical-intuition':
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
       return;
@@ -165,7 +259,7 @@ async function prepareFrame(frame) {
       return;
     case 'make-every-mistake-count':
       await openTab('review-tab', 'review-due-card');
-      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
       return;
     case 'see-your-progress':
       await prepareRatingTrend();
@@ -209,7 +303,7 @@ async function prepareCustomRun() {
   await element(by.id('custom-theme-fork')).tap();
   await waitForVisibleInPracticeScroll('custom-theme-pin');
   await element(by.id('custom-theme-pin')).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('bottom');
+  await element(by.id('practice-main-scroll')).scrollTo('bottom', 0.5, 0.5);
   await waitFor(element(by.id('practice-run-duration-stepper')))
     .toExist()
     .withTimeout(10000);
@@ -231,19 +325,40 @@ async function prepareCustomRun() {
     String(story.fictionalUser.customRun.startingRating)
   );
   await element(by.id('practice-run-elo-input')).tapReturnKey();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   await waitFor(element(by.id('practice-run-editor-title')))
     .toBeVisible()
     .withTimeout(5000);
   await element(by.id('practice-run-editor-title')).tap();
   await sleep(500);
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   if (isGooglePlayCapture && target.deviceFamily === 'android-phone') {
     await element(by.id('practice-main-scroll')).scroll(80, 'down', 0.5, 0.5);
   }
 }
 
 async function assertCompositionViewport(frame) {
+  if (frame.id === 'tactical-profile') {
+    await waitFor(element(by.id('tactical-profile-recommendations')))
+      .toExist()
+      .withTimeout(10000);
+    await waitFor(element(by.text(TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE)))
+      .toExist()
+      .withTimeout(10000);
+    return;
+  }
+  if (frame.id === 'focused-run') {
+    await waitFor(element(by.id('focused-run-rating-anchor')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await waitFor(element(by.id('focused-run-allocation-bar')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await waitFor(element(by.id('tactical-profile-early-estimate')))
+      .toBeVisible()
+      .withTimeout(10000);
+    return;
+  }
   if (frame.id === 'focus-your-practice') {
     for (const testID of [
       'practice-run-name-input',
@@ -292,11 +407,11 @@ async function prepareRatingTrend() {
   await element(by.id('history-range-90d')).tap();
   await waitForVisibleInPracticeScroll('history-filter-toggle');
   await element(by.id('history-filter-toggle')).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
 }
 
 async function assertFrameContract(frame) {
-  for (const testID of frame.source.requiredVisibleTestIds) {
+  for (const testID of frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []) {
     await waitFor(element(by.id(testID))).toExist().withTimeout(10000);
   }
   await assertStableText(frame);
@@ -304,6 +419,16 @@ async function assertFrameContract(frame) {
 }
 
 async function assertStableText(frame) {
+  if (frame.id === 'practice-home' || frame.id === 'survival' || frame.id === 'review') {
+    return;
+  }
+  if (frame.id === 'dark-arrow-duel') {
+    await waitFor(element(by.id('session-progress'))).toBeVisible().withTimeout(10000);
+    return;
+  }
+  if (frame.id === 'tactical-profile' || frame.id === 'focused-run') {
+    return;
+  }
   const stable = frame.source.stableText;
   switch (frame.id) {
     case 'build-tactical-intuition':
@@ -387,7 +512,10 @@ async function assertForbiddenState(frame) {
     'settings-stockfish-diagnostics',
   ]);
   for (const testID of forbiddenTestIDs) {
-    if (frame.source.requiredVisibleTestIds.includes(testID)) {
+    if (
+      (frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []).includes(testID)
+      || frame.captureAnchorTestId === testID
+    ) {
       continue;
     }
     await expect(element(by.id(testID))).not.toExist();
@@ -413,6 +541,9 @@ async function assertForbiddenState(frame) {
       throw new Error(`Review marketing frame must not show overdue work: ${dueCardText}`);
     }
   }
+  if (frame.id === 'review') {
+    await expect(element(by.text('Overdue now'))).not.toExist();
+  }
 }
 
 async function assertNativeResponsiveLayout(frame) {
@@ -424,10 +555,22 @@ async function assertNativeResponsiveLayout(frame) {
       + `${target.orientation}: ${JSON.stringify(screenFrame)}`
     );
   }
+  if (frame.id === 'practice-home') {
+    const practiceTab = topLevelTab('practice-tab');
+    await waitFor(practiceTab).toExist().withTimeout(10000);
+    const tabFrame = await frameFor(practiceTab);
+    assertPositiveFrame(tabFrame, `${frame.id} native Practice tab`);
+  }
+  if (frame.id === 'survival') {
+    // Survival setup is an intentional full-screen surface on every device.
+    await expect(topLevelTab('practice-tab')).not.toExist();
+    return;
+  }
   if (isWideTabletTarget()) {
     const isActiveSessionFrame = (
       frame.id === 'build-tactical-intuition'
       || frame.id === 'choose-the-best-move'
+      || frame.id === 'dark-arrow-duel'
     );
     if (isActiveSessionFrame) {
       const layoutFrame = await frameFor(element(by.id('active-session-adaptive-layout')));
@@ -479,50 +622,107 @@ function isWideTabletTarget() {
 async function assertRequiredFrameGeometry(frame) {
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   assertPositiveFrame(screenFrame, `${frame.id} app root`);
-
+  const requiredTestIDs = frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? [];
+  const captureControlTestIDs = [
+    ...new Set([
+      ...(story.campaign ? CAMPAIGN_CAPTURE_CONTROLS[frame.id] ?? [] : []),
+      ...requiredTestIDs.filter((testID) => !CAMPAIGN_SCROLL_SURFACES.has(testID)),
+    ])
+  ];
   const requiredFrames = [];
-  for (const testID of frame.source.requiredVisibleTestIds) {
+  for (const testID of requiredTestIDs) {
     const requiredElement = element(by.id(testID));
     await waitFor(requiredElement).toExist().withTimeout(10000);
     const requiredFrame = await frameFor(requiredElement);
     assertPositiveFrame(requiredFrame, `${frame.id} ${testID}`);
-    if (ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)) {
-      assertFramesIntersect(
-        requiredFrame,
-        screenFrame,
-        `${frame.id} ${testID}`
-      );
+    if (ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID) || CAMPAIGN_SCROLL_SURFACES.has(testID)) {
+      // Owner-approved iPad underlap lets the scroll surface extend behind the
+      // native tab bar. Its capture controls are checked separately below.
+      assertFramesIntersect(requiredFrame, screenFrame, `${frame.id} ${testID}`);
     } else {
-      expectFrameContained(
-        requiredFrame,
-        screenFrame,
-        `${frame.id} ${testID}`
-      );
+      expectFrameContained(requiredFrame, screenFrame, `${frame.id} ${testID}`);
     }
     requiredFrames.push({testID, frame: requiredFrame});
   }
 
-  if (!isWideTabletTarget() || [
+  for (const testID of captureControlTestIDs) {
+    const control = element(by.id(testID));
+    // Some native grouped Section wrappers report incomplete Detox coverage
+    // even when their measured bounds are wholly in the screenshot viewport.
+    // Existence plus the containment proof below checks the actual capture
+    // condition without accepting a partially off-screen control.
+    await waitFor(control).toExist().withTimeout(10000);
+    const controlFrame = await frameFor(control);
+    assertPositiveFrame(controlFrame, `${frame.id} ${testID}`);
+    expectFrameContained(controlFrame, screenFrame, `${frame.id} ${testID}`);
+    if (!requiredFrames.some((required) => required.testID === testID)) {
+      requiredFrames.push({testID, frame: controlFrame});
+    }
+  }
+
+  if (frame.id === 'tactical-profile') {
+    const disclosure = element(by.text(TACTICAL_PROFILE_EARLY_ESTIMATE_DISCLOSURE));
+    await waitFor(disclosure).toExist().withTimeout(10000);
+    const disclosureFrame = await frameFor(disclosure);
+    assertPositiveFrame(disclosureFrame, `${frame.id} early-estimate disclosure`);
+    expectFrameContained(
+      disclosureFrame,
+      screenFrame,
+      `${frame.id} early-estimate disclosure`
+    );
+    requiredFrames.push({
+      testID: 'tactical-profile-early-estimate-disclosure',
+      frame: disclosureFrame,
+    });
+  }
+
+  if (
+    ['practice-home', 'tactical-profile', 'focused-run'].includes(frame.id)
+    && device.getPlatform() === 'ios'
+    && !isWideTabletTarget()
+  ) {
+    const tabFrame = await frameFor(topLevelTab('practice-tab'));
+    assertPositiveFrame(tabFrame, `${frame.id} native tab bar item`);
+    for (const required of requiredFrames) {
+      if (captureControlTestIDs.includes(required.testID)
+        && required.frame.y + required.frame.height > tabFrame.y + 1) {
+        throw new Error(
+          `${frame.id} ${required.testID} is obscured by the native tab bar: `
+          + `control=${JSON.stringify(required.frame)}, tab=${JSON.stringify(tabFrame)}`
+        );
+      }
+    }
+  }
+
+  if (frame.id === 'survival' || !isWideTabletTarget() || [
     'build-tactical-intuition',
     'choose-the-best-move',
+    'dark-arrow-duel',
   ].includes(frame.id)) {
     return;
   }
 
   if (device.getPlatform() !== 'android') {
-    // iPad: the scrolling content viewport starts below the native top tab
-    // bar (#612). Sections inside it may be scrolled up under its clipped top
-    // edge, so the viewport, not each section, is checked.
+    // Owner requested the iPad scroll viewport underlap the floating native
+    // tab bar. The viewport must reach the window top, while this capture's
+    // actionable controls remain clear of the bar and fully in-frame above.
     const tabFrame = await frameFor(topLevelTab('practice-tab'));
     assertPositiveFrame(tabFrame, `${frame.id} top tab bar item`);
     const tabBarBottom = tabFrame.y + tabFrame.height;
     const contentFrame = await frameFor(element(by.id('practice-main-scroll')));
-    if (contentFrame.y < tabBarBottom - 1) {
+    if (contentFrame.y > screenFrame.y + 1) {
       throw new Error(
-        `${frame.id} content viewport overlaps the top tab bar: `
-        + `content=${JSON.stringify(contentFrame)}, `
-        + `tab=${JSON.stringify(tabFrame)}`
+        `${frame.id} content viewport must reach the window top for native-tab underlap: `
+        + `content=${JSON.stringify(contentFrame)}, app=${JSON.stringify(screenFrame)}`
       );
+    }
+    for (const required of requiredFrames) {
+      if (captureControlTestIDs.includes(required.testID) && required.frame.y < tabBarBottom - 1) {
+        throw new Error(
+          `${frame.id} ${required.testID} is obscured by the native top tab bar: `
+          + `control=${JSON.stringify(required.frame)}, tab=${JSON.stringify(tabFrame)}`
+        );
+      }
     }
     return;
   }
@@ -530,11 +730,10 @@ async function assertRequiredFrameGeometry(frame) {
   assertPositiveFrame(navigationFrame, `${frame.id} navigation rail`);
   const navigationRight = navigationFrame.x + navigationFrame.width;
   for (const required of requiredFrames) {
-    if (required.frame.x < navigationRight - 1) {
+    if (captureControlTestIDs.includes(required.testID) && required.frame.x < navigationRight - 1) {
       throw new Error(
         `${frame.id} ${required.testID} overlaps the navigation rail: `
-        + `content=${JSON.stringify(required.frame)}, `
-        + `navigation=${JSON.stringify(navigationFrame)}`
+        + `content=${JSON.stringify(required.frame)}, navigation=${JSON.stringify(navigationFrame)}`
       );
     }
   }
@@ -576,6 +775,7 @@ async function takeReadyScreenshot(frame) {
   if (
     frame.id !== 'build-tactical-intuition'
     && frame.id !== 'choose-the-best-move'
+    && frame.id !== 'dark-arrow-duel'
   ) {
     return device.takeScreenshot(frame.captureId);
   }

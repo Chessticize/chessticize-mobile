@@ -198,7 +198,8 @@ show the actual native bottom bar, iPad top bar, Duo adaptive columns, or
 Android tablet side rail as appropriate. Both platforms share this story
 configuration; there is no separate Google Play story file.
 
-The approved layout and manifest validation remain in place while this plan
-is prepared. Final captures and new headline-template hashes are separate
-release deliverables, and store upload/submission require explicit owner
-approval.
+The test-only fixture adapters, schema-v2 raw-manifest validation, explicit
+campaign commands, and versioned composition layouts now implement this plan.
+Raw native capture and its visual review remain separate release deliverables:
+each receipt must record the actual source and immutable PNG hashes before
+composition. Store upload/submission require explicit owner approval.

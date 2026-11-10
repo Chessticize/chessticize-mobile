@@ -1058,6 +1058,8 @@ async function openTab(tabTestID, contentTestID) {
   // handles the selection (#612). Container panels are taller than the
   // viewport, so assert on a child.
   await waitFor(element(by.id('practice-main-scroll'))).toExist().withTimeout(10000);
+  // iPad content underlaps native top tabs. Start the gesture at the
+  // viewport center so the floating bar cannot intercept it.
   await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   // The native tab switch animates; let a target near the top settle before
   // scrolling for one further down.

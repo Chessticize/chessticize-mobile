@@ -10,6 +10,7 @@ IPHONE_DEVICE_UDID="${CHESSTICIZE_MARKETING_IPHONE_DEVICE_UDID:-}"
 IPAD_DEVICE_NAME="${CHESSTICIZE_MARKETING_IPAD_DEVICE:-Chessticize Marketing iPad Pro 13-inch (M5)}"
 IPAD_DEVICE_UDID="${CHESSTICIZE_MARKETING_IPAD_DEVICE_UDID:-}"
 SIMULATOR_WINDOW_WAIT_ATTEMPTS="${CHESSTICIZE_SIMULATOR_WINDOW_WAIT_ATTEMPTS:-240}"
+MARKETING_CAMPAIGN="${CHESSTICIZE_MARKETING_CAMPAIGN:-}"
 IPAD_PORTRAIT_RESTORE_REQUIRED=0
 
 if [[ ! "$SIMULATOR_WINDOW_WAIT_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
@@ -129,6 +130,7 @@ capture_device_family() {
   (
     cd "$APP_DIR"
     CHESSTICIZE_CAPTURE_MARKETING_ASSETS=1 \
+    CHESSTICIZE_MARKETING_CAMPAIGN="$MARKETING_CAMPAIGN" \
     CHESSTICIZE_MARKETING_DEVICE_FAMILY="$device_family" \
     CHESSTICIZE_MARKETING_OUTPUT_ROOT="$OUTPUT_ROOT" \
     CHESSTICIZE_SOURCE_COMMIT="$SOURCE_COMMIT" \
@@ -144,7 +146,12 @@ capture_device_family() {
 SOURCE_COMMIT="$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
 assert_clean_source_state "$SOURCE_COMMIT"
 
-configured_output_root="${CHESSTICIZE_MARKETING_OUTPUT_ROOT:-scratch/store-assets/marketing/$SOURCE_COMMIT}"
+if [[ -n "$MARKETING_CAMPAIGN" ]]; then
+  default_output_root="scratch/store-assets/marketing/$MARKETING_CAMPAIGN/$SOURCE_COMMIT"
+else
+  default_output_root="scratch/store-assets/marketing/$SOURCE_COMMIT"
+fi
+configured_output_root="${CHESSTICIZE_MARKETING_OUTPUT_ROOT:-$default_output_root}"
 if [[ "$configured_output_root" = /* ]]; then
   OUTPUT_ROOT="$configured_output_root"
 else
@@ -177,6 +184,7 @@ prepare_simulator_orientation "$IPAD_UDID" "$IPAD_DEVICE_NAME" landscape
 capture_device_family ipad "$IPAD_DEVICE_NAME" "$IPAD_UDID"
 assert_clean_source_state "$SOURCE_COMMIT"
 
+CHESSTICIZE_MARKETING_CAMPAIGN="$MARKETING_CAMPAIGN" \
 CHESSTICIZE_MARKETING_OUTPUT_ROOT="$OUTPUT_ROOT" \
   node "$APP_DIR/scripts/finalize-marketing-capture.js"
 

@@ -1,10 +1,12 @@
 import {
   addReviewDays,
+  beginArrowDuelReply,
   createCustomPracticeRun,
   defaultPracticeRuns,
   defaultSprintConfig,
   reviewQueueForecast,
   startSprint,
+  submitSprintMove,
   type AttemptEvent,
   type Puzzle,
   type RatingRecord,
@@ -17,6 +19,13 @@ import type {
   ExportedSprintSession,
   LocalDataImport
 } from "../../../../packages/storage/src/practice-store.ts";
+import type { PreparedFocusedRun, TacticalProfileSnapshot } from "../../../../packages/storage/src/tactical-profile-service.ts";
+import type { PersonalBestChallengeDesignPreview } from "../components/PersonalBestChallengeDesign.tsx";
+import { buildSurvivalChallengePresentation } from "../components/survivalChallengePresentation.tsx";
+import type {
+  TacticalProfilePresentation,
+  TacticalProfileScreen
+} from "../components/tacticalProfilePresentation.ts";
 
 const marketingStory = require(
   "../../../../config/app-store-marketing-story-v1.json"
@@ -105,15 +114,31 @@ type AppStoreMarketingStory = {
     id: string;
     order: number;
   }>;
+  releaseCampaign: ReleaseMarketingCampaign;
   locale: string;
   schemaVersion: 1;
   storyId: string;
 };
 
+type ReleaseMarketingCampaign = {
+  id: "mobile-1.6-en-us";
+  publicVersion: "1.6.0";
+  status: "capture-plan";
+  frames: Array<{
+    appearance: "dark" | "light";
+    id: string;
+    order: number;
+  }>;
+};
+
 export type AppStoreMarketingCaptureFixture = {
+  appearance?: "dark" | "light";
+  campaign?: Pick<ReleaseMarketingCampaign, "id" | "publicVersion" | "status">;
   captureInstantMs: number;
   frameId: string;
   initialActiveState?: SprintState;
+  personalBestChallengeDesignPreview?: PersonalBestChallengeDesignPreview;
+  tacticalProfilePresentation?: TacticalProfilePresentation;
   themeCatalogPresentation?: {
     groups: ReadonlyArray<{
       label: string;
@@ -141,13 +166,32 @@ export function appStoreMarketingCaptureFrameIds(): string[] {
     .map((frame) => frame.id);
 }
 
+export function appStoreMarketingReleaseCampaignFrameIds(): string[] {
+  assertStoryContract();
+  return marketingStory.releaseCampaign.frames
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .map((frame) => frame.id);
+}
+
 export function loadAppStoreMarketingCaptureFixture(
   frameId: string,
   practiceService: PracticeService
 ): AppStoreMarketingCaptureFixture {
   assertStoryContract();
-  if (!appStoreMarketingCaptureFrameIds().includes(frameId)) {
+  const releaseCampaignFrame = marketingStory.releaseCampaign.frames.find(
+    (frame) => frame.id === frameId
+  );
+  if (!appStoreMarketingCaptureFrameIds().includes(frameId) && !releaseCampaignFrame) {
     throw new Error(`Unknown App Store marketing capture frame "${frameId}"`);
+  }
+
+  if (releaseCampaignFrame) {
+    return loadReleaseCampaignFixture({
+      frame: releaseCampaignFrame,
+      frameId,
+      practiceService
+    });
   }
 
   practiceService.loadFixturePuzzles(bundledPuzzles);
@@ -207,6 +251,176 @@ export function loadAppStoreMarketingCaptureFixture(
           )
         })
   };
+}
+
+function loadReleaseCampaignFixture({
+  frame,
+  frameId,
+  practiceService
+}: {
+  frame: ReleaseMarketingCampaign["frames"][number];
+  frameId: string;
+  practiceService: PracticeService;
+}): AppStoreMarketingCaptureFixture {
+  const captureInstant = marketingStory.captureClock.instant;
+  practiceService.loadFixturePuzzles(bundledPuzzles);
+  const history = require("../../../../fixtures/marketing-mobile-1.6-history.json") as { data: LocalDataImport };
+  practiceService.importLocalData(history.data);
+  practiceService.saveSettings({
+    appearance: frame.appearance,
+    arrowDuel: { opponentReplyEnabled: true },
+    sync: { iCloudEnabled: false },
+    notifications: { reviewReminder: { mode: "off" } },
+    moveFeedback: { soundEnabled: false, hapticsEnabled: false },
+    sprintGuides: {
+      rulesSeen: true,
+      activeSessionSeen: true,
+      arrowDuelSeen: true,
+      focusedRunSeen: true
+    }
+  });
+  completeCampaignScheduledReviews(practiceService, captureInstant);
+  const snapshot = practiceService.getTacticalProfileSnapshot(captureInstant);
+  if (!snapshot) {
+    throw new Error("1.6 marketing Tactical Profile fixture is unavailable");
+  }
+  const focused = practiceService.prepareFocusedRun("line", captureInstant);
+  if (focused.status !== "ready") {
+    throw new Error(`1.6 marketing Focused Run fixture is unavailable: ${focused.reason}`);
+  }
+  const tacticalProfilePresentation = tacticalProfileCapturePresentation(
+    snapshot,
+    focused.prepared,
+    frameId === "focused-run" ? "focused_run" : "profile"
+  );
+  const activeSnapshot = frameId === "dark-arrow-duel"
+    ? buildArrowDuelReplySnapshot(marketingStory.fictionalUser.activeSnapshots.arrowDuel)
+    : undefined;
+  const personalBestChallengeDesignPreview = frameId === "survival"
+    ? {
+        ...buildSurvivalChallengePresentation({
+          currentState: null,
+          nowMs: Date.parse(captureInstant),
+          service: practiceService
+        }),
+        hubInitiallyVisible: true,
+        homeGuideOnFirstEntry: false
+      }
+    : undefined;
+
+  return {
+    appearance: frame.appearance,
+    campaign: {
+      id: marketingStory.releaseCampaign.id,
+      publicVersion: marketingStory.releaseCampaign.publicVersion,
+      status: marketingStory.releaseCampaign.status
+    },
+    captureInstantMs: Date.parse(captureInstant),
+    frameId,
+    ...(activeSnapshot === undefined ? {} : {
+      initialActiveState: activeSnapshot
+    }),
+    ...(personalBestChallengeDesignPreview === undefined ? {} : {
+      personalBestChallengeDesignPreview
+    }),
+    ...(frameId === "tactical-profile" || frameId === "focused-run" ? {
+      tacticalProfilePresentation
+    } : {})
+  };
+}
+
+function completeCampaignScheduledReviews(service: PracticeService, captureInstant: string): void {
+  // Continue the same fictional user's real Review journey after their mixed
+  // Runs: clear yesterday's queue, then complete two of today's reviews. The
+  // scheduler owns every resulting due date; no capture-only queue is invented.
+  const queue = service.listReviewQueue();
+  const captureMs = Date.parse(captureInstant);
+  const complete = (review: ReviewQueueState, completedAtMs: number) => {
+    const puzzle = service.getPuzzle(review.puzzleId);
+    const expectedMove = puzzle?.solutionMoves[1] ?? puzzle?.solutionMoves[0];
+    if (!expectedMove) {
+      throw new Error(`1.6 marketing Review puzzle is unavailable: ${review.puzzleId}`);
+    }
+    service.recordReviewAttempt({
+      puzzleId: review.puzzleId,
+      mode: review.mode,
+      ratingKey: review.ratingKey,
+      result: "correct",
+      submittedMove: expectedMove,
+      expectedMove,
+      startedAt: new Date(completedAtMs - 10_000).toISOString()
+    }, new Date(completedAtMs).toISOString());
+  };
+  queue.forEach((review, index) => complete(review, captureMs - 24 * 60 * 60 * 1_000 - index * 30_000));
+  queue.slice(0, 2).forEach((review, index) => complete(review, captureMs - (index + 1) * 60_000));
+}
+
+function tacticalProfileCapturePresentation(
+  snapshot: TacticalProfileSnapshot,
+  prepared: PreparedFocusedRun,
+  screen: TacticalProfileScreen
+): TacticalProfilePresentation {
+  const signals = snapshot.evaluation.signals.map((signal) => ({
+    id: signal.id,
+    taskFamily: signal.taskFamily,
+    themeKey: signal.theme,
+    themeLabel: humanizeTheme(signal.theme),
+    kind: signal.reason === "completed_speed" ? "speed" as const : signal.reason,
+    distinctPuzzleCount: signal.distinctPuzzleCount,
+    distinctSessionCount: signal.distinctSessionCount,
+    priorityLabel: signal.status === "recommended"
+      ? signal.confidence === "very_high"
+        ? "Recommended · strong evidence"
+        : "Recommended"
+      : "Collecting evidence",
+    status: signal.status
+  }));
+  const focusedRun = {
+    taskFamily: prepared.plan.taskFamily,
+    title: prepared.plan.reasons.length > 1
+      ? "Tactical focus"
+      : `${humanizeTheme(prepared.plan.reasons[0]?.theme ?? "Tactical")} focus`,
+    ratingLabel: `Puzzle-solving Rating ${prepared.plan.ratingAnchor.rating}`,
+    durationLabel: formatDuration(prepared.config.durationSeconds),
+    totalPuzzleCount: prepared.puzzles.length,
+    allocations: [
+      ...prepared.plan.reasons.map((reason, index) => ({
+        id: reason.theme,
+        label: humanizeTheme(reason.theme),
+        puzzleCount: reason.count,
+        tone: index === 0 ? "primary" as const : "secondary" as const
+      })),
+      {
+        id: "mixed",
+        label: "Mixed practice",
+        puzzleCount: prepared.plan.mixedControlCount,
+        tone: "mixed" as const
+      }
+    ]
+  };
+  return {
+    phase: snapshot.phase,
+    assurance: snapshot.assurance,
+    screen,
+    activeTaskFamily: "line",
+    signals,
+    unavailableFamilies: snapshot.unavailableFamilies,
+    ...(snapshot.homeLeadSignalId === undefined ? {} : { homeLeadSignalId: snapshot.homeLeadSignalId }),
+    ...(screen === "focused_run" ? { focusedRun } : {}),
+    onIntent: () => undefined
+  };
+}
+
+function humanizeTheme(theme: string): string {
+  const words = theme
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return words.length === 0 ? "Tactical pattern" : words[0]!.toUpperCase() + words.slice(1);
+}
+
+function formatDuration(seconds: number): string {
+  return seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.ceil(seconds / 60)} min`;
 }
 
 export function appStoreMarketingCaptureStory(): Readonly<AppStoreMarketingStory> {
@@ -502,6 +716,28 @@ function reviewQueue(): ReviewQueueState[] {
   return queue;
 }
 
+function buildArrowDuelReplySnapshot(contract: ActiveSnapshotContract): SprintState {
+  const choiceSnapshot = buildActiveSnapshot("arrow_duel", contract);
+  const currentPuzzle = choiceSnapshot.currentPuzzle;
+  if (currentPuzzle?.kind !== "arrow_duel" || currentPuzzle.phase !== "choice") {
+    throw new Error("1.6 Arrow Duel capture must start from a choice state");
+  }
+  const captureMs = Date.parse(marketingStory.captureClock.instant);
+  const handoff = submitSprintMove(
+    choiceSnapshot,
+    currentPuzzle.correctMove,
+    new Date(captureMs - 2_000).toISOString()
+  );
+  if (handoff.state.currentPuzzle?.kind !== "arrow_duel" || handoff.state.currentPuzzle.phase !== "reply_handoff") {
+    throw new Error("1.6 Arrow Duel capture could not reach the opponent reply handoff");
+  }
+  const replying = beginArrowDuelReply(handoff.state, new Date(captureMs - 1_000).toISOString());
+  if (replying.currentPuzzle?.kind !== "arrow_duel" || replying.currentPuzzle.phase !== "reply") {
+    throw new Error("1.6 Arrow Duel capture could not reach the opponent reply");
+  }
+  return replying;
+}
+
 function buildActiveSnapshot(
   mode: Extract<SprintMode, "arrow_duel" | "standard">,
   contract: ActiveSnapshotContract
@@ -614,6 +850,10 @@ function shiftIso(value: string, deltaMs: number): string {
 }
 
 function assertStoryContract(): void {
+  const releaseFrames = marketingStory.releaseCampaign.frames
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .map(({ appearance, id, order }) => ({ appearance, id, order }));
   if (
     marketingStory.schemaVersion !== 1
     || marketingStory.contractStatus !== "approved"
@@ -621,5 +861,20 @@ function assertStoryContract(): void {
     || !Number.isFinite(Date.parse(marketingStory.captureClock.instant))
   ) {
     throw new Error("App Store marketing capture requires the approved v1 story contract");
+  }
+  if (
+    marketingStory.releaseCampaign.id !== "mobile-1.6-en-us"
+    || marketingStory.releaseCampaign.publicVersion !== "1.6.0"
+    || marketingStory.releaseCampaign.status !== "capture-plan"
+    || JSON.stringify(releaseFrames) !== JSON.stringify([
+      { appearance: "light", id: "practice-home", order: 1 },
+      { appearance: "dark", id: "dark-arrow-duel", order: 2 },
+      { appearance: "light", id: "tactical-profile", order: 3 },
+      { appearance: "light", id: "focused-run", order: 4 },
+      { appearance: "dark", id: "survival", order: 5 },
+      { appearance: "light", id: "review", order: 6 }
+    ])
+  ) {
+    throw new Error("App Store marketing capture requires the planned 1.6 campaign contract");
   }
 }

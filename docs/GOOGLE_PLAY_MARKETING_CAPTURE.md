@@ -51,13 +51,27 @@ Play AAB or Play-delivered APK cannot activate the fixture.
 
 ## Capture the phone set
 
-Reuse a compatible API 24 or newer emulator when possible:
+The legacy-default command captures the approved v1 story. Reuse a compatible
+API 24 or newer emulator when possible:
 
 ```sh
 CHESSTICIZE_MARKETING_ANDROID_PHONE_SERIAL=emulator-5554 \
 CHESSTICIZE_MARKETING_ANDROID_PHONE_PROFILE="Pixel 2 API 36" \
   pnpm mobile:capture:marketing-assets:android
 ```
+
+For the explicit 1.6 campaign, use the same phone profile with:
+
+```sh
+CHESSTICIZE_MARKETING_ANDROID_PHONE_SERIAL=emulator-5554 \
+CHESSTICIZE_MARKETING_ANDROID_PHONE_PROFILE="Pixel 2 API 36" \
+  pnpm mobile:capture:marketing-assets:android:1.6
+```
+
+The 1.6 command captures `practice-home`, `dark-arrow-duel`,
+`tactical-profile`, `focused-run`, `survival`, and `review` from the same
+deterministic fictional player through public native screens. It keeps the
+early-estimate disclosure visible and does not reuse a v1 raw screenshot.
 
 The wrapper:
 
@@ -68,7 +82,22 @@ The wrapper:
 4. captures and validates the approved six-frame story; and
 5. writes the phone-only `google-play-capture-manifest.json`.
 
-This is a screenshot-production build, not a new signed release build.
+The legacy command writes below
+`scratch/store-assets/google-play/<full-source-commit>/`. The explicit 1.6
+command writes below
+`scratch/store-assets/google-play/mobile-1.6-en-us/<full-source-commit>/`.
+Its raw manifests use `schemaVersion: 2`, top-level campaign
+`{"id":"mobile-1.6-en-us","publicVersion":"1.6.0","status":"capture-plan"}`,
+and release-frame receipts with immutable PNG hashes. They intentionally omit
+the v1 top-level `storyId` and legacy copy fields. `sourceBuild.kind` is
+`integrated-main-preparation`: it records a real integrated source SHA without
+claiming a Play or store release candidate. `capture-plan` is preparation
+status, not listing-upload evidence.
+
+The 1.6 tooling is available, but no old v1 raw set can satisfy this campaign;
+a native capture manifest exists only after the explicit command completes and
+is visually reviewed. This is a screenshot-production build, not a new signed
+release build.
 
 ## Android Photo Studio composition
 
@@ -89,17 +118,19 @@ or other Apple-specific cue. The renderer records
 Preview:
 
 ```sh
-pnpm google-play:compose-marketing -- \
-  --capture-root <capture-directory> \
-  --manifest <capture-directory>/google-play-capture-manifest.json \
+pnpm app-store:compose-marketing -- \
+  --capture-root <campaign-raw-capture-directory> \
   --output-dir <separate-preview-directory> \
-  --device-family android-phone \
-  --orientation portrait \
+  --campaign mobile-1.6-en-us \
+  --platform google-play \
   --preview-only
 ```
 
 Review the single contact sheet. Omit `--preview-only` to write the six opaque
-1080 x 1920 upload assets and `composition-manifest.json`.
+1080 x 1920 upload assets and `composition-manifest.json`. A self-built v2
+capture with its truthful preparation status can export these assets after
+review. Exact-artifact capture provenance remains separately fail-closed until
+the campaign-aware verifier accepts its schema-v2 receipt.
 
 ## Listing handoff
 

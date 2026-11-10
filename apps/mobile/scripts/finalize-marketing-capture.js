@@ -5,6 +5,7 @@ const story = require('../../../config/app-store-marketing-story-v1.json');
 const {
   writeCombinedCaptureManifest,
 } = require('../e2e/marketingCaptureArtifacts');
+const { resolveMarketingCampaign } = require('../e2e/marketingCampaign');
 
 function main(environment = process.env) {
   const repositoryRoot = resolve(__dirname, '../../..');
@@ -14,7 +15,7 @@ function main(environment = process.env) {
   );
   const manifestPath = writeCombinedCaptureManifest({
     outputRoot,
-    story,
+    story: resolveMarketingCampaign(story, environment.CHESSTICIZE_MARKETING_CAMPAIGN),
   });
   process.stdout.write(`Marketing capture manifest: ${manifestPath}\n`);
 }

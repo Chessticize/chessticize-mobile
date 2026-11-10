@@ -5,6 +5,7 @@ const story = require('../../../config/app-store-marketing-story-v1.json');
 const {
   writeCombinedGooglePlayCaptureManifest,
 } = require('./googlePlayMarketingCaptureArtifacts');
+const { resolveMarketingCampaign } = require('./marketingCampaign');
 
 function main(environment = process.env) {
   const repositoryRoot = resolve(__dirname, '../../..');
@@ -14,7 +15,7 @@ function main(environment = process.env) {
   );
   const manifestPath = writeCombinedGooglePlayCaptureManifest({
     outputRoot,
-    story,
+    story: resolveMarketingCampaign(story, environment.CHESSTICIZE_MARKETING_CAMPAIGN),
   });
   process.stdout.write(`Google Play capture manifest: ${manifestPath}\n`);
 }

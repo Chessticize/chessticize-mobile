@@ -3,6 +3,7 @@
 const { existsSync, statSync } = require('node:fs');
 const { resolve } = require('node:path');
 const story = require('../../../config/app-store-marketing-story-v1.json');
+const { resolveMarketingCampaign } = require('./marketingCampaign');
 const {
   captureMarketingScreenshot,
   sourceCommitForCapture,
@@ -23,6 +24,10 @@ function recordGooglePlayPublicUiCapture({
   sourceCommit,
   story: storyContract = story,
 }) {
+  const campaign = resolveMarketingCampaign(
+    storyContract,
+    environment.CHESSTICIZE_MARKETING_CAMPAIGN
+  );
   const inputRoot = resolveRequiredDirectory(
     environment.CHESSTICIZE_MARKETING_INPUT_ROOT,
     'CHESSTICIZE_MARKETING_INPUT_ROOT'
@@ -52,7 +57,7 @@ function recordGooglePlayPublicUiCapture({
     run,
     target,
   });
-  const records = storyContract.frames.map((frame) => {
+  const records = campaign.frames.map((frame) => {
     const exactFrame = readGooglePlayPublicUiFrame({
       artifact,
       frame,
@@ -60,7 +65,7 @@ function recordGooglePlayPublicUiCapture({
       outputRoot,
       installedSession,
       sourceCommit,
-      story: storyContract,
+      story: campaign,
       target,
     });
     return {
@@ -69,7 +74,7 @@ function recordGooglePlayPublicUiCapture({
         outputRoot,
         screenshotPath: exactFrame.screenshotPath,
         sourceCommit,
-        story: storyContract,
+        story: campaign,
         target,
       }),
       captureProvenance: exactFrame.captureProvenance,
@@ -81,7 +86,7 @@ function recordGooglePlayPublicUiCapture({
     outputRoot,
     records,
     sourceCommit,
-    story: storyContract,
+    story: campaign,
     target,
   });
   return manifestPath;
