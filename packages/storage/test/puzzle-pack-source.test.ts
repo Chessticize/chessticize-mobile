@@ -537,7 +537,9 @@ test("SQLitePuzzlePackSource merges indexed theme scans for OR matching without 
       (packDb.prepare("SELECT id FROM themes WHERE name = ?").get(theme) as { id: number }).id
     );
     for (const [index, sql] of candidateSql.entries()) {
-      const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(themeIds[index], 1700, 1900, 10) as Array<{ detail: string }>;
+      const themeId = themeIds[index];
+      assert.ok(themeId !== undefined);
+      const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(themeId, 1700, 1900, 10) as Array<{ detail: string }>;
       assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
       assert.ok(plan.every((row) => !row.detail.includes("SEARCH puzzles")));
       assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
@@ -918,7 +920,9 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
         puzzle.stockfishEvalAfterFirstMove ?? 0
       );
       for (const theme of puzzle.themes) {
-        insertTheme.run(puzzle.id, themeIds.get(theme), puzzle.rating);
+        const themeId = themeIds.get(theme);
+        assert.ok(themeId !== undefined);
+        insertTheme.run(puzzle.id, themeId, puzzle.rating);
       }
     }
     db.exec("COMMIT");
