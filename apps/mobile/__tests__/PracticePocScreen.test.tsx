@@ -12158,14 +12158,13 @@ describe("PracticePocScreen", () => {
     );
     const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
     expect(historyAttemptThemes).toMatch(/^[A-Z]/);
-    // The result icon sits level with the first line, like Review's tiles:
-    // it is a direct child of a top-aligned row and is not centered itself.
+    // The result icon is centered vertically within the card, like Review's tiles.
     const historyRowHost = hostByTestId(renderer, `history-attempt-${historyAttemptId}`);
     const historyTile = hostByTestId(renderer, `history-attempt-${historyAttemptId}-badge`);
     const historyRowStyle = historyRowHost.props.style;
     expect(flattenTestStyle(
       typeof historyRowStyle === "function" ? historyRowStyle({ pressed: false }) : historyRowStyle
-    ).alignItems).toBe("flex-start");
+    ).alignItems).toBe("center");
     expect(flattenTestStyle(historyTile.props.style).alignSelf).toBeUndefined();
     let tileHostParent = historyTile.parent;
     while (tileHostParent && typeof tileHostParent.type !== "string") {
@@ -14003,6 +14002,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
 
     const firstRetryRow = findByTestId(renderer, "review-due-item-review-badge-0-standard-standard-5-20");
+    const retryRowStyle = firstRetryRow.props.style;
+    expect(flattenTestStyle(
+      typeof retryRowStyle === "function" ? retryRowStyle({ pressed: false }) : retryRowStyle
+    ).alignItems).toBe("center");
     expect(firstRetryRow.props.accessibilityLabel).toContain("Scheduled retry");
     expect(firstRetryRow.props.accessibilityLabel).toContain("First missed 2 days ago");
     expect(firstRetryRow.props.accessibilityLabel).toContain("1 attempt, 1 miss");

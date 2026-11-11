@@ -916,7 +916,7 @@ const useStyles = makeStyles((theme) => ({
     paddingVertical: 16
   },
   attemptRow: {
-    alignItems: "flex-start",
+    alignItems: "center",
     paddingVertical: 12
   },
   attemptRowChevron: {
