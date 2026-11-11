@@ -558,21 +558,23 @@ the unsigned-in test emulator. No AAB, Play submission, or mirror is implied by
 this preparation record; observe those states from the release workflows and
 Play before reporting them complete.
 
+## Android 1.6.2 candidate preparation
+
+Android 1.6.2 build 24 centers the status icons on Review and History puzzle cards. This is a bounded UI delta; reuse applicable earlier evidence and verify the new signed artifact and source identity.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.6.1`)
-- Android version code: `apps/mobile/release-version.json` (`23`)
-- iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
+- Public version: `apps/mobile/release-version.json` (`1.6.2`)
+- Android version code: `apps/mobile/release-version.json` (`24`)
+- iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Open-development target: `apps/mobile/development-version.json`
   (Debug/E2E only, independent of the Android store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.6.1-build-23`
+- Required source tag before any Play track upload: `android-v1.6.2-build-24`
 
-Android `versionCode` must increase for every later Play upload. This Android-only
-release preserves the separate iOS public version `1.6.0` and iOS build `2`; it
-does not allocate or distribute an iOS candidate. Settings reads `versionName`
+Android `versionCode` must increase for every later Play upload. This coordinated release also allocates iOS 1.6.2 build 1. Settings reads `versionName`
 and `versionCode` from the installed Android artifact and the corresponding bundle
 keys on iOS; no user-visible version fallback is hardcoded in JavaScript.
 Prepare candidate identities only on the coordinated release branch and advance

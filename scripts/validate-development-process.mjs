@@ -605,8 +605,8 @@ for (const rcFreezePolicy of [
   );
 }
 
-assert.equal(releaseVersion.publicVersion, "1.6.1");
-assert.equal(releaseVersion.androidVersionCode, 23);
+assert.equal(releaseVersion.publicVersion, "1.6.2");
+assert.equal(releaseVersion.androidVersionCode, 24);
 assert.deepEqual(developmentVersion, {
   schemaVersion: 1,
   plannedPublicVersion: "1.6.2"
