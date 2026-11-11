@@ -677,7 +677,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the Android release to public version 1.6.1 build 23', () => {
+  it('pins the Android release to public version 1.6.2 build 24', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -707,11 +707,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.6.1',
-        androidVersionCode: 23,
+        publicVersion: '1.6.2',
+        androidVersionCode: 24,
       }),
     );
-    expect(sourceTag).toBe('android-v1.6.1-build-23');
+    expect(sourceTag).toBe('android-v1.6.2-build-24');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -724,10 +724,10 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`23`)',
+      'Android version code: `apps/mobile/release-version.json` (`24`)',
     );
-    expect(releaseNote).toContain('Public version: `1.6.1`');
-    expect(releaseNote).toContain('Build or version code: `23`');
+    expect(releaseNote).toContain('Public version: `1.6.2`');
+    expect(releaseNote).toContain('Build or version code: `24`');
     expect(releaseNote).toContain(`Source tag: \`${sourceTag}\``);
     const storeCopy = releaseNote.match(
       /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/,
@@ -735,8 +735,8 @@ describe('Android Play release contract', () => {
     expect(storeCopy).toBeDefined();
     expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
     expect(storeCopy).not.toMatch(/https?:\/\//u);
-    expect(storeCopy).toContain('Google Play can now invite you to rate Chessticize after successful practice.');
-    expect(storeCopy).toContain('Invitations appear on finished results, at least 120 days apart.');
+    expect(storeCopy).toContain('Review puzzle cards now center their status icons.');
+    expect(storeCopy).toContain('History puzzle cards now center their status icons.');
     expect(storeCopy.split('\n').filter(line => line.startsWith('• '))).toHaveLength(2);
     expect(storeCopy).not.toContain('Progress Backup');
     expect(releaseNote).not.toMatch(/Rating history/i);
