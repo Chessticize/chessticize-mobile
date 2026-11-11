@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { SyncSQLiteStore, type SyncSqliteDatabase, type SyncSqliteValue } from "./sync-sqlite-store.ts";
 
 export class SQLiteStore extends SyncSQLiteStore {
@@ -29,12 +29,18 @@ export class NodeSqliteDatabase implements SyncSqliteDatabase {
 
   prepare(sql: string) {
     const statement = this.db.prepare(sql);
+    const normalize = (params: SyncSqliteValue[]): SQLInputValue[] =>
+      params.map((value) => value instanceof ArrayBuffer
+        ? new Uint8Array(value)
+        : ArrayBuffer.isView(value)
+          ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+          : value);
     return {
       run: (...params: SyncSqliteValue[]) => {
-        statement.run(...params);
+        statement.run(...normalize(params));
       },
-      get: (...params: SyncSqliteValue[]) => statement.get(...params),
-      all: (...params: SyncSqliteValue[]) => statement.all(...params)
+      get: (...params: SyncSqliteValue[]) => statement.get(...normalize(params)),
+      all: (...params: SyncSqliteValue[]) => statement.all(...normalize(params))
     };
   }
 }

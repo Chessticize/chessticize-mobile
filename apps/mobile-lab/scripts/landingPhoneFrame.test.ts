@@ -27,7 +27,7 @@ test(`${engine}: iPhone screens preserve a continuous bezel at all four corners`
         const geometry = await phone.evaluate((element) => {
           const style = getComputedStyle(element);
           const { width, height } = element.getBoundingClientRect();
-          const [x, y = x] = style.borderTopLeftRadius.split(" ");
+          const [x = "0", y = x] = style.borderTopLeftRadius.split(" ");
           return {
             width, height,
             rx: parseFloat(x) * (x.endsWith("%") ? width / 100 : 1),
