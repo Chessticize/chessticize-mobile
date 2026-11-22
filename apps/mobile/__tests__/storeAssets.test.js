@@ -141,7 +141,8 @@ describe("App Store assets document", () => {
 
     expect(template.storeCopy).toBe(storeCopyTemplateBlock());
     expect(template.rules).toContain("Use two or three short bullets and no raw URLs.");
-    expect(plannedVersion.sourceTag).toBe("ios-v1.6.0-build-2");
+    expect(plannedVersion.sourceTag).toMatch(/^ios-v\d+\.\d+\.\d+-build-\d+$/u);
+    expect(plannedIOSReleaseNote).toContain(`- Source tag: \`${plannedVersion.sourceTag}\``);
     expect(plannedVersion.status).toBe("release-candidate");
     expect(template.storeCopy).not.toMatch(/https?:\/\//u);
     expect(draft).not.toMatch(/https?:\/\//u);
