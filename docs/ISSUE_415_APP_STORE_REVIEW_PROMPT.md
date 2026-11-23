@@ -7,26 +7,30 @@ production review-request wiring.
 
 ## Product decision
 
-Version 1 uses a concrete puzzle milestone:
+The in-app review prompt uses a positive puzzle milestone:
 
-- the current result is a successful rated puzzle Sprint;
-- the user has successfully completed at least four rated puzzle Sprints;
-- those successful Sprints span at least two local calendar dates;
-- the successful result screen has remained stable for two seconds;
+- the current result is a positive completed puzzle session:
+  - a won Standard, Blitz, Arrow Duel, or Custom Sprint (rated or unrated),
+  - a completed Focused Run with at least 60% accuracy (`correct >= 1` and
+    `correct / (correct + mistakes) >= 0.6`), or
+  - a completed Survival Run that either solved at least 10 puzzles or cleared
+    the band's eligible pool;
+- the user has reached at least **2** positive completed sessions across at
+  least **2** distinct local calendar dates, **or** at least **3** positive
+  completed sessions (including on a single date);
+- the completed result screen has remained stable for **1 second**;
 - no guide, confirmation, analysis, other modal, or active puzzle timer is
   present.
 
-Standard, Arrow Duel, and user-controlled Custom Sprints may count. Focused Runs
-do not participate in this first trigger, so review eligibility does not depend
-on personalized weakness detection.
-
 The app must not request a review after a failed Sprint, wrong move, timeout,
-abandon action, error, crash recovery, first launch, onboarding, or an
-in-progress puzzle. Navigating away, backgrounding the app, or presenting
-another modal during the two-second idle window cancels that request attempt.
-The delay lets the completed result settle before any platform-owned sheet can
-take focus, while preserving a clear cancellation window for a user who moves
-on immediately.
+abandon action, low-accuracy Focused Run, low-score Survival Run, error, crash
+recovery, first launch, onboarding, or an in-progress puzzle. Navigating away,
+backgrounding the app while on the result screen, or presenting another modal
+during the one-second idle window cancels that request attempt. Backgrounding
+mid-sprint to pause and resume later does not disqualify that session if the
+player returns and wins it. The delay lets the completed result settle before
+any platform-owned sheet can take focus, while preserving a clear cancellation
+window for a user who moves on immediately.
 
 ## Native boundary
 
@@ -56,10 +60,10 @@ for respectful request attempts:
 - the app version for the last platform review request attempt;
 - the local timestamp of that attempt.
 
-An eligible request requires both a different app version and at least 120
-elapsed days since the previous request attempt. The app records an attempt
-when it invokes the platform flow because neither platform guarantees that a
-sheet appears.
+An eligible request requires at least 30 elapsed days since the previous
+request attempt (platform APIs enforce their own additional per-version and
+annual display quotas). The app records an attempt when it invokes the platform
+flow because neither platform guarantees that a sheet appears.
 No new account, server event, analytics event, or personal-data collection is
 needed.
 
@@ -67,15 +71,19 @@ needed.
 
 The implementation phase must cover:
 
-- the fourth successful rated puzzle Sprint across a second local date becomes
+- the second positive completed session across a second local date becomes
   eligible;
-- fewer than four successful Sprints remains ineligible;
-- four successes on one local date remains ineligible;
-- failed, timed-out, abandoned, onboarding, and active-modal states remain
-  suppressed;
-- same-version and 120-day cooldown gates remain suppressed;
-- the two-second request is cancelled by navigation, backgrounding, or a new
-  modal;
+- the third positive completed session on a single local date becomes eligible;
+- one positive session or two on a single local date remains ineligible;
+- unrated Custom Sprints, high-accuracy Focused Runs (≥ 60%), and strong
+  Survival Runs (≥ 10 solved or pool cleared) are eligible;
+- failed, timed-out, abandoned, low-accuracy Focused, low-score Survival,
+  onboarding, and active-modal states remain suppressed;
+- the 30-day cooldown gate remains suppressed before 30 days and re-opens after
+  30 days;
+- the one-second request is cancelled by navigation, backgrounding on the
+  result screen, or a new modal, while backgrounding mid-sprint does not cancel
+  a later win;
 - an attempted request that produces no system sheet does not block or change
   the result flow;
 - eligibility remains local and creates no analytics or network dependency.
@@ -110,8 +118,8 @@ pnpm --filter ChessticizeMobile exec detox test --configuration android.attached
 Select the dedicated simulator with the normal `DETOX_IOS_DEVICE`,
 `DETOX_IOS_DEVICE_UDID`, or `DETOX_ANDROID_DEVICE` variables. The journey uses
 the existing test-only one-puzzle Sprint and clock controls. It completes
-three rated Sprints on one local date and a fourth on the next, retaining the
-production review eligibility and two-second delay. It captures the default
+one Sprint on the first local date and a second on the next, retaining the
+production review eligibility and one-second delay. It captures the default
 Practice screen and each successful result. A passing journey proves those
 public UI steps; inspect the final screenshot separately to determine whether
 the platform actually displayed its rating sheet. No fake review dialog is

@@ -1302,11 +1302,17 @@ export class PracticeService {
         ...(session.completedAt === undefined
           ? {}
           : { completedAt: session.completedAt }),
+        correctCount: session.correctCount,
         focused: session.config?.tacticalFocus !== undefined,
+        mistakeCount: session.mistakeCount,
         rated:
           session.ratingAfter !== undefined &&
           session.config?.ratingPolicy !== "unrated",
-        status: session.status
+        status: session.status,
+        survival: session.config?.survival !== undefined,
+        ...(session.config?.targetCorrect === undefined
+          ? {}
+          : { targetCorrect: session.config.targetCorrect })
       })),
       ...(lastAttempt === undefined ? {} : { lastAttempt }),
       ...(timeZone === undefined ? {} : { timeZone })

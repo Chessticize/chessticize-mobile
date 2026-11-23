@@ -10,8 +10,8 @@ const {
 const fixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
 
 describe('Native app-review milestone acceptance', () => {
-  it('reaches four successful rated Sprints over two local dates using public UI', async () => {
-    for (let index = 0; index < 4; index += 1) {
+  it('reaches two successful Sprints over two local dates using public UI', async () => {
+    for (let index = 0; index < 2; index += 1) {
       if (index > 0) {
         await device.terminateApp();
       }
@@ -23,10 +23,10 @@ describe('Native app-review milestone acceptance', () => {
           chessticizePuzzleSelectionId: fixture.puzzle.id,
           chessticizePuzzleSelectionSeed: fixture.puzzleSelectionSeed,
           chessticizeStandardTargetCorrect: '1',
-          // Keep the real review milestone (4 successes, 2 dates). Only the
-          // existing puzzle-length and clock test controls shorten this run.
+          // Keep the real review milestone (2 successes across 2 dates). Only
+          // the existing puzzle-length and clock test controls shorten this run.
           chessticizeTestNowMs: String(Date.parse('2026-11-08T12:00:00Z')
-            + (index === 3 ? 86400000 : index * 600000)),
+            + (index === 1 ? 86400000 : 0)),
         },
       });
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);

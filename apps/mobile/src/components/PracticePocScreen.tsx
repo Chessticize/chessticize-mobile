@@ -556,7 +556,7 @@ function shouldShowTimeoutSnapshot(
 const ARROW_DUEL_OPTIONAL_SETTINGS_COPY =
   "This extra challenge is optional — turn it off in Settings.";
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
-const APP_REVIEW_REQUEST_IDLE_MS = 2_000;
+const APP_REVIEW_REQUEST_IDLE_MS = 1_000;
 
 export function isAppReviewRequestSurfaceBlocked(input: {
   hasError: boolean;
@@ -1271,9 +1271,9 @@ export function PracticePocScreen({
         pauseActiveSprint("app-state");
       }
       if (nextState === "background" || nextState === "inactive") {
-        const currentSessionId = stateRef.current?.id;
-        if (currentSessionId) {
-          appReviewCancelledSessionIdsRef.current.add(currentSessionId);
+        const currentSession = stateRef.current;
+        if (currentSession && currentSession.status === "won") {
+          appReviewCancelledSessionIdsRef.current.add(currentSession.id);
         }
         refreshReviewReminder("app-background", true);
         if (service.getSettings().sync.iCloudEnabled) {

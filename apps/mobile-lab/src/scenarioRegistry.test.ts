@@ -438,8 +438,9 @@ test("closed Issue #415 keeps its stable story without a new marker", () => {
     ),
     false
   );
-  assert.ok(scenario.scope.includes.includes("Four successful puzzle Sprints"));
-  assert.ok(scenario.scope.includes.includes("At least two local dates"));
+  assert.ok(scenario.scope.includes.includes("Two sessions across two dates or three total"));
+  assert.ok(scenario.scope.includes.includes("One-second idle handoff"));
+  assert.ok(scenario.scope.includes.includes("30-day cooldown"));
   assert.ok(scenario.scope.includes.includes("No custom pre-prompt"));
   assert.ok(scenario.scope.exits.includes("Apple StoreKit review sheet"));
   assert.match(scenario.description, /successful puzzle Sprint Result/);

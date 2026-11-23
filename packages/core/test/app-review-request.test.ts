@@ -8,24 +8,42 @@ import {
 
 const NOW = Date.parse("2026-07-29T12:00:00.000Z");
 
-test("the fourth successful rated puzzle Sprint across a second local date is eligible", () => {
+test("the second successful puzzle Sprint across a second local date is eligible", () => {
   const sessions = [
     successfulSprint("one", "2026-07-27T17:00:00.000Z"),
-    successfulSprint("two", "2026-07-27T18:00:00.000Z"),
-    successfulSprint("three", "2026-07-27T19:00:00.000Z"),
-    successfulSprint("four", "2026-07-28T17:00:00.000Z")
+    successfulSprint("two", "2026-07-28T17:00:00.000Z")
   ];
 
   assert.deepEqual(evaluateAppReviewRequestEligibility({
     appVersion: "1.4.0",
-    currentSessionId: "four",
+    currentSessionId: "two",
     nowMs: NOW,
     sessions,
     timeZone: "America/Los_Angeles"
   }), {
     eligible: true,
-    successfulSprintCount: 4,
+    successfulSprintCount: 2,
     successfulLocalDateCount: 2
+  });
+});
+
+test("the third successful puzzle Sprint on a single local date is eligible", () => {
+  const sessions = [
+    successfulSprint("one", "2026-07-29T01:00:00.000Z"),
+    successfulSprint("two", "2026-07-29T02:00:00.000Z"),
+    successfulSprint("three", "2026-07-29T03:00:00.000Z")
+  ];
+
+  assert.deepEqual(evaluateAppReviewRequestEligibility({
+    appVersion: "1.4.0",
+    currentSessionId: "three",
+    nowMs: NOW,
+    sessions,
+    timeZone: "UTC"
+  }), {
+    eligible: true,
+    successfulSprintCount: 3,
+    successfulLocalDateCount: 1
   });
 });
 
@@ -55,109 +73,148 @@ test("invalid input and first-launch onboarding history fail closed", () => {
   })), "current_sprint_not_successful");
 });
 
-test("too few successes or successes on only one local date remain ineligible", () => {
-  const threeSessions = [
-    successfulSprint("one", "2026-07-28T17:00:00.000Z"),
-    successfulSprint("two", "2026-07-28T18:00:00.000Z"),
-    successfulSprint("three", "2026-07-29T17:00:00.000Z")
-  ];
+test("one win or two wins on a single local date remain ineligible", () => {
   assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
     appVersion: "1.4.0",
-    currentSessionId: "three",
+    currentSessionId: "one",
     nowMs: NOW,
-    sessions: threeSessions,
+    sessions: [successfulSprint("one", "2026-07-29T12:00:00.000Z")],
     timeZone: "UTC"
   })), "not_enough_successful_sprints");
 
-  const oneDate = [
+  const twoSameDate = [
     successfulSprint("one", "2026-07-29T01:00:00.000Z"),
-    successfulSprint("two", "2026-07-29T02:00:00.000Z"),
-    successfulSprint("three", "2026-07-29T03:00:00.000Z"),
-    successfulSprint("four", "2026-07-29T04:00:00.000Z")
+    successfulSprint("two", "2026-07-29T02:00:00.000Z")
   ];
   assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
     appVersion: "1.4.0",
-    currentSessionId: "four",
+    currentSessionId: "two",
     nowMs: NOW,
-    sessions: oneDate,
+    sessions: twoSameDate,
     timeZone: "UTC"
-  })), "not_enough_local_dates");
+  })), "not_enough_successful_sprints");
 });
 
-test("failed, timed-out, abandoned, active, unrated, and Focused results are suppressed", () => {
-  const prior = [
-    successfulSprint("one", "2026-07-27T12:00:00.000Z"),
-    successfulSprint("two", "2026-07-27T13:00:00.000Z"),
-    successfulSprint("three", "2026-07-28T12:00:00.000Z")
-  ];
-  const cases: Array<{
-    current: AppReviewSprintRecord;
-    reason: string;
-  }> = [
+test("unrated Sprints, high-accuracy Focused Runs, and strong Survival Runs are eligible", () => {
+  const prior = [successfulSprint("one", "2026-07-28T12:00:00.000Z")];
+
+  const positiveModes: AppReviewSprintRecord[] = [
     {
-      current: { ...successfulSprint("current", "2026-07-29T12:00:00.000Z"), status: "failed" },
-      reason: "current_sprint_not_successful"
+      ...successfulSprint("unrated-custom", "2026-07-29T12:00:00.000Z"),
+      rated: false
     },
     {
-      current: {
-        ...successfulSprint("current", "2026-07-29T12:00:00.000Z"),
-        status: "failed",
-        endReason: "time_expired"
-      },
-      reason: "current_sprint_not_successful"
+      ...successfulSprint("focused-good", "2026-07-29T12:00:00.000Z"),
+      focused: true,
+      rated: false,
+      correctCount: 9,
+      mistakeCount: 6,
+      endReason: "attempt_limit"
     },
     {
-      current: { ...successfulSprint("current", "2026-07-29T12:00:00.000Z"), status: "abandoned" },
-      reason: "current_sprint_not_successful"
+      ...successfulSprint("survival-10", "2026-07-29T12:00:00.000Z"),
+      rated: false,
+      survival: true,
+      correctCount: 10,
+      mistakeCount: 3,
+      targetCorrect: 200,
+      endReason: "max_mistakes"
     },
     {
-      current: { ...successfulSprint("current", "2026-07-29T12:00:00.000Z"), status: "active" },
-      reason: "current_sprint_not_successful"
-    },
-    {
-      current: { ...successfulSprint("current", "2026-07-29T12:00:00.000Z"), rated: false },
-      reason: "current_sprint_not_rated"
-    },
-    {
-      current: { ...successfulSprint("current", "2026-07-29T12:00:00.000Z"), focused: true },
-      reason: "current_sprint_is_focused"
+      ...successfulSprint("survival-pool-cleared", "2026-07-29T12:00:00.000Z"),
+      rated: false,
+      survival: true,
+      correctCount: 6,
+      mistakeCount: 0,
+      targetCorrect: 6,
+      endReason: "pool_cleared"
     }
   ];
 
-  for (const { current, reason } of cases) {
+  for (const current of positiveModes) {
+    assert.deepEqual(evaluateAppReviewRequestEligibility({
+      appVersion: "1.4.0",
+      currentSessionId: current.id,
+      nowMs: NOW,
+      sessions: [...prior, current],
+      timeZone: "UTC"
+    }), {
+      eligible: true,
+      successfulSprintCount: 2,
+      successfulLocalDateCount: 2
+    });
+  }
+});
+
+test("failed, timed-out, abandoned, active, low-accuracy Focused, and low-score Survival results are suppressed", () => {
+  const prior = [
+    successfulSprint("one", "2026-07-27T12:00:00.000Z"),
+    successfulSprint("two", "2026-07-28T12:00:00.000Z")
+  ];
+  const cases: AppReviewSprintRecord[] = [
+    { ...successfulSprint("failed", "2026-07-29T12:00:00.000Z"), status: "failed" },
+    {
+      ...successfulSprint("timed-out", "2026-07-29T12:00:00.000Z"),
+      status: "failed",
+      endReason: "time_expired"
+    },
+    { ...successfulSprint("abandoned", "2026-07-29T12:00:00.000Z"), status: "abandoned" },
+    { ...successfulSprint("active", "2026-07-29T12:00:00.000Z"), status: "active" },
+    {
+      ...successfulSprint("focused-low-accuracy", "2026-07-29T12:00:00.000Z"),
+      focused: true,
+      rated: false,
+      correctCount: 8,
+      mistakeCount: 7,
+      endReason: "attempt_limit"
+    },
+    {
+      ...successfulSprint("focused-missing-counts", "2026-07-29T12:00:00.000Z"),
+      focused: true,
+      rated: false
+    },
+    {
+      ...successfulSprint("survival-low-score", "2026-07-29T12:00:00.000Z"),
+      rated: false,
+      survival: true,
+      correctCount: 9,
+      mistakeCount: 3,
+      targetCorrect: 200,
+      endReason: "max_mistakes"
+    },
+    {
+      ...successfulSprint("survival-zero", "2026-07-29T12:00:00.000Z"),
+      rated: false,
+      survival: true,
+      correctCount: 0,
+      mistakeCount: 3,
+      targetCorrect: 200,
+      endReason: "max_mistakes"
+    }
+  ];
+
+  for (const current of cases) {
     assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
       appVersion: "1.4.0",
       currentSessionId: current.id,
       nowMs: NOW,
       sessions: [...prior, current],
       timeZone: "UTC"
-    })), reason);
+    })), "current_sprint_not_successful", current.id);
   }
 });
 
-test("same-version and 120-day cooldown gates both fail closed", () => {
+test("30-day cooldown gate suppresses before 30 days and allows again at 30 days", () => {
+  assert.equal(APP_REVIEW_REQUEST_COOLDOWN_MS, 30 * 24 * 60 * 60 * 1000);
+
   const sessions = [
-    successfulSprint("one", "2026-07-27T12:00:00.000Z"),
-    successfulSprint("two", "2026-07-27T13:00:00.000Z"),
-    successfulSprint("three", "2026-07-28T12:00:00.000Z"),
-    successfulSprint("four", "2026-07-29T12:00:00.000Z")
+    successfulSprint("one", "2026-07-28T12:00:00.000Z"),
+    successfulSprint("two", "2026-07-29T12:00:00.000Z")
   ];
 
   assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
     appVersion: "1.4.0",
-    currentSessionId: "four",
-    lastAttempt: {
-      appVersion: "1.4.0",
-      attemptedAt: new Date(NOW - APP_REVIEW_REQUEST_COOLDOWN_MS).toISOString()
-    },
-    nowMs: NOW,
-    sessions,
-    timeZone: "UTC"
-  })), "same_app_version");
-
-  assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
-    appVersion: "1.4.0",
-    currentSessionId: "four",
+    currentSessionId: "two",
     lastAttempt: {
       appVersion: "1.3.0",
       attemptedAt: new Date(NOW - APP_REVIEW_REQUEST_COOLDOWN_MS + 1).toISOString()
@@ -169,9 +226,21 @@ test("same-version and 120-day cooldown gates both fail closed", () => {
 
   assert.equal(evaluateAppReviewRequestEligibility({
     appVersion: "1.4.0",
-    currentSessionId: "four",
+    currentSessionId: "two",
     lastAttempt: {
-      appVersion: "1.3.0",
+      appVersion: "1.4.0",
+      attemptedAt: new Date(NOW - APP_REVIEW_REQUEST_COOLDOWN_MS).toISOString()
+    },
+    nowMs: NOW,
+    sessions,
+    timeZone: "UTC"
+  }).eligible, true);
+
+  assert.equal(evaluateAppReviewRequestEligibility({
+    appVersion: "1.5.0",
+    currentSessionId: "two",
+    lastAttempt: {
+      appVersion: "1.4.0",
       attemptedAt: new Date(NOW - APP_REVIEW_REQUEST_COOLDOWN_MS).toISOString()
     },
     nowMs: NOW,
@@ -181,7 +250,7 @@ test("same-version and 120-day cooldown gates both fail closed", () => {
 
   assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
     appVersion: "1.4.0",
-    currentSessionId: "four",
+    currentSessionId: "two",
     lastAttempt: {
       appVersion: "1.3.0",
       attemptedAt: "not-a-date"
