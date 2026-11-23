@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.6.2-build-1",
+    "sourceTag": "ios-v1.6.3-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Review puzzle cards now center their status icons.\n• History puzzle cards now center their status icons."
+    "storeCopy": "• App Store review prompts now appear after fewer completed practice runs, including Focused Runs and Survival.\n• Pausing mid-Sprint no longer suppresses a review prompt after you return and finish."
   }
 }
