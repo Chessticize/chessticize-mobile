@@ -609,7 +609,7 @@ assert.equal(releaseVersion.publicVersion, "1.6.2");
 assert.equal(releaseVersion.androidVersionCode, 24);
 assert.deepEqual(developmentVersion, {
   schemaVersion: 1,
-  plannedPublicVersion: "1.6.3"
+  plannedPublicVersion: "1.6.4"
 });
 assert.match(releaseVersioning, /development-version\.json` is the public version/);
 assert.match(releaseVersioning, /release-version\.json` is the exact cross-platform candidate/);
