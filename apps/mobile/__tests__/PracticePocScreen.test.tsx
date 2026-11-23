@@ -16847,7 +16847,7 @@ describe("App Store review request scheduling", () => {
     }
   });
 
-  it("requests StoreKit after an eligible puzzle result remains stable for two seconds", async () => {
+  it("requests StoreKit after an eligible puzzle result remains stable for one second", async () => {
     const { current, service } = createAppReviewEligibleService();
     const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
     const renderer = renderScreen({
@@ -16859,7 +16859,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(1_999);
+      jest.advanceTimersByTime(999);
     });
     expect(appStoreReviewRequestClient.requestCount).toBe(0);
 
@@ -16889,7 +16889,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(1_000);
+      jest.advanceTimersByTime(500);
     });
     press(renderer, "sprint-result-history-button");
     press(renderer, "practice-tab");
@@ -16914,7 +16914,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(1_000);
+      jest.advanceTimersByTime(500);
       (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
       (AppState as unknown as { __emit: (nextState: string) => void }).__emit("active");
       jest.advanceTimersByTime(5_000);
@@ -16923,6 +16923,50 @@ describe("App Store review request scheduling", () => {
 
     expect(appStoreReviewRequestClient.requestCount).toBe(0);
     expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+  });
+
+  it("still requests StoreKit when backgrounded mid-sprint and later won", async () => {
+    const service = createMobilePracticeService("random1000");
+    const store = (service as unknown as { store: MemoryStore }).store;
+    store.createSprintSession(
+      completedRatingSprintState({
+        id: "app-review-prior",
+        mode: "standard",
+        completedAt: "2026-07-28T12:00:00.000Z",
+        ratingBefore: 600,
+        ratingAfter: 610
+      })
+    );
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      standardTargetCorrect: 1
+    });
+
+    startStandardSprint(renderer);
+    act(() => {
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("active");
+    });
+    expect(service.getActiveSprint()?.status).toBe("paused");
+    press(renderer, "session-resume");
+
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(1);
+    expect(service.getAppReviewRequestAttempt()?.appVersion).toBe("1.4.0");
   });
 
   it("cancels the result attempt when another transient surface appears", async () => {
@@ -16939,7 +16983,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(1_000);
+      jest.advanceTimersByTime(500);
     });
     systemBack.startPredictive();
     expect(findByTestId(renderer, "mobile-back-destination-preview")).toBeTruthy();
@@ -16965,7 +17009,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(2_000);
+      jest.advanceTimersByTime(1_000);
     });
     await act(async () => {});
 
@@ -16988,7 +17032,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(2_000);
+      jest.advanceTimersByTime(1_000);
     });
     await act(async () => {});
 
@@ -17013,7 +17057,7 @@ describe("App Store review request scheduling", () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(2_000);
+      jest.advanceTimersByTime(1_000);
     });
     await act(async () => {});
 
@@ -18003,37 +18047,23 @@ function createAppReviewEligibleService(store: MemoryStore = new MemoryStore()):
     completedRatingSprintState({
       id: "app-review-one",
       mode: "standard",
-      completedAt: "2026-07-27T12:00:00.000Z",
+      completedAt: "2026-07-28T12:00:00.000Z",
       ratingBefore: 600,
       ratingAfter: 610
     }),
     completedRatingSprintState({
       id: "app-review-two",
       mode: "arrow_duel",
-      completedAt: "2026-07-27T13:00:00.000Z",
+      completedAt: "2026-07-29T12:00:00.000Z",
       ratingBefore: 610,
       ratingAfter: 620
-    }),
-    completedRatingSprintState({
-      id: "app-review-three",
-      mode: "custom",
-      completedAt: "2026-07-28T12:00:00.000Z",
-      ratingBefore: 620,
-      ratingAfter: 630
-    }),
-    completedRatingSprintState({
-      id: "app-review-four",
-      mode: "standard",
-      completedAt: "2026-07-29T12:00:00.000Z",
-      ratingBefore: 630,
-      ratingAfter: 640
     })
   ];
   for (const session of sessions) {
     store.createSprintSession(session);
   }
   return {
-    current: sessions[3] as SprintState,
+    current: sessions[1] as SprintState,
     service: new PracticeService(store)
   };
 }

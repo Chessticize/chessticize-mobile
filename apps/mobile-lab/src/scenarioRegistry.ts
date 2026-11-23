@@ -287,13 +287,13 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
       "Practice",
       "App Store review request · eligible puzzle milestone",
       "practice--app-store-review-request-eligible-puzzle-milestone",
-      "The unchanged successful puzzle Sprint Result at the native StoreKit boundary. After four successful puzzle Sprints across at least two local dates, the production app may request Apple's standard review sheet after this result has remained stable for two seconds. StoreKit may show nothing, and the result remains fully usable.",
+      "The unchanged successful puzzle Sprint Result at the native StoreKit boundary. After two positive completed puzzle sessions across two local dates (or three sessions on one date), the production app may request Apple's standard review sheet after this result has remained stable for one second. StoreKit may show nothing, and the result remains fully usable.",
       "practice",
       [
         "Successful puzzle Sprint Result",
-        "Four successful puzzle Sprints",
-        "At least two local dates",
-        "Two-second idle handoff",
+        "Two sessions across two dates or three total",
+        "One-second idle handoff",
+        "30-day cooldown",
         "No custom pre-prompt",
         "Unchanged result when StoreKit shows nothing"
       ],

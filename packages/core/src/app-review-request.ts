@@ -1,7 +1,10 @@
 import type { SprintEndReason, SprintStatus } from "./types.ts";
 import { localCalendarDateKey } from "./local-date.ts";
 
-export const APP_REVIEW_REQUEST_COOLDOWN_MS = 120 * 24 * 60 * 60 * 1000;
+export const APP_REVIEW_REQUEST_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+export const APP_REVIEW_REQUEST_MIN_SESSIONS_MULTI_DATE = 2;
+export const APP_REVIEW_REQUEST_MIN_SESSIONS_SINGLE_DATE = 3;
+export const APP_REVIEW_REQUEST_MIN_SURVIVAL_CORRECT = 10;
 
 export interface AppReviewRequestAttempt {
   appVersion: string;
@@ -11,21 +14,21 @@ export interface AppReviewRequestAttempt {
 export interface AppReviewSprintRecord {
   id: string;
   completedAt?: string;
+  correctCount?: number;
   endReason?: SprintEndReason;
   focused: boolean;
+  mistakeCount?: number;
   rated: boolean;
   status: SprintStatus;
+  survival?: boolean;
+  targetCorrect?: number;
 }
 
 export type AppReviewRequestIneligibleReason =
   | "invalid_app_version"
   | "current_sprint_not_successful"
-  | "current_sprint_not_rated"
-  | "current_sprint_is_focused"
   | "not_enough_successful_sprints"
-  | "not_enough_local_dates"
   | "invalid_last_attempt"
-  | "same_app_version"
   | "cooldown_active";
 
 export type AppReviewRequestEligibility =
@@ -61,25 +64,14 @@ export function evaluateAppReviewRequestEligibility(
   const current = input.sessions.find(
     (session) => session.id === input.currentSessionId
   );
-  if (
-    !current ||
-    current.status !== "won" ||
-    !current.completedAt ||
-    !Number.isFinite(Date.parse(current.completedAt))
-  ) {
+  if (!current || !isPositiveCompletedPuzzleSession(current)) {
     return ineligible("current_sprint_not_successful");
-  }
-  if (current.focused) {
-    return ineligible("current_sprint_is_focused");
-  }
-  if (!current.rated) {
-    return ineligible("current_sprint_not_rated");
   }
 
   const successfulSessions = [
     ...new Map(
       input.sessions
-        .filter(isSuccessfulRatedPuzzleSprint)
+        .filter(isPositiveCompletedPuzzleSession)
         .map((session) => [session.id, session] as const)
     ).values()
   ];
@@ -91,11 +83,12 @@ export function evaluateAppReviewRequestEligibility(
   ).size;
   const counts = { successfulSprintCount, successfulLocalDateCount };
 
-  if (successfulSprintCount < 4) {
+  const meetsMilestone =
+    successfulSprintCount >= APP_REVIEW_REQUEST_MIN_SESSIONS_SINGLE_DATE ||
+    (successfulSprintCount >= APP_REVIEW_REQUEST_MIN_SESSIONS_MULTI_DATE &&
+      successfulLocalDateCount >= 2);
+  if (!meetsMilestone) {
     return ineligible("not_enough_successful_sprints", counts);
-  }
-  if (successfulLocalDateCount < 2) {
-    return ineligible("not_enough_local_dates", counts);
   }
 
   if (input.lastAttempt) {
@@ -105,9 +98,6 @@ export function evaluateAppReviewRequestEligibility(
       !Number.isFinite(attemptedAtMs)
     ) {
       return ineligible("invalid_last_attempt", counts);
-    }
-    if (input.lastAttempt.appVersion === appVersion) {
-      return ineligible("same_app_version", counts);
     }
     if (input.nowMs - attemptedAtMs < APP_REVIEW_REQUEST_COOLDOWN_MS) {
       return ineligible("cooldown_active", counts);
@@ -120,14 +110,52 @@ export function evaluateAppReviewRequestEligibility(
   };
 }
 
-function isSuccessfulRatedPuzzleSprint(
+function isPositiveCompletedPuzzleSession(
   session: AppReviewSprintRecord
 ): session is AppReviewSprintRecord & { completedAt: string } {
-  return session.status === "won" &&
-    session.rated &&
-    !session.focused &&
-    typeof session.completedAt === "string" &&
-    Number.isFinite(Date.parse(session.completedAt));
+  if (
+    session.status !== "won" ||
+    typeof session.completedAt !== "string" ||
+    !Number.isFinite(Date.parse(session.completedAt))
+  ) {
+    return false;
+  }
+
+  if (session.survival) {
+    if (session.endReason === "pool_cleared") {
+      return true;
+    }
+    const correct = session.correctCount;
+    if (typeof correct !== "number" || !Number.isFinite(correct) || correct <= 0) {
+      return false;
+    }
+    if (correct >= APP_REVIEW_REQUEST_MIN_SURVIVAL_CORRECT) {
+      return true;
+    }
+    return (
+      typeof session.targetCorrect === "number" &&
+      Number.isFinite(session.targetCorrect) &&
+      session.targetCorrect > 0 &&
+      correct >= session.targetCorrect
+    );
+  }
+
+  if (session.focused) {
+    const correct = session.correctCount;
+    const mistakes = session.mistakeCount ?? 0;
+    if (
+      typeof correct !== "number" ||
+      !Number.isFinite(correct) ||
+      correct <= 0 ||
+      !Number.isFinite(mistakes) ||
+      mistakes < 0
+    ) {
+      return false;
+    }
+    return correct * 5 >= (correct + mistakes) * 3;
+  }
+
+  return true;
 }
 
 function ineligible(
