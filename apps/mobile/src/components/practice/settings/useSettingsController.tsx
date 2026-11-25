@@ -30,7 +30,13 @@ import {
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduleResult
 } from "../../../platform/reviewReminderScheduler.ts";
-import { useAppearance, type AppearancePreference } from "../../../theme/index.ts";
+import {
+  useAppearance,
+  useBoardAppearance,
+  type AppearancePreference,
+  type BoardThemeId,
+  type ChessPieceSetId
+} from "../../../theme/index.ts";
 import type {
   ICloudSyncErrorDetailsPresentation,
   ICloudSyncSupportBundlePresentation
@@ -113,7 +119,21 @@ export function useSettingsController({
   const [appearance, setAppearancePreference] = useState<AppearancePreference>(
     () => service.getSettings().appearance
   );
+  const [lightBoardTheme, setLightBoardThemePreference] = useState<BoardThemeId>(
+    () => service.getSettings().lightBoardTheme
+  );
+  const [darkBoardTheme, setDarkBoardThemePreference] = useState<BoardThemeId>(
+    () => service.getSettings().darkBoardTheme
+  );
+  const [pieceSet, setPieceSetPreference] = useState<ChessPieceSetId>(
+    () => service.getSettings().pieceSet
+  );
   const { setAppearance } = useAppearance();
+  const {
+    setLightBoardTheme,
+    setDarkBoardTheme,
+    setPieceSet
+  } = useBoardAppearance();
 
   const progressV2Diagnostics = service.getProgressV2Diagnostics();
   const activeProgressV2Phase = resolveProgressV2ActivePhase(progressV2Diagnostics.phase);
@@ -365,6 +385,33 @@ export function useSettingsController({
     setAppearance(saved.appearance);
   }
 
+  function saveLightBoardTheme(next: BoardThemeId): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      lightBoardTheme: next
+    });
+    setLightBoardThemePreference(saved.lightBoardTheme);
+    setLightBoardTheme(saved.lightBoardTheme);
+  }
+
+  function saveDarkBoardTheme(next: BoardThemeId): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      darkBoardTheme: next
+    });
+    setDarkBoardThemePreference(saved.darkBoardTheme);
+    setDarkBoardTheme(saved.darkBoardTheme);
+  }
+
+  function savePieceSet(next: ChessPieceSetId): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      pieceSet: next
+    });
+    setPieceSetPreference(saved.pieceSet);
+    setPieceSet(saved.pieceSet);
+  }
+
   async function runICloudProgressSync(reason: string): Promise<string> {
     if (!service.getSettings().sync.iCloudEnabled) {
       setICloudSyncStatus("Off");
@@ -522,16 +569,19 @@ export function useSettingsController({
 
   return {
     appearance,
+    darkBoardTheme,
     dismissReviewReminderPermissionPrompt,
     effectiveErrorDetails,
     effectiveSupportBundle,
     iCloudSyncEnabled,
     iCloudSyncInProgress,
     iCloudSyncStatus,
+    lightBoardTheme,
     maybeShowReviewReminderPermissionPrompt,
     moveFeedbackPreferences,
     notificationPermissionStatus,
     openReviewReminderSystemSettings,
+    pieceSet,
     refreshReviewReminder,
     requestReviewReminderPermission,
     reviewReminderPermissionPromptVisible,
@@ -539,8 +589,11 @@ export function useSettingsController({
     reviewReminderScheduleStatus,
     runICloudProgressSync,
     saveAppearance,
+    saveDarkBoardTheme,
     saveICloudSyncEnabled,
+    saveLightBoardTheme,
     saveMoveFeedbackPreferences,
+    savePieceSet,
     saveReviewReminderPreference,
     scheduleDevReviewReminderNotification,
     setICloudSyncEnabled,

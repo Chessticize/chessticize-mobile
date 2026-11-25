@@ -1,25 +1,9 @@
 {
-  "release-notes-ios": {
+  "settings-board-appearance": {
     "issues": [
       {
-        "issueNumber": 651,
-        "changeNote": "One-time What’s New sheet on the first launch after an update to 1.6.0 (iOS wording): phone portrait and landscape, iPad, light and dark, and large text."
-      }
-    ]
-  },
-  "release-notes-android": {
-    "issues": [
-      {
-        "issueNumber": 651,
-        "changeNote": "The same What’s New sheet with Android wording for the bottom bar and side rail."
-      }
-    ]
-  },
-  "settings-whats-new": {
-    "issues": [
-      {
-        "issueNumber": 651,
-        "changeNote": "Settings > About gains a What’s New row that reopens the latest notes at any time."
+        "issueNumber": 742,
+        "changeNote": "Settings > Appearance adds independent Light and Dark board color schemes (9 palettes), 6 license-verified chess piece sets, and a live 4x4 board preview."
       }
     ]
   }

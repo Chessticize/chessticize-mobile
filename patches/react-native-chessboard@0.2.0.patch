@@ -1,12 +1,14 @@
 diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
-index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..ad4945237d1a2a55b0b6ba83bf7b62af0cc6f05e 100644
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..fe51c7c4283043ef1a03b41c5eeabcfabb798c49 100644
 --- a/lib/commonjs/components/promotion-dialog.js
 +++ b/lib/commonjs/components/promotion-dialog.js
-@@ -11,30 +11,34 @@ var _pieceImages = require("../assets/piece-images");
+@@ -11,71 +11,113 @@ var _pieceImages = require("../assets/piece-images");
  function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
  function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
 +const PROMOTION_PIECE_NAMES = { q: 'queen', r: 'rook', b: 'bishop', n: 'knight' };
++const PROMOTION_PIECE_SIZE = 48;
++const PROMOTION_PIECE_COLUMNS = { q: 4, r: 3, b: 2, n: 1 };
  const styles = _reactNative.StyleSheet.create({
    overlay: {
 -    ..._reactNative.StyleSheet.absoluteFillObject,
@@ -47,7 +49,31 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..ad4945237d1a2a55b0b6ba83bf7b62af
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -51,31 +55,45 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+-    width: 48,
+-    height: 48
++    width: PROMOTION_PIECE_SIZE,
++    height: PROMOTION_PIECE_SIZE
++  },
++  pieceSpriteClip: {
++    width: PROMOTION_PIECE_SIZE,
++    height: PROMOTION_PIECE_SIZE,
++    overflow: 'hidden',
++    position: 'relative'
++  },
++  pieceSprite: {
++    position: 'absolute',
++    width: PROMOTION_PIECE_SIZE * 6,
++    height: PROMOTION_PIECE_SIZE * 2
+   }
+ });
+ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.memo(({
+   color,
+   onSelect,
+   onCancel,
+-  config
++  config,
++  spriteSource
+ }) => {
    const {
      colors
    } = config;
@@ -95,9 +121,19 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..ad4945237d1a2a55b0b6ba83bf7b62af
 -      activeOpacity: 0.7
 +      activeOpacity: 0.7,
 +      accessibilityLabel: `Promote to ${PROMOTION_PIECE_NAMES[piece]}`
++    }, spriteSource ? /*#__PURE__*/_react.default.createElement(_reactNative.View, {
++      style: styles.pieceSpriteClip
      }, /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
 -      source: source,
 -      style: styles.pieceImage
++      source: spriteSource,
++      resizeMode: "stretch",
++      style: [styles.pieceSprite, {
++        left: -PROMOTION_PIECE_COLUMNS[piece] * PROMOTION_PIECE_SIZE,
++        top: color === 'w' ? 0 : -PROMOTION_PIECE_SIZE
++      }],
++      testID: `promotion-choice-${piece}-image`
++    })) : /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
 +      source: _pieceImages.PIECE_SOURCES[pieceCode],
 +      style: styles.pieceImage,
 +      testID: `promotion-choice-${piece}-image`
@@ -105,7 +141,7 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..ad4945237d1a2a55b0b6ba83bf7b62af
    }))));
  });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
-index 7ddc0516545a4e1e16774f520123aaa883c235c0..8b97816cbda6a7212cac4f38a3db0e702485a75e 100644
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..10439d456e312ea7890156fc36ce4b4ca856ea5a 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
 +++ b/lib/commonjs/components/skia/gesture-board.js
 @@ -20,13 +20,17 @@ var _promotionDialog = require("../promotion-dialog");
@@ -180,6 +216,16 @@ index 7ddc0516545a4e1e16774f520123aaa883c235c0..8b97816cbda6a7212cac4f38a3db0e70
      onIllegalMove
    });
    const containerStyle = (0, _react.useMemo)(() => [styles.container, {
+@@ -172,7 +199,8 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+     color: promotionInfoRef.current.color,
+     onSelect: handlePromotionSelect,
+     onCancel: handlePromotionCancel,
+-    config: config
++    config: config,
++    spriteSource: spriteSource
+   }));
+ });
+ GestureBoard.displayName = 'GestureBoard';
 diff --git a/lib/commonjs/components/skia/skia-dots.js b/lib/commonjs/components/skia/skia-dots.js
 index 99152d0e193c3ff32b49cb57c78a5b09799a8617..27bd528cb50e65fefa778afe525945ca29584669 100644
 --- a/lib/commonjs/components/skia/skia-dots.js
@@ -988,10 +1034,10 @@ index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..4a9ba5a255d44f8f9a140019f6f351a2
        chess.reset();
      } else {
 diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
-index 5bf64b655079b16368383257bc53bc3bce4d8418..d07030053476c10fec7719da9293f77ba2f831d1 100644
+index 5bf64b655079b16368383257bc53bc3bce4d8418..99bbe8eeb42a23f261e50962deeb88560e5b3549 100644
 --- a/lib/module/components/promotion-dialog.js
 +++ b/lib/module/components/promotion-dialog.js
-@@ -1,32 +1,36 @@
+@@ -1,73 +1,115 @@
  import React from 'react';
 -import { StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
 +import { StyleSheet, TouchableOpacity, Image, Modal, Platform, Pressable, View } from 'react-native';
@@ -999,6 +1045,8 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..d07030053476c10fec7719da9293f77b
  import { PIECE_SOURCES } from '../assets/piece-images';
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
 +const PROMOTION_PIECE_NAMES = { q: 'queen', r: 'rook', b: 'bishop', n: 'knight' };
++const PROMOTION_PIECE_SIZE = 48;
++const PROMOTION_PIECE_COLUMNS = { q: 4, r: 3, b: 2, n: 1 };
  const styles = StyleSheet.create({
    overlay: {
 -    ...StyleSheet.absoluteFillObject,
@@ -1039,7 +1087,31 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..d07030053476c10fec7719da9293f77b
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -43,31 +47,45 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+-    width: 48,
+-    height: 48
++    width: PROMOTION_PIECE_SIZE,
++    height: PROMOTION_PIECE_SIZE
++  },
++  pieceSpriteClip: {
++    width: PROMOTION_PIECE_SIZE,
++    height: PROMOTION_PIECE_SIZE,
++    overflow: 'hidden',
++    position: 'relative'
++  },
++  pieceSprite: {
++    position: 'absolute',
++    width: PROMOTION_PIECE_SIZE * 6,
++    height: PROMOTION_PIECE_SIZE * 2
+   }
+ });
+ export const PromotionDialog = /*#__PURE__*/React.memo(({
+   color,
+   onSelect,
+   onCancel,
+-  config
++  config,
++  spriteSource
+ }) => {
    const {
      colors
    } = config;
@@ -1087,9 +1159,19 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..d07030053476c10fec7719da9293f77b
 -      activeOpacity: 0.7
 +      activeOpacity: 0.7,
 +      accessibilityLabel: `Promote to ${PROMOTION_PIECE_NAMES[piece]}`
++    }, spriteSource ? /*#__PURE__*/React.createElement(View, {
++      style: styles.pieceSpriteClip
      }, /*#__PURE__*/React.createElement(Image, {
 -      source: source,
 -      style: styles.pieceImage
++      source: spriteSource,
++      resizeMode: "stretch",
++      style: [styles.pieceSprite, {
++        left: -PROMOTION_PIECE_COLUMNS[piece] * PROMOTION_PIECE_SIZE,
++        top: color === 'w' ? 0 : -PROMOTION_PIECE_SIZE
++      }],
++      testID: `promotion-choice-${piece}-image`
++    })) : /*#__PURE__*/React.createElement(Image, {
 +      source: PIECE_SOURCES[pieceCode],
 +      style: styles.pieceImage,
 +      testID: `promotion-choice-${piece}-image`
@@ -1097,7 +1179,7 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..d07030053476c10fec7719da9293f77b
    }))));
  });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
-index 79598f3cce08d079d2a004ed0563f1194fd7d31c..de993aab7013fb3195216144f73301a29dac3c24 100644
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..ac659e89ae39b15cac07db7d8dca07dc4f2f0a0f 100644
 --- a/lib/module/components/skia/gesture-board.js
 +++ b/lib/module/components/skia/gesture-board.js
 @@ -1,4 +1,4 @@
@@ -1178,6 +1260,16 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..de993aab7013fb3195216144f73301a2
      onIllegalMove
    });
    const containerStyle = useMemo(() => [styles.container, {
+@@ -165,7 +192,8 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+     color: promotionInfoRef.current.color,
+     onSelect: handlePromotionSelect,
+     onCancel: handlePromotionCancel,
+-    config: config
++    config: config,
++    spriteSource: spriteSource
+   }));
+ });
+ GestureBoard.displayName = 'GestureBoard';
 diff --git a/lib/module/components/skia/skia-dots.js b/lib/module/components/skia/skia-dots.js
 index 120f116f938d6bf19ed350321959c9c5a860b48a..863f4f5380a90afb2c2f1ed1508efe197b54782b 100644
 --- a/lib/module/components/skia/skia-dots.js
@@ -1987,6 +2079,24 @@ index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..5445a48d5e9faf642f4462debe9b0989
      if (!initialFen) {
        chess.reset();
      } else {
+diff --git a/lib/typescript/components/promotion-dialog.d.ts b/lib/typescript/components/promotion-dialog.d.ts
+index 081f8868f04493844a57aaeb340048baacd3b203..0ccfa19839ebbeade3968893ab9e635962018d7c 100644
+--- a/lib/typescript/components/promotion-dialog.d.ts
++++ b/lib/typescript/components/promotion-dialog.d.ts
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import type { ImageSourcePropType } from 'react-native';
+ import type { PieceSymbol } from 'chess.js';
+ import type { BoardConfig } from '../state';
+ interface PromotionDialogProps {
+@@ -6,6 +7,7 @@ interface PromotionDialogProps {
+     onSelect: (piece: PieceSymbol) => void;
+     onCancel: () => void;
+     config: BoardConfig;
++    spriteSource?: ImageSourcePropType;
+ }
+ export declare const PromotionDialog: React.FC<PromotionDialogProps>;
+ export {};
 diff --git a/lib/typescript/components/skia/gesture-board.d.ts b/lib/typescript/components/skia/gesture-board.d.ts
 index 879929871b8cf9abe7953a6992f7c038f0592d5f..6f6dcbdca8c30769e833fcd58fd1cdd716f9032e 100644
 --- a/lib/typescript/components/skia/gesture-board.d.ts
@@ -2159,12 +2269,14 @@ index eaac9e98118247d6e6776fe990fa7e10aa5b9227..a9fa92602ea79cb5109a5a03a1209737
      durations: {
          move: number;
 diff --git a/src/components/promotion-dialog.tsx b/src/components/promotion-dialog.tsx
-index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f8625266a 100644
+index a3f67bf02f45b674772813bdf03f4b25c56f070e..d6f85c3b63ec768014112c66e3140fe38baf6641 100644
 --- a/src/components/promotion-dialog.tsx
 +++ b/src/components/promotion-dialog.tsx
-@@ -4,14 +4,17 @@ import {
+@@ -3,85 +3,163 @@ import {
+   StyleSheet,
    TouchableOpacity,
    Image,
++  type ImageSourcePropType,
    Modal,
 +  Platform,
    Pressable,
@@ -2178,11 +2290,16 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f
 -const PROMOTION_PIECES: PieceSymbol[] = ['q', 'r', 'b', 'n'];
 +const PROMOTION_PIECES = ['q', 'r', 'b', 'n'] as const satisfies readonly PieceSymbol[];
 +const PROMOTION_PIECE_NAMES: Record<(typeof PROMOTION_PIECES)[number], string> = { q: 'queen', r: 'rook', b: 'bishop', n: 'knight' };
++const PROMOTION_PIECE_SIZE = 48;
++// 6x2 sprite sheet layout: p=0, n=1, b=2, r=3, q=4, k=5; row 0=white, row 1=black.
++const PROMOTION_PIECE_COLUMNS: Record<(typeof PROMOTION_PIECES)[number], number> = { q: 4, r: 3, b: 2, n: 1 };
  
  interface PromotionDialogProps {
    color: 'w' | 'b';
-@@ -20,27 +23,40 @@ interface PromotionDialogProps {
+   onSelect: (piece: PieceSymbol) => void;
+   onCancel: () => void;
    config: BoardConfig;
++  spriteSource?: ImageSourcePropType;
  }
  
 +const debugChessboard = (event: string, details: Record<string, unknown>) => {
@@ -2231,9 +2348,27 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f
      marginHorizontal: 4,
    },
    pieceImage: {
-@@ -52,36 +68,65 @@ const styles = StyleSheet.create({
+-    width: 48,
+-    height: 48,
++    width: PROMOTION_PIECE_SIZE,
++    height: PROMOTION_PIECE_SIZE,
++  },
++  pieceSpriteClip: {
++    width: PROMOTION_PIECE_SIZE,
++    height: PROMOTION_PIECE_SIZE,
++    overflow: 'hidden',
++    position: 'relative',
++  },
++  pieceSprite: {
++    position: 'absolute',
++    width: PROMOTION_PIECE_SIZE * 6,
++    height: PROMOTION_PIECE_SIZE * 2,
+   },
+ });
+ 
  export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
-   ({ color, onSelect, onCancel, config }) => {
+-  ({ color, onSelect, onCancel, config }) => {
++  ({ color, onSelect, onCancel, config, spriteSource }) => {
      const { colors } = config;
 +    const animatePresentation = Platform.OS !== 'android';
  
@@ -2293,11 +2428,28 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f
 +                  accessibilityLabel={`Promote to ${PROMOTION_PIECE_NAMES[piece]}`}
                  >
 -                  <Image source={source} style={styles.pieceImage} />
-+                  <Image
-+                    source={PIECE_SOURCES[pieceCode]}
-+                    style={styles.pieceImage}
-+                    testID={`promotion-choice-${piece}-image`}
-+                  />
++                  {spriteSource ? (
++                    <View style={styles.pieceSpriteClip}>
++                      <Image
++                        source={spriteSource}
++                        resizeMode="stretch"
++                        style={[
++                          styles.pieceSprite,
++                          {
++                            left: -PROMOTION_PIECE_COLUMNS[piece] * PROMOTION_PIECE_SIZE,
++                            top: color === 'w' ? 0 : -PROMOTION_PIECE_SIZE,
++                          },
++                        ]}
++                        testID={`promotion-choice-${piece}-image`}
++                      />
++                    </View>
++                  ) : (
++                    <Image
++                      source={PIECE_SOURCES[pieceCode]}
++                      style={styles.pieceImage}
++                      testID={`promotion-choice-${piece}-image`}
++                    />
++                  )}
                  </TouchableOpacity>
                );
              })}
@@ -2308,7 +2460,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f
      );
    }
 diff --git a/src/components/skia/gesture-board.tsx b/src/components/skia/gesture-board.tsx
-index b4a278cc2ada84715a4916324b459952ab33c942..c228081804c1e2f84acdf23d6cd2569bc10781f7 100644
+index b4a278cc2ada84715a4916324b459952ab33c942..57f5298745a0a4de1f6cdaaa86bbd74ad373f0d6 100644
 --- a/src/components/skia/gesture-board.tsx
 +++ b/src/components/skia/gesture-board.tsx
 @@ -2,11 +2,13 @@ import React, {
@@ -2502,7 +2654,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..c228081804c1e2f84acdf23d6cd2569b
        onIllegalMove,
      });
  
-@@ -244,25 +334,28 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -244,25 +334,29 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
  
      return (
        <GestureHandlerRootView style={containerStyle}>
@@ -2532,6 +2684,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..c228081804c1e2f84acdf23d6cd2569b
 -              spriteImage={spriteImage}
 -              renderEffect={renderEffect}
 -              effectParams={effectParams}
++              spriteSource={spriteSource}
              />
 -          </View>
 -        </GestureDetector>

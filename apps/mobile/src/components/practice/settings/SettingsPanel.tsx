@@ -40,7 +40,14 @@ import {
   type ICloudSyncSupportBundlePresentation,
   ICloudSyncSupportDiagnosticsEntry
 } from "../../ICloudSyncErrorDetails.tsx";
-import { type AppearancePreference, makeStyles, useTheme } from "../../../theme/index.ts";
+import {
+  type AppearancePreference,
+  type BoardThemeId,
+  type ChessPieceSetId,
+  makeStyles,
+  useTheme
+} from "../../../theme/index.ts";
+import { BoardAppearanceSettings } from "./BoardAppearanceSettings.tsx";
 import {
   type MoveFeedbackPreferences,
   type MoveFeedbackPreviewer,
@@ -146,13 +153,18 @@ export function SettingsPanel({
   applicationMetadata,
   arrowDuelOpponentReplyGlobalSetting,
   captureBottomInset,
+  darkBoardTheme,
   feedbackIssuesOpener,
+  lightBoardTheme,
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onOpenWhatsNew,
   onAdjustRating,
   onAdvancedRatingsOpenChange,
+  onDarkBoardThemeChange,
+  onLightBoardThemeChange,
+  onPieceSetChange,
   onRequestReviewReminderPermission,
   onResetSprintGuides,
   onSaveICloudSyncEnabled,
@@ -168,6 +180,7 @@ export function SettingsPanel({
   notificationPermissionStatus,
   onAppearanceChange,
   onMoveFeedbackPreferencesChange,
+  pieceSet,
   reminderPlatform,
   ratings,
   reviewReminderScheduleStatus,
@@ -202,11 +215,17 @@ export function SettingsPanel({
   iCloudSyncStatus: string;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   appearance: AppearancePreference;
+  darkBoardTheme: BoardThemeId;
+  lightBoardTheme: BoardThemeId;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   onAppearanceChange: (appearance: AppearancePreference) => void;
+  onDarkBoardThemeChange: (boardTheme: BoardThemeId) => void;
+  onLightBoardThemeChange: (boardTheme: BoardThemeId) => void;
   onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
+  onPieceSetChange: (pieceSet: ChessPieceSetId) => void;
+  pieceSet: ChessPieceSetId;
   reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
@@ -423,6 +442,15 @@ export function SettingsPanel({
           testID="settings-appearance-options"
           value={appearance}
           onChange={onAppearanceChange}
+        />
+        <BoardAppearanceSettings
+          appearance={appearance}
+          darkBoardTheme={darkBoardTheme}
+          lightBoardTheme={lightBoardTheme}
+          pieceSet={pieceSet}
+          onDarkBoardThemeChange={onDarkBoardThemeChange}
+          onLightBoardThemeChange={onLightBoardThemeChange}
+          onPieceSetChange={onPieceSetChange}
         />
       </SettingsSection>
 

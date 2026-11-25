@@ -24,6 +24,12 @@ import { PracticeService } from "../../../packages/storage/src/practice-service.
 import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository.ts";
 import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service.ts";
 import { PracticePocScreen } from "../../mobile/src/components/PracticePocScreen.tsx";
+import {
+  ThemeProvider,
+  useTheme,
+  type BoardThemeId,
+  type ChessPieceSetId
+} from "../../mobile/src/theme/index.ts";
 import type { MobilePlatformCapabilities } from "../../mobile/src/platform/mobilePlatformCapabilities.ts";
 import type { MobileSystemBackSource } from "../../mobile/src/navigation/mobileSystemBack.ts";
 import type {
@@ -183,6 +189,16 @@ function LabScenarioContent({
     : scenarioId === "practice-home"
       ? "practice-tactical-profile-collecting"
       : null;
+  const outerTheme = useTheme();
+  const [lightBoardTheme, setLightBoardTheme] = useState<BoardThemeId>(
+    () => runtime.service.getSettings().lightBoardTheme
+  );
+  const [darkBoardTheme, setDarkBoardTheme] = useState<BoardThemeId>(
+    () => runtime.service.getSettings().darkBoardTheme
+  );
+  const [pieceSet, setPieceSet] = useState<ChessPieceSetId>(
+    () => runtime.service.getSettings().pieceSet
+  );
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
   const [tacticalProfileState, setTacticalProfileState] = useState(() =>
     tacticalProfileScenarioId
@@ -348,46 +364,56 @@ function LabScenarioContent({
   ]);
 
   return (
-    <LabScenarioShell
-      nativeFeedbackPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
-        ? "Medium haptic requested on pickup"
-        : runReorderFeedbackPreview}
-      scenarioId={scenarioId}
-      storyPresentation={storyPresentation}
+    <ThemeProvider
+      darkBoardTheme={darkBoardTheme}
+      lightBoardTheme={lightBoardTheme}
+      pieceSet={pieceSet}
+      theme={outerTheme}
+      onDarkBoardThemeChange={setDarkBoardTheme}
+      onLightBoardThemeChange={setLightBoardTheme}
+      onPieceSetChange={setPieceSet}
     >
-      <PracticePocScreen
-        key={startedFocusedRun === null
-          ? `scenario-${scenarioId}`
-          : `tactical-focus-active-${startedFocusedRun.id}`}
-        customThemeSelection={{
-          selectedThemes: selectedCustomThemes,
-          onChange: setSelectedCustomThemes
-        }}
-        historyProgressPresentation={isHistoryProgressScenario(scenarioId)
-          ? historyProgressPresentationFor(scenarioId)
-          : undefined}
-        personalBestChallengeDesignPreview={personalBestChallengePreview}
-        platformCapabilities={runtime.platformCapabilities}
-        systemBack={systemBack}
-        runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
-          ? { pickedUpRunId: runReorderPickedUpRunId }
-          : undefined}
-        runReorderFeedbackPreview={scenarioId === "practice-home-edit"
-          ? ({ haptic }) => {
-              setRunReorderDesignPreviewActive(false);
-              setRunReorderFeedbackPreview(
-                `${haptic === "medium" ? "Medium" : haptic} haptic requested on pickup`
-              );
-            }
-          : undefined}
-        themeCatalogPresentation={showsThemeCatalogPrototype
-          ? SERVER_CURATED_THEME_PRESENTATION
-          : undefined}
-        runEloEditingMovedToHome
-        tacticalProfilePresentation={tacticalProfilePresentation}
-        {...effectiveScreenProps}
-      />
-    </LabScenarioShell>
+      <LabScenarioShell
+        nativeFeedbackPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
+          ? "Medium haptic requested on pickup"
+          : runReorderFeedbackPreview}
+        scenarioId={scenarioId}
+        storyPresentation={storyPresentation}
+      >
+        <PracticePocScreen
+          key={startedFocusedRun === null
+            ? `scenario-${scenarioId}`
+            : `tactical-focus-active-${startedFocusedRun.id}`}
+          customThemeSelection={{
+            selectedThemes: selectedCustomThemes,
+            onChange: setSelectedCustomThemes
+          }}
+          historyProgressPresentation={isHistoryProgressScenario(scenarioId)
+            ? historyProgressPresentationFor(scenarioId)
+            : undefined}
+          personalBestChallengeDesignPreview={personalBestChallengePreview}
+          platformCapabilities={runtime.platformCapabilities}
+          systemBack={systemBack}
+          runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
+            ? { pickedUpRunId: runReorderPickedUpRunId }
+            : undefined}
+          runReorderFeedbackPreview={scenarioId === "practice-home-edit"
+            ? ({ haptic }) => {
+                setRunReorderDesignPreviewActive(false);
+                setRunReorderFeedbackPreview(
+                  `${haptic === "medium" ? "Medium" : haptic} haptic requested on pickup`
+                );
+              }
+            : undefined}
+          themeCatalogPresentation={showsThemeCatalogPrototype
+            ? SERVER_CURATED_THEME_PRESENTATION
+            : undefined}
+          runEloEditingMovedToHome
+          tacticalProfilePresentation={tacticalProfilePresentation}
+          {...effectiveScreenProps}
+        />
+      </LabScenarioShell>
+    </ThemeProvider>
   );
 }
 
@@ -1593,6 +1619,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       screenProps.initialTab = "settings";
       break;
     case "settings-whats-new":
+      screenProps.initialTab = "settings";
+      break;
+    case "settings-board-appearance":
       screenProps.initialTab = "settings";
       break;
     case "practice-unclear-follow-up":

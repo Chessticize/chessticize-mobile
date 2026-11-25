@@ -355,6 +355,9 @@ test("PracticeService persists settings through the store boundary", () => {
   const defaults = service.getSettings();
   assert.deepEqual(defaults, {
     appearance: "system",
+    lightBoardTheme: "slate",
+    darkBoardTheme: "graphite",
+    pieceSet: "default",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -381,6 +384,9 @@ test("PracticeService persists settings through the store boundary", () => {
 
   const saved = service.saveSettings({
     appearance: "system",
+    lightBoardTheme: "green",
+    darkBoardTheme: "walnut",
+    pieceSet: "cburnett",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -413,6 +419,9 @@ test("PracticeService persists settings through the store boundary", () => {
   assert.deepEqual(service.getSettings().notifications.reviewReminder, { mode: "fixed", fixedLocalTime: "20:30" });
   assert.deepEqual(service.exportLocalData().settings, {
     appearance: "system",
+    lightBoardTheme: "green",
+    darkBoardTheme: "walnut",
+    pieceSet: "cburnett",
     arrowDuel: {
       opponentReplyEnabled: true
     },

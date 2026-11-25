@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import fs from "node:fs";
 import path from "node:path";
-import { darkTheme, lightTheme } from "../src/theme";
+import { BOARD_THEME_OPTIONS, darkTheme, lightTheme, themeWithBoardTheme } from "../src/theme";
 import type { Theme } from "../src/theme";
 
 // WCAG 2.x contrast over the token pairs the components actually use. Pairs are
@@ -178,6 +178,20 @@ describe("theme contrast", () => {
       const onDark = contrast(theme, "board.coordinateOnDarkSquare", "board.darkSquare");
       expect(onLight).toBeGreaterThanOrEqual(theme === darkTheme ? AA_TEXT : 3);
       expect(onDark).toBeGreaterThanOrEqual(theme === darkTheme ? AA_TEXT : 3);
+    }
+  });
+
+  it("keeps board coordinates legible for every curated board color scheme", () => {
+    expect(BOARD_THEME_OPTIONS).toHaveLength(9);
+    for (const option of BOARD_THEME_OPTIONS) {
+      const minDarkContrast = option.id === "slate" ? AA_UI : AA_TEXT;
+      for (const baseTheme of [lightTheme, darkTheme]) {
+        const resolved = themeWithBoardTheme(baseTheme, option.id);
+        const onLight = contrast(resolved, "board.coordinateOnLightSquare", "board.lightSquare");
+        const onDark = contrast(resolved, "board.coordinateOnDarkSquare", "board.darkSquare");
+        expect(onLight).toBeGreaterThanOrEqual(AA_TEXT);
+        expect(onDark).toBeGreaterThanOrEqual(minDarkContrast);
+      }
     }
   });
 });

@@ -52,21 +52,19 @@ test("every typed navigation coverage entry points to a registered scenario", ()
 test("New Scenario Markers derive catalog tags from issue ownership", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
-  const issue651Scenarios = [
-    "settings-whats-new",
-    "release-notes-ios",
-    "release-notes-android"
-  ];
-  assert.deepEqual(newScenarios.map((scenario) => scenario.id), issue651Scenarios);
+  const issue742Scenarios = ["settings-board-appearance"];
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), issue742Scenarios);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 651))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 742))
       .map((scenario) => scenario.id),
-    issue651Scenarios
+    issue742Scenarios
   );
-  assert.equal(scenarioRegistry["release-notes-ios" as LabScenarioId].group, "Release Notes");
-  assert.equal(scenarioRegistry["release-notes-android" as LabScenarioId].group, "Release Notes");
-  assert.equal(scenarioRegistry["settings-whats-new" as LabScenarioId].group, "Settings");
+  assert.equal(scenarioRegistry["settings-board-appearance" as LabScenarioId].group, "Settings");
+  // The #742 track reset the #651 What's New markers; the scenarios stay.
+  assert.deepEqual(storyTagsForScenario("settings-whats-new"), []);
+  assert.deepEqual(storyTagsForScenario("release-notes-ios"), []);
+  assert.deepEqual(storyTagsForScenario("release-notes-android"), []);
   // The #651 design track reset the #609 Visual Direction markers; the scenarios stay.
   assert.deepEqual(storyTagsForScenario("visual-direction-a-grouped-native-phone"), []);
   // The #609 design track reset the merged #611 guide markers; the scenarios stay.

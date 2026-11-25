@@ -136,3 +136,63 @@ test("appearance defaults to following the system and normalizes unknown values"
     "system"
   );
 });
+
+test("board color schemes and piece set default safely and normalize unknown values", () => {
+  const defaults = defaultPracticeSettings();
+  assert.equal(defaults.lightBoardTheme, "slate");
+  assert.equal(defaults.darkBoardTheme, "graphite");
+  assert.equal(defaults.pieceSet, "default");
+
+  const legacySettings = {
+    sync: { iCloudEnabled: true },
+    notifications: { reviewReminder: { mode: "smart" as const } }
+  } as PracticeSettings;
+  const clonedLegacy = clonePracticeSettings(legacySettings);
+  assert.equal(clonedLegacy.lightBoardTheme, "slate");
+  assert.equal(clonedLegacy.darkBoardTheme, "graphite");
+  assert.equal(clonedLegacy.pieceSet, "default");
+
+  for (const boardTheme of [
+    "slate",
+    "graphite",
+    "brown",
+    "green",
+    "blue",
+    "deep-blue",
+    "purple",
+    "walnut",
+    "forest"
+  ] as const) {
+    const cloned = clonePracticeSettings({
+      ...defaults,
+      lightBoardTheme: boardTheme,
+      darkBoardTheme: boardTheme
+    });
+    assert.equal(cloned.lightBoardTheme, boardTheme);
+    assert.equal(cloned.darkBoardTheme, boardTheme);
+  }
+
+  for (const pieceSet of [
+    "default",
+    "cburnett",
+    "merida",
+    "chessnut",
+    "spatial",
+    "fantasy"
+  ] as const) {
+    assert.equal(
+      clonePracticeSettings({ ...defaults, pieceSet }).pieceSet,
+      pieceSet
+    );
+  }
+
+  const invalid = clonePracticeSettings({
+    ...defaults,
+    lightBoardTheme: "neon" as unknown as PracticeSettings["lightBoardTheme"],
+    darkBoardTheme: "marble" as unknown as PracticeSettings["darkBoardTheme"],
+    pieceSet: "horsey" as unknown as PracticeSettings["pieceSet"]
+  });
+  assert.equal(invalid.lightBoardTheme, "slate");
+  assert.equal(invalid.darkBoardTheme, "graphite");
+  assert.equal(invalid.pieceSet, "default");
+});

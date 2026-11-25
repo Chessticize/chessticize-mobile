@@ -4,15 +4,28 @@ import {
   type ArrowDuelReplyCueStage,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
-import type {
-  AppearancePreference,
-  PracticeSettings,
-  ReviewReminderPreference
+import {
+  BOARD_THEME_IDS,
+  CHESS_PIECE_SET_IDS,
+  DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_LIGHT_BOARD_THEME,
+  DEFAULT_PIECE_SET,
+  type AppearancePreference,
+  type BoardThemeId,
+  type ChessPieceSetId,
+  type PracticeSettings,
+  type ReviewReminderPreference
 } from "./practice-store.ts";
+
+const BOARD_THEME_ID_SET: ReadonlySet<string> = new Set(BOARD_THEME_IDS);
+const CHESS_PIECE_SET_ID_SET: ReadonlySet<string> = new Set(CHESS_PIECE_SET_IDS);
 
 export function defaultPracticeSettings(): PracticeSettings {
   return {
     appearance: "system",
+    lightBoardTheme: DEFAULT_LIGHT_BOARD_THEME,
+    darkBoardTheme: DEFAULT_DARK_BOARD_THEME,
+    pieceSet: DEFAULT_PIECE_SET,
     sync: {
       iCloudEnabled: true
     },
@@ -35,6 +48,9 @@ export function defaultPracticeSettings(): PracticeSettings {
 export function clonePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return normalizePracticeSettings({
     appearance: normalizeAppearancePreference(settings.appearance),
+    lightBoardTheme: normalizeBoardTheme(settings.lightBoardTheme, DEFAULT_LIGHT_BOARD_THEME),
+    darkBoardTheme: normalizeBoardTheme(settings.darkBoardTheme, DEFAULT_DARK_BOARD_THEME),
+    pieceSet: normalizePieceSet(settings.pieceSet),
     ...whatsNewSeenVersionField(settings.whatsNewSeenVersion),
     sync: {
       iCloudEnabled: settings.sync.iCloudEnabled
@@ -64,6 +80,9 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
 export function normalizePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return {
     appearance: normalizeAppearancePreference(settings.appearance),
+    lightBoardTheme: normalizeBoardTheme(settings.lightBoardTheme, DEFAULT_LIGHT_BOARD_THEME),
+    darkBoardTheme: normalizeBoardTheme(settings.darkBoardTheme, DEFAULT_DARK_BOARD_THEME),
+    pieceSet: normalizePieceSet(settings.pieceSet),
     ...whatsNewSeenVersionField(settings.whatsNewSeenVersion),
     sync: {
       iCloudEnabled: Boolean(settings.sync.iCloudEnabled)
@@ -92,6 +111,22 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
 
 export function normalizeAppearancePreference(value: unknown): AppearancePreference {
   return value === "light" || value === "dark" ? value : "system";
+}
+
+export function isBoardThemeId(value: unknown): value is BoardThemeId {
+  return typeof value === "string" && BOARD_THEME_ID_SET.has(value);
+}
+
+export function normalizeBoardTheme(value: unknown, fallback: BoardThemeId): BoardThemeId {
+  return isBoardThemeId(value) ? value : fallback;
+}
+
+export function isChessPieceSetId(value: unknown): value is ChessPieceSetId {
+  return typeof value === "string" && CHESS_PIECE_SET_ID_SET.has(value);
+}
+
+export function normalizePieceSet(value: unknown): ChessPieceSetId {
+  return isChessPieceSetId(value) ? value : DEFAULT_PIECE_SET;
 }
 
 /** A recorded What's New version must read as a release version; anything else counts as unrecorded. */

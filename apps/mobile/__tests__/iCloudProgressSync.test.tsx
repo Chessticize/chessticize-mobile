@@ -306,6 +306,9 @@ function sampleSnapshot(): ProgressSyncSnapshot {
       schemaVersion: 1,
       settings: {
         appearance: "system",
+        lightBoardTheme: "slate",
+        darkBoardTheme: "graphite",
+        pieceSet: "default",
         arrowDuel: {
           opponentReplyEnabled: true
         },

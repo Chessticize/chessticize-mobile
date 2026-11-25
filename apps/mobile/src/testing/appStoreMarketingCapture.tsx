@@ -200,6 +200,9 @@ export function loadAppStoreMarketingCaptureFixture(
   }));
   practiceService.saveSettings({
     appearance: "system",
+    lightBoardTheme: "slate",
+    darkBoardTheme: "graphite",
+    pieceSet: "default",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -268,6 +271,9 @@ function loadReleaseCampaignFixture({
   practiceService.importLocalData(history.data);
   practiceService.saveSettings({
     appearance: frame.appearance,
+    lightBoardTheme: "slate",
+    darkBoardTheme: "graphite",
+    pieceSet: "default",
     arrowDuel: { opponentReplyEnabled: true },
     sync: { iCloudEnabled: false },
     notifications: { reviewReminder: { mode: "off" } },
@@ -448,6 +454,9 @@ function marketingLocalData({
     schemaVersion: 1,
     settings: {
       appearance: "system",
+      lightBoardTheme: "slate",
+      darkBoardTheme: "graphite",
+      pieceSet: "default",
       arrowDuel: {
         opponentReplyEnabled: true
       },

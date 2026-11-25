@@ -322,6 +322,25 @@ export type ThemeElevation = {
 
 export type AppearancePreference = "system" | "light" | "dark";
 
+export type BoardThemeId =
+  | "slate"
+  | "graphite"
+  | "brown"
+  | "green"
+  | "blue"
+  | "deep-blue"
+  | "purple"
+  | "walnut"
+  | "forest";
+
+export type ChessPieceSetId =
+  | "default"
+  | "cburnett"
+  | "merida"
+  | "chessnut"
+  | "spatial"
+  | "fantasy";
+
 export type Theme = {
   name: "light" | "dark";
   // Status bar icon style that stays legible over the theme's canvas.
