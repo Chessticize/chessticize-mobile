@@ -335,6 +335,9 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       });
       assert.deepEqual(service.getSettings(), {
         appearance: "system",
+        lightBoardTheme: "slate",
+        darkBoardTheme: "graphite",
+        pieceSet: "default",
         sync: { iCloudEnabled: true },
         arrowDuel: { opponentReplyEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
@@ -437,6 +440,9 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
 
       service.saveSettings({
         appearance: "system",
+        lightBoardTheme: "slate",
+        darkBoardTheme: "graphite",
+        pieceSet: "default",
         arrowDuel: { opponentReplyEnabled: true },
         sync: { iCloudEnabled: false },
         notifications: { reviewReminder: { mode: "off" } },
@@ -587,6 +593,9 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
 
       assert.deepEqual(service.getSettings(), {
         appearance: "system",
+        lightBoardTheme: "slate",
+        darkBoardTheme: "graphite",
+        pieceSet: "default",
         sync: { iCloudEnabled: false },
         arrowDuel: { opponentReplyEnabled: true },
         notifications: {
@@ -1793,6 +1802,71 @@ test("SQLite v24 adds the What's New seen version, leaves it unrecorded and keep
     try {
       assert.equal(schemaVersionForStore(reopenedStore), CURRENT_SCHEMA_VERSION);
       assert.equal(new PracticeService(reopenedStore).getSettings().whatsNewSeenVersion, "1.6.0");
+    } finally {
+      reopenedStore.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v25 adds device-local board themes and piece set with default values and no sync outbox write", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-board-theme-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    const setupService = new PracticeService(setupStore);
+    setupService.saveSettings({
+      ...setupService.getSettings(),
+      appearance: "dark",
+      whatsNewSeenVersion: "1.6.0",
+      moveFeedback: { soundEnabled: true, hapticsEnabled: false },
+      notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "07:30" } }
+    });
+    setupStore.db.exec("DELETE FROM progress_v2_outbox");
+    // Rebuild the schema-v24 shape: drop v25 columns.
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN light_board_theme");
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN dark_board_theme");
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN piece_set");
+    setupStore.db.exec("PRAGMA user_version = 24");
+    setupStore.close();
+
+    const migratedStore = new SQLiteStore(databasePath);
+    migratedStore.migrate();
+    const migratedService = new PracticeService(migratedStore);
+    try {
+      const settings = migratedService.getSettings();
+      assert.equal(settings.lightBoardTheme, "slate");
+      assert.equal(settings.darkBoardTheme, "graphite");
+      assert.equal(settings.pieceSet, "default");
+      assert.equal(settings.appearance, "dark");
+      assert.equal(settings.whatsNewSeenVersion, "1.6.0");
+      assert.deepEqual(settings.moveFeedback, { soundEnabled: true, hapticsEnabled: false });
+      assert.deepEqual(settings.notifications.reviewReminder, { mode: "fixed", fixedLocalTime: "07:30" });
+
+      migratedService.saveSettings({
+        ...settings,
+        lightBoardTheme: "brown",
+        darkBoardTheme: "forest",
+        pieceSet: "merida"
+      });
+      const outbox = migratedStore.db
+        .prepare("SELECT kind, entity_key FROM progress_v2_outbox")
+        .all();
+      assert.deepEqual(outbox, []);
+    } finally {
+      migratedStore.close();
+    }
+
+    const reopenedStore = new SQLiteStore(databasePath);
+    reopenedStore.migrate();
+    try {
+      assert.equal(schemaVersionForStore(reopenedStore), CURRENT_SCHEMA_VERSION);
+      const persisted = new PracticeService(reopenedStore).getSettings();
+      assert.equal(persisted.lightBoardTheme, "brown");
+      assert.equal(persisted.darkBoardTheme, "forest");
+      assert.equal(persisted.pieceSet, "merida");
     } finally {
       reopenedStore.close();
     }

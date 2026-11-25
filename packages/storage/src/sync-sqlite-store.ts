@@ -70,8 +70,22 @@ import type {
   PracticeStore,
   ReviewQueueDuePromotionResult
 } from "./practice-store.ts";
-import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
-import { clonePracticeSettings, defaultPracticeSettings, normalizeAppearancePreference, normalizeReviewReminderPreference, normalizeWhatsNewSeenVersion, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
+import {
+  DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_LIGHT_BOARD_THEME,
+  exportReviewQueueState,
+  normalizeImportedReviewQueueState
+} from "./practice-store.ts";
+import {
+  clonePracticeSettings,
+  defaultPracticeSettings,
+  normalizeAppearancePreference,
+  normalizeBoardTheme,
+  normalizePieceSet,
+  normalizeReviewReminderPreference,
+  normalizeWhatsNewSeenVersion,
+  reviewReminderPreferenceToSettings
+} from "./practice-settings.ts";
 import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
@@ -258,6 +272,9 @@ interface AppSettingsRow {
   sync_upload_allowed: number;
   arrow_duel_opponent_reply_enabled: number;
   appearance: PracticeSettings["appearance"];
+  light_board_theme: PracticeSettings["lightBoardTheme"];
+  dark_board_theme: PracticeSettings["darkBoardTheme"];
+  piece_set: PracticeSettings["pieceSet"];
   whats_new_seen_version: string | null;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
@@ -365,7 +382,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 24;
+export const CURRENT_SCHEMA_VERSION = 25;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -398,7 +415,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 20, to: 21, apply: migrateV20ToV21 },
   { from: 21, to: 22, apply: migrateV21ToV22 },
   { from: 22, to: 23, apply: migrateV22ToV23 },
-  { from: 23, to: 24, apply: migrateV23ToV24 }
+  { from: 23, to: 24, apply: migrateV23ToV24 },
+  { from: 24, to: 25, apply: migrateV24ToV25 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1024,6 +1042,9 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_upload_allowed,
           arrow_duel_opponent_reply_enabled,
           appearance,
+          light_board_theme,
+          dark_board_theme,
+          piece_set,
           whats_new_seen_version,
           review_reminder_mode,
           review_reminder_fixed_local_time,
@@ -1034,12 +1055,15 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
           arrow_duel_opponent_reply_enabled = excluded.arrow_duel_opponent_reply_enabled,
           appearance = excluded.appearance,
+          light_board_theme = excluded.light_board_theme,
+          dark_board_theme = excluded.dark_board_theme,
+          piece_set = excluded.piece_set,
           whats_new_seen_version = excluded.whats_new_seen_version,
           review_reminder_mode = excluded.review_reminder_mode,
           review_reminder_fixed_local_time = excluded.review_reminder_fixed_local_time,
@@ -1056,6 +1080,9 @@ export class SyncSQLiteStore implements PracticeStore {
         0,
         boolToInt(cloned.arrowDuel.opponentReplyEnabled),
         cloned.appearance,
+        cloned.lightBoardTheme,
+        cloned.darkBoardTheme,
+        cloned.pieceSet,
         cloned.whatsNewSeenVersion ?? null,
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
@@ -3144,11 +3171,15 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV21ToV22(db);
   migrateV22ToV23(db);
   migrateV23ToV24(db);
+  migrateV24ToV25(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
     hasColumn(db, "app_settings", "appearance") &&
+    hasColumn(db, "app_settings", "light_board_theme") &&
+    hasColumn(db, "app_settings", "dark_board_theme") &&
+    hasColumn(db, "app_settings", "piece_set") &&
     hasColumn(db, "app_settings", "whats_new_seen_version") &&
     hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
@@ -3996,6 +4027,32 @@ function migrateV23ToV24(db: SyncSqliteDatabase): void {
   );
 }
 
+// Device-local board themes and piece set; progress sync triggers ignore them.
+function migrateV24ToV25(db: SyncSqliteDatabase): void {
+  const boardThemeCheck =
+    "('slate', 'graphite', 'brown', 'green', 'blue', 'deep-blue', 'purple', 'walnut', 'forest')";
+  const pieceSetCheck =
+    "('default', 'cburnett', 'merida', 'chessnut', 'spatial', 'fantasy')";
+  ensureColumn(
+    db,
+    "app_settings",
+    "light_board_theme",
+    `ALTER TABLE app_settings ADD COLUMN light_board_theme TEXT NOT NULL DEFAULT 'slate' CHECK (light_board_theme IN ${boardThemeCheck})`
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "dark_board_theme",
+    `ALTER TABLE app_settings ADD COLUMN dark_board_theme TEXT NOT NULL DEFAULT 'graphite' CHECK (dark_board_theme IN ${boardThemeCheck})`
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "piece_set",
+    `ALTER TABLE app_settings ADD COLUMN piece_set TEXT NOT NULL DEFAULT 'default' CHECK (piece_set IN ${pieceSetCheck})`
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -4171,6 +4228,9 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
   );
   return {
     appearance: normalizeAppearancePreference(row.appearance),
+    lightBoardTheme: normalizeBoardTheme(row.light_board_theme, DEFAULT_LIGHT_BOARD_THEME),
+    darkBoardTheme: normalizeBoardTheme(row.dark_board_theme, DEFAULT_DARK_BOARD_THEME),
+    pieceSet: normalizePieceSet(row.piece_set),
     ...whatsNewSeenVersionField(row.whats_new_seen_version),
     sync: {
       iCloudEnabled: intToBool(row.sync_icloud_enabled)

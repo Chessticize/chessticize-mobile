@@ -25,12 +25,17 @@ type BoardMoveResult = {
 
 type BoardPlaceholderProps = {
   boardSize?: number;
+  colors?: {
+    black?: string;
+    white?: string;
+  };
   fen: string;
   flipped?: boolean;
   gestureEnabled?: boolean;
   onIllegalMove?: (from: string, to: string) => void;
   onMove?: (result: BoardMoveResult) => void;
   onReady?: () => void;
+  spriteSource?: unknown;
   squareHighlights?: ReadonlyArray<{ square: string; color: string }>;
 };
 
@@ -61,6 +66,7 @@ type AnimatedPreviewMove = BoardMove & { glyph: string };
 const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(function BoardPlaceholder(
   {
     boardSize = 320,
+    colors,
     fen,
     flipped = false,
     gestureEnabled = true,
@@ -232,10 +238,10 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
 
   const squareSize = boardSize / 8;
   const theme = useTheme();
-  // The placeholder keeps its historic light squares; dark uses the board tokens.
-  const darkSquares = theme.name === "dark"
-    ? { dark: theme.colors.board.darkSquare, light: theme.colors.board.lightSquare }
-    : undefined;
+  const boardSquareColors = {
+    dark: colors?.black ?? theme.colors.board.darkSquare,
+    light: colors?.white ?? theme.colors.board.lightSquare
+  };
   const squares = useMemo(
     () => Array.from({ length: 64 }, (_, index) => ({
       id: index,
@@ -264,8 +270,7 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
             key={square.id}
             style={[
               styles.square,
-              square.dark ? styles.darkSquare : styles.lightSquare,
-              darkSquares ? { backgroundColor: square.dark ? darkSquares.dark : darkSquares.light } : null,
+              { backgroundColor: square.dark ? boardSquareColors.dark : boardSquareColors.light },
               { height: squareSize, width: squareSize }
             ]}
           />

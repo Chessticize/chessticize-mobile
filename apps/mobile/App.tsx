@@ -21,7 +21,15 @@ import {
 } from "./src/testing/appStoreMarketingCapture";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
-import { makeStyles, ThemeProvider, type AppearancePreference } from "./src/theme";
+import {
+  DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_LIGHT_BOARD_THEME,
+  makeStyles,
+  ThemeProvider,
+  type AppearancePreference,
+  type BoardThemeId,
+  type ChessPieceSetId
+} from "./src/theme";
 
 enableTestControlsFromLaunchConfig();
 
@@ -46,9 +54,22 @@ function App() {
   const [appearance, setAppearance] = React.useState<AppearancePreference>(
     () => platformCapabilities?.storage.practiceService.getSettings().appearance ?? "system"
   );
+  const [lightBoardTheme, setLightBoardTheme] = React.useState<BoardThemeId>(
+    () => platformCapabilities?.storage.practiceService.getSettings().lightBoardTheme ?? DEFAULT_LIGHT_BOARD_THEME
+  );
+  const [darkBoardTheme, setDarkBoardTheme] = React.useState<BoardThemeId>(
+    () => platformCapabilities?.storage.practiceService.getSettings().darkBoardTheme ?? DEFAULT_DARK_BOARD_THEME
+  );
+  const [pieceSet, setPieceSet] = React.useState<ChessPieceSetId>(
+    () => platformCapabilities?.storage.practiceService.getSettings().pieceSet ?? "default"
+  );
   React.useEffect(() => {
     if (platformCapabilities) {
-      setAppearance(platformCapabilities.storage.practiceService.getSettings().appearance);
+      const settings = platformCapabilities.storage.practiceService.getSettings();
+      setAppearance(settings.appearance);
+      setLightBoardTheme(settings.lightBoardTheme);
+      setDarkBoardTheme(settings.darkBoardTheme);
+      setPieceSet(settings.pieceSet);
     }
   }, [platformCapabilities]);
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
@@ -90,7 +111,16 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider appearance={appearance} onAppearanceChange={setAppearance}>
+      <ThemeProvider
+        appearance={appearance}
+        darkBoardTheme={darkBoardTheme}
+        lightBoardTheme={lightBoardTheme}
+        pieceSet={pieceSet}
+        onAppearanceChange={setAppearance}
+        onDarkBoardThemeChange={setDarkBoardTheme}
+        onLightBoardThemeChange={setLightBoardTheme}
+        onPieceSetChange={setPieceSet}
+      >
         {platformCapabilities ? (
           <PracticePocScreen
             platformCapabilities={platformCapabilities}

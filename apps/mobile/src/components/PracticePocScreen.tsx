@@ -219,9 +219,9 @@ export type {
   RunReorderPickupFeedback,
   SprintRulesGuidePresentation
 } from "./practice/home/PracticeHome.tsx";
-import { makeStyles, useTheme, type Theme } from "../theme/index.ts";
+import { makeStyles, useBoardAppearance, useTheme, type Theme } from "../theme/index.ts";
 import { LARGE_TITLE_MAX_FONT_SCALE } from "../theme/scales.ts";
-import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
+import { chessPieceSpriteFor } from "./practice/shared/chessPieceSprite.ts";
 import {
   CUSTOM_INITIAL_RATING_MIN,
   errorMessage,
@@ -1174,18 +1174,23 @@ export function PracticePocScreen({
   }, [configurePuzzleSource, puzzleSource, service]);
 
   // Called here so its iCloud startup effect keeps its place in the effect order.
+  const { pieceSet: activePieceSet } = useBoardAppearance();
+  const pieceSprite = chessPieceSpriteFor(activePieceSet);
   const {
     appearance,
+    darkBoardTheme,
     dismissReviewReminderPermissionPrompt,
     effectiveErrorDetails,
     effectiveSupportBundle,
     iCloudSyncEnabled,
     iCloudSyncInProgress,
     iCloudSyncStatus,
+    lightBoardTheme,
     maybeShowReviewReminderPermissionPrompt,
     moveFeedbackPreferences,
     notificationPermissionStatus,
     openReviewReminderSystemSettings,
+    pieceSet,
     refreshReviewReminder,
     requestReviewReminderPermission,
     reviewReminderPermissionPromptVisible,
@@ -1193,8 +1198,11 @@ export function PracticePocScreen({
     reviewReminderScheduleStatus,
     runICloudProgressSync,
     saveAppearance,
+    saveDarkBoardTheme,
     saveICloudSyncEnabled,
+    saveLightBoardTheme,
     saveMoveFeedbackPreferences,
+    savePieceSet,
     saveReviewReminderPreference,
     scheduleDevReviewReminderNotification,
     setICloudSyncEnabled,
@@ -4499,7 +4507,7 @@ export function PracticePocScreen({
             withLetters={false}
             withNumbers={false}
             durations={CHESSBOARD_DURATIONS}
-            spriteSource={CHESS_PIECE_SPRITE}
+            spriteSource={pieceSprite}
             colors={chessboardColorsFor(appTheme)}
             squareHighlights={sessionBoardSquareTints}
             onReady={arrowDuelBoardRenderKey ? markArrowDuelBoardReady : undefined}
@@ -4689,6 +4697,7 @@ export function PracticePocScreen({
         adaptiveLayout,
         appTheme,
         boardSize,
+        pieceSprite,
         presentation: sessionGuidePresentation,
         step: sessionGuideStep,
         styles,
@@ -5514,6 +5523,9 @@ export function PracticePocScreen({
                 iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
                 iCloudSyncSupportBundle={effectiveSupportBundle}
                 appearance={appearance}
+                darkBoardTheme={darkBoardTheme}
+                lightBoardTheme={lightBoardTheme}
+                pieceSet={pieceSet}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -5523,7 +5535,10 @@ export function PracticePocScreen({
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onAppearanceChange={saveAppearance}
+                onDarkBoardThemeChange={saveDarkBoardTheme}
+                onLightBoardThemeChange={saveLightBoardTheme}
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
+                onPieceSetChange={savePieceSet}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
@@ -5813,6 +5828,7 @@ function buildSessionGuideStageNodes({
   adaptiveLayout,
   appTheme,
   boardSize,
+  pieceSprite,
   presentation,
   step,
   styles,
@@ -5823,6 +5839,7 @@ function buildSessionGuideStageNodes({
   adaptiveLayout: AdaptiveLayout;
   appTheme: Theme;
   boardSize: number;
+  pieceSprite: ReturnType<typeof chessPieceSpriteFor>;
   presentation: SprintSessionGuidePresentation;
   step: SprintSessionGuideStep;
   styles: ReturnType<typeof useStyles>;
@@ -5883,7 +5900,7 @@ function buildSessionGuideStageNodes({
           withLetters={false}
           withNumbers={false}
           durations={CHESSBOARD_DURATIONS}
-          spriteSource={CHESS_PIECE_SPRITE}
+          spriteSource={pieceSprite}
           colors={chessboardColorsFor(appTheme)}
           squareHighlights={isReplyStep
             ? boardMoveSquareTints(ARROW_DUEL_REPLY_GUIDE_LAST_MOVE, appTheme.colors.board.lastMoveSquare)

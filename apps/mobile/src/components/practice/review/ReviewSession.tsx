@@ -44,7 +44,7 @@ import {
   moveFeedbackCueForMove
 } from "../../../platform/moveFeedback.ts";
 import type { MobileStockfishCapabilities } from "../../../platform/mobilePlatformCapabilities.ts";
-import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { makeStyles, useBoardAppearance, useTheme } from "../../../theme/index.ts";
 import { typography as baseTypography } from "../../../theme/scales.ts";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import {
@@ -89,7 +89,7 @@ import { fenAfterMove, fenAfterMoves, normalizeUci } from "../../../backend/prem
 import { ArrowDuelReplyChallengePrompt, PracticePrompt } from "../session/PracticePrompt.tsx";
 import { arePracticeTestControlsEnabled } from "../../../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../../../platform/testLaunchConfig.ts";
-import { CHESS_PIECE_SPRITE } from "../shared/chessPieceSprite.ts";
+import { chessPieceSpriteFor } from "../shared/chessPieceSprite.ts";
 import { ThemeTagRail } from "../history/HistoryPanel.tsx";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
 import { AppModal } from "../../AppModal.tsx";
@@ -258,6 +258,8 @@ export function ReviewSession({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const { pieceSet } = useBoardAppearance();
+  const pieceSprite = chessPieceSpriteFor(pieceSet);
   const headerTextStyles = useReviewHeaderTextStyles();
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
@@ -1610,7 +1612,7 @@ export function ReviewSession({
               withLetters={false}
               withNumbers={false}
               durations={{ move: BOARD_MOVE_ANIMATION_MS }}
-              spriteSource={CHESS_PIECE_SPRITE}
+              spriteSource={pieceSprite}
               colors={chessboardColorsFor(appTheme)}
               squareHighlights={reviewBoardSquareTints}
             />

@@ -93,8 +93,7 @@ export const IosPhoneLight: Story = {
     title: "iOS · phone · light",
     viewport: "phonePortrait"
   }),
-  name: "iOS · phone · light",
-  tags: ["new"]
+  name: "iOS · phone · light"
 };
 
 export const IosPhoneDark: Story = {
@@ -105,8 +104,7 @@ export const IosPhoneDark: Story = {
     title: "iOS · phone · dark",
     viewport: "phonePortrait"
   }),
-  name: "iOS · phone · dark",
-  tags: ["new"]
+  name: "iOS · phone · dark"
 };
 
 export const IosPhoneLandscapeLight: Story = {
@@ -117,8 +115,7 @@ export const IosPhoneLandscapeLight: Story = {
     title: "iOS · phone landscape · light",
     viewport: "phoneLandscape"
   }),
-  name: "iOS · phone landscape · light",
-  tags: ["new"]
+  name: "iOS · phone landscape · light"
 };
 
 export const IosPhoneLandscapeDark: Story = {
@@ -129,8 +126,7 @@ export const IosPhoneLandscapeDark: Story = {
     title: "iOS · phone landscape · dark",
     viewport: "phoneLandscape"
   }),
-  name: "iOS · phone landscape · dark",
-  tags: ["new"]
+  name: "iOS · phone landscape · dark"
 };
 
 export const IosIpadPortraitLight: Story = {
@@ -141,8 +137,7 @@ export const IosIpadPortraitLight: Story = {
     title: "iOS · iPad portrait · light",
     viewport: "tabletPortrait"
   }),
-  name: "iOS · iPad portrait · light",
-  tags: ["new"]
+  name: "iOS · iPad portrait · light"
 };
 
 export const IosIpadPortraitDark: Story = {
@@ -153,8 +148,7 @@ export const IosIpadPortraitDark: Story = {
     title: "iOS · iPad portrait · dark",
     viewport: "tabletPortrait"
   }),
-  name: "iOS · iPad portrait · dark",
-  tags: ["new"]
+  name: "iOS · iPad portrait · dark"
 };
 
 export const IosIpadLandscapeLight: Story = {
@@ -165,8 +159,7 @@ export const IosIpadLandscapeLight: Story = {
     title: "iOS · iPad landscape · light",
     viewport: "regularWidth"
   }),
-  name: "iOS · iPad landscape · light",
-  tags: ["new"]
+  name: "iOS · iPad landscape · light"
 };
 
 export const IosIpadLandscapeDark: Story = {
@@ -177,8 +170,7 @@ export const IosIpadLandscapeDark: Story = {
     title: "iOS · iPad landscape · dark",
     viewport: "regularWidth"
   }),
-  name: "iOS · iPad landscape · dark",
-  tags: ["new"]
+  name: "iOS · iPad landscape · dark"
 };
 
 export const IosLargeTextLight: Story = {
@@ -189,8 +181,7 @@ export const IosLargeTextLight: Story = {
     title: "iOS · phone · light · large text",
     viewport: "phonePortrait", textScale: LARGE_TEXT_SCALE
   }),
-  name: "iOS · phone · light · large text",
-  tags: ["new"]
+  name: "iOS · phone · light · large text"
 };
 
 export const IosLargeTextDark: Story = {
@@ -201,8 +192,7 @@ export const IosLargeTextDark: Story = {
     title: "iOS · phone · dark · large text",
     viewport: "phonePortrait", textScale: LARGE_TEXT_SCALE
   }),
-  name: "iOS · phone · dark · large text",
-  tags: ["new"]
+  name: "iOS · phone · dark · large text"
 };
 
 export const AndroidPhoneLight: Story = {
@@ -213,8 +203,7 @@ export const AndroidPhoneLight: Story = {
     title: "Android · phone · light",
     viewport: "phonePortrait"
   }),
-  name: "Android · phone · light",
-  tags: ["new"]
+  name: "Android · phone · light"
 };
 
 export const AndroidPhoneDark: Story = {
@@ -225,8 +214,7 @@ export const AndroidPhoneDark: Story = {
     title: "Android · phone · dark",
     viewport: "phonePortrait"
   }),
-  name: "Android · phone · dark",
-  tags: ["new"]
+  name: "Android · phone · dark"
 };
 
 export const AndroidPhoneLandscapeLight: Story = {
@@ -237,8 +225,7 @@ export const AndroidPhoneLandscapeLight: Story = {
     title: "Android · phone landscape · light",
     viewport: "phoneLandscape"
   }),
-  name: "Android · phone landscape · light",
-  tags: ["new"]
+  name: "Android · phone landscape · light"
 };
 
 export const AndroidPhoneLandscapeDark: Story = {
@@ -249,8 +236,7 @@ export const AndroidPhoneLandscapeDark: Story = {
     title: "Android · phone landscape · dark",
     viewport: "phoneLandscape"
   }),
-  name: "Android · phone landscape · dark",
-  tags: ["new"]
+  name: "Android · phone landscape · dark"
 };
 
 export const AndroidTabletPortraitLight: Story = {
@@ -261,8 +247,7 @@ export const AndroidTabletPortraitLight: Story = {
     title: "Android · tablet portrait · light",
     viewport: "tabletPortrait"
   }),
-  name: "Android · tablet portrait · light",
-  tags: ["new"]
+  name: "Android · tablet portrait · light"
 };
 
 export const AndroidTabletPortraitDark: Story = {
@@ -273,8 +258,7 @@ export const AndroidTabletPortraitDark: Story = {
     title: "Android · tablet portrait · dark",
     viewport: "tabletPortrait"
   }),
-  name: "Android · tablet portrait · dark",
-  tags: ["new"]
+  name: "Android · tablet portrait · dark"
 };
 
 export const AndroidTabletLandscapeLight: Story = {
@@ -285,8 +269,7 @@ export const AndroidTabletLandscapeLight: Story = {
     title: "Android · tablet landscape · light",
     viewport: "regularWidth"
   }),
-  name: "Android · tablet landscape · light",
-  tags: ["new"]
+  name: "Android · tablet landscape · light"
 };
 
 export const AndroidTabletLandscapeDark: Story = {
@@ -297,8 +280,7 @@ export const AndroidTabletLandscapeDark: Story = {
     title: "Android · tablet landscape · dark",
     viewport: "regularWidth"
   }),
-  name: "Android · tablet landscape · dark",
-  tags: ["new"]
+  name: "Android · tablet landscape · dark"
 };
 
 export const AndroidLargeTextLight: Story = {
@@ -309,8 +291,7 @@ export const AndroidLargeTextLight: Story = {
     title: "Android · phone · light · large text",
     viewport: "phonePortrait", textScale: LARGE_TEXT_SCALE
   }),
-  name: "Android · phone · light · large text",
-  tags: ["new"]
+  name: "Android · phone · light · large text"
 };
 
 export const AndroidLargeTextDark: Story = {
@@ -321,14 +302,12 @@ export const AndroidLargeTextDark: Story = {
     title: "Android · phone · dark · large text",
     viewport: "phonePortrait", textScale: LARGE_TEXT_SCALE
   }),
-  name: "Android · phone · dark · large text",
-  tags: ["new"]
+  name: "Android · phone · dark · large text"
 };
 
 // Continue finishes the notes and leaves the idle Practice home behind the sheet.
 export const IosContinue: Story = {
   name: "iOS · Continue",
-  tags: ["new"],
   args: {
     scenarioId: "release-notes-ios",
     storyPresentation: { storyId: "release-notes--ios-continue", title: "iOS · Continue" }

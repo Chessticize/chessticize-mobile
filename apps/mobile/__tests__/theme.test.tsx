@@ -1,7 +1,16 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { darkTheme, lightTheme, makeStyles, ThemeProvider, themeForAppearance, useTheme } from "../src/theme";
-import type { AppearancePreference, Theme } from "../src/theme";
+import {
+  BOARD_THEME_OPTIONS,
+  darkTheme,
+  lightTheme,
+  makeStyles,
+  ThemeProvider,
+  themeForAppearance,
+  useBoardAppearance,
+  useTheme
+} from "../src/theme";
+import type { AppearancePreference, BoardThemeId, ChessPieceSetId, Theme } from "../src/theme";
 import {
   createNativeSystemBarAppearanceClient,
   type SystemBarAppearanceClient,
@@ -125,6 +134,66 @@ describe("appearance", () => {
   it("uses a dark status bar style for light and a light one for dark", () => {
     expect(lightTheme.statusBarStyle).toBe("dark-content");
     expect(darkTheme.statusBarStyle).toBe("light-content");
+  });
+
+  it("resolves separate light and dark board color schemes and exposes piece set via ThemeProvider", () => {
+    const seen: Array<{ theme: Theme; pieceSet: ChessPieceSetId; lightBoardTheme: BoardThemeId; darkBoardTheme: BoardThemeId }> = [];
+    function BoardProbe() {
+      const theme = useTheme();
+      const board = useBoardAppearance();
+      seen.push({
+        theme,
+        pieceSet: board.pieceSet,
+        lightBoardTheme: board.lightBoardTheme,
+        darkBoardTheme: board.darkBoardTheme
+      });
+      return null;
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider
+          appearance="system"
+          lightBoardTheme="brown"
+          darkBoardTheme="forest"
+          pieceSet="merida"
+        >
+          <BoardProbe />
+        </ThemeProvider>
+      );
+    });
+    expect(seen[seen.length - 1]?.theme.name).toBe("light");
+    expect(seen[seen.length - 1]?.theme.colors.board.lightSquare).toBe("#F0D9B5");
+    expect(seen[seen.length - 1]?.theme.colors.board.darkSquare).toBe("#B58863");
+    expect(seen[seen.length - 1]?.pieceSet).toBe("merida");
+
+    act(() => {
+      reactNativeMock.__setColorScheme("dark");
+    });
+    expect(seen[seen.length - 1]?.theme.name).toBe("dark");
+    expect(seen[seen.length - 1]?.theme.colors.board.lightSquare).toBe("#9DB094");
+    expect(seen[seen.length - 1]?.theme.colors.board.darkSquare).toBe("#4E6B47");
+
+    // Default schemes preserve the exact base light/dark theme references.
+    expect(
+      themeForAppearance("light", "light", { lightBoardTheme: "slate", darkBoardTheme: "forest" })
+    ).toBe(lightTheme);
+    expect(
+      themeForAppearance("dark", "dark", { lightBoardTheme: "brown", darkBoardTheme: "graphite" })
+    ).toBe(darkTheme);
+    expect(BOARD_THEME_OPTIONS.map((option) => option.id)).toEqual([
+      "slate",
+      "graphite",
+      "brown",
+      "green",
+      "blue",
+      "deep-blue",
+      "purple",
+      "walnut",
+      "forest"
+    ]);
+    act(() => renderer?.unmount());
   });
 });
 

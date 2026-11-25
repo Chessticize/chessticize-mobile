@@ -1,9 +1,9 @@
 import React from "react";
 import { Image, View } from "react-native";
-import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { makeStyles, useBoardAppearance, useTheme, type ChessPieceSetId } from "../../../theme/index.ts";
 import { Icon } from "../../ui/index.tsx";
 import type { MoveSide } from "./moveSide.ts";
-import { CHESS_PIECE_SPRITE } from "./chessPieceSprite.ts";
+import { chessPieceSpriteFor } from "./chessPieceSprite.ts";
 
 export function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral" }): React.JSX.Element {
   const styles = useStyles();
@@ -36,14 +36,18 @@ export function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "n
 
 export function MoveSideGlyph({
   kingPieceSize = 22,
+  pieceSet,
   side,
   testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
 }: {
   kingPieceSize?: number;
+  pieceSet?: ChessPieceSetId;
   side: MoveSide;
   testID?: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { pieceSet: activePieceSet } = useBoardAppearance();
+  const spriteSource = chessPieceSpriteFor(pieceSet ?? activePieceSet);
   return (
     <View
       style={[styles.moveSideKingGlyph, { height: kingPieceSize, width: kingPieceSize }]}
@@ -53,7 +57,7 @@ export function MoveSideGlyph({
         accessible={false}
         accessibilityIgnoresInvertColors
         resizeMode="stretch"
-        source={CHESS_PIECE_SPRITE}
+        source={spriteSource}
         style={[
           styles.moveSideKingSprite,
           {

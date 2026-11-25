@@ -14,7 +14,11 @@ import {
   type SprintConfig
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
-import { defaultPracticeSettings } from "./practice-settings.ts";
+import {
+  defaultPracticeSettings,
+  isBoardThemeId,
+  isChessPieceSetId
+} from "./practice-settings.ts";
 
 const SPRINT_MODES = new Set(["standard", "blitz", "arrow_duel", "custom"]);
 const SPRINT_STATUSES = new Set(["active", "paused", "won", "failed", "abandoned"]);
@@ -55,6 +59,9 @@ export function normalizeLegacyProgressSyncSnapshot(
       ...data,
       settings: {
         appearance: defaults.appearance,
+        lightBoardTheme: defaults.lightBoardTheme,
+        darkBoardTheme: defaults.darkBoardTheme,
+        pieceSet: defaults.pieceSet,
         sync: settings.sync,
         arrowDuel: defaults.arrowDuel,
         notifications: settings.notifications,
@@ -91,6 +98,9 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
   const sprintGuides = value.sprintGuides;
   if (
     !isOptional(value.appearance, isAppearancePreference) ||
+    !isOptional(value.lightBoardTheme, isBoardThemeId) ||
+    !isOptional(value.darkBoardTheme, isBoardThemeId) ||
+    !isOptional(value.pieceSet, isChessPieceSetId) ||
     !isOptional(value.whatsNewSeenVersion, isReleaseVersionText) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||

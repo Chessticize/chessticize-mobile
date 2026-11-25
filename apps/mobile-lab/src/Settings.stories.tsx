@@ -253,7 +253,6 @@ export const StockfishDiagnostics: Story = {
 // Issue #651: About gains a What’s New row that reopens the latest release notes.
 export const WhatsNewRow: Story = {
   name: "What’s New row",
-  tags: ["new"],
   args: { scenarioId: "settings-whats-new" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "settings-about-section");
@@ -265,7 +264,6 @@ export const WhatsNewRow: Story = {
 
 export const WhatsNewRowDark: Story = {
   name: "What’s New row · dark",
-  tags: ["new"],
   args: {
     scenarioId: "settings-whats-new",
     storyPresentation: { storyId: "settings--whats-new-row-dark", title: "What’s New row · dark" }
@@ -279,7 +277,6 @@ export const WhatsNewRowDark: Story = {
 
 export const WhatsNewRowReopened: Story = {
   name: "What’s New row · reopened",
-  tags: ["new"],
   args: {
     scenarioId: "settings-whats-new",
     storyPresentation: { storyId: "settings--whats-new-row-reopened", title: "What’s New row · reopened" }
@@ -291,5 +288,75 @@ export const WhatsNewRowReopened: Story = {
     await clickTestId(canvasElement, "whats-new-continue");
     await waitForAbsentTestId(canvasElement, "whats-new-sheet");
     await waitForTestId(canvasElement, "settings-panel");
+  }
+};
+
+// Issue #742: Lichess-inspired board color schemes (separate Light/Dark) and chess piece sets.
+export const BoardAppearance: Story = {
+  name: "Appearance · board & pieces",
+  tags: ["new"],
+  args: { scenarioId: "settings-board-appearance" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-appearance-section");
+    await waitForTestId(canvasElement, "settings-board-preview");
+    await waitForTestId(canvasElement, "settings-board-mode-selector");
+    await waitForTestId(canvasElement, "settings-board-theme-slate");
+    await waitForTestId(canvasElement, "settings-piece-set-default");
+    await centerTestId(canvasElement, "settings-appearance-section");
+  }
+};
+
+export const BoardAppearanceLightCustomized: Story = {
+  name: "Appearance · board & pieces · light customized",
+  tags: ["new"],
+  args: {
+    scenarioId: "settings-board-appearance",
+    storyPresentation: {
+      storyId: "settings--board-appearance-light-customized",
+      title: "Appearance · board & pieces · light customized"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-board-preview");
+    await clickTestId(canvasElement, "settings-board-theme-green");
+    await clickTestId(canvasElement, "settings-piece-set-merida");
+    await centerTestId(canvasElement, "settings-appearance-section");
+  }
+};
+
+export const BoardAppearanceDark: Story = {
+  name: "Appearance · board & pieces · dark",
+  tags: ["new"],
+  args: {
+    scenarioId: "settings-board-appearance",
+    storyPresentation: {
+      storyId: "settings--board-appearance-dark",
+      title: "Appearance · board & pieces · dark"
+    }
+  },
+  globals: { theme: "dark" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-board-preview");
+    await waitForTestId(canvasElement, "settings-board-mode-selector");
+    await centerTestId(canvasElement, "settings-appearance-section");
+  }
+};
+
+export const BoardAppearanceDarkCustomized: Story = {
+  name: "Appearance · board & pieces · dark customized",
+  tags: ["new"],
+  args: {
+    scenarioId: "settings-board-appearance",
+    storyPresentation: {
+      storyId: "settings--board-appearance-dark-customized",
+      title: "Appearance · board & pieces · dark customized"
+    }
+  },
+  globals: { theme: "dark" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-board-preview");
+    await clickTestId(canvasElement, "settings-board-theme-walnut");
+    await clickTestId(canvasElement, "settings-piece-set-cburnett");
+    await centerTestId(canvasElement, "settings-appearance-section");
   }
 };

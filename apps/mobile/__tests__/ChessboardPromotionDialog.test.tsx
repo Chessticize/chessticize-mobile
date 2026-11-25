@@ -272,4 +272,88 @@ describe("react-native-chessboard promotion dialog patch", () => {
       Platform.OS = originalOS;
     }
   });
+
+  it("crops q, r, b, n from spriteSource when provided and receives it from Chessboard", async () => {
+    const { Chessboard } = require("react-native-chessboard/src/index");
+    const { StyleSheet } = require("react-native");
+    const customSprite = { uri: "custom-merida-sprite" };
+    const boardRef = React.createRef<{
+      move: (move: { from: string; to: string }) => Promise<unknown>;
+      resetBoard: (fen: string) => Promise<void>;
+    }>();
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <Chessboard
+          ref={boardRef}
+          fen="7k/4P3/8/8/8/8/8/7K w - - 0 1"
+          boardSize={320}
+          gestureEnabled
+          flipped={false}
+          spriteSource={customSprite}
+        />
+      );
+    });
+    if (!renderer || !boardRef.current) {
+      throw new Error("Chessboard did not render");
+    }
+
+    let pendingMove: Promise<unknown> | undefined;
+    await act(async () => {
+      pendingMove = boardRef.current?.move({ from: "e7", to: "e8" });
+      await Promise.resolve();
+    });
+
+    const expectedColumns = [
+      ["q", 4],
+      ["r", 3],
+      ["b", 2],
+      ["n", 1]
+    ] as const;
+    for (const [piece, column] of expectedColumns) {
+      const choiceImage = renderer.root.findByProps({ testID: `promotion-choice-${piece}-image` });
+      expect(choiceImage.props.source).toBe(customSprite);
+      expect(choiceImage.props.resizeMode).toBe("stretch");
+      expect(StyleSheet.flatten(choiceImage.props.style)).toMatchObject({
+        position: "absolute",
+        width: 48 * 6,
+        height: 48 * 2,
+        left: -column * 48,
+        top: 0
+      });
+    }
+
+    await act(async () => {
+      renderer!.root.findByProps({ testID: "promotion-choice-n" }).props.onPress();
+      await Promise.resolve();
+    });
+    await expect(pendingMove).resolves.toMatchObject({ promotion: "n" });
+
+    // Also verify black promotion uses row 1 (top: -48).
+    const { PromotionDialog } = require("react-native-chessboard/src/components/promotion-dialog");
+    let blackRenderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      blackRenderer = TestRenderer.create(
+        <PromotionDialog
+          color="b"
+          onSelect={jest.fn()}
+          onCancel={jest.fn()}
+          spriteSource={customSprite}
+          config={{ colors: { promotionPieceButton: "#D1D1D6" } } as never}
+        />
+      );
+    });
+    for (const [piece, column] of expectedColumns) {
+      const choiceImage = blackRenderer!.root.findByProps({ testID: `promotion-choice-${piece}-image` });
+      expect(choiceImage.props.source).toBe(customSprite);
+      expect(StyleSheet.flatten(choiceImage.props.style)).toMatchObject({
+        left: -column * 48,
+        top: -48
+      });
+    }
+    act(() => {
+      renderer?.unmount();
+      blackRenderer?.unmount();
+    });
+  });
 });

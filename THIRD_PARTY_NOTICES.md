@@ -34,6 +34,45 @@ the complete license texts shipped in this repository.
   trained on data provided by the Leela Chess Zero project under the Open
   Database License. These network files are bundled with the embedded engine.
 
+## Lichess chess piece sets
+
+The optional chess piece sprite sheets under `apps/mobile/src/assets/pieces/`
+are rasterized from license-verified SVG artwork in `lichess-org/lila` at
+upstream commit `47948db658a1678d14e97d41c1bcf82958e70ded` using
+`apps/mobile/scripts/build-chess-piece-sprites.mjs`. The default piece sprite
+(`apps/mobile/src/assets/chess-pieces-sprite.png`) comes from
+`react-native-chessboard` (MIT).
+
+- **Classic (`cburnett`)**
+  - File shipped: `apps/mobile/src/assets/pieces/cburnett.png`
+  - Author: Colin M.L. Burnett
+  - License: GNU General Public License v2.0 or later (GPLv2+; https://www.gnu.org/licenses/gpl-2.0.txt)
+  - Source: https://github.com/lichess-org/lila/tree/47948db658a1678d14e97d41c1bcf82958e70ded/public/piece/cburnett
+
+- **Merida (`merida`)**
+  - File shipped: `apps/mobile/src/assets/pieces/merida.png`
+  - Author: Armando Hernandez Marroquin
+  - License: GNU General Public License v2.0 or later (GPLv2+; https://www.gnu.org/licenses/gpl-2.0.txt)
+  - Source: https://github.com/lichess-org/lila/tree/47948db658a1678d14e97d41c1bcf82958e70ded/public/piece/merida
+
+- **Chessnut (`chessnut`)**
+  - File shipped: `apps/mobile/src/assets/pieces/chessnut.png`
+  - Author: Alexis Luengas
+  - License: Apache License 2.0 (https://github.com/LexLuengas/chessnut-pieces/blob/master/LICENSE.txt)
+  - Source: https://github.com/lichess-org/lila/tree/47948db658a1678d14e97d41c1bcf82958e70ded/public/piece/chessnut
+
+- **Spatial (`spatial`)**
+  - File shipped: `apps/mobile/src/assets/pieces/spatial.png`
+  - Author: Maurizio Monge
+  - License: MIT (https://github.com/maurimo/chess-art/blob/main/LICENSE)
+  - Source: https://github.com/lichess-org/lila/tree/47948db658a1678d14e97d41c1bcf82958e70ded/public/piece/spatial
+
+- **Fantasy (`fantasy`)**
+  - File shipped: `apps/mobile/src/assets/pieces/fantasy.png`
+  - Author: Maurizio Monge
+  - License: MIT (https://github.com/maurimo/chess-art/blob/main/LICENSE)
+  - Source: https://github.com/lichess-org/lila/tree/47948db658a1678d14e97d41c1bcf82958e70ded/public/piece/fantasy
+
 ## Lichess puzzle database
 
 - Name: Lichess puzzle database

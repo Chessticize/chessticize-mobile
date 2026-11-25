@@ -100,8 +100,40 @@ export interface LocalDataImportObserver {
 // Device appearance override: follow the system, or force light or dark.
 export type AppearancePreference = "system" | "light" | "dark";
 
+export const BOARD_THEME_IDS = [
+  "slate",
+  "graphite",
+  "brown",
+  "green",
+  "blue",
+  "deep-blue",
+  "purple",
+  "walnut",
+  "forest"
+] as const;
+
+export type BoardThemeId = (typeof BOARD_THEME_IDS)[number];
+
+export const CHESS_PIECE_SET_IDS = [
+  "default",
+  "cburnett",
+  "merida",
+  "chessnut",
+  "spatial",
+  "fantasy"
+] as const;
+
+export type ChessPieceSetId = (typeof CHESS_PIECE_SET_IDS)[number];
+
+export const DEFAULT_LIGHT_BOARD_THEME: BoardThemeId = "slate";
+export const DEFAULT_DARK_BOARD_THEME: BoardThemeId = "graphite";
+export const DEFAULT_PIECE_SET: ChessPieceSetId = "default";
+
 export interface PracticeSettings {
   appearance: AppearancePreference;
+  lightBoardTheme: BoardThemeId;
+  darkBoardTheme: BoardThemeId;
+  pieceSet: ChessPieceSetId;
   /**
    * Release version whose What's New notes were last seen or skipped on this
    * device (for example "1.6.0"). Absent until recorded. Device-local: iCloud

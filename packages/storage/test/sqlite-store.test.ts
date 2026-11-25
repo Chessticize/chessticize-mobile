@@ -210,6 +210,9 @@ test("SQLite migration preserves legacy settings while adding current safety and
     store.migrate();
     assert.deepEqual(store.getSettings(), {
       appearance: "system",
+      lightBoardTheme: "slate",
+      darkBoardTheme: "graphite",
+      pieceSet: "default",
       arrowDuel: { opponentReplyEnabled: true },
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
@@ -225,6 +228,9 @@ test("SQLite migration preserves legacy settings while adding current safety and
 
     store.saveSettings({
       appearance: "system",
+      lightBoardTheme: "slate",
+      darkBoardTheme: "graphite",
+      pieceSet: "default",
       arrowDuel: { opponentReplyEnabled: false },
       sync: { iCloudEnabled: true },
       notifications: { reviewReminder: { mode: "off" } },
@@ -266,6 +272,9 @@ test("SQLite migration preserves legacy settings while adding current safety and
     assert.ok(columns.some((column) => column.name === "sprint_arrow_duel_reply_cue_stage"));
     assert.deepEqual({ ...settings }, {
       appearance: "system",
+      light_board_theme: "slate",
+      dark_board_theme: "graphite",
+      piece_set: "default",
       whats_new_seen_version: null,
       id: "default",
       sync_icloud_enabled: 1,
@@ -874,6 +883,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       try {
         assert.deepEqual(service.getSettings(), {
           appearance: "system",
+          lightBoardTheme: "slate",
+          darkBoardTheme: "graphite",
+          pieceSet: "default",
           arrowDuel: {
             opponentReplyEnabled: true
           },
@@ -900,6 +912,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
 
         service.saveSettings({
           appearance: "system",
+          lightBoardTheme: "blue",
+          darkBoardTheme: "walnut",
+          pieceSet: "chessnut",
           arrowDuel: {
             opponentReplyEnabled: false
           },
@@ -942,6 +957,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       try {
         assert.deepEqual(service.getSettings(), {
           appearance: "system",
+          lightBoardTheme: "blue",
+          darkBoardTheme: "walnut",
+          pieceSet: "chessnut",
           arrowDuel: {
             opponentReplyEnabled: false
           },
