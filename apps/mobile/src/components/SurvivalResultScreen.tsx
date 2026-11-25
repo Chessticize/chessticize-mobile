@@ -11,6 +11,7 @@ import React from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { makeStyles } from "../theme/makeStyles.ts";
 import { useTheme } from "../theme/ThemeProvider.ts";
+import { useTranslation } from "../i18n/index.ts";
 import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
 import {
   RESULT_CAPPED_SCALE,
@@ -65,7 +66,8 @@ export function SurvivalResultScreen({
   paddingInsets?: ResultInsets | undefined;
   style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
-  const result = presentSurvivalResult(data);
+  const { locale, t } = useTranslation();
+  const result = presentSurvivalResult(data, locale);
   useUiHapticOnAppear(survivalResultHapticIntent(data), data.sessionId);
   return (
     <ResultScreenLayout
@@ -81,14 +83,14 @@ export function SurvivalResultScreen({
             />
           ) : null}
           <Button
-            accessibilityLabel="Play the same Survival Run again"
-            label="Play again"
+            accessibilityLabel={t("survival.result.playAgainA11y")}
+            label={t("common.playAgainLower")}
             stretch
             testID="personal-best-result-try-again"
             onPress={onPlayAgain}
           />
           <Button
-            label="Done"
+            label={t("common.done")}
             stretch
             testID="personal-best-result-done"
             variant="plain"
@@ -96,7 +98,7 @@ export function SurvivalResultScreen({
           />
         </>
       )}
-      backAccessibilityLabel="Back to Practice"
+      backAccessibilityLabel={t("survival.result.backToPracticeA11y")}
       backTestID="personal-best-result-back"
       renderDetails={({ statsLayout }) => (
         <>
@@ -194,6 +196,7 @@ function SurvivalHero({
 }
 
 function DetailRows({ result }: { result: SurvivalResultPresentation }): React.JSX.Element {
+  const { t } = useTranslation();
   const review = result.review;
   return (
     <Section rows testID="personal-best-result-details">
@@ -207,7 +210,7 @@ function DetailRows({ result }: { result: SurvivalResultPresentation }): React.J
         <ListRow
           accessibilityLabel={review.accessibilityLabel}
           testID="personal-best-result-review"
-          title="In Review"
+          title={t("session.previousNotice.inReviewStatus")}
           trailing={(
             <AppText
               maxFontSizeMultiplier={NUMERAL_MAX_SCALE}

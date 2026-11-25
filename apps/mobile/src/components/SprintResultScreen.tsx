@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { makeStyles } from "../theme/makeStyles.ts";
 import { useTheme } from "../theme/ThemeProvider.ts";
+import { useTranslation } from "../i18n/index.ts";
 import {
   RESULT_CAPPED_SCALE,
   ResultHeroFrame,
@@ -63,8 +64,9 @@ export function SprintResultScreen({
   paddingInsets?: ResultInsets;
   style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
-  const result = presentSprintResult(data);
+  const result = presentSprintResult(data, locale);
   useUiHapticOnAppear(sprintResultHapticIntent(data), data.sessionId);
 
   return (
@@ -88,7 +90,7 @@ export function SprintResultScreen({
           />
         </>
       )}
-      backAccessibilityLabel="Done"
+      backAccessibilityLabel={t("common.done")}
       backTestID="back-practice-button"
       renderDetails={({ fontScale, stacked, statsLayout }) => (
         <>
@@ -122,7 +124,7 @@ export function SprintResultScreen({
       title={result.title}
       trailingAction={result.showTrendAction
         ? {
-            accessibilityLabel: "View rating trend in History",
+            accessibilityLabel: t("sprintResult.viewRatingTrendA11y"),
             icon: "trend",
             onPress: actions.onOpenHistory,
             testID: "sprint-result-history-button"
@@ -215,6 +217,7 @@ function ReviewArea({
   onReplay: () => void;
   onToggleInfo: () => void;
 }): React.JSX.Element | null {
+  const { t } = useTranslation();
   const styles = useStyles();
   const theme = useTheme();
   const review = result.review;
@@ -225,7 +228,7 @@ function ReviewArea({
   if (data.unclearPrompt) {
     rows.push(
       <View
-        accessibilityLabel={`${data.unclearPrompt.question} ${data.unclearPrompt.marked ? "Marked as unclear." : ""}`.trim()}
+        accessibilityLabel={`${data.unclearPrompt.question} ${data.unclearPrompt.marked ? t("session.unclear.markedSentence") : ""}`.trim()}
         key="unclear"
         style={[styles.row, stacked ? styles.rowStacked : null]}
         testID="sprint-unclear-prompt"
@@ -235,12 +238,12 @@ function ReviewArea({
         </AppText>
         {data.unclearPrompt.marked ? (
           <View style={stacked ? null : styles.centeredSelf}>
-            <Badge label="Marked" testID="sprint-unclear-marked" />
+            <Badge label={t("session.unclear.marked")} testID="sprint-unclear-marked" />
           </View>
         ) : (
           <Button
-            accessibilityLabel="Mark this attempt as unclear"
-            label="Mark as unclear"
+            accessibilityLabel={t("session.unclear.markAttemptA11y")}
+            label={t("session.unclear.markPrompt")}
             size="compact"
             testID="sprint-unclear-toggle"
             variant="secondary"
@@ -268,7 +271,7 @@ function ReviewArea({
               <AppText testID="sprint-result-review-count" variant="headline">{review.title}</AppText>
             </View>
             <Pressable
-              accessibilityLabel="About the puzzles to review"
+              accessibilityLabel={t("sprintResult.aboutReviewInfoA11y")}
               accessibilityRole="button"
               accessibilityState={{ expanded: infoOpen }}
               style={({ pressed }) => [
@@ -283,7 +286,7 @@ function ReviewArea({
             </Pressable>
           </View>
           <View pointerEvents="none" style={styles.reviewTrailing}>
-            <AppText numberOfLines={1} tone="accent" variant="body">Replay</AppText>
+            <AppText numberOfLines={1} tone="accent" variant="body">{t("common.replay")}</AppText>
             <Icon
               color={theme.colors.text.tertiary}
               name="chevronRight"

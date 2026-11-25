@@ -196,3 +196,34 @@ test("board color schemes and piece set default safely and normalize unknown val
   assert.equal(invalid.darkBoardTheme, "graphite");
   assert.equal(invalid.pieceSet, "default");
 });
+
+test("language defaults to following the system and normalizes supported or unknown values", () => {
+  assert.equal(defaultPracticeSettings().language, "system");
+
+  const legacySettings = {
+    sync: { iCloudEnabled: true },
+    notifications: { reviewReminder: { mode: "smart" as const } }
+  } as PracticeSettings;
+  assert.equal(clonePracticeSettings(legacySettings).language, "system");
+
+  for (const language of ["system", "en", "zh-Hans", "es", "de", "fr", "pt-BR"] as const) {
+    assert.equal(
+      clonePracticeSettings({ ...defaultPracticeSettings(), language }).language,
+      language
+    );
+  }
+  assert.equal(
+    clonePracticeSettings({
+      ...defaultPracticeSettings(),
+      language: "pt-PT" as unknown as "en"
+    }).language,
+    "pt-BR"
+  );
+  assert.equal(
+    clonePracticeSettings({
+      ...defaultPracticeSettings(),
+      language: "ja" as unknown as "en"
+    }).language,
+    "system"
+  );
+});

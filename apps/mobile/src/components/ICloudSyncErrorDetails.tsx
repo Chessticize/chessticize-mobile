@@ -10,6 +10,7 @@ import {
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { AppModal } from "./AppModal.tsx";
 import { makeStyles, useTheme } from "../theme/index.ts";
+import { useTranslation } from "../i18n/index.ts";
 import {
   AppText,
   Badge,
@@ -73,6 +74,7 @@ export function ICloudSyncErrorDetails({
   entryVariant?: "error" | "support";
   presentation: ICloudSyncErrorDetailsPresentation;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const theme = useTheme();
   const rowStyle = useListRowStyle();
@@ -171,7 +173,7 @@ export function ICloudSyncErrorDetails({
       ) {
         return;
       }
-      setPrepareError(error instanceof Error ? error.message : "The support bundle could not be prepared.");
+      setPrepareError(error instanceof Error ? error.message : t("settings.diagnostics.prepareFallbackError"));
       setPanel("export-confirmation");
     }
   }
@@ -191,21 +193,21 @@ export function ICloudSyncErrorDetails({
   }
 
   const modalTitle = panel === "details"
-    ? "iCloud Sync Error"
+    ? t("settings.diagnostics.modalTitleDetails")
     : panel === "export-confirmation"
-      ? "Export Support Diagnostics?"
+      ? t("settings.diagnostics.modalTitleExport")
       : panel === "preparing"
-        ? "Preparing Support Bundle"
+        ? t("settings.diagnostics.modalTitlePreparing")
         : bundleResult?.kind === "partial"
-          ? "Partial Support Bundle Ready"
-          : "Support Bundle Ready";
+          ? t("settings.diagnostics.modalTitlePartial")
+          : t("settings.diagnostics.modalTitleReady");
   const modalBadge = panel === "details"
-    ? "LOCAL DIAGNOSTIC"
+    ? t("settings.diagnostics.badgeLocal")
     : bundleResult?.kind === "partial" && panel === "ready"
-      ? "PARTIAL BUNDLE"
+      ? t("settings.diagnostics.badgePartial")
       : panel === "ready"
-        ? "BUNDLE READY"
-        : "SUPPORT BUNDLE";
+        ? t("settings.diagnostics.badgeReady")
+        : t("settings.diagnostics.badgeSupport");
 
   const statusBadgeTone = panel === "details" || (panel === "ready" && bundleResult?.kind === "partial")
     ? "warning"
@@ -218,8 +220,8 @@ export function ICloudSyncErrorDetails({
     <>
       <Pressable
         accessibilityLabel={entryVariant === "support"
-          ? "Export app diagnostics and progress for support"
-          : `View iCloud sync error details. Last failed ${presentation.occurredAtLabel}.`}
+          ? t("settings.diagnostics.entrySupportA11y")
+          : t("settings.diagnostics.entryErrorA11y", { occurredAt: presentation.occurredAtLabel })}
         accessibilityRole="button"
         onPress={() => {
           visibleRef.current = true;
@@ -243,14 +245,16 @@ export function ICloudSyncErrorDetails({
         />
         <View style={styles.copy}>
           <AppText variant="body">
-            {entryVariant === "support" ? "Export Support Diagnostics" : "View Error Details"}
+            {entryVariant === "support"
+              ? t("settings.diagnostics.entrySupportTitle")
+              : t("settings.diagnostics.entryErrorTitle")}
           </AppText>
           <AppText tone="secondary" variant="footnote">
             {entryVariant === "support"
               ? isAndroidSupportBundle
-                ? "Share a local SQLite snapshot and diagnostic details."
-                : "Share a local database snapshot, iCloud progress records, and diagnostic details."
-              : `Last failed ${presentation.occurredAtLabel}. Copy technical information for support.`}
+                ? t("settings.diagnostics.entrySupportDetailAndroid")
+                : t("settings.diagnostics.entrySupportDetailIos")
+              : t("settings.diagnostics.entryErrorDetail", { occurredAt: presentation.occurredAtLabel })}
           </AppText>
         </View>
         <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
@@ -288,22 +292,22 @@ export function ICloudSyncErrorDetails({
                   <AppText variant="title">{modalTitle}</AppText>
                   <AppText tone="secondary" variant="subheadline">
                     {panel === "details"
-                      ? "These details can help support understand why the last sync failed."
+                      ? t("settings.diagnostics.subtitleDetails")
                       : panel === "export-confirmation"
-                        ? "Create a file you can send to support so the app and sync state can be diagnosed."
+                        ? t("settings.diagnostics.subtitleExport")
                         : panel === "preparing"
                           ? isAndroidSupportBundle
-                            ? "Creating a consistent local SQLite snapshot and checking its integrity."
-                            : "Creating a consistent local database snapshot and a full read-only iCloud progress capture."
+                            ? t("settings.diagnostics.subtitlePreparingAndroid")
+                            : t("settings.diagnostics.subtitlePreparingIos")
                           : isAndroidSupportBundle
-                            ? "Review what was included before opening Android share options."
-                            : "Review what was included before opening the iOS Share Sheet."}
+                            ? t("settings.diagnostics.subtitleReadyAndroid")
+                            : t("settings.diagnostics.subtitleReadyIos")}
                   </AppText>
                 </View>
                 <Pressable
                   accessibilityLabel={entryVariant === "support"
-                    ? "Close support diagnostics"
-                    : "Close iCloud sync error details"}
+                    ? t("settings.diagnostics.closeSupportA11y")
+                    : t("settings.diagnostics.closeErrorA11y")}
                   accessibilityRole="button"
                   onPress={close}
                   style={({ pressed }) => [styles.closeIconButton, pressed ? styles.entryPressed : null]}
@@ -316,22 +320,22 @@ export function ICloudSyncErrorDetails({
               {panel === "details" ? (
                 <>
                   <View style={styles.block}>
-                    <AppText style={styles.label} tone="secondary" variant="caption">WHAT HAPPENED</AppText>
+                    <AppText style={styles.label} tone="secondary" variant="caption">
+                      {t("settings.diagnostics.whatHappened")}
+                    </AppText>
                     <Text selectable style={styles.message} testID="settings-sync-error-message">
                       {presentation.message}
                     </Text>
                   </View>
 
-                  <Note title="Your progress stays private">
-                    Nothing is uploaded. These error details do not include your iCloud account,
-                    ratings, history, puzzles, or saved progress. You choose where to paste them
-                    after copying.
+                  <Note title={t("settings.diagnostics.privacyTitle")}>
+                    {t("settings.diagnostics.privacyBody")}
                   </Note>
 
                   <View style={styles.block}>
-                    <AppText variant="headline">Technical details</AppText>
+                    <AppText variant="headline">{t("settings.diagnostics.technicalDetails")}</AppText>
                     <AppText tone="secondary" variant="footnote">
-                      You can select this text manually if copying is unavailable.
+                      {t("settings.diagnostics.technicalHint")}
                     </AppText>
                     <View style={styles.technicalCard}>
                       <Text
@@ -351,7 +355,7 @@ export function ICloudSyncErrorDetails({
                       tone="positive"
                       variant="footnote"
                     >
-                      Copied. Paste these details into your support message.
+                      {t("settings.diagnostics.copiedMessage")}
                     </AppText>
                   ) : null}
                   {copyState === "failed" ? (
@@ -361,24 +365,25 @@ export function ICloudSyncErrorDetails({
                       tone="negative"
                       variant="footnote"
                     >
-                      Couldn&apos;t copy automatically. Select the technical details above to copy
-                      them manually.
+                      {t("settings.diagnostics.copyFailedMessage")}
                     </AppText>
                   ) : null}
 
                   <View style={styles.actions}>
                     <Button
-                      accessibilityLabel="Close iCloud sync error details"
-                      label="Close"
+                      accessibilityLabel={t("settings.diagnostics.closeErrorA11y")}
+                      label={t("common.close")}
                       stretch
                       testID="settings-sync-error-details-close"
                       variant="secondary"
                       onPress={close}
                     />
                     <Button
-                      accessibilityLabel="Copy iCloud sync error details"
+                      accessibilityLabel={t("settings.diagnostics.copyA11y")}
                       disabled={copyState === "copying"}
-                      label={copyState === "copying" ? "Copying…" : "Copy Error Details"}
+                      label={copyState === "copying"
+                        ? t("settings.diagnostics.copying")
+                        : t("settings.diagnostics.copyButton")}
                       stretch
                       testID="settings-sync-error-copy"
                       onPress={() => {
@@ -389,16 +394,16 @@ export function ICloudSyncErrorDetails({
 
                   {presentation.supportBundle ? (
                     <View style={[styles.block, styles.divided]}>
-                      <AppText variant="headline">Need help reproducing the problem?</AppText>
+                      <AppText variant="headline">{t("settings.diagnostics.reproduceTitle")}</AppText>
                       <AppText tone="secondary" variant="footnote">
                         {isAndroidSupportBundle
-                          ? "Export the local SQLite database and this diagnostic in one support bundle."
-                          : "Export the local database, iCloud progress records, and this diagnostic in one support bundle."}
+                          ? t("settings.diagnostics.reproduceDetailAndroid")
+                          : t("settings.diagnostics.reproduceDetailIos")}
                       </AppText>
                       <Button
-                        accessibilityLabel="Export support diagnostics bundle"
+                        accessibilityLabel={t("settings.diagnostics.exportBundleA11y")}
                         icon="share"
-                        label="Export Support Bundle"
+                        label={t("settings.diagnostics.exportBundleButton")}
                         size="compact"
                         testID="settings-sync-support-bundle-open"
                         variant="secondary"
@@ -414,17 +419,16 @@ export function ICloudSyncErrorDetails({
 
               {panel === "export-confirmation" ? (
                 <>
-                  <Callout icon="warning" title="This bundle contains progress data" tone="warning">
-                    It may include ratings, attempts and history, review queue entries, settings,
-                    run configuration, and timestamps. Review where you send it.
+                  <Callout icon="warning" title={t("settings.diagnostics.containsProgressTitle")} tone="warning">
+                    {t("settings.diagnostics.containsProgressBody")}
                   </Callout>
 
                   <View style={styles.actions}>
                     <Button
                       accessibilityLabel={entryVariant === "support"
-                        ? "Cancel support diagnostics export"
-                        : "Back to iCloud sync error details"}
-                      label={entryVariant === "support" ? "Cancel" : "Back"}
+                        ? t("settings.diagnostics.cancelExportA11y")
+                        : t("settings.diagnostics.backToErrorA11y")}
+                      label={entryVariant === "support" ? t("common.cancel") : t("common.back")}
                       stretch
                       testID="settings-sync-support-bundle-back"
                       variant="secondary"
@@ -437,8 +441,8 @@ export function ICloudSyncErrorDetails({
                       }}
                     />
                     <Button
-                      accessibilityLabel="Prepare support diagnostics bundle"
-                      label="Prepare Support Bundle"
+                      accessibilityLabel={t("settings.diagnostics.prepareA11y")}
+                      label={t("settings.diagnostics.prepareButton")}
                       stretch
                       testID="settings-sync-support-bundle-prepare"
                       onPress={() => {
@@ -448,47 +452,49 @@ export function ICloudSyncErrorDetails({
                   </View>
 
                   <View style={styles.block}>
-                    <AppText variant="headline">Files prepared</AppText>
+                    <AppText variant="headline">{t("settings.diagnostics.filesPrepared")}</AppText>
                     <BundleFile
-                      description="A transactionally consistent snapshot of progress stored on this device."
+                      description={t("settings.diagnostics.fileLocalSqlite")}
                       name="local-progress.sqlite"
                     />
                     {isAndroidSupportBundle ? null : (
                       <BundleFile
-                        description="A full read-only capture of V2 records and deletions, stored as one line-delimited file."
+                        description={t("settings.diagnostics.fileIcloudV2")}
                         name="icloud-progress-v2.ndjson"
                       />
                     )}
                     {isAndroidSupportBundle ? null : (
                       <BundleFile
-                        description="The legacy V1 snapshot, included only during bridging when it exists."
-                        name="icloud-progress-v1.json (optional)"
+                        description={t("settings.diagnostics.fileIcloudV1")}
+                        name={t("settings.diagnostics.fileIcloudV1Name")}
                       />
                     )}
                     <BundleFile
                       description={entryVariant === "support"
                         ? isAndroidSupportBundle
-                          ? "App, Android, database, and progress-protection details."
-                          : "App, database, and sync environment details, plus the latest failure captured in this session."
-                        : "The copyable sync failure details shown above, plus app and sync environment details."}
+                          ? t("settings.diagnostics.fileDiagnosticSupportAndroid")
+                          : t("settings.diagnostics.fileDiagnosticSupportIos")
+                        : t("settings.diagnostics.fileDiagnosticError")}
                       name="diagnostic.txt"
                     />
                     <BundleFile
-                      description={`App and ${isAndroidSupportBundle ? "Android" : "iOS"} versions, database health, timestamps, checksums, and file availability.`}
+                      description={t("settings.diagnostics.fileManifest", {
+                        platform: isAndroidSupportBundle ? "Android" : "iOS"
+                      })}
                       name="manifest.json"
                     />
                   </View>
 
-                  <Note title="Not included">
+                  <Note title={t("settings.diagnostics.notIncludedTitle")}>
                     {isAndroidSupportBundle
-                      ? "Your Google account, credentials, hardware identifiers, and the bundled puzzle pack are not included."
-                      : "Your Apple ID, iCloud credentials, hardware identifiers, and the bundled puzzle pack are not included. The progress data does contain the app-generated sync ID needed to reproduce merge behavior."}
+                      ? t("settings.diagnostics.notIncludedAndroid")
+                      : t("settings.diagnostics.notIncludedIos")}
                   </Note>
 
                   <AppText tone="secondary" variant="footnote">
                     {isAndroidSupportBundle
-                      ? "Nothing is uploaded automatically. After preparation, Android lets you choose where to send the bundle."
-                      : "Nothing is uploaded automatically. After preparation, the iOS Share Sheet lets you choose where to send the bundle."}
+                      ? t("settings.diagnostics.noAutoUploadAndroid")
+                      : t("settings.diagnostics.noAutoUploadIos")}
                   </AppText>
 
                   {prepareError ? (
@@ -498,7 +504,7 @@ export function ICloudSyncErrorDetails({
                       tone="negative"
                       variant="footnote"
                     >
-                      {prepareError} Try again, or copy the error details instead.
+                      {t("settings.diagnostics.prepareErrorHint", { error: prepareError })}
                     </AppText>
                   ) : null}
                 </>
@@ -511,10 +517,9 @@ export function ICloudSyncErrorDetails({
                   testID="settings-sync-support-bundle-preparing"
                 >
                   <ActivityIndicator color={theme.colors.accent.s600} size="large" />
-                  <AppText variant="headline">Preparing files…</AppText>
+                  <AppText variant="headline">{t("settings.diagnostics.preparingFiles")}</AppText>
                   <AppText style={styles.centered} tone="secondary" variant="footnote">
-                    Keep Chessticize open. Your data stays on this device until you choose a share
-                    destination.
+                    {t("settings.diagnostics.preparingBody")}
                   </AppText>
                 </View>
               ) : null}
@@ -526,20 +531,20 @@ export function ICloudSyncErrorDetails({
                       icon="warning"
                       testID="settings-sync-support-bundle-partial"
                       title={isAndroidSupportBundle
-                        ? "Local SQLite snapshot couldn't be included"
-                        : "iCloud progress capture couldn't be completed"}
+                        ? t("settings.diagnostics.partialTitleAndroid")
+                        : t("settings.diagnostics.partialTitleIos")}
                       tone="warning"
                     >
                       <AppText tone="secondary" variant="footnote">
                         {bundleResult.unavailableReason
                           ?? (isAndroidSupportBundle
-                            ? "The local progress snapshot was unavailable."
-                            : "CloudKit did not return a complete progress capture.")}
+                            ? t("settings.diagnostics.partialReasonAndroid")
+                            : t("settings.diagnostics.partialReasonIos"))}
                       </AppText>
                       <AppText tone="secondary" variant="footnote">
                         {isAndroidSupportBundle
-                          ? "The diagnostic and manifest can still help, but this bundle does not include the local progress database needed for reproduction."
-                          : "The local database and diagnostic can still help, but this bundle is not a complete reproduction."}
+                          ? t("settings.diagnostics.partialDetailAndroid")
+                          : t("settings.diagnostics.partialDetailIos")}
                       </AppText>
                     </Callout>
                   ) : (
@@ -547,22 +552,24 @@ export function ICloudSyncErrorDetails({
                       icon="check"
                       testID="settings-sync-support-bundle-complete"
                       title={isAndroidSupportBundle
-                        ? "Android diagnostics bundle ready"
-                        : "Complete reproduction bundle"}
+                        ? t("settings.diagnostics.completeTitleAndroid")
+                        : t("settings.diagnostics.completeTitleIos")}
                       tone="positive"
                     >
                       {isAndroidSupportBundle
-                        ? "The consistent local SQLite snapshot and diagnostic details are included."
-                        : "The local database and a complete read-only V2 CloudKit capture are included."}
+                        ? t("settings.diagnostics.completeDetailAndroid")
+                        : t("settings.diagnostics.completeDetailIos")}
                     </Callout>
                   )}
 
                   <View style={styles.actions}>
                     <Button
                       accessibilityLabel={entryVariant === "support"
-                        ? "Close support diagnostics"
-                        : "Back to iCloud sync error details"}
-                      label={entryVariant === "support" ? "Close" : "Back to Details"}
+                        ? t("settings.diagnostics.closeSupportA11y")
+                        : t("settings.diagnostics.backToErrorA11y")}
+                      label={entryVariant === "support"
+                        ? t("common.close")
+                        : t("settings.diagnostics.backToDetails")}
                       stretch
                       testID="settings-sync-support-bundle-details"
                       variant="secondary"
@@ -575,16 +582,16 @@ export function ICloudSyncErrorDetails({
                       }}
                     />
                     <Button
-                      accessibilityLabel="Share support diagnostics bundle"
+                      accessibilityLabel={t("settings.diagnostics.shareA11y")}
                       disabled={shareBusy}
                       icon="share"
                       label={shareState === "sharing"
-                        ? "Opening…"
+                        ? t("settings.diagnostics.shareOpening")
                         : shareState === "shared"
                           ? isAndroidSupportBundle
-                            ? "Share Options Opened"
-                            : "Bundle Removed"
-                          : "Share Support Bundle"}
+                            ? t("settings.diagnostics.shareOpenedAndroid")
+                            : t("settings.diagnostics.shareRemovedIos")
+                          : t("settings.diagnostics.shareButton")}
                       stretch
                       testID="settings-sync-support-bundle-share"
                       onPress={() => {
@@ -594,7 +601,7 @@ export function ICloudSyncErrorDetails({
                   </View>
 
                   <View style={styles.block}>
-                    <AppText variant="headline">Included files</AppText>
+                    <AppText variant="headline">{t("settings.diagnostics.includedFiles")}</AppText>
                     {bundleResult.files.map((file) => (
                       <View key={file} style={styles.readyFileRow}>
                         <Icon color={theme.colors.positive.s600} name="check" size={15} weight="semibold" />
@@ -603,10 +610,10 @@ export function ICloudSyncErrorDetails({
                     ))}
                   </View>
 
-                  <Note title="You control the handoff">
+                  <Note title={t("settings.diagnostics.handoffTitle")}>
                     {isAndroidSupportBundle
-                      ? "The next action asks Android to open its share options. Chessticize does not choose a recipient or upload the bundle."
-                      : "The next action asks iOS to open its Share Sheet. Chessticize does not choose a recipient or upload the bundle."}
+                      ? t("settings.diagnostics.handoffAndroid")
+                      : t("settings.diagnostics.handoffIos")}
                   </Note>
 
                   {shareState === "shared" ? (
@@ -617,8 +624,8 @@ export function ICloudSyncErrorDetails({
                       variant="footnote"
                     >
                       {isAndroidSupportBundle
-                        ? "Android share options opened. The temporary bundle expires automatically."
-                        : "Share Sheet closed. The temporary bundle was removed."}
+                        ? t("settings.diagnostics.sharedAndroid")
+                        : t("settings.diagnostics.sharedIos")}
                     </AppText>
                   ) : null}
                   {shareState === "failed" ? (
@@ -629,8 +636,8 @@ export function ICloudSyncErrorDetails({
                       variant="footnote"
                     >
                       {isAndroidSupportBundle
-                        ? "Android share options couldn't be opened. Your prepared bundle remains available while this window is open."
-                        : "The Share Sheet couldn't be opened. Your prepared bundle remains available while this window is open."}
+                        ? t("settings.diagnostics.shareFailedAndroid")
+                        : t("settings.diagnostics.shareFailedIos")}
                     </AppText>
                   ) : null}
                 </>

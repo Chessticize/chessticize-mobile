@@ -4,7 +4,8 @@
 // turns it into the screen's copy. The score, the best and the end reason come
 // from @chessticize/core and storage; this module only formats them.
 
-import type { SprintState } from "../../../../packages/core/src/index.ts";
+import type { SprintState, SupportedLocale } from "../../../../packages/core/src/index.ts";
+import { formatNumberForLocale, getActiveLocale, translate } from "../i18n/translate.ts";
 import type { ResultStat } from "./resultStat.ts";
 
 export type SurvivalResultData = {
@@ -57,17 +58,18 @@ const DOT = " · ";
 // break opportunity.
 const WORD_JOINER = "⁠";
 
-function plural(count: number, one: string, many: string): string {
-  return `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;
-}
-
 function levelLabel(level: SurvivalResultData["level"], unbreakable = false): string {
   const dash = unbreakable ? `${WORD_JOINER}–${WORD_JOINER}` : "–";
   return `${level.minRating}${dash}${level.maxRating}`;
 }
 
-function challengeTypeLabel(challengeType: SurvivalResultData["challengeType"]): string {
-  return challengeType === "arrow_duel" ? "Arrow Duel" : "Puzzle";
+function challengeTypeLabel(
+  challengeType: SurvivalResultData["challengeType"],
+  locale: SupportedLocale
+): string {
+  return challengeType === "arrow_duel"
+    ? translate(locale, "common.arrowDuel")
+    : translate(locale, "common.puzzle");
 }
 
 /** Active time as m:ss, or h:mm:ss from one hour. */
@@ -81,15 +83,15 @@ export function formatActiveTime(elapsedMs: number): string {
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function spokenActiveTime(elapsedMs: number): string {
+function spokenActiveTime(elapsedMs: number, locale: SupportedLocale): string {
   const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor(seconds / 60) % 60;
   const rest = seconds % 60;
   return [
-    hours > 0 ? plural(hours, "hour", "hours") : null,
-    minutes > 0 ? plural(minutes, "minute", "minutes") : null,
-    rest > 0 || seconds === 0 ? plural(rest, "second", "seconds") : null
+    hours > 0 ? translate(locale, "common.hoursCount", { count: hours }) : null,
+    minutes > 0 ? translate(locale, "common.minutesCount", { count: minutes }) : null,
+    rest > 0 || seconds === 0 ? translate(locale, "common.secondsCount", { count: rest }) : null
   ].filter((part): part is string => part !== null).join(" ");
 }
 
@@ -133,79 +135,96 @@ export function survivalResultHapticIntent(data: SurvivalResultData): "success" 
   return data.endReason === "max_mistakes" ? "warning" : null;
 }
 
-export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultPresentation {
+export function presentSurvivalResult(
+  data: SurvivalResultData,
+  locale: SupportedLocale = getActiveLocale()
+): SurvivalResultPresentation {
   const isPerfectClear = data.endReason === "pool_cleared";
   const level = levelLabel(data.level);
-  const typeLabel = challengeTypeLabel(data.challengeType);
-  const scoreLabel = data.score.toLocaleString("en-US");
+  const typeLabel = challengeTypeLabel(data.challengeType, locale);
+  const scoreLabel = formatNumberForLocale(data.score, locale);
   const attempts = data.score + data.mistakeCount;
   const accuracy = Math.round((data.score / Math.max(1, attempts)) * 100);
   const activeTime = formatActiveTime(data.activeElapsedMs);
   const previousBest = data.previousBestScore;
   const comparison = previousBest === null
-    ? "First score at this level"
+    ? translate(locale, "survival.result.firstScore")
     : data.isNewBest
-      ? `Previous best ${previousBest.toLocaleString("en-US")}`
-      : `${Math.max(0, previousBest - data.score).toLocaleString("en-US")} short of best ${previousBest.toLocaleString("en-US")}`;
+      ? translate(locale, "survival.result.previousBest", {
+          score: formatNumberForLocale(previousBest, locale)
+        })
+      : translate(locale, "survival.result.shortOfBest", {
+          delta: formatNumberForLocale(Math.max(0, previousBest - data.score), locale),
+          best: formatNumberForLocale(previousBest, locale)
+        });
 
   const outcome = (range: string) => isPerfectClear
-    ? `Perfect clear at ${range}`
+    ? translate(locale, "survival.result.perfectClear", { range })
     : data.isNewBest
-      ? `New best at ${range}`
-      : "Run complete";
+      ? translate(locale, "survival.result.newBestAt", { range })
+      : translate(locale, "survival.result.runComplete");
 
   return {
-    title: `${typeLabel} Result`,
+    title: translate(locale, "survival.result.title", { type: typeLabel }),
     tone: data.isNewBest ? "best" : "neutral",
     outcomeLabel: outcome(level),
     outcomeDisplay: outcome(levelLabel(data.level, true)),
     scoreLabel,
-    scoreAccessibilityLabel: `${scoreLabel} solved`,
+    scoreAccessibilityLabel: translate(locale, "session.status.solvedCount", { count: scoreLabel }),
     // Like the in-Run meter, the bar shows the way to the standing best and
     // gives way once the best is passed.
     progressTowardBest: !data.isNewBest && previousBest !== null && previousBest > 0
       ? Math.min(1, Math.max(0, data.score / previousBest))
       : null,
     comparison,
-    summaryParts: [`${attempts.toLocaleString("en-US")} attempted`, `${accuracy}% accuracy`],
+    summaryParts: [
+      translate(locale, "sprintResult.attemptedCount", { count: formatNumberForLocale(attempts, locale) }),
+      translate(locale, "sprintResult.accuracyPercent", { percent: accuracy })
+    ],
     endReasonLines: isPerfectClear
       ? [
-          `You cleared every available ${typeLabel} in this level.`,
-          "Loading and selection errors never count as a clear."
+          translate(locale, "survival.result.perfectClearLine1", { type: typeLabel }),
+          translate(locale, "survival.result.perfectClearLine2")
         ]
       : [],
     levelTitle: `${typeLabel}${DOT}${level}`,
     // A no-break space keeps the separator with the range when the row wraps.
-    levelTitleDisplay: `${typeLabel} · ${levelLabel(data.level, true)}`,
+    levelTitleDisplay: `${typeLabel} ·\u00A0${levelLabel(data.level, true)}`,
     stats: [
       {
         key: "time",
-        label: "Active time",
+        label: translate(locale, "survival.result.activeTimeLabel"),
         value: activeTime,
         valueTone: "primary",
-        accessibilityLabel: `Active time ${spokenActiveTime(data.activeElapsedMs)}`
+        accessibilityLabel: translate(locale, "survival.result.activeTimeA11y", {
+          duration: spokenActiveTime(data.activeElapsedMs, locale)
+        })
       },
       {
         key: "streak",
-        label: "Best streak",
-        value: data.bestStreak.toLocaleString("en-US"),
+        label: translate(locale, "common.bestStreak"),
+        value: formatNumberForLocale(data.bestStreak, locale),
         valueTone: "primary",
-        accessibilityLabel: `Best streak ${data.bestStreak}`
+        accessibilityLabel: translate(locale, "sprintResult.bestStreakA11y", { count: data.bestStreak })
       },
       {
         key: "sittings",
-        label: "Sittings",
-        value: data.sittings.toLocaleString("en-US"),
+        label: translate(locale, "survival.result.sittingsLabel"),
+        value: formatNumberForLocale(data.sittings, locale),
         valueTone: "primary",
-        accessibilityLabel: plural(data.sittings, "sitting", "sittings")
+        accessibilityLabel: translate(locale, "common.sittingsCount", { count: data.sittings })
       }
     ],
     review: data.mistakeCount > 0
       ? {
           count: data.mistakeCount,
-          accessibilityLabel: `In Review, ${plural(data.mistakeCount, "mistake", "mistakes")}`
+          accessibilityLabel: translate(locale, "survival.result.inReviewA11y", {
+            mistakes: translate(locale, "common.mistakesCount", { count: data.mistakeCount })
+          })
         }
       : null,
-    replayMistakesLabel: `Replay ${plural(data.mistakeCount, "mistake", "mistakes")}`
+    replayMistakesLabel: translate(locale, "sprintResult.replayMistakes", {
+      mistakes: translate(locale, "common.mistakesCount", { count: data.mistakeCount })
+    })
   };
 }

@@ -15,11 +15,19 @@ import type {
   HistoryStrengthSeries,
   HistoryWeaknessEffect
 } from "./historyProgressPresentation.ts";
+import { customThemeLabel } from "./practice/shared/themeCatalog.ts";
+import {
+  formatDateForLocale,
+  getActiveLocale,
+  type SupportedLocale,
+  translate
+} from "../i18n/index.ts";
 
 const MAX_VISIBLE_PROGRESS_THEMES = 8;
 
 export function historyProgressPresentationFromModel(
-  progress: TacticalProfileProgress
+  progress: TacticalProfileProgress,
+  locale: SupportedLocale = getActiveLocale()
 ): HistoryProgressPresentation | undefined {
   if (progress.phase === "building") {
     return undefined;
@@ -46,7 +54,8 @@ export function historyProgressPresentationFromModel(
         strengthSeries(
           estimate,
           kind,
-          progress.snapshots
+          progress.snapshots,
+          locale
         )
       );
     });
@@ -54,7 +63,7 @@ export function historyProgressPresentationFromModel(
     .filter((signal) => signal.status === "recommended")
     .sort(compareWeaknessSignals)[0];
   const weakness = weaknessSignal
-    ? weaknessPresentation(weaknessSignal, wellSampled)
+    ? weaknessPresentation(weaknessSignal, wellSampled, locale)
     : undefined;
   const initialSeriesId =
     strengths.find((series) =>
@@ -66,19 +75,18 @@ export function historyProgressPresentationFromModel(
 
   return {
     assurance: progress.assurance,
-    periodLabel: periodLabel(progress.periodStart, progress.periodEnd),
-    sampleLabel: "ordinary mixed Runs",
-    sampleUnitLabel: "model-weighted observations",
+    periodLabel: periodLabel(progress.periodStart, progress.periodEnd, locale),
+    sampleLabel: translate(locale, "history.progress.sampleLabel"),
+    sampleUnitLabel: translate(locale, "history.progress.sampleUnitLabel"),
     initialSeriesId,
     strengths,
     ...(weakness === undefined ? {} : { weakness }),
     ...(progress.phase === "balanced"
-      ? balancedPresentation(observed)
+      ? balancedPresentation(observed, locale)
       : {
           noWeaknessTone: "collecting",
-          noWeaknessTitle: "Still collecting evidence",
-          noWeaknessLabel:
-            "Play more ordinary mixed Runs to build reliable stats across different puzzles and sessions."
+          noWeaknessTitle: translate(locale, "history.progress.collectingTitle"),
+          noWeaknessLabel: translate(locale, "history.progress.collectingBody")
         })
   };
 }
@@ -102,7 +110,8 @@ function visibleProgressEstimates(
 function strengthSeries(
   current: TacticalProfileThemeEstimate,
   kind: Exclude<TacticalFocusReason, "both">,
-  snapshots: readonly TacticalProfileProgressSnapshot[]
+  snapshots: readonly TacticalProfileProgressSnapshot[],
+  locale: SupportedLocale
 ): HistoryStrengthSeries {
   const points = snapshots.map((snapshot) => {
     const estimate = snapshot.estimates.find(
@@ -111,20 +120,19 @@ function strengthSeries(
         candidate.theme === current.theme
     );
     if (!estimate) {
-      return unavailableProgressPoint(snapshot.asOf);
+      return unavailableProgressPoint(snapshot.asOf, locale);
     }
-    const point = progressPoint(snapshot.asOf, estimate, kind);
-    return point ?? unavailableProgressPoint(snapshot.asOf);
+    const point = progressPoint(snapshot.asOf, estimate, kind, locale);
+    return point ?? unavailableProgressPoint(snapshot.asOf, locale);
   });
   const availablePoints = points.filter((point) => !point.unavailable);
   const first = availablePoints[0];
   const latest = availablePoints.at(-1);
-  const themeLabel = humanizeTheme(current.theme);
-  const label = themeLabel;
+  const label = localizedThemeName(current.theme, locale);
   const change = first && latest
-    ? changePresentation(kind, first.value, latest.value)
+    ? changePresentation(kind, first.value, latest.value, locale)
     : {
-        label: "No comparison yet",
+        label: translate(locale, "history.progress.noComparisonYet"),
         tone: "steady" as const
       };
   const maxValue = Math.max(
@@ -139,26 +147,26 @@ function strengthSeries(
     label,
     kind,
     metricLabel: kind === "completed_speed"
-      ? "Solve time · lower is better"
-      : "Accuracy · higher is better",
+      ? translate(locale, "history.progress.metricSolveTimeDirection")
+      : translate(locale, "history.progress.metricAccuracyDirection"),
     baselineLabel: kind === "completed_speed"
-      ? "1.00× matches your comparable completed puzzles"
-      : "Recent attempts and stronger theme matches contribute more to n",
+      ? translate(locale, "history.progress.baselineSpeed")
+      : translate(locale, "history.progress.baselineAccuracy"),
     scaleMax: kind === "completed_speed"
       ? Math.max(100, Math.ceil(maxValue * 1.15))
       : 100,
     changeLabel: change.label,
     changeTone: change.tone,
     summary: kind === "completed_speed"
-      ? "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
-      : "Wrong moves and timeouts count as misses.",
+      ? translate(locale, "history.progress.summarySpeed")
+      : translate(locale, "history.progress.summaryAccuracy"),
     points
   };
 }
 
-function unavailableProgressPoint(asOf: string): HistoryProgressPoint {
+function unavailableProgressPoint(asOf: string, locale: SupportedLocale): HistoryProgressPoint {
   return {
-    label: shortUtcDate(asOf),
+    label: shortUtcDate(asOf, locale),
     value: 0,
     valueLabel: "—",
     sampleSize: 0,
@@ -169,7 +177,8 @@ function unavailableProgressPoint(asOf: string): HistoryProgressPoint {
 function progressPoint(
   asOf: string,
   estimate: TacticalProfileThemeEstimate,
-  kind: Exclude<TacticalFocusReason, "both">
+  kind: Exclude<TacticalFocusReason, "both">,
+  locale: SupportedLocale
 ): HistoryProgressPoint | undefined {
   const evidenceWeight = kind === "completed_speed"
     ? estimate.speedEvidenceWeight
@@ -179,7 +188,7 @@ function progressPoint(
   }
   if (kind === "completed_speed") {
     return {
-      label: shortUtcDate(asOf),
+      label: shortUtcDate(asOf, locale),
       value: 100 * estimate.completedTimeMultiplier,
       valueLabel: `${estimate.completedTimeMultiplier.toFixed(2)}×`,
       sampleSize: Math.max(1, Math.round(evidenceWeight))
@@ -187,7 +196,7 @@ function progressPoint(
   }
   const accuracyPercent = 100 * estimate.observedSolveRate;
   return {
-    label: shortUtcDate(asOf),
+    label: shortUtcDate(asOf, locale),
     value: accuracyPercent,
     valueLabel: `${Math.round(accuracyPercent)}%`,
     sampleSize: Math.max(1, Math.round(evidenceWeight))
@@ -196,32 +205,38 @@ function progressPoint(
 
 function weaknessPresentation(
   signal: TacticalProfileModelSignal,
-  wellSampled: readonly TacticalProfileThemeEstimate[]
+  wellSampled: readonly TacticalProfileThemeEstimate[],
+  locale: SupportedLocale
 ): HistoryProgressWeakness {
-  const label = `${humanizeTheme(signal.theme)} · ${taskFamilyLabel(signal.taskFamily)}`;
+  const label = `${localizedThemeName(signal.theme, locale)} · ${taskFamilyLabel(signal.taskFamily, locale)}`;
   const effects: HistoryWeaknessEffect[] = [];
   if (signal.reason === "solve_rate" || signal.reason === "both") {
     effects.push({
       kind: "solve_rate",
-      valueLabel: `${Math.round(signal.expectedFailuresPer100)} extra misses`,
-      metricLabel: "per 100 comparable puzzles",
+      valueLabel: translate(locale, "history.progress.extraMisses", {
+        count: Math.round(signal.expectedFailuresPer100)
+      }),
+      metricLabel: translate(locale, "history.progress.per100Puzzles"),
       comparisonLabel: relativeComparisonLabel(
         signal,
         wellSampled,
-        "solve_rate"
+        "solve_rate",
+        locale
       )
     });
   }
   if (signal.reason === "completed_speed" || signal.reason === "both") {
     effects.push({
       kind: "completed_speed",
-      valueLabel:
-        `${signal.completedTimeMultiplier.toFixed(2)}× comparable time`,
-      metricLabel: "on correctly completed puzzles",
+      valueLabel: translate(locale, "history.progress.comparableTime", {
+        multiplier: signal.completedTimeMultiplier.toFixed(2)
+      }),
+      metricLabel: translate(locale, "history.progress.onCompletedPuzzles"),
       comparisonLabel: relativeComparisonLabel(
         signal,
         wellSampled,
-        "completed_speed"
+        "completed_speed",
+        locale
       )
     });
   }
@@ -230,19 +245,20 @@ function weaknessPresentation(
     label,
     reason: signal.reason,
     effects,
-    evidenceLabel:
-      `${signal.distinctPuzzleCount} different puzzles · ${signal.distinctSessionCount} sessions`,
-    explanation:
-      "This is the highest-confidence current model gap that passes the evidence, practical-impact, and diversity checks. One unusual attempt is not enough.",
-    eligibilityLabel:
-      "Correct attempts count once as solve successes. Wrong moves and timeouts count once as solve failures. Completed speed uses only correct, before-timeout attempts with reliable elapsed time and appears only after enough personal controls that exclude the theme being measured. Slow, Unclear, and Review membership do not decide the result."
+    evidenceLabel: translate(locale, "history.progress.weaknessEvidence", {
+      puzzles: signal.distinctPuzzleCount,
+      sessions: signal.distinctSessionCount
+    }),
+    explanation: translate(locale, "history.progress.weaknessExplanation"),
+    eligibilityLabel: translate(locale, "history.progress.weaknessEligibility")
   };
 }
 
 function relativeComparisonLabel(
   signal: TacticalProfileModelSignal,
   wellSampled: readonly TacticalProfileThemeEstimate[],
-  kind: Exclude<TacticalFocusReason, "both">
+  kind: Exclude<TacticalFocusReason, "both">,
+  locale: SupportedLocale
 ): string {
   const peers = wellSampled.filter(
     (estimate) =>
@@ -264,27 +280,32 @@ function relativeComparisonLabel(
         : estimate.completedTimeMultiplier
     ) < currentValue
   );
+  const themeName = localizedThemeName(signal.theme, locale);
   if (kind === "completed_speed") {
     const slowerPercent = Math.max(
       0,
       Math.round(100 * (signal.completedTimeMultiplier - 1))
     );
-    const comparison =
-      `${humanizeTheme(signal.theme)} takes about ${slowerPercent}% longer than your comparable completed puzzles after accounting for relative Rating difficulty, decision count, Run pace, Slow policy, and Timeout policy`;
-    return peersAreCloser
-      ? `${comparison}; the other well-sampled themes in this task family are closer to their personal baselines.`
-      : `${comparison}. It is the highest-confidence current speed weakness among the well-sampled themes.`;
+    return translate(
+      locale,
+      peersAreCloser
+        ? "history.progress.speedComparePeersCloser"
+        : "history.progress.speedCompareHighest",
+      { theme: themeName, percent: slowerPercent }
+    );
   }
-  const modelContext =
-    "after matching puzzle difficulty, your Rating, and task family";
-  if (peersAreCloser) {
-    return `${humanizeTheme(signal.theme)} stands farther from its matched expectation ${modelContext}; the other well-sampled themes in this task family are closer to theirs.`;
-  }
-  return `${humanizeTheme(signal.theme)} stands out ${modelContext}. It is the highest-confidence current weakness signal among the well-sampled themes, each measured against its own matched expectation.`;
+  return translate(
+    locale,
+    peersAreCloser
+      ? "history.progress.solveComparePeersCloser"
+      : "history.progress.solveCompareHighest",
+    { theme: themeName }
+  );
 }
 
 function balancedPresentation(
-  estimates: readonly TacticalProfileThemeEstimate[]
+  estimates: readonly TacticalProfileThemeEstimate[],
+  locale: SupportedLocale
 ): Pick<
   HistoryProgressPresentation,
   "noWeaknessTone" | "noWeaknessTitle" | "noWeaknessLabel"
@@ -295,35 +316,32 @@ function balancedPresentation(
   const hasSpeed = estimates.some(
     (estimate) => estimate.speedEvidenceWeight > 0
   );
+  const title = translate(locale, "history.progress.balancedTitle");
   if (hasAccuracy && hasSpeed) {
     return {
       noWeaknessTone: "balanced",
-      noWeaknessTitle: "Recent play looks balanced",
-      noWeaknessLabel:
-        "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
+      noWeaknessTitle: title,
+      noWeaknessLabel: translate(locale, "history.progress.balancedBoth")
     };
   }
   if (hasAccuracy) {
     return {
       noWeaknessTone: "balanced",
-      noWeaknessTitle: "Recent play looks balanced",
-      noWeaknessLabel:
-        "No theme currently shows a repeated, meaningful accuracy weakness. Solve time is unavailable until there are enough comparable completed puzzles."
+      noWeaknessTitle: title,
+      noWeaknessLabel: translate(locale, "history.progress.balancedAccuracyOnly")
     };
   }
   if (hasSpeed) {
     return {
       noWeaknessTone: "balanced",
-      noWeaknessTitle: "Recent play looks balanced",
-      noWeaknessLabel:
-        "No theme currently shows a repeated, meaningful solve-time weakness. Accuracy is unavailable until there is enough attempt evidence."
+      noWeaknessTitle: title,
+      noWeaknessLabel: translate(locale, "history.progress.balancedSpeedOnly")
     };
   }
   return {
     noWeaknessTone: "balanced",
-    noWeaknessTitle: "Recent play looks balanced",
-    noWeaknessLabel:
-      "Accuracy and solve time are unavailable until there is enough mixed-practice evidence."
+    noWeaknessTitle: title,
+    noWeaknessLabel: translate(locale, "history.progress.balancedNeither")
   };
 }
 
@@ -421,7 +439,8 @@ function weaknessConfidence(
 function changePresentation(
   kind: Exclude<TacticalFocusReason, "both">,
   first: number,
-  latest: number
+  latest: number,
+  locale: SupportedLocale
 ): {
   label: string;
   tone: HistoryStrengthSeries["changeTone"];
@@ -431,23 +450,23 @@ function changePresentation(
   if (delta <= -meaningfulDelta) {
     return {
       label: kind === "completed_speed"
-        ? `${Math.round(Math.abs(delta))}% less time`
-        : `${Math.round(Math.abs(delta))} points lower`,
+        ? translate(locale, "history.progress.changeLessTime", { percent: Math.round(Math.abs(delta)) })
+        : translate(locale, "history.progress.changePointsLower", { points: Math.round(Math.abs(delta)) }),
       tone: kind === "completed_speed" ? "improved" : "worsened"
     };
   }
   if (delta >= meaningfulDelta) {
     return {
       label: kind === "completed_speed"
-        ? `${Math.round(delta)}% more time`
-        : `${Math.round(delta)} points higher`,
+        ? translate(locale, "history.progress.changeMoreTime", { percent: Math.round(delta) })
+        : translate(locale, "history.progress.changePointsHigher", { points: Math.round(delta) }),
       tone: kind === "completed_speed" ? "worsened" : "improved"
     };
   }
   return {
     label: kind === "completed_speed"
-      ? "Time is steady"
-      : "Accuracy is steady",
+      ? translate(locale, "history.progress.changeTimeSteady")
+      : translate(locale, "history.progress.changeAccuracySteady"),
     tone: "steady"
   };
 }
@@ -459,42 +478,35 @@ function signalId(input: {
   return `${input.taskFamily}:${input.theme}`;
 }
 
-function taskFamilyLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return taskFamily === "arrow_duel" ? "Arrow Duel" : "Puzzle solving";
+function taskFamilyLabel(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "common.arrowDuel")
+    : translate(locale, "history.progress.taskFamilyLine");
 }
 
-function humanizeTheme(theme: string): string {
-  const words = theme
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .trim();
-  return words.length === 0
-    ? "Tactical pattern"
-    : words[0]!.toUpperCase() + words.slice(1);
+function localizedThemeName(theme: string, locale: SupportedLocale): string {
+  const trimmed = theme.trim();
+  if (trimmed.length === 0) {
+    return translate(locale, "history.progress.tacticalPatternFallback");
+  }
+  return customThemeLabel(trimmed, locale);
 }
 
-function shortUtcDate(timestamp: string): string {
+function shortUtcDate(timestamp: string, locale: SupportedLocale): string {
   const date = new Date(timestamp);
   if (!Number.isFinite(date.getTime())) {
     return timestamp;
   }
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec"
-  ] as const;
-  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}`;
+  return formatDateForLocale(
+    date,
+    locale,
+    { month: "short", day: "numeric", timeZone: "UTC" }
+  );
 }
 
-function periodLabel(start: string, end: string): string {
-  return `${shortUtcDate(start)} – ${shortUtcDate(end)}`;
+function periodLabel(start: string, end: string, locale: SupportedLocale): string {
+  return `${shortUtcDate(start, locale)} – ${shortUtcDate(end, locale)}`;
 }

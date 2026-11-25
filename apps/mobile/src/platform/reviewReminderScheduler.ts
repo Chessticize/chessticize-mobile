@@ -5,9 +5,11 @@ import {
   reviewReminderUsageWindowStart,
   type AttemptEvent,
   type ReviewReminderDecision,
-  type ReviewReminderUsageEntry
+  type ReviewReminderUsageEntry,
+  type SupportedLocale
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import { getActiveLocale, translate } from "../i18n/translate.ts";
 
 export interface ReviewReminderScheduleResult {
   scheduled: boolean;
@@ -186,16 +188,18 @@ export function createNativeReviewReminderNotificationClient(): ReviewReminderNo
 export async function rescheduleReviewReminder(
   service: PracticeService,
   scheduler: ReviewReminderScheduler,
-  now: string | number | Date
+  now: string | number | Date,
+  locale: SupportedLocale = getActiveLocale()
 ): Promise<ReviewReminderDecision | undefined> {
-  const decision = computeReviewReminderDecision(service, now);
+  const decision = computeReviewReminderDecision(service, now, locale);
   await scheduler.replaceNextReminder(decision);
   return decision;
 }
 
 export function computeReviewReminderDecision(
   service: PracticeService,
-  now: string | number | Date
+  now: string | number | Date,
+  locale: SupportedLocale = getActiveLocale()
 ): ReviewReminderDecision | undefined {
   return computeNextReminder(
     service.listReviewQueue(),
@@ -203,7 +207,10 @@ export function computeReviewReminderDecision(
       since: reviewReminderUsageWindowStart(now)
     }) as AttemptEvent[]),
     service.getReviewReminderSettings(),
-    now
+    now,
+    {
+      formatBody: (dueCount) => translate(locale, "notifications.reviewReminderBody", { count: dueCount })
+    }
   );
 }
 

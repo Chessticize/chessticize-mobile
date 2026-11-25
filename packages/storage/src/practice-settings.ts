@@ -1,7 +1,9 @@
 import {
   defaultSprintGuideProgress,
+  normalizeLanguagePreference,
   parseReleaseVersion,
   type ArrowDuelReplyCueStage,
+  type LanguagePreference,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
 import {
@@ -26,6 +28,7 @@ export function defaultPracticeSettings(): PracticeSettings {
     lightBoardTheme: DEFAULT_LIGHT_BOARD_THEME,
     darkBoardTheme: DEFAULT_DARK_BOARD_THEME,
     pieceSet: DEFAULT_PIECE_SET,
+    language: "system",
     sync: {
       iCloudEnabled: true
     },
@@ -51,6 +54,7 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
     lightBoardTheme: normalizeBoardTheme(settings.lightBoardTheme, DEFAULT_LIGHT_BOARD_THEME),
     darkBoardTheme: normalizeBoardTheme(settings.darkBoardTheme, DEFAULT_DARK_BOARD_THEME),
     pieceSet: normalizePieceSet(settings.pieceSet),
+    language: normalizeLanguagePreference(settings.language),
     ...whatsNewSeenVersionField(settings.whatsNewSeenVersion),
     sync: {
       iCloudEnabled: settings.sync.iCloudEnabled
@@ -83,6 +87,7 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
     lightBoardTheme: normalizeBoardTheme(settings.lightBoardTheme, DEFAULT_LIGHT_BOARD_THEME),
     darkBoardTheme: normalizeBoardTheme(settings.darkBoardTheme, DEFAULT_DARK_BOARD_THEME),
     pieceSet: normalizePieceSet(settings.pieceSet),
+    language: normalizeLanguagePreference(settings.language),
     ...whatsNewSeenVersionField(settings.whatsNewSeenVersion),
     sync: {
       iCloudEnabled: Boolean(settings.sync.iCloudEnabled)
@@ -128,6 +133,8 @@ export function isChessPieceSetId(value: unknown): value is ChessPieceSetId {
 export function normalizePieceSet(value: unknown): ChessPieceSetId {
   return isChessPieceSetId(value) ? value : DEFAULT_PIECE_SET;
 }
+
+export { normalizeLanguagePreference, type LanguagePreference };
 
 /** A recorded What's New version must read as a release version; anything else counts as unrecorded. */
 export function normalizeWhatsNewSeenVersion(value: unknown): string | undefined {

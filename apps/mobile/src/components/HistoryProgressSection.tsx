@@ -17,6 +17,7 @@ import type {
   HistoryProgressWeakness,
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
+import { type SupportedLocale, translate, useTranslation } from "../i18n/index.ts";
 
 export type {
   HistoryProgressPoint,
@@ -31,11 +32,12 @@ export function HistoryProgressEntryButton({
 }: {
   onPress: () => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <Button
-      accessibilityLabel="Open tactical progress"
+      accessibilityLabel={t("history.progress.openA11y")}
       icon="profile"
-      label="Progress"
+      label={t("history.progress.button")}
       size="compact"
       testID="history-progress-button"
       variant="secondary"
@@ -53,6 +55,7 @@ export function HistoryProgressScreen({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { locale, t } = useTranslation();
   const [selectedSeriesId, setSelectedSeriesId] = useState(
     presentation.initialSeriesId
   );
@@ -80,7 +83,7 @@ export function HistoryProgressScreen({
     <View style={styles.screen} testID="history-progress-screen">
       <View style={styles.screenHeader}>
         <Pressable
-          accessibilityLabel="Back to History"
+          accessibilityLabel={t("history.progress.backA11y")}
           accessibilityRole="button"
           hitSlop={4}
           onPress={onBack}
@@ -91,16 +94,16 @@ export function HistoryProgressScreen({
           testID="history-progress-back"
         >
           <Icon color={theme.colors.accent.s600} name="chevronLeft" size={20} weight="semibold" />
-          <AppText tone="accent" variant="body">History</AppText>
+          <AppText tone="accent" variant="body">{t("tabs.history")}</AppText>
         </Pressable>
         <View style={styles.headerCopy}>
-          <AppText accessibilityRole="header" variant="largeTitle">Tactical progress</AppText>
+          <AppText accessibilityRole="header" variant="largeTitle">{t("history.progress.title")}</AppText>
           <AppText tone="secondary" variant="subheadline">
             {presentation.periodLabel} · {presentation.sampleLabel}
           </AppText>
           {presentation.assurance === "provisional" ? (
             <View style={styles.badgeRow}>
-              <Badge label="Early estimate" testID="history-progress-early-estimate" tone="warning" />
+              <Badge label={t("history.progress.earlyEstimate")} testID="history-progress-early-estimate" tone="warning" />
             </View>
           ) : null}
         </View>
@@ -114,10 +117,10 @@ export function HistoryProgressScreen({
           {selectedSeries && taskFamilies.length > 1 ? (
             <View testID="history-progress-task-family-selector">
               <SegmentedControl
-                accessibilityLabel="Choose progress mode"
+                accessibilityLabel={t("history.progress.chooseModeA11y")}
                 options={taskFamilies.map((taskFamily) => ({
                   value: taskFamily,
-                  label: TASK_FAMILY_LABELS[taskFamily],
+                  label: taskFamilyLabel(taskFamily, locale),
                   testID: `history-progress-task-family-${taskFamily}`
                 }))}
                 value={selectedSeries.taskFamily}
@@ -143,7 +146,7 @@ export function HistoryProgressScreen({
                 const selected = series.themeId === selectedSeries?.themeId;
                 return (
                   <Pressable
-                    accessibilityLabel={`Show ${series.label} progress`}
+                    accessibilityLabel={t("history.progress.showThemeA11y", { label: series.label })}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     hitSlop={4}
@@ -174,9 +177,9 @@ export function HistoryProgressScreen({
 
       <View style={styles.card} testID="history-strength-over-time">
         <View style={styles.cardHeader}>
-          <AppText style={styles.eyebrow} tone="accent" variant="footnote">Progress over time</AppText>
+          <AppText style={styles.eyebrow} tone="accent" variant="footnote">{t("history.progress.overTimeEyebrow")}</AppText>
           <AppText variant="title">
-            {selectedSeries?.label ?? "No progress data yet"}
+            {selectedSeries?.label ?? t("history.progress.noDataYet")}
           </AppText>
         </View>
 
@@ -209,7 +212,7 @@ export function HistoryProgressScreen({
               testID="history-progress-chart-note"
             >
               <AppText style={styles.noteTitle} variant="footnote">
-                {progressMetricNoteTitle(selectedSeries.kind)}
+                {progressMetricNoteTitle(selectedSeries.kind, locale)}
               </AppText>
               <AppText tone="secondary" variant="footnote">
                 {selectedSeries.baselineLabel}. {selectedSeries.summary}
@@ -217,7 +220,7 @@ export function HistoryProgressScreen({
             </View>
           </>
         ) : (
-          <AppText tone="secondary" variant="subheadline">No progress data is available yet.</AppText>
+          <AppText tone="secondary" variant="subheadline">{t("history.progress.noDataBody")}</AppText>
         )}
       </View>
 
@@ -259,18 +262,23 @@ function ProgressMetricSelector({
   series: readonly HistoryStrengthSeries[];
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   return (
     <View
-      accessibilityLabel="Progress metric"
+      accessibilityLabel={t("history.progress.metricA11y")}
       style={styles.progressMetricSelector}
       testID="history-progress-metric-selector"
     >
       {series.map((candidate) => {
         const selected = candidate.id === selectedSeriesId;
         const latest = candidate.points.at(-1);
+        const metricLabel = progressMetricLabel(candidate.kind, locale);
         return (
           <Pressable
-            accessibilityLabel={`Show ${progressMetricLabel(candidate.kind)} progress, ${latest?.valueLabel ?? "no data"}`}
+            accessibilityLabel={t("history.progress.showMetricA11y", {
+              label: metricLabel,
+              value: latest?.valueLabel ?? t("history.progress.noDataLower")
+            })}
             accessibilityRole="button"
             accessibilityState={{ selected }}
             key={candidate.id}
@@ -283,7 +291,7 @@ function ProgressMetricSelector({
             testID={`history-progress-metric-${candidate.kind}`}
           >
             <AppText tone={selected ? "accent" : "secondary"} variant="footnote">
-              {progressMetricLabel(candidate.kind)}
+              {metricLabel}
             </AppText>
             <AppText tone={selected ? "accent" : "primary"} variant="numeral">
               {latest?.valueLabel ?? "—"}
@@ -303,13 +311,19 @@ function StrengthTrendChart({
   series: HistoryStrengthSeries;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <View
       accessibilityLabel={`${series.label} ${series.metricLabel}. ${series.points
         .map((point) =>
           point.unavailable
-            ? `${point.label}: unavailable`
-            : `${point.label}: ${point.valueLabel} from ${point.sampleSize} ${sampleUnitLabel}`
+            ? t("history.progress.pointUnavailable", { label: point.label })
+            : t("history.progress.pointValue", {
+                label: point.label,
+                value: point.valueLabel,
+                sampleSize: point.sampleSize,
+                sampleUnit: sampleUnitLabel
+              })
         )
         .join(". ")}`}
       style={styles.chart}
@@ -342,7 +356,7 @@ function StrengthTrendChart({
             <Text
               accessibilityLabel={
                 point.unavailable
-                  ? "Unavailable"
+                  ? t("history.progress.unavailable")
                   : `${point.sampleSize} ${sampleUnitLabel}`
               }
               numberOfLines={1}
@@ -364,14 +378,15 @@ function WeaknessCard({
   weakness: HistoryProgressWeakness;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   return (
     <View style={styles.card} testID="history-clear-weakness">
       <View style={styles.weaknessHeader}>
         <View style={styles.cardHeader}>
-          <AppText style={styles.eyebrow} tone="negative" variant="footnote">Clear weakness</AppText>
+          <AppText style={styles.eyebrow} tone="negative" variant="footnote">{t("history.progress.clearWeaknessEyebrow")}</AppText>
           <AppText variant="title">{weakness.label}</AppText>
         </View>
-        <Badge label={modelSignalLabel(weakness.reason)} tone="negative" />
+        <Badge label={modelSignalLabel(weakness.reason, locale)} tone="negative" />
       </View>
       <View style={styles.weaknessEffects}>
         {weakness.effects.map((effect) => (
@@ -381,7 +396,7 @@ function WeaknessCard({
             testID={`history-weakness-effect-${effect.kind}`}
           >
             <AppText tone="secondary" variant="footnote">
-              {modelSignalLabel(effect.kind)}
+              {modelSignalLabel(effect.kind, locale)}
             </AppText>
             <View style={styles.weaknessMetricRow}>
               <AppText tone="negative" variant="numeral">{effect.valueLabel}</AppText>
@@ -392,46 +407,54 @@ function WeaknessCard({
         ))}
       </View>
       <View style={styles.note}>
-        <AppText style={styles.noteTitle} variant="footnote">Why this stands out</AppText>
+        <AppText style={styles.noteTitle} variant="footnote">{t("history.progress.whyStandsOut")}</AppText>
         <AppText tone="secondary" variant="footnote">{weakness.explanation}</AppText>
         <AppText tone="secondary" variant="caption">{weakness.evidenceLabel}</AppText>
       </View>
       <View style={styles.note}>
-        <AppText style={styles.noteTitle} variant="footnote">How this is measured</AppText>
+        <AppText style={styles.noteTitle} variant="footnote">{t("history.progress.howMeasured")}</AppText>
         <AppText tone="secondary" variant="footnote">{weakness.eligibilityLabel}</AppText>
       </View>
     </View>
   );
 }
 
-function modelSignalLabel(kind: TacticalFocusReason): string {
+function modelSignalLabel(kind: TacticalFocusReason, locale: SupportedLocale): string {
   if (kind === "completed_speed") {
-    return "Completed-puzzle speed";
+    return translate(locale, "history.progress.signalSpeed");
   }
   if (kind === "both") {
-    return "Reliability & speed";
+    return translate(locale, "history.progress.signalBoth");
   }
-  return "Solve reliability";
+  return translate(locale, "history.progress.signalSolveRate");
 }
 
 function progressMetricLabel(
-  kind: Exclude<TacticalFocusReason, "both">
+  kind: Exclude<TacticalFocusReason, "both">,
+  locale: SupportedLocale
 ): string {
-  return kind === "completed_speed" ? "Solve time" : "Accuracy";
+  return kind === "completed_speed"
+    ? translate(locale, "history.progress.metricSolveTime")
+    : translate(locale, "history.progress.metricAccuracy");
 }
 
 function progressMetricNoteTitle(
-  kind: Exclude<TacticalFocusReason, "both">
+  kind: Exclude<TacticalFocusReason, "both">,
+  locale: SupportedLocale
 ): string {
   return kind === "completed_speed"
-    ? "How solve time is counted"
-    : "How accuracy is counted";
+    ? translate(locale, "history.progress.noteTitleSpeed")
+    : translate(locale, "history.progress.noteTitleAccuracy");
 }
 
-const TASK_FAMILY_LABELS = {
-  line: "Puzzle solving",
-  arrow_duel: "Arrow Duel"
-} satisfies Record<TacticalProfileTaskFamily, string>;
+function taskFamilyLabel(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "common.arrowDuel")
+    : translate(locale, "history.progress.taskFamilyLine");
+}
 
 const useStyles = makeStyles((theme) => ({
   screen: {

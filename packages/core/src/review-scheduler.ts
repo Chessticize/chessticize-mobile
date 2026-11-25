@@ -165,11 +165,18 @@ export function isReviewOverdue(
   return reviewDueState(review, now, timeZone) === "overdue";
 }
 
+export interface ReviewDueLabels {
+  dueToday: string;
+  dueTomorrow: string;
+  dueOn: (formattedDate: string) => string;
+}
+
 export function reviewDueLabel(
   review: Pick<ReviewQueueState, "dueDay">,
   now: string | number | Date,
   timeZone?: string,
-  locale?: string
+  locale?: string,
+  labels?: ReviewDueLabels
 ): string {
   const nowDate = now instanceof Date ? new Date(now) : new Date(now);
   if (!Number.isFinite(nowDate.getTime())) {
@@ -177,12 +184,13 @@ export function reviewDueLabel(
   }
   const today = localCalendarDayFor(nowDate, timeZone);
   if (review.dueDay <= today) {
-    return "Due today";
+    return labels?.dueToday ?? "Due today";
   }
   if (review.dueDay === addReviewDays(today, 1)) {
-    return "Due tomorrow";
+    return labels?.dueTomorrow ?? "Due tomorrow";
   }
-  return `Due ${formatReviewDay(review.dueDay, locale ? { locale } : {})}`;
+  const formattedDay = formatReviewDay(review.dueDay, locale ? { locale } : {});
+  return labels ? labels.dueOn(formattedDay) : `Due ${formattedDay}`;
 }
 
 export function reviewDayFor(now: string | number | Date, timeZone?: string): string {

@@ -1,4 +1,5 @@
 import type { SprintSessionGuideStep } from "../../../../packages/core/src/index.ts";
+import { getActiveLocale, translate, type SupportedLocale } from "../i18n/index.ts";
 import type { GuidePlacement } from "./sessionGuideGeometry.ts";
 
 export type SessionGuideStepCopy = {
@@ -18,57 +19,61 @@ export type SessionGuideCopyContext = {
 // screen; the Sprint rules card on Practice Home covers the rest.
 export function sessionGuideStepCopy(
   step: SprintSessionGuideStep,
-  { focusedRun }: SessionGuideCopyContext
+  { focusedRun }: SessionGuideCopyContext,
+  locale: SupportedLocale = getActiveLocale()
 ): SessionGuideStepCopy {
   switch (step) {
     case "session_progress":
       return focusedRun
         ? {
-            detail: "Puzzles done and time so far. There’s no overall time limit.",
+            detail: translate(locale, "guide.sessionProgress.focusedDetail"),
             preferred: ["below", "trailing"],
-            title: "Track your Focused Run"
+            title: translate(locale, "guide.sessionProgress.focusedTitle")
           }
         : {
-            detail: "Puzzles solved, time left and mistakes left. The clock waits until you start.",
+            detail: translate(locale, "guide.sessionProgress.sprintDetail"),
             preferred: ["below", "trailing"],
-            title: "Track your Sprint"
+            title: translate(locale, "guide.sessionProgress.sprintTitle")
           };
     case "slow_timer":
       return {
-        detail: "Keep going. A slow correct answer still counts, but it is marked Unclear.",
+        detail: translate(locale, "guide.slowTimer.detail"),
         preferred: ["above", "below", "leading"],
-        title: "Amber means slow"
+        title: translate(locale, "guide.slowTimer.title")
       };
     case "mark_unclear":
       return {
-        detail: "Tap it after a puzzle if the solution still doesn’t make sense to you.",
+        detail: translate(locale, "guide.markUnclear.detail"),
         preferred: ["above", "leading"],
-        title: "Mark as unclear"
+        title: translate(locale, "guide.markUnclear.title")
       };
     case "arrow_duel_choice":
       return {
-        detail: "Two arrows, two candidate moves. Play the stronger one on the board.",
+        detail: translate(locale, "guide.arrowDuelChoice.detail"),
         preferred: ["trailing", "below", "above", "leading"],
-        title: "Choose the stronger move"
+        title: translate(locale, "guide.arrowDuelChoice.title")
       };
     case "arrow_duel_reply":
       return {
         detail: focusedRun
-          ? "Next we play the other move. Find Black’s best reply in 10 seconds."
-          : "Next we play the other move. Find Black’s best reply in 10 seconds. Sprint time pauses.",
+          ? translate(locale, "guide.arrowDuelReply.focusedDetail")
+          : translate(locale, "guide.arrowDuelReply.sprintDetail"),
         // Same order as the choice step, so both board steps sit in one place.
         preferred: ["trailing", "below", "above", "leading"],
-        title: "Then reply for Black"
+        title: translate(locale, "guide.arrowDuelReply.title")
       };
   }
 }
 
-export function sessionGuideStartLabel({ focusedRun, mode }: SessionGuideCopyContext): string {
+export function sessionGuideStartLabel(
+  { focusedRun, mode }: SessionGuideCopyContext,
+  locale: SupportedLocale = getActiveLocale()
+): string {
   return focusedRun
-    ? "Start Focused Run"
+    ? translate(locale, "guide.startFocusedRun")
     : mode === "arrow_duel"
-      ? "Start Arrow Duel"
-      : "Start Sprint";
+      ? translate(locale, "guide.startArrowDuel")
+      : translate(locale, "guide.startSprint");
 }
 
 // Arrow Duel steps keep their historical container test ID so store-asset and

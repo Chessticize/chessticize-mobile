@@ -1,7 +1,8 @@
 import type { IconName, IconTone } from "../components/ui/iconNames.ts";
+import { getActiveLocale, translate, type SupportedLocale } from "../i18n/index.ts";
 
-// The What's New notes for one release. All user-facing copy lives here so a
-// release edits one file; components render whatever this module returns.
+// The What's New notes for one release. All user-facing copy lives in the i18n
+// catalog; components render whatever this module returns for the active locale.
 
 /** The release these notes describe. The sheet shows once the app runs this version or later. */
 export const WHATS_NEW_RELEASE_VERSION = "1.6.0";
@@ -23,46 +24,46 @@ export interface WhatsNewContent {
   highlights: readonly WhatsNewHighlight[];
 }
 
-const NEW_LOOK: WhatsNewHighlight = {
-  id: "look",
-  icon: "design",
-  tone: "accent",
-  headline: "A fresh new look",
-  detail: "A cleaner design with clearer type and more room for the board."
-};
-
-const DARK_MODE: WhatsNewHighlight = {
-  id: "dark-mode",
-  icon: "darkMode",
-  tone: "warning",
-  headline: "Dark mode",
-  // Non-breaking spaces keep the arrow with its neighbors instead of starting a line.
-  detail: "Follows your system, or choose in Settings\u00A0→\u00A0Appearance."
-};
-
-const NAVIGATION_COPY: Record<WhatsNewPlatform, string> = {
-  ios: "A glass tab bar that fits iPhone, iPad, and iPhone Duo.",
-  android: "A bottom bar on phones and a side rail on tablets and foldables."
-};
-
-export function whatsNewContentFor(platform: WhatsNewPlatform): WhatsNewContent {
+export function whatsNewContentFor(
+  platform: WhatsNewPlatform,
+  locale: SupportedLocale = getActiveLocale()
+): WhatsNewContent {
   return {
     releaseVersion: WHATS_NEW_RELEASE_VERSION,
-    title: "What’s New in Chessticize",
-    continueLabel: "Continue",
+    title: translate(locale, "whatsNew.title"),
+    continueLabel: translate(locale, "whatsNew.continue"),
     highlights: [
-      NEW_LOOK,
+      {
+        id: "look",
+        icon: "design",
+        tone: "accent",
+        headline: translate(locale, "whatsNew.look.headline"),
+        detail: translate(locale, "whatsNew.look.detail")
+      },
       {
         id: "navigation",
         icon: "navigation",
         tone: "positive",
-        headline: "New navigation",
-        detail: NAVIGATION_COPY[platform]
+        headline: translate(locale, "whatsNew.navigation.headline"),
+        detail: platform === "ios"
+          ? translate(locale, "whatsNew.navigation.iosDetail")
+          : translate(locale, "whatsNew.navigation.androidDetail")
       },
-      DARK_MODE
+      {
+        id: "dark-mode",
+        icon: "darkMode",
+        tone: "warning",
+        headline: translate(locale, "whatsNew.darkMode.headline"),
+        detail: translate(locale, "whatsNew.darkMode.detail")
+      }
     ]
   };
 }
 
-/** The Settings row that reopens the latest notes. */
+/** Localized Settings row label that reopens the latest notes. */
+export function whatsNewSettingsLabel(locale: SupportedLocale = getActiveLocale()): string {
+  return translate(locale, "whatsNew.settingsLabel");
+}
+
+/** The Settings row that reopens the latest notes (default English constant retained for compatibility). */
 export const WHATS_NEW_SETTINGS_LABEL = "What’s New";

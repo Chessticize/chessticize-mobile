@@ -7,6 +7,7 @@ import { MoveSideGlyph } from "../shared/Glyphs.tsx";
 import { FABRIC_SAFE_HIDDEN_TEXT_STYLE, formatCompactDuration, modeLabel } from "../shared/practiceUtils.ts";
 import { PRACTICE_FEEDBACK_MAX_TEXT_SCALE, PRACTICE_PROMPT_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
 import { makeStyles } from "../../../theme/index.ts";
+import { useTranslation } from "../../../i18n/index.ts";
 
 export type PreviousAttemptNoticeReason = "slow" | "timed_out" | "wrong";
 
@@ -17,23 +18,24 @@ export function PreviousAttemptNotice({
 }: {
   reason: PreviousAttemptNoticeReason;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const presentation = reason === "slow"
     ? {
-        detail: "It was automatically marked Unclear and added to Review.",
-        status: "Marked Unclear",
-        title: "Previous puzzle took too long"
+        detail: t("session.previousNotice.slowDetail"),
+        status: t("session.previousNotice.slowStatus"),
+        title: t("session.previousNotice.slowTitle")
       }
     : reason === "wrong"
       ? {
-          detail: "It counted as a mistake and was added to Review.",
-          status: "In Review",
-          title: "Previous answer was incorrect"
+          detail: t("session.previousNotice.mistakeDetail"),
+          status: t("session.previousNotice.inReviewStatus"),
+          title: t("session.previousNotice.wrongTitle")
         }
       : {
-          detail: "It counted as a mistake and was added to Review.",
-          status: "In Review",
-          title: "Previous puzzle timed out"
+          detail: t("session.previousNotice.mistakeDetail"),
+          status: t("session.previousNotice.inReviewStatus"),
+          title: t("session.previousNotice.timedOutTitle")
         };
   return (
     <View
@@ -86,12 +88,13 @@ export function UnclearAttemptPrompt({
   targetArea?: "action" | "prompt";
   targetRef?: React.RefObject<View | null>;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const targetsPrompt = targetArea === "prompt";
 
   return (
     <View
-      accessibilityLabel={`${question} ${marked ? "Marked as unclear." : "Mark as unclear. Activate to mark unclear."}`}
+      accessibilityLabel={`${question} ${marked ? t("session.unclear.markedSentence") : t("session.unclear.markActivateA11y")}`}
       ref={targetsPrompt ? targetRef : undefined}
       style={styles.unclearPrompt}
       testID="sprint-unclear-prompt"
@@ -109,13 +112,13 @@ export function UnclearAttemptPrompt({
       {marked ? (
         <View style={styles.readOnlyAttemptStatus} testID="sprint-unclear-marked">
           <Text maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE} style={styles.readOnlyAttemptStatusText}>
-            Marked
+            {t("session.unclear.marked")}
           </Text>
         </View>
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Mark this attempt as unclear"
+          accessibilityLabel={t("session.unclear.markAttemptA11y")}
           ref={targetsPrompt ? undefined : targetRef}
           style={styles.unclearPromptButton}
           testID="sprint-unclear-toggle"
@@ -123,7 +126,7 @@ export function UnclearAttemptPrompt({
           onLayout={targetsPrompt ? undefined : onTargetLayout}
         >
           <Text maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE} style={styles.unclearPromptButtonText}>
-            Mark as unclear
+            {t("session.unclear.markPrompt")}
           </Text>
         </Pressable>
       )}
@@ -132,11 +135,12 @@ export function UnclearAttemptPrompt({
 }
 
 export function ErrorPanel({ error }: { error: string }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View
       accessible
-      accessibilityLabel={`Error. ${error}`}
+      accessibilityLabel={t("screen.announcement.error", { error })}
       accessibilityLiveRegion="assertive"
       accessibilityRole="alert"
       style={styles.errorPanel}
@@ -178,24 +182,27 @@ export function ArrowDuelReplyChallengePrompt({
   showReplyTimer?: boolean;
   testIDPrefix?: string;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const styles = useStyles();
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
-  const side = displayedSide === "b" ? "black" : "white";
-  const sideName = moveSideDisplayName(displayedSide);
+  const sideName = moveSideDisplayName(displayedSide, locale);
+  const side = locale === "en" ? sideName.toLowerCase() : sideName;
   const expectedReply = currentPuzzle.puzzle.solutionMoves[1] ?? "";
   const copy = phase === "choice"
     ? {
-        context: `For ${side}, between the two arrows.`,
-        hint: "Be ready for a quick reply check.",
-        title: "Choose the best move",
+        context: t("session.prompt.forSideBetweenArrows", { side }),
+        hint: t("session.prompt.arrowDuelReplyPrepHint"),
+        title: t("session.prompt.chooseBestMove"),
         tone: "neutral" as const
       }
     : {
         context: explicitReplySideCopy
-          ? "The other move was played."
-          : "If the tempting move was played, what happens next?",
+          ? t("session.prompt.arrowDuelReplyContextExplicit")
+          : t("session.prompt.arrowDuelReplyContextGeneric"),
         hint: settingsHint ?? null,
-        title: explicitReplySideCopy ? `Find ${sideName}’s reply` : "Find the reply",
+        title: explicitReplySideCopy
+          ? t("session.prompt.arrowDuelReplyTitleShort", { side: sideName })
+          : t("session.prompt.arrowDuelReplyTitleGeneric"),
         tone: "reply" as const
       };
 
@@ -241,7 +248,7 @@ export function ArrowDuelReplyChallengePrompt({
             </Text>
             {phase === "reply" && replyReady && showReplyTimer ? (
               <View
-                accessibilityLabel={`${replySeconds} ${replySeconds === 1 ? "second" : "seconds"} remaining.`}
+                accessibilityLabel={t("session.prompt.replySecondsRemainingA11y", { count: replySeconds })}
                 style={styles.arrowDuelReplyTimerGroup}
                 testID={`${testIDPrefix}-reply-timer-group`}
               >
@@ -309,20 +316,24 @@ export function PracticePrompt({
   promptHintNumberOfLines?: number;
   reserveDefaultLayout?: boolean;
 }): React.JSX.Element | null {
+  const { locale, t } = useTranslation();
   const styles = useStyles();
   if (!currentPuzzle) {
     return null;
   }
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
-  const side = displayedSide === "b" ? "black" : "white";
+  const sideName = moveSideDisplayName(displayedSide, locale);
+  const side = locale === "en" ? sideName.toLowerCase() : sideName;
   const usesArrowDuelPrompt = currentPuzzle.kind === "arrow_duel"
     || (reserveDefaultLayout && mode === "arrow_duel");
-  const defaultPromptTitle = usesArrowDuelPrompt ? "Choose the best move" : "Find the best move";
+  const defaultPromptTitle = usesArrowDuelPrompt
+    ? t("session.prompt.chooseBestMove")
+    : t("session.prompt.findBestMove");
   const defaultPromptContext = usesArrowDuelPrompt
-    ? `For ${side}, between the two arrows.`
-    : `For ${side}.`;
+    ? t("session.prompt.forSideBetweenArrows", { side })
+    : t("session.prompt.forSide", { side });
   const defaultPromptHint = usesArrowDuelPrompt
-    ? "Watch for checks, captures, and attacks!"
+    ? t("session.prompt.arrowDuelHint")
     : null;
   const promptContext = promptText === undefined ? defaultPromptContext : promptText;
   const promptHintCopy = promptHint === undefined
@@ -330,7 +341,7 @@ export function PracticePrompt({
     : promptHint;
   const promptTitle = promptText === undefined
     ? defaultPromptTitle
-    : modeLabel(mode);
+    : modeLabel(mode, locale);
   const layoutPromptTitle = reserveDefaultLayout ? defaultPromptTitle : promptTitle;
   const layoutPromptContext = reserveDefaultLayout ? defaultPromptContext : promptContext;
   const layoutPromptHint = reserveDefaultLayout ? defaultPromptHint : promptHintCopy;
@@ -423,7 +434,7 @@ export function PracticePrompt({
             testID="practice-prompt-solved-overlay"
           >
             <Text style={styles.promptTitle} testID="practice-prompt-solved-title">
-              Solved
+              {t("common.solved")}
             </Text>
           </View>
         ) : null}

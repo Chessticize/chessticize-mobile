@@ -11,6 +11,7 @@ import {
   type ChessPieceSetId
 } from "../../../theme/index.ts";
 import { useUiHaptics } from "../../../platform/uiHaptics.ts";
+import { useTranslation } from "../../../i18n/index.ts";
 import { AppText, SegmentedControl } from "../../ui/index.tsx";
 import { CHESS_PIECE_SET_OPTIONS, chessPieceSpriteFor } from "../shared/chessPieceSprite.ts";
 
@@ -61,6 +62,7 @@ export function BoardAppearanceSettings({
   const styles = useStyles();
   const appTheme = useTheme();
   const uiHaptics = useUiHaptics();
+  const { t } = useTranslation();
   const [systemBoardMode, setSystemBoardMode] = useState<PreviewMode>(appTheme.name);
 
   useEffect(() => {
@@ -70,6 +72,9 @@ export function BoardAppearanceSettings({
   }, [appearance]);
 
   const editingMode: PreviewMode = appearance === "system" ? systemBoardMode : appearance;
+  const editingModeLabel = editingMode === "dark"
+    ? t("settings.appearance.modeDarkLower")
+    : t("settings.appearance.modeLightLower");
   const activeBoardTheme = editingMode === "dark" ? darkBoardTheme : lightBoardTheme;
   const previewColors = boardColorsFor(activeBoardTheme, editingMode);
 
@@ -104,14 +109,14 @@ export function BoardAppearanceSettings({
 
       <View style={styles.group}>
         <AppText style={styles.groupLabel} tone="secondary" variant="footnote">
-          Board
+          {t("settings.appearance.boardHeading")}
         </AppText>
         {appearance === "system" ? (
           <SegmentedControl
-            accessibilityLabel="Board color mode"
+            accessibilityLabel={t("settings.appearance.boardModeA11y")}
             options={[
-              { value: "light", label: "Light", testID: "settings-board-mode-light" },
-              { value: "dark", label: "Dark", testID: "settings-board-mode-dark" }
+              { value: "light", label: t("common.light"), testID: "settings-board-mode-light" },
+              { value: "dark", label: t("common.dark"), testID: "settings-board-mode-dark" }
             ]}
             testID="settings-board-mode-selector"
             value={systemBoardMode}
@@ -119,16 +124,17 @@ export function BoardAppearanceSettings({
           />
         ) : null}
         <View
-          accessibilityLabel={`Board color scheme for ${editingMode} mode`}
+          accessibilityLabel={t("settings.appearance.boardSchemeGroupA11y", { mode: editingModeLabel })}
           role="radiogroup"
           style={styles.grid}
           testID="settings-board-theme-grid"
         >
           {BOARD_THEME_OPTIONS.map((option) => {
             const selected = option.id === activeBoardTheme;
+            const optionLabel = t(`settings.appearance.boardTheme.${option.id}`);
             return (
               <Pressable
-                accessibilityLabel={`${option.label} board`}
+                accessibilityLabel={t("settings.appearance.boardOptionA11y", { name: optionLabel })}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: selected }}
                 aria-checked={selected}
@@ -156,7 +162,7 @@ export function BoardAppearanceSettings({
                   style={selected ? styles.optionLabelSelected : styles.optionLabel}
                   variant="caption"
                 >
-                  {option.label}
+                  {optionLabel}
                 </AppText>
               </Pressable>
             );
@@ -166,19 +172,20 @@ export function BoardAppearanceSettings({
 
       <View style={styles.group}>
         <AppText style={styles.groupLabel} tone="secondary" variant="footnote">
-          Pieces
+          {t("settings.appearance.piecesHeading")}
         </AppText>
         <View
-          accessibilityLabel="Chess piece set"
+          accessibilityLabel={t("settings.appearance.pieceSetGroupA11y")}
           role="radiogroup"
           style={styles.grid}
           testID="settings-piece-set-grid"
         >
           {CHESS_PIECE_SET_OPTIONS.map((option) => {
             const selected = option.id === pieceSet;
+            const optionLabel = t(`settings.appearance.pieceSet.${option.id}`);
             return (
               <Pressable
-                accessibilityLabel={`${option.label} pieces`}
+                accessibilityLabel={t("settings.appearance.pieceSetOptionA11y", { name: optionLabel })}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: selected }}
                 aria-checked={selected}
@@ -209,7 +216,7 @@ export function BoardAppearanceSettings({
                   style={selected ? styles.optionLabelSelected : styles.optionLabel}
                   variant="caption"
                 >
-                  {option.label}
+                  {optionLabel}
                 </AppText>
               </Pressable>
             );
@@ -232,10 +239,20 @@ function BoardMiniPreview({
   pieceSet: ChessPieceSetId;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
+  const modeLabel = mode === "dark"
+    ? t("settings.appearance.modeDarkLower")
+    : t("settings.appearance.modeLightLower");
+  const boardLabel = t(`settings.appearance.boardTheme.${boardThemeId}`);
+  const piecesLabel = t(`settings.appearance.pieceSet.${pieceSet}`);
   return (
     <View
       accessible
-      accessibilityLabel={`Board preview: ${mode} mode, ${boardThemeId} board, ${pieceSet} pieces`}
+      accessibilityLabel={t("settings.appearance.boardPreviewA11y", {
+        mode: modeLabel,
+        board: boardLabel,
+        pieces: piecesLabel
+      })}
       accessibilityRole="image"
       style={styles.previewBoard}
       testID="settings-board-preview"

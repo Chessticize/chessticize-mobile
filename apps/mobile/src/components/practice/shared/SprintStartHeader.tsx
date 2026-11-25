@@ -1,12 +1,13 @@
 import React from "react";
 import { Pressable, View } from "react-native";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { useTranslation } from "../../../i18n/index.ts";
 import { AppText, Button, Icon } from "../../ui/index.tsx";
 
 // Close, centered title and the primary action, matching the other direction A
 // sub-screens (#609). The side slots share one width so the title stays centered.
 export function SprintStartHeader({
-  actionLabel = "Start",
+  actionLabel,
   closeAccessibilityLabel,
   closeTestID,
   headerTestID,
@@ -30,8 +31,10 @@ export function SprintStartHeader({
   onClose?: () => void;
   onStart: () => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const appTheme = useTheme();
+  const resolvedActionLabel = actionLabel ?? t("common.start");
   return (
     <View style={styles.sprintScreenHeader} testID={headerTestID}>
       {onClose ? (
@@ -60,7 +63,7 @@ export function SprintStartHeader({
         <Button
           accessibilityLabel={startAccessibilityLabel}
           disabled={startDisabled}
-          label={actionLabel}
+          label={resolvedActionLabel}
           size="compact"
           testID={startTestID}
           onPress={onStart}

@@ -4,6 +4,8 @@
 // this module owns which tab is selected, when the tab chrome is shown, and how
 // a native selection is reconciled with the app's request.
 import { ICONS, type IconName } from "../components/ui/iconNames.ts";
+import { getActiveLocale, translate } from "../i18n/translate.ts";
+import type { SupportedLocale } from "../../../../packages/core/src/index.ts";
 import type { MobileBackPrimaryTab } from "./mobileBackContract.ts";
 
 export type TopLevelTab = MobileBackPrimaryTab;
@@ -145,12 +147,34 @@ export type ReviewTabBadge = {
   tone: "default" | "danger";
 } | null;
 
-export function reviewTabBadge(dueCount: number, overdueCount: number): ReviewTabBadge {
+export function topLevelTabLabel(
+  tab: TopLevelTab,
+  locale: SupportedLocale = getActiveLocale()
+): string {
+  switch (tab) {
+    case "practice":
+      return translate(locale, "tabs.practice");
+    case "review":
+      return translate(locale, "tabs.review");
+    case "history":
+      return translate(locale, "tabs.history");
+    case "settings":
+      return translate(locale, "tabs.settings");
+  }
+}
+
+export function reviewTabBadge(
+  dueCount: number,
+  overdueCount: number,
+  locale: SupportedLocale = getActiveLocale()
+): ReviewTabBadge {
   if (dueCount <= 0) {
     return null;
   }
   return {
-    accessibilityLabel: `${dueCount} due reviews${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`,
+    accessibilityLabel: overdueCount > 0
+      ? translate(locale, "tabs.reviewBadgeOverdueAccessibility", { count: dueCount, overdueCount })
+      : translate(locale, "tabs.reviewBadgeAccessibility", { count: dueCount }),
     text: dueCount > 99 ? "99+" : `${dueCount}`,
     tone: overdueCount > 0 ? "danger" : "default"
   };

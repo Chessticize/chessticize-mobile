@@ -39,6 +39,7 @@ import {
 } from "../shared/practiceUtils.ts";
 import { SprintStartHeader } from "../shared/SprintStartHeader.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import { useTranslation } from "../../../i18n/index.ts";
 
 const PRACTICE_RUN_DURATION_OPTIONS = [
   3 * 60,
@@ -60,29 +61,30 @@ export function RunRemovalConfirmation({
   run: PracticeRunPresentation | null;
 }): React.JSX.Element | null {
   const styles = useStyles();
+  const { t } = useTranslation();
   if (!run) {
     return null;
   }
   return (
     <View style={styles.homeRemovalConfirmation} testID="practice-run-remove-confirmation">
       <View style={styles.homeRowCopy}>
-        <AppText variant="headline">Remove {run.name} from Home?</AppText>
+        <AppText variant="headline">{t("runEditor.removeConfirmTitle", { name: run.name })}</AppText>
         <AppText tone="secondary" variant="subheadline">
-          Its rating and history will be kept. You can restore this run later.
+          {t("runEditor.removeConfirmBody")}
         </AppText>
       </View>
       <View style={styles.homeRemovalActions}>
         <Button
-          accessibilityLabel="Cancel run removal"
-          label="Cancel"
+          accessibilityLabel={t("runEditor.removeCancelA11y")}
+          label={t("common.cancel")}
           size="compact"
           testID="practice-run-remove-cancel"
           variant="secondary"
           onPress={() => onIntent({ type: "dismiss-remove" })}
         />
         <Button
-          accessibilityLabel={`Confirm removing ${run.name} from Home`}
-          label="Remove"
+          accessibilityLabel={t("practiceHome.runRemoveConfirmA11y", { name: run.name })}
+          label={t("common.remove")}
           size="compact"
           testID="practice-run-remove-confirm"
           variant="destructive"
@@ -118,6 +120,7 @@ export function PracticeRunEditor({
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
   const editorLayout = useEditorRowLayout();
+  const { locale, t } = useTranslation();
   const stackNameField = editorLayout.stacked;
   const draft = presentation.draft;
   if (!draft) {
@@ -130,7 +133,7 @@ export function PracticeRunEditor({
   const customMode = draft.mode === "arrow_duel" ? "arrow_duel" : "custom";
   const previousRows = presentation.previousConfigs?.slice(0, 5).map(({ config, rating }) => ({
     config,
-    row: previousCustomConfigRowModel(config, rating)
+    row: previousCustomConfigRowModel(config, rating, locale)
   })) ?? [];
   const sprintRules = buildSprintConfig({
     durationSeconds: draft.durationSeconds,
@@ -158,16 +161,16 @@ export function PracticeRunEditor({
       <View key="name" style={[rowStyle, styles.editorFieldStack]}>
         <View style={[styles.runNameRow, stackNameField ? styles.runNameRowStacked : null]} testID="practice-run-name-row">
           <View style={styles.runNameCopy}>
-            <AppText variant="body">Name</AppText>
-            <AppText tone="secondary" variant="footnote">Required · unique</AppText>
+            <AppText variant="body">{t("runEditor.nameSection")}</AppText>
+            <AppText tone="secondary" variant="footnote">{t("runEditor.nameRequiredUnique")}</AppText>
           </View>
           <TextInput
             keyboardAppearance={appTheme.name}
-            accessibilityLabel="Run name"
+            accessibilityLabel={t("runEditor.nameInputA11y")}
             autoCapitalize="words"
             autoCorrect={false}
             maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
-            placeholder="e.g. Tactics Focus"
+            placeholder={t("runEditor.namePlaceholder")}
             placeholderTextColor={appTheme.colors.text.faint}
             returnKeyType="done"
             style={[
@@ -197,8 +200,8 @@ export function PracticeRunEditor({
     fieldRows.push(
       <CustomValueRow
         key="fixed-name"
-        detail="Built-in run names stay fixed"
-        label="Name"
+        detail={t("runEditor.fixedNameDetail")}
+        label={t("runEditor.nameSection")}
         testID="practice-run-fixed-name"
         value={draft.name}
       />
@@ -217,8 +220,8 @@ export function PracticeRunEditor({
       if (!themeCatalogPresentation) {
         fieldRows.push(
           <View key="theme-label" style={[rowStyle, editorLayout.row]}>
-            <AppText style={editorLayout.copy} variant="body">Themes</AppText>
-            <AppText style={styles.customConfigValue} tone="secondary" variant="footnote">Choose one or more</AppText>
+            <AppText style={editorLayout.copy} variant="body">{t("common.themes")}</AppText>
+            <AppText style={styles.customConfigValue} tone="secondary" variant="footnote">{t("customSetup.chooseOneOrMore")}</AppText>
           </View>
         );
       }
@@ -233,12 +236,12 @@ export function PracticeRunEditor({
         />,
         <CustomOptionRow
           key="duration"
-          label="Duration"
-          value={formatDurationLabel(draft.durationSeconds)}
+          label={t("customSetup.durationLabel")}
+          value={formatDurationLabel(draft.durationSeconds, locale)}
           stepperTestID="practice-run-duration-stepper"
           options={PRACTICE_RUN_DURATION_OPTIONS.map((option) => ({
             value: option,
-            label: formatDurationLabel(option),
+            label: formatDurationLabel(option, locale),
             testID: `practice-run-duration-${option}`
           }))}
           selected={draft.durationSeconds as (typeof PRACTICE_RUN_DURATION_OPTIONS)[number]}
@@ -246,12 +249,12 @@ export function PracticeRunEditor({
         />,
         <CustomOptionRow
           key="per-puzzle"
-          label="Time per puzzle"
-          value={`${draft.perPuzzleSeconds} sec`}
+          label={t("customSetup.perPuzzleLabel")}
+          value={t("common.secondsShort", { count: draft.perPuzzleSeconds })}
           stepperTestID="practice-run-per-puzzle-stepper"
           options={PRACTICE_RUN_PER_PUZZLE_OPTIONS.map((option) => ({
             value: option,
-            label: `${option}s`,
+            label: t("common.secondsCompact", { count: option }),
             testID: `practice-run-per-puzzle-${option}`
           }))}
           selected={draft.perPuzzleSeconds as (typeof PRACTICE_RUN_PER_PUZZLE_OPTIONS)[number]}
@@ -262,9 +265,9 @@ export function PracticeRunEditor({
       fieldRows.push(
         <CustomValueRow
           key="format"
-          label="Format"
+          label={t("runEditor.formatLabel")}
           testID="practice-run-fixed-format"
-          value={draft.kind === "arrow_duel" ? "Arrow Duel" : "Standard puzzles"}
+          value={draft.kind === "arrow_duel" ? t("common.arrowDuel") : t("runEditor.formatStandard")}
         />
       );
     }
@@ -274,12 +277,12 @@ export function PracticeRunEditor({
       fieldRows.push(
         <CustomValueRow
           key="format"
-          detail="Cannot be changed after creation"
-          label="Format"
+          detail={t("runEditor.formatFixedDetail")}
+          label={t("runEditor.formatLabel")}
           testID="practice-run-fixed-format"
           value={draft.mode === "arrow_duel"
-            ? "Arrow Duel"
-            : draft.kind === "standard" ? "Standard puzzles" : "Regular puzzles"}
+            ? t("common.arrowDuel")
+            : draft.kind === "standard" ? t("runEditor.formatStandard") : t("runEditor.formatRegular")}
         />
       );
     }
@@ -289,19 +292,23 @@ export function PracticeRunEditor({
   return (
     <View style={styles.customSetupPanel} testID="practice-run-editor">
       <SprintStartHeader
-        actionLabel={isCreate ? "Add" : "Save"}
-        closeAccessibilityLabel="Close run editor"
+        actionLabel={isCreate ? t("common.add") : t("common.save")}
+        closeAccessibilityLabel={t("runEditor.closeA11y")}
         closeTestID="practice-run-editor-close"
         headerTestID="practice-run-editor-header"
         startAccessibilityLabel={isCreate
-          ? "Add run to Home"
-          : directRunEditing ? `Save ${draft.name} run` : `Save ${draft.name} rating`}
+          ? t("runEditor.addRunA11y")
+          : directRunEditing
+            ? t("runEditor.saveRunA11y", { name: draft.name })
+            : t("runEditor.saveRunRatingA11y", { name: draft.name })}
         startDisabled={
           presentation.canSave === false
           || Boolean(arrowDuelReplyChallenge?.replySecondsError)
         }
         startTestID="practice-run-save"
-        title={isCreate ? "New Run" : directRunEditing ? "Edit Run" : "Edit rating"}
+        title={isCreate
+          ? t("runEditor.createTitle")
+          : directRunEditing ? t("runEditor.editTitle") : t("settings.ratings.editRowLabel")}
         titleTestID="practice-run-editor-title"
         onClose={() => presentation.onIntent({ type: "cancel-edit" })}
         onStart={() => presentation.onIntent({ type: "save-run" })}
@@ -315,10 +322,10 @@ export function PracticeRunEditor({
         ) : null}
         <AppText tone="secondary" variant="subheadline">
           {isCreate
-            ? "Saving adds this run to Home. It does not start a sprint."
+            ? t("runEditor.createIntro")
             : directRunEditing
-              ? "Change this Run's name, rating, and puzzle timing."
-              : "Adjust the current rating. Run settings stay fixed."}
+              ? t("runEditor.editDirectIntro")
+              : t("runEditor.editRatingIntro")}
         </AppText>
       </View>
 
@@ -328,15 +335,15 @@ export function PracticeRunEditor({
             <ListRow
               icon="warning"
               iconTone="warning"
-              subtitle="Choose different themes or settings before adding this Run to Home."
-              title="No matching local puzzles"
+              subtitle={t("runEditor.noMatchingPuzzlesBody")}
+              title={t("runEditor.noMatchingPuzzlesTitle")}
             />
           </Section>
         </View>
       ) : null}
 
       <Section
-        header={!isCreate && directRunEditing ? "Run details" : undefined}
+        header={!isCreate && directRunEditing ? t("runEditor.runDetailsSection") : undefined}
         headerTestID="practice-run-details-section"
         rows
         testID="practice-run-editor-fields"
@@ -375,7 +382,7 @@ export function PracticeRunEditor({
       ) : null}
 
       {isCreate && isCustom && previousRows.length > 0 ? (
-        <Section header="Previous configs" rows testID="custom-previous-configs">
+        <Section header={t("customSetup.previousConfigsTitle")} rows testID="custom-previous-configs">
           {previousRows.map(({ config, row }) => (
             <PreviousCustomConfigRow
               key={config.id}
@@ -412,21 +419,22 @@ function ArrowDuelReplyChallengeSetting({
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
   const fieldScale = useNumericFieldScale();
+  const { t } = useTranslation();
   return (
-    <Section header="Arrow Duel" rows testID="practice-run-arrow-duel-reply-setting">
+    <Section header={t("common.arrowDuel")} rows testID="practice-run-arrow-duel-reply-setting">
       <View style={[rowStyle, editorLayout.row]}>
         <View style={editorLayout.copy}>
           <AppText variant="body">
-            Find the opponent’s best reply
+            {t("runEditor.arrowDuel.title")}
           </AppText>
           <AppText tone="secondary" variant="footnote">
             {individualRunCopy
-              ? "After you choose the better arrow, we play the other move so you can find the opponent’s best reply."
-              : "After you choose the better arrow, find the opponent’s best reply."}
+              ? t("runEditor.arrowDuel.detailIndividual")
+              : t("runEditor.arrowDuel.detailDefault")}
           </AppText>
           {individualRunCopy ? (
             <AppText tone="secondary" variant="footnote">
-              This setting only changes this Run. Turn it off to go straight to the next puzzle.
+              {t("runEditor.arrowDuel.individualHint")}
             </AppText>
           ) : null}
         </View>
@@ -437,10 +445,10 @@ function ArrowDuelReplyChallengeSetting({
             tone="secondary"
             variant="body"
           >
-            {enabled ? "On" : "Off"}
+            {enabled ? t("common.on") : t("common.off")}
           </AppText>
           <EditorSwitch
-            accessibilityLabel="Find the opponent’s best reply"
+            accessibilityLabel={t("runEditor.arrowDuel.title")}
             enabled={enabled}
             testID="practice-run-arrow-duel-reply-toggle"
             onPress={onToggle}
@@ -449,16 +457,19 @@ function ArrowDuelReplyChallengeSetting({
       </View>
       <View style={[rowStyle, editorLayout.row]} testID="practice-run-arrow-duel-reply-time-row">
         <View style={editorLayout.copy}>
-          <AppText variant="body">Time to find the reply</AppText>
+          <AppText variant="body">{t("runEditor.arrowDuel.timeLabel")}</AppText>
           <AppText tone="secondary" variant="footnote">
-            You’ll have {DEFAULT_OPPONENT_REPLY_SECONDS} seconds by default. Choose up to {OPPONENT_REPLY_MAX_SECONDS} seconds.
+            {t("runEditor.arrowDuel.timeDetail", {
+              defaultSeconds: DEFAULT_OPPONENT_REPLY_SECONDS,
+              maxSeconds: OPPONENT_REPLY_MAX_SECONDS
+            })}
           </AppText>
           <AppText tone="secondary" variant="footnote">
-            Your Sprint and puzzle timers pause while you find the reply.
+            {t("runEditor.arrowDuel.pauseHint")}
           </AppText>
           {individualRunCopy ? (
             <AppText tone="secondary" variant="footnote">
-              To turn this extra challenge off for every Run, go to Settings.
+              {t("runEditor.arrowDuel.globalSettingsHint")}
             </AppText>
           ) : null}
           {replySecondsError ? (
@@ -487,7 +498,7 @@ function ArrowDuelReplyChallengeSetting({
           >
             <TextInput
               keyboardAppearance={appTheme.name}
-              accessibilityLabel="Time to find the opponent’s reply in seconds"
+              accessibilityLabel={t("runEditor.arrowDuel.secondsInputA11y")}
               accessibilityState={{ disabled: !enabled }}
               editable={enabled}
               inputMode="numeric"
@@ -504,7 +515,7 @@ function ArrowDuelReplyChallengeSetting({
               onChangeText={onReplySecondsInputChange}
             />
           </View>
-          <AppText numberOfLines={1} tone="secondary" variant="body">sec</AppText>
+          <AppText numberOfLines={1} tone="secondary" variant="body">{t("common.secUnit")}</AppText>
         </View>
       </View>
     </Section>
@@ -517,30 +528,39 @@ function SprintPassRulesSummary({
   config: SprintConfig;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
+  const durationLabel = formatSprintDurationLabel(config.durationSeconds, locale);
   return (
     <View
-      accessibilityLabel={`Pass rules. Solve ${config.targetCorrect} before ${formatSprintDurationLabel(config.durationSeconds)} ends. Mistake ${config.maxMistakes} ends the Sprint. Wrong answers count as attempts, not solved puzzles.`}
+      accessibilityLabel={t("runEditor.passRules.a11y", {
+        target: config.targetCorrect,
+        duration: durationLabel,
+        maxMistakes: config.maxMistakes
+      })}
       testID="practice-run-pass-rules"
     >
-      <Section header="Pass rules">
+      <Section header={t("runEditor.passRules.header")}>
         <View style={styles.sprintPassRulesHeading}>
           <AppText style={styles.editorRowLabel} variant="headline">
-            Solve {config.targetCorrect} before {formatSprintDurationLabel(config.durationSeconds)} ends
+            {t("runEditor.passRules.headline", {
+              target: config.targetCorrect,
+              duration: durationLabel
+            })}
           </AppText>
           <View style={styles.sprintPassRulesTarget}>
             <AppText numberOfLines={1} style={styles.sprintPassRulesTargetText} tone="accent" variant="numeral">
               {config.targetCorrect}
             </AppText>
             <AppText numberOfLines={1} style={styles.sprintPassRulesTargetLabel} tone="accent" variant="caption">
-              to pass
+              {t("runEditor.passRules.toPass")}
             </AppText>
           </View>
         </View>
         <AppText tone="secondary" variant="subheadline">
-          Wrong answers count as attempts, not solved puzzles. Mistake {config.maxMistakes} ends the Sprint.
+          {t("runEditor.passRules.body", { maxMistakes: config.maxMistakes })}
         </AppText>
         <AppText tone="secondary" variant="footnote">
-          The goal updates with Duration and Time per puzzle.
+          {t("runEditor.passRules.footnote")}
         </AppText>
       </Section>
     </View>
@@ -565,6 +585,7 @@ function PracticeRunTimingSettings({
   timeoutCountsAsMistake: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   const editor = puzzleTimingEditorState(puzzleTiming, perPuzzleSeconds);
   const currentTiming = editor.policy;
   const warningEnabled = currentTiming.slowAfterSeconds !== null;
@@ -575,16 +596,18 @@ function PracticeRunTimingSettings({
   return (
     <View style={styles.settingsSection} testID="practice-run-puzzle-timing">
       <View style={styles.runTimingSectionCopy}>
-        <AppText accessibilityRole="header" variant="title">Puzzle timing</AppText>
+        <AppText accessibilityRole="header" variant="title">{t("runEditor.timing.header")}</AppText>
         <AppText tone="secondary" variant="footnote">
-          {`Typical time ${formatCompactDuration(perPuzzleSeconds)} · no rating impact`}
+          {t("runEditor.timing.subtitle", {
+            duration: formatCompactDuration(perPuzzleSeconds)
+          })}
         </AppText>
       </View>
       <Section rows testID="practice-run-puzzle-timing-card">
         <RunTimingSettingRow
-          detail="Turns the puzzle clock yellow. A correct answer after that is marked Unclear; play continues."
+          detail={t("runEditor.timing.slowDetail")}
           enabled={warningEnabled}
-          label="Slow warning"
+          label={t("runEditor.timing.slowLabel")}
           maximumSeconds={editor.slowMaximumSeconds}
           minimumSeconds={10}
           seconds={warningSeconds}
@@ -602,10 +625,10 @@ function PracticeRunTimingSettings({
         />
         <RunTimingSettingRow
           detail={timeoutCountsAsMistake
-            ? "Marks it Timed out, counts as a mistake, adds it to Review, and moves on."
-            : "Marks Timed out and moves on."}
+            ? t("runEditor.timing.timeoutDetailMistake")
+            : t("runEditor.timing.timeoutDetailNoMistake")}
           enabled={timeoutEnabled}
-          label="Puzzle timeout"
+          label={t("runEditor.timing.timeoutLabel")}
           maximumSeconds={180}
           minimumSeconds={editor.timeoutMinimumSeconds}
           seconds={timeoutSeconds}
@@ -650,6 +673,7 @@ function RunTimingSettingRow({
   const styles = useStyles();
   const editorLayout = useEditorRowLayout();
   const rowStyle = useListRowStyle();
+  const { t } = useTranslation();
   return (
     <View style={[rowStyle, editorLayout.row]} testID={testID}>
       <View style={editorLayout.copy}>
@@ -659,7 +683,7 @@ function RunTimingSettingRow({
       <View style={editorLayout.controls}>
         <View style={[styles.runTimingStepper, !enabled ? styles.runTimingControlDisabled : null]}>
           <StepperButton
-            accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+            accessibilityLabel={t("runEditor.decreaseA11y", { label: label.toLowerCase() })}
             direction="decrease"
             disabled={!enabled || seconds <= minimumSeconds}
             testID={`${testID}-decrease`}
@@ -669,7 +693,7 @@ function RunTimingSettingRow({
             {formatCompactDuration(seconds)}
           </AppText>
           <StepperButton
-            accessibilityLabel={`Increase ${label.toLowerCase()}`}
+            accessibilityLabel={t("runEditor.increaseA11y", { label: label.toLowerCase() })}
             direction="increase"
             disabled={!enabled || seconds >= maximumSeconds}
             testID={`${testID}-increase`}
@@ -711,6 +735,7 @@ function PracticeRunEloRow({
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
   const fieldScale = useNumericFieldScale();
+  const { t } = useTranslation();
   if (directEntry) {
     const parsedInput = Number(inputValue);
     const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
@@ -722,16 +747,16 @@ function PracticeRunEloRow({
       <View style={[rowStyle, styles.editorFieldStack]}>
         <View style={editorLayout.line} testID="practice-run-elo-row">
           <View style={editorLayout.copy}>
-            <AppText variant="body">{isCreate ? "Starting rating" : "Current rating"}</AppText>
+            <AppText variant="body">{isCreate ? t("customSetup.startingRatingLabel") : t("runEditor.currentRatingLabel")}</AppText>
             <AppText tone="secondary" variant="footnote">
               {isCreate
-                ? `Sets initial puzzle difficulty · ${CUSTOM_INITIAL_RATING_MIN}–${CUSTOM_INITIAL_RATING_MAX}`
-                : `${CUSTOM_INITIAL_RATING_MIN}–${CUSTOM_INITIAL_RATING_MAX} · ±100 buttons`}
+                ? t("runEditor.eloCreateHintDirect", { min: CUSTOM_INITIAL_RATING_MIN, max: CUSTOM_INITIAL_RATING_MAX })
+                : t("runEditor.eloEditHintDirect", { min: CUSTOM_INITIAL_RATING_MIN, max: CUSTOM_INITIAL_RATING_MAX })}
             </AppText>
           </View>
           <View style={styles.runEloStepper} testID="practice-run-elo-stepper">
             <StepperButton
-              accessibilityLabel="Decrease run rating by 100"
+              accessibilityLabel={t("runEditor.ratingDecreaseA11y")}
               direction="decrease"
               disabled={!canDecrease}
               testID="practice-run-elo-decrease"
@@ -747,7 +772,7 @@ function PracticeRunEloRow({
             >
               <TextInput
                 keyboardAppearance={appTheme.name}
-                accessibilityLabel={isCreate ? "Starting rating" : "Current rating"}
+                accessibilityLabel={isCreate ? t("customSetup.startingRatingLabel") : t("runEditor.currentRatingLabel")}
                 inputMode="numeric"
                 keyboardType="number-pad"
                 maxFontSizeMultiplier={NUMERIC_FIELD_MAX_TEXT_SCALE}
@@ -763,7 +788,7 @@ function PracticeRunEloRow({
               />
             </View>
             <StepperButton
-              accessibilityLabel="Increase run rating by 100"
+              accessibilityLabel={t("runEditor.ratingIncreaseA11y")}
               direction="increase"
               disabled={!canIncrease}
               testID="practice-run-elo-increase"
@@ -788,24 +813,24 @@ function PracticeRunEloRow({
   return (
     <View style={[rowStyle, editorLayout.row]} testID="practice-run-elo-row">
       <View style={editorLayout.copy}>
-        <AppText variant="body">{isCreate ? "Starting rating" : "Current rating"}</AppText>
+        <AppText variant="body">{isCreate ? t("customSetup.startingRatingLabel") : t("runEditor.currentRatingLabel")}</AppText>
         <AppText tone="secondary" variant="footnote">
           {isCreate
-            ? `Sets initial puzzle difficulty · minimum ${RATING_FLOOR}`
-            : `Adjusts puzzle difficulty · minimum ${RATING_FLOOR}`}
+            ? t("runEditor.eloCreateHintFloor", { floor: RATING_FLOOR })
+            : t("runEditor.eloEditHintFloor", { floor: RATING_FLOOR })}
         </AppText>
       </View>
       <View style={editorLayout.controls}>
         <StepperButton
-          accessibilityLabel="Decrease run rating"
+          accessibilityLabel={t("runEditor.ratingDecreaseSimpleA11y")}
           direction="decrease"
           disabled={!canDecrease}
           testID="practice-run-elo-decrease"
           onPress={() => onChange(stepManualRating(value, -1))}
         />
-        <AppText numberOfLines={1} testID="practice-run-elo-value" tone="secondary" variant="numeralRow">Rating {value}</AppText>
+        <AppText numberOfLines={1} testID="practice-run-elo-value" tone="secondary" variant="numeralRow">{t("common.ratingValue", { rating: value })}</AppText>
         <StepperButton
-          accessibilityLabel="Increase run rating"
+          accessibilityLabel={t("runEditor.ratingIncreaseSimpleA11y")}
           direction="increase"
           disabled={false}
           testID="practice-run-elo-increase"

@@ -11,6 +11,7 @@ import {
 import type {
   HistoryProgressPresentation
 } from "./historyProgressPresentation.ts";
+import { useTranslation } from "../i18n/index.ts";
 
 export function useHistoryProgressPresentation(input: {
   enabled: boolean;
@@ -19,6 +20,7 @@ export function useHistoryProgressPresentation(input: {
   refreshKey?: unknown;
 }): HistoryProgressPresentation | undefined {
   const { injectedPresentation, service } = input;
+  const { locale } = useTranslation();
   const [progress, setProgress] = useState<TacticalProfileProgress | undefined>();
   const failedRetryCount = useRef(0);
 
@@ -59,7 +61,7 @@ export function useHistoryProgressPresentation(input: {
       return undefined;
     }
     return progress
-      ? historyProgressPresentationFromModel(progress)
+      ? historyProgressPresentationFromModel(progress, locale)
       : undefined;
-  }, [injectedPresentation, input.enabled, progress]);
+  }, [injectedPresentation, input.enabled, locale, progress]);
 }

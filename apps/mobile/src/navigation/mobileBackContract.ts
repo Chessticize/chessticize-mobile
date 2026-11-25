@@ -1,3 +1,6 @@
+import { getActiveLocale, translate } from "../i18n/translate.ts";
+import type { SupportedLocale } from "../../../../packages/core/src/index.ts";
+
 export type MobileBackPrimaryTab = "practice" | "review" | "history" | "settings";
 export type MobileBackTab = MobileBackPrimaryTab | "analysis";
 
@@ -92,71 +95,74 @@ export function resolveMobileBackIntent(
 /** A frontend-owned description of the destination revealed by a Back gesture. */
 export function mobileBackDestination(
   intent: MobileBackIntent,
-  state: MobileBackState
+  state: MobileBackState,
+  locale: SupportedLocale = getActiveLocale()
 ): MobileBackDestination | null {
   switch (intent.kind) {
     case "dismiss-transient":
       if (intent.transient === "practice-exit-confirmation") {
-        return { label: "Active sprint", testID: "active-practice" };
+        return { label: translate(locale, "back.activeSprint"), testID: "active-practice" };
       }
       if (intent.transient === "starting-practice") {
-        return { label: "Practice setup", testID: "practice-setup" };
+        return { label: translate(locale, "back.practiceSetup"), testID: "practice-setup" };
       }
       if (intent.transient === "sprint-session-guide") {
-        return { label: "Practice setup", testID: "practice-setup" };
+        return { label: translate(locale, "back.practiceSetup"), testID: "practice-setup" };
       }
       if (
         intent.transient === "survival-guide-to-hub"
         || intent.transient === "survival-records"
         || intent.transient === "survival-source-picker"
       ) {
-        return { label: "Survival Hub", testID: "personal-best-hub" };
+        return { label: translate(locale, "back.survivalHub"), testID: "personal-best-hub" };
       }
       if (
         intent.transient === "survival-guide-to-practice"
         || intent.transient === "survival-hub"
         || intent.transient === "survival-pause"
       ) {
-        return { label: "Practice", testID: "practice-home" };
+        return { label: translate(locale, "tabs.practice"), testID: "practice-home" };
       }
       if (intent.transient === "custom-rating-editor") {
-        return { label: "Custom setup", testID: "custom-sprint-setup" };
+        return { label: translate(locale, "back.customSetup"), testID: "custom-sprint-setup" };
       }
       return {
-        label: destinationLabelForTab(state.tab),
+        label: destinationLabelForTab(state.tab, locale),
         testID: `tab-${state.tab}`
       };
     case "close-analysis":
       return {
-        label: intent.owner === "history" ? "History review" : "Review session",
+        label: intent.owner === "history"
+          ? translate(locale, "back.historyReview")
+          : translate(locale, "back.reviewSession"),
         testID: `${intent.owner}-review`
       };
     case "return-to-owner":
       return {
-        label: destinationLabelForTab(intent.owner),
+        label: destinationLabelForTab(intent.owner, locale),
         testID: `tab-${intent.owner}`
       };
     case "pause-survival":
-      return { label: "Survival pause", testID: "session-abandon-confirmation" };
+      return { label: translate(locale, "back.survivalPause"), testID: "session-abandon-confirmation" };
     case "request-practice-exit":
-      return { label: "Leave sprint confirmation", testID: "practice-exit-confirmation" };
+      return { label: translate(locale, "back.leaveSprintConfirmation"), testID: "practice-exit-confirmation" };
     case "return-to-practice":
-      return { label: "Practice", testID: "tab-practice" };
+      return { label: translate(locale, "tabs.practice"), testID: "tab-practice" };
     case "delegate-platform":
       return null;
   }
 }
 
-function destinationLabelForTab(tab: MobileBackTab): string {
+function destinationLabelForTab(tab: MobileBackTab, locale: SupportedLocale): string {
   switch (tab) {
     case "practice":
-      return "Practice";
+      return translate(locale, "tabs.practice");
     case "review":
-      return "Review";
+      return translate(locale, "tabs.review");
     case "history":
-      return "History";
+      return translate(locale, "tabs.history");
     case "settings":
     case "analysis":
-      return "Settings";
+      return translate(locale, "tabs.settings");
   }
 }

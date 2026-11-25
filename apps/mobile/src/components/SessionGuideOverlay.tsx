@@ -9,6 +9,7 @@ import {
   type LayoutChangeEvent
 } from "react-native";
 import { makeStyles } from "../theme/index.ts";
+import { useTranslation } from "../i18n/index.ts";
 import {
   DEFAULT_GUIDE_METRICS,
   guideCalloutMaxWidth,
@@ -120,6 +121,7 @@ export function SessionGuideOverlay({
   onNext,
   onRequestScroll
 }: SessionGuideOverlayProps): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const { fontScale } = useWindowDimensions();
   const textScale = Math.min(Math.max(fontScale || 1, 1), GUIDE_MAX_TEXT_SCALE);
@@ -415,7 +417,7 @@ export function SessionGuideOverlay({
             {title}
           </Text>
           <Pressable
-            accessibilityLabel="Exit guide"
+            accessibilityLabel={t("guide.exitGuideA11y")}
             accessibilityRole="button"
             hitSlop={Math.max(0, (44 - exitSize) / 2)}
             style={[styles.exitButton, { height: exitSize, width: exitSize }]}
@@ -484,7 +486,7 @@ export function SessionGuideOverlay({
           >
             {canGoBack ? (
               <Pressable
-                accessibilityLabel="Previous guide"
+                accessibilityLabel={t("guide.previousGuideA11y")}
                 accessibilityRole="button"
                 style={styles.backButton}
                 testID="practice-session-guide-back"
@@ -499,7 +501,7 @@ export function SessionGuideOverlay({
                   numberOfLines={1}
                   style={styles.backText}
                 >
-                  Back
+                  {t("common.back")}
                 </Text>
               </Pressable>
             ) : (
@@ -507,13 +509,13 @@ export function SessionGuideOverlay({
             )}
           </View>
           <Text
-            accessibilityLabel={`Guide ${stepNumber} of ${totalSteps}`}
+            accessibilityLabel={t("guide.progressA11y", { step: stepNumber, total: totalSteps })}
             maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
             numberOfLines={1}
             style={styles.progress}
             testID="practice-session-guide-coach-progress"
           >
-            {stepNumber} of {totalSteps}
+            {t("guide.progressText", { step: stepNumber, total: totalSteps })}
           </Text>
           <View
             style={[

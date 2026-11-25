@@ -213,6 +213,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
       lightBoardTheme: "slate",
       darkBoardTheme: "graphite",
       pieceSet: "default",
+      language: "system",
       arrowDuel: { opponentReplyEnabled: true },
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
@@ -275,6 +276,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
       light_board_theme: "slate",
       dark_board_theme: "graphite",
       piece_set: "default",
+      language: "system",
       whats_new_seen_version: null,
       id: "default",
       sync_icloud_enabled: 1,
@@ -886,6 +888,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           lightBoardTheme: "slate",
           darkBoardTheme: "graphite",
           pieceSet: "default",
+          language: "system",
           arrowDuel: {
             opponentReplyEnabled: true
           },
@@ -960,6 +963,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           lightBoardTheme: "blue",
           darkBoardTheme: "walnut",
           pieceSet: "chessnut",
+          language: "system",
           arrowDuel: {
             opponentReplyEnabled: false
           },

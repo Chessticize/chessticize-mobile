@@ -5,9 +5,11 @@ import {
 } from "./theme-catalog.ts";
 import {
   DEFAULT_NEW_PRACTICE_RUN_RATING,
+  PRACTICE_RUN_NAME_MAX_LENGTH,
   PRACTICE_RUN_RATING_MAX,
   PRACTICE_RUN_RATING_MIN,
   PracticeRunNameError,
+  type PracticeRunNameErrorCode,
   validatePracticeRunName
 } from "./practice-runs.ts";
 import { clampManualRating } from "./ratings.ts";
@@ -143,8 +145,35 @@ const PRACTICE_RUN_ELO_STEP = 100;
 export const PRACTICE_RUN_ELO_ERROR =
   `Enter a whole-number rating from ${PRACTICE_RUN_RATING_MIN} to ${PRACTICE_RUN_RATING_MAX}.`;
 
+export interface PracticeRunManagementMessages {
+  eloError: () => string;
+  opponentReplySecondsError: () => string;
+  nameError: (code: PracticeRunNameErrorCode, maxLength: number) => string;
+  runAdded: (name: string) => string;
+  runUpdated: (name: string) => string;
+  runRemoved: (name: string) => string;
+  runRestored: (name: string, elo: number) => string;
+}
+
+const DEFAULT_PRACTICE_RUN_MANAGEMENT_MESSAGES: PracticeRunManagementMessages = {
+  eloError: () => PRACTICE_RUN_ELO_ERROR,
+  opponentReplySecondsError: () =>
+    `Enter a positive whole number up to ${OPPONENT_REPLY_MAX_SECONDS} seconds.`,
+  nameError: (code, maxLength) =>
+    code === "required"
+      ? "Enter a name for this run."
+      : code === "too_long"
+        ? `Run names can be at most ${maxLength} characters.`
+        : "That name is already in use. Choose a unique name.",
+  runAdded: (name) => `${name} added to Home.`,
+  runUpdated: (name) => `${name} updated.`,
+  runRemoved: (name) => `${name} removed from Home. Its rating and history were kept.`,
+  runRestored: (name, elo) => `${name} restored with Rating ${elo}.`
+};
+
 export function createPracticeRunManagementController(
-  adapter: PracticeRunManagementAdapter
+  adapter: PracticeRunManagementAdapter,
+  messages: PracticeRunManagementMessages = DEFAULT_PRACTICE_RUN_MANAGEMENT_MESSAGES
 ): PracticeRunManagementController {
   let catalog = cloneCatalog(adapter.read());
   let view = initialView(catalog.runs);
@@ -204,10 +233,10 @@ export function createPracticeRunManagementController(
         return;
       }
       case "change-elo-input":
-        commit(changeEloInput(view, intent.value));
+        commit(changeEloInput(view, intent.value, messages));
         return;
       case "step-elo-input":
-        commit(stepEloInput(view, intent.direction));
+        commit(stepEloInput(view, intent.direction, messages));
         return;
       case "change-mode":
         if (view.screen === "create") {
@@ -242,7 +271,8 @@ export function createPracticeRunManagementController(
           return;
         }
         const opponentReplySecondsError = validateOpponentReplySecondsInput(
-          intent.value
+          intent.value,
+          messages.opponentReplySecondsError()
         );
         const seconds = Number(intent.value);
         commit({
@@ -368,7 +398,7 @@ export function createPracticeRunManagementController(
         const result = execute({ type: "archive-run", runId: run.id });
         commit({
           ...view,
-          notice: `${run.name} removed from Home. Its rating and history were kept.`,
+          notice: messages.runRemoved(run.name),
           removeCandidateId: null,
           selectedRunId: selectedRunId(
             result.catalog.runs,
@@ -388,7 +418,7 @@ export function createPracticeRunManagementController(
         ) ?? run;
         commit({
           ...view,
-          notice: `${restored.name} restored with Rating ${restored.elo}.`,
+          notice: messages.runRestored(restored.name, restored.elo),
           selectedRunId: restored.id
         }, result.catalog);
         return;
@@ -430,7 +460,8 @@ export function createPracticeRunManagementController(
             }),
             opponentReplySecondsError: enabled
               ? validateOpponentReplySecondsInput(
-                  view.opponentReplySecondsInput ?? String(current.seconds)
+                  view.opponentReplySecondsInput ?? String(current.seconds),
+                  messages.opponentReplySecondsError()
                 )
               : null
           });
@@ -463,7 +494,7 @@ export function createPracticeRunManagementController(
         }
         commit({
           ...returnHome(view),
-          notice: `${saved.name} added to Home.`,
+          notice: messages.runAdded(saved.name),
           selectedRunId: saved.id
         }, result.catalog);
         return;
@@ -485,13 +516,16 @@ export function createPracticeRunManagementController(
         }
         commit({
           ...returnHome(view, true),
-          notice: `${saved.name} updated.`,
+          notice: messages.runUpdated(saved.name),
           selectedRunId: selectedRunId(result.catalog.runs, view.selectedRunId)
         }, result.catalog);
       }
     } catch (error) {
       if (error instanceof PracticeRunNameError) {
-        commit({ ...view, nameError: error.message });
+        commit({
+          ...view,
+          nameError: messages.nameError(error.code, PRACTICE_RUN_NAME_MAX_LENGTH)
+        });
         return;
       }
       throw error;
@@ -559,9 +593,10 @@ function updateDraft(
 
 function changeEloInput(
   view: RunManagementViewState,
-  value: string
+  value: string,
+  messages: PracticeRunManagementMessages = DEFAULT_PRACTICE_RUN_MANAGEMENT_MESSAGES
 ): RunManagementViewState {
-  const eloError = validateEloInput(value);
+  const eloError = validateEloInput(value, messages.eloError());
   const elo = Number(value);
   return {
     ...(eloError ? view : updateDraft(view, { elo })),
@@ -572,7 +607,8 @@ function changeEloInput(
 
 function stepEloInput(
   view: RunManagementViewState,
-  direction: -1 | 1
+  direction: -1 | 1,
+  messages: PracticeRunManagementMessages = DEFAULT_PRACTICE_RUN_MANAGEMENT_MESSAGES
 ): RunManagementViewState {
   if (!view.draft) {
     return view;
@@ -587,23 +623,29 @@ function stepEloInput(
     PRACTICE_RUN_RATING_MAX,
     Math.max(PRACTICE_RUN_RATING_MIN, current + direction * PRACTICE_RUN_ELO_STEP)
   );
-  return changeEloInput(view, String(elo));
+  return changeEloInput(view, String(elo), messages);
 }
 
-function validateEloInput(value: string): string | null {
+function validateEloInput(
+  value: string,
+  errorMessage: string = PRACTICE_RUN_ELO_ERROR
+): string | null {
   if (!/^\d+$/.test(value)) {
-    return PRACTICE_RUN_ELO_ERROR;
+    return errorMessage;
   }
   const elo = Number(value);
   return Number.isInteger(elo)
     && elo >= PRACTICE_RUN_RATING_MIN
     && elo <= PRACTICE_RUN_RATING_MAX
     ? null
-    : PRACTICE_RUN_ELO_ERROR;
+    : errorMessage;
 }
 
-export function validateOpponentReplySecondsInput(value: string): string | null {
-  const error = `Enter a positive whole number up to ${OPPONENT_REPLY_MAX_SECONDS} seconds.`;
+export function validateOpponentReplySecondsInput(
+  value: string,
+  errorMessage?: string
+): string | null {
+  const error = errorMessage ?? `Enter a positive whole number up to ${OPPONENT_REPLY_MAX_SECONDS} seconds.`;
   if (!/^\d+$/.test(value)) {
     return error;
   }

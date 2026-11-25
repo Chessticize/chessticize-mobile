@@ -223,6 +223,12 @@ import { makeStyles, useBoardAppearance, useTheme, type Theme } from "../theme/i
 import { LARGE_TITLE_MAX_FONT_SCALE } from "../theme/scales.ts";
 import { chessPieceSpriteFor } from "./practice/shared/chessPieceSprite.ts";
 import {
+  getActiveLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../i18n/index.ts";
+import {
   CUSTOM_INITIAL_RATING_MIN,
   errorMessage,
   FABRIC_SAFE_HIDDEN_TEXT_STYLE,
@@ -511,14 +517,15 @@ function previousAttemptNoticeFor(
 }
 
 function incompleteUnclearPromptFor(
-  attempt: Pick<AttemptEvent, "id" | "puzzleId" | "result" | "unclear"> | null | undefined
+  attempt: Pick<AttemptEvent, "id" | "puzzleId" | "result" | "unclear"> | null | undefined,
+  locale: SupportedLocale = getActiveLocale()
 ): UnclearPromptState | null {
   return attempt?.result === "incomplete"
     ? {
         attemptId: attempt.id,
         marked: Boolean(attempt.unclear),
         puzzleId: attempt.puzzleId,
-        question: "Was the final puzzle unclear?"
+        question: translate(locale, "session.unclear.finalQuestion")
       }
     : null;
 }
@@ -553,8 +560,6 @@ function shouldShowTimeoutSnapshot(
     nextState.currentPuzzle?.puzzle.id !== submittedPuzzleId;
 }
 
-const ARROW_DUEL_OPTIONAL_SETTINGS_COPY =
-  "This extra challenge is optional — turn it off in Settings.";
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
 const APP_REVIEW_REQUEST_IDLE_MS = 1_000;
 
@@ -613,6 +618,7 @@ export function PracticePocScreen({
 }: Props): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const { locale, t } = useTranslation();
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
   const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
@@ -839,10 +845,11 @@ export function PracticePocScreen({
     void aggregateRevision;
     return buildSurvivalChallengePresentation({
       currentState: state,
+      locale,
       nowMs: survivalPresentationNowMs,
       service
     });
-  }, [aggregateRevision, service, state, survivalPresentationNowMs]);
+  }, [aggregateRevision, locale, service, state, survivalPresentationNowMs]);
   const basePersonalBestPresentation = personalBestChallengeDesignPreview
     ?? livePersonalBestPresentation;
   const personalBestPresentation = useMemo<PersonalBestChallengeDesignPreview | undefined>(() => {
@@ -1185,6 +1192,7 @@ export function PracticePocScreen({
     iCloudSyncEnabled,
     iCloudSyncInProgress,
     iCloudSyncStatus,
+    language,
     lightBoardTheme,
     maybeShowReviewReminderPermissionPrompt,
     moveFeedbackPreferences,
@@ -1200,6 +1208,7 @@ export function PracticePocScreen({
     saveAppearance,
     saveDarkBoardTheme,
     saveICloudSyncEnabled,
+    saveLanguage,
     saveLightBoardTheme,
     saveMoveFeedbackPreferences,
     savePieceSet,
@@ -1640,7 +1649,7 @@ export function PracticePocScreen({
     try {
       run = service.getActivePracticeRun(runId);
     } catch {
-      setError("This run is no longer available on Home.");
+      setError(t("practiceHome.runNotAvailableError"));
       internalRunManagement.refresh();
       return;
     }
@@ -2808,7 +2817,7 @@ export function PracticePocScreen({
                 attemptId: next.attempt.id,
                 marked: Boolean(next.attempt.unclear),
                 puzzleId: next.attempt.puzzleId,
-                question: "Was it clear why the last correct move worked?"
+                question: t("session.unclear.correctQuestion")
               }
             : null
         ));
@@ -3627,7 +3636,7 @@ export function PracticePocScreen({
     sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting;
   const opponentReplySettingsHint = isSurvivalState
     ? undefined
-    : "Optional · Turn off in Settings";
+    : t("session.prompt.optionalSettingsHint");
   const arrowDuelReplyAutoTimeoutMs = arrowDuelReplyChallengeDesign?.autoTimeoutMs;
   const arrowDuelReplyChallengePreviewVisible = Boolean(
     arrowDuelReplyChallengeDesign?.enabled
@@ -3770,12 +3779,12 @@ export function PracticePocScreen({
   const explicitReplySideCopy = sprintGuidanceEnabled
     || arrowDuelReplyChallengeDesign?.explicitReplySideCopy === true;
   const arrowDuelWhatIfDetail = isSurvivalState
-    ? "Find the opponent’s reply. There is no time limit."
+    ? t("session.prompt.arrowDuelWhatIfSurvivalDetail")
     : explicitReplySideCopy
-      ? replyPreparationInstruction(arrowDuelReplySecondsRemaining)
-      : `Find the opponent’s reply in ${arrowDuelReplySecondsRemaining} ${
-          arrowDuelReplySecondsRemaining === 1 ? "second" : "seconds"
-        }.`;
+      ? replyPreparationInstruction(arrowDuelReplySecondsRemaining, locale)
+      : t("session.prompt.arrowDuelWhatIfFallbackDetail", {
+          count: arrowDuelReplySecondsRemaining
+        });
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
   const sessionEntryPreview = usePuzzleEntryPreview({
@@ -4300,11 +4309,11 @@ export function PracticePocScreen({
       && (historyReviewEntries.length > 0 || historyUnavailableAttempt !== null)
     )
   )
-    ? "Replay"
-    : screenTitleFor(tab);
+    ? t("common.replay")
+    : screenTitleFor(tab, locale);
   const screenSubtitle = tab === "practice"
-    ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
-    : screenSubtitleFor(tab);
+    ? t("screen.subtitle.practice", { count: seededPuzzleCount(puzzleSource) })
+    : screenSubtitleFor(tab, locale);
   const practiceModeSummaries: PracticeModeSummary[] = (["standard", "arrow_duel", "custom"] as const).map((nextMode) => {
     const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
     return {
@@ -4329,7 +4338,7 @@ export function PracticePocScreen({
   const sprintRulesGuidePresentation = sprintRulesDesignPreview?.firstRunGuide
     ?? (sprintGuidanceEnabled
       ? {
-          durationLabel: formatSprintDurationLabel(selectedHomeConfig.durationSeconds),
+          durationLabel: formatSprintDurationLabel(selectedHomeConfig.durationSeconds, locale),
           maxMistakes: selectedHomeConfig.maxMistakes,
           targetCorrect: selectedHomeConfig.targetCorrect
         }
@@ -4413,8 +4422,8 @@ export function PracticePocScreen({
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       closeAccessibilityLabel={personalBestActivePresentation
-        ? "Open Survival leave options"
-        : "Abandon sprint"}
+        ? t("session.status.survivalLeaveA11y")
+        : t("session.status.abandonSprintA11y")}
       compactMetrics={sessionUsesRail}
       metricsRef={activeSessionMetricsRef}
       onMetricsLayout={measureActiveAbandonAnchor}
@@ -4514,7 +4523,7 @@ export function PracticePocScreen({
           />
         ) : (
           <View style={[styles.emptyBoard, { width: boardSize, height: boardSize }]}>
-            <Text style={styles.emptyBoardText}>Ready</Text>
+            <Text style={styles.emptyBoardText}>{t("common.ready")}</Text>
           </View>
         )}
 
@@ -4536,12 +4545,12 @@ export function PracticePocScreen({
             style={styles.puzzleTimeoutOverlay}
             testID="session-puzzle-timeout-overlay"
           >
-            <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
+            <Text style={styles.puzzleTimeoutOverlayTitle}>{t("session.timedOut")}</Text>
             {(sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true) && !(
               feedbackSnapshot.currentPuzzle.kind === "arrow_duel" &&
               feedbackSnapshot.currentPuzzle.phase === "reply"
             ) ? (
-              <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review</Text>
+              <Text style={styles.puzzleTimeoutOverlayDetail}>{t("session.addedToReview")}</Text>
             ) : null}
           </View>
         ) : null}
@@ -4552,7 +4561,7 @@ export function PracticePocScreen({
               ?.preparationConfirmationRequired === true
               || productionReplyCuePresentation?.confirmationRequired === true)
               && !arrowDuelReplyPreparationAcknowledged
-              ? "Got it"
+              ? t("common.gotIt")
               : undefined}
             compactTitle={boardSize < 300}
             detail={arrowDuelWhatIfDetail}
@@ -4569,7 +4578,9 @@ export function PracticePocScreen({
             }}
             testIDPrefix="arrow-duel"
             title={explicitReplySideCopy && arrowDuelPromptSide
-              ? `What would ${moveSideDisplayName(arrowDuelPromptSide)} play after the other move?`
+              ? t("session.prompt.arrowDuelReplyTitle", {
+                  side: moveSideDisplayName(arrowDuelPromptSide, locale)
+                })
               : undefined}
             titleSide={explicitReplySideCopy && arrowDuelPromptSide
               ? arrowDuelPromptSide
@@ -4680,7 +4691,7 @@ export function PracticePocScreen({
           marked={unclearPrompt.marked}
           question={unclearPrompt.question.includes("wrong")
             ? unclearPrompt.question
-            : "Was the previous puzzle clear?"}
+            : t("session.unclear.defaultQuestion")}
           onToggle={toggleUnclearPrompt}
         />
       ) : null}
@@ -4697,6 +4708,7 @@ export function PracticePocScreen({
         adaptiveLayout,
         appTheme,
         boardSize,
+        locale,
         pieceSprite,
         presentation: sessionGuidePresentation,
         step: sessionGuideStep,
@@ -4727,26 +4739,39 @@ export function PracticePocScreen({
     || sessionBottomFeedbackNode !== null
     || errorNode !== null;
   const practiceAnnouncement = error
-    ? `Error. ${error}`
+    ? t("screen.announcement.error", { error })
     : personalBestGuideVisible
-      ? "Survival rules. The Run has not started."
+      ? t("survival.guide.announcement")
     : personalBestRecordsVisible
-      ? "Survival records. Puzzle and Arrow Duel bests are listed separately by level."
+      ? t("survival.records.announcement")
     : personalBestHubVisible
-      ? "Survival setup. Choose Puzzle or Arrow Duel and a level."
+      ? t("survival.hub.announcement")
     : isSessionGuideVisible
-      ? `${sessionGuidePresentation?.focusedRun
-        ? "Focused Run"
-        : sessionGuidePresentation?.mode === "arrow_duel"
-          ? "Arrow Duel"
-          : "Sprint"} first-session guide. The timer has not started.`
+      ? t("screen.announcement.guide", {
+          subject: sessionGuidePresentation?.focusedRun
+            ? t("common.focusedRun")
+            : sessionGuidePresentation?.mode === "arrow_duel"
+              ? t("common.arrowDuel")
+              : t("common.sprint")
+        })
     : boardFeedback
-      ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
+      ? `${boardFeedback.result === "correct" ? t("session.announcement.correct") : t("session.announcement.wrong")}. ${boardFeedback.puzzleSolved ? t("session.announcement.puzzleComplete") : t("session.announcement.continuePuzzle")}`
       : isActive && displayedSideToMove
         ? state?.config.tacticalFocus
-          ? `Focused Run. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${(state.correctCount + state.mistakeCount)} completed, ${state.mistakeCount} mistakes.`
-          : `${personalBestActivePresentation ? "Survival" : `${modeLabel(mode)} sprint`}. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
-        : `${screenTitle} screen`;
+          ? t("session.announcement.focusedActive", {
+              sideLabel: sideToMoveAccessibilityLabel(displayedSideToMove, locale),
+              completed: state.correctCount + state.mistakeCount,
+              mistakes: state.mistakeCount
+            })
+          : t("session.announcement.sprintActive", {
+              subject: personalBestActivePresentation
+                ? t("common.survival")
+                : t("session.announcement.sprintSubject", { mode: modeLabel(mode, locale) }),
+              sideLabel: sideToMoveAccessibilityLabel(displayedSideToMove, locale),
+              solved: state?.correctCount ?? 0,
+              mistakes: state?.mistakeCount ?? 0
+            })
+        : t("screen.announcement.screen", { title: screenTitle });
 
   function selectTopLevelTab(nextTab: TopLevelTab): void {
     const intent = topLevelTabIntent(nextTab);
@@ -4803,7 +4828,7 @@ export function PracticePocScreen({
       </View>
       {simulationProfile?.active ? (
         <Text style={styles.simulationBadge} testID="simulation-profile-indicator">
-          Simulation data
+          {t("screen.simulationBadge")}
         </Text>
       ) : null}
     </View>
@@ -5042,8 +5067,8 @@ export function PracticePocScreen({
                 {personalBestGuideVisible && personalBestGuidePresentation ? (
                   <PersonalBestGuide
                     backAccessibilityLabel={personalBestGuideIntent === "first-entry"
-                      ? "Back to Practice"
-                      : "Back to Survival Hub"}
+                      ? t("sprintResult.backToPractice")
+                      : t("screen.backToSurvivalHub")}
                     presentation={personalBestGuidePresentation}
                     onAcknowledge={acknowledgePersonalBestGuide}
                     onClose={closePersonalBestGuide}
@@ -5501,8 +5526,8 @@ export function PracticePocScreen({
                 progressProtection={progressProtection}
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
                 ratings={[
-                  { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
-                  { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
+                  { label: t("common.standard"), record: service.getRating(defaultSprintConfig("standard").ratingKey) },
+                  { label: t("common.arrowDuel"), record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
                 onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => navigateToTab("analysis") : undefined}
                 onOpenWhatsNew={whatsNew.open}
@@ -5520,10 +5545,11 @@ export function PracticePocScreen({
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncErrorDetails={effectiveErrorDetails}
                 iCloudSyncInProgress={iCloudSyncInProgress}
-                iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
+                iCloudSyncStatus={iCloudSyncErrorDetails ? t("screen.iCloudSyncFailed") : iCloudSyncStatus}
                 iCloudSyncSupportBundle={effectiveSupportBundle}
                 appearance={appearance}
                 darkBoardTheme={darkBoardTheme}
+                language={language}
                 lightBoardTheme={lightBoardTheme}
                 pieceSet={pieceSet}
                 moveFeedbackPreferences={moveFeedbackPreferences}
@@ -5536,6 +5562,7 @@ export function PracticePocScreen({
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onAppearanceChange={saveAppearance}
                 onDarkBoardThemeChange={saveDarkBoardTheme}
+                onLanguageChange={saveLanguage}
                 onLightBoardThemeChange={saveLightBoardTheme}
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onPieceSetChange={savePieceSet}
@@ -5564,7 +5591,7 @@ export function PracticePocScreen({
         </View>
         {startingMode ? (
           <View
-            accessibilityLabel={`Preparing ${modeLabel(startingMode)} sprint`}
+            accessibilityLabel={t("session.loading.a11y", { mode: modeLabel(startingMode, locale) })}
             accessibilityRole="progressbar"
             accessibilityViewIsModal
             style={styles.sprintLoadingOverlay}
@@ -5572,8 +5599,8 @@ export function PracticePocScreen({
           >
             <View style={styles.sprintLoadingCard}>
               <ActivityIndicator color={appTheme.colors.accent.s600} size="large" testID="sprint-loading-spinner" />
-              <Text style={styles.sprintLoadingTitle}>Preparing {modeLabel(startingMode)}</Text>
-              <Text style={styles.sprintLoadingDetail}>Loading puzzles and setting up the board</Text>
+              <Text style={styles.sprintLoadingTitle}>{t("session.loading.title", { mode: modeLabel(startingMode, locale) })}</Text>
+              <Text style={styles.sprintLoadingDetail}>{t("session.loading.detail")}</Text>
             </View>
           </View>
         ) : null}
@@ -5583,7 +5610,7 @@ export function PracticePocScreen({
           {...sessionGuideStepCopy(sessionGuideStep, {
             focusedRun: sessionGuide.presentation.focusedRun === true,
             mode: sessionGuide.presentation.mode
-          })}
+          }, locale)}
           canGoBack={sessionGuide.stepIndex > 0}
           insets={insets}
           measureKey={[
@@ -5596,14 +5623,14 @@ export function PracticePocScreen({
             sessionGuideTargetRevision
           ].join(":")}
           nextLabel={sessionGuide.stepIndex < sessionGuide.plan.steps.length - 1
-            ? "Next"
+            ? t("common.next")
             : sessionGuideStartLabel({
                 focusedRun: sessionGuide.presentation.focusedRun === true,
                 mode: sessionGuide.presentation.mode
-              })}
+              }, locale)}
           note={sessionGuideStep === "arrow_duel_reply"
             && sessionGuide.presentation.opponentReplySettingsHint === true
-            ? ARROW_DUEL_OPTIONAL_SETTINGS_COPY
+            ? t("session.prompt.optionalSettingsCopy")
             : undefined}
           stepNumber={sessionGuide.stepIndex + 1}
           stepTestID={`practice-session-guide-step-${sessionGuideStep}`}
@@ -5659,7 +5686,7 @@ export function PracticePocScreen({
               style={styles.predictiveBackDestination}
               testID="mobile-back-destination-preview"
             >
-              <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+              <Text style={styles.predictiveBackEyebrow}>{t("back.eyebrow")}</Text>
               <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
                 {mobileBackPreview.label}
               </Text>
@@ -5828,6 +5855,7 @@ function buildSessionGuideStageNodes({
   adaptiveLayout,
   appTheme,
   boardSize,
+  locale,
   pieceSprite,
   presentation,
   step,
@@ -5839,6 +5867,7 @@ function buildSessionGuideStageNodes({
   adaptiveLayout: AdaptiveLayout;
   appTheme: Theme;
   boardSize: number;
+  locale: SupportedLocale;
   pieceSprite: ReturnType<typeof chessPieceSpriteFor>;
   presentation: SprintSessionGuidePresentation;
   step: SprintSessionGuideStep;
@@ -5860,7 +5889,7 @@ function buildSessionGuideStageNodes({
   const slotWidth = adaptiveLayout.sessionColumnWidth;
   const targetsBoard = step === "arrow_duel_choice" || step === "arrow_duel_reply";
   const settingsHint = presentation.opponentReplySettingsHint
-    ? "Optional · Turn off in Settings"
+    ? translate(locale, "session.prompt.optionalSettingsHint")
     : undefined;
   const noop = (): void => undefined;
 
@@ -5880,9 +5909,9 @@ function buildSessionGuideStageNodes({
         accessible
         accessibilityLabel={isArrowDuel
           ? isReplyStep
-            ? "Example Arrow Duel reply position, Black to move after the other move"
-            : "Example Arrow Duel puzzle, White to move, two candidate arrows"
-          : "Example chess puzzle, White to move"}
+            ? translate(locale, "screen.guideBoard.arrowDuelReplyA11y")
+            : translate(locale, "screen.guideBoard.arrowDuelChoiceA11y")
+          : translate(locale, "screen.guideBoard.standardA11y")}
         accessibilityRole="image"
         collapsable={false}
         ref={targetsBoard ? targetRef : undefined}
@@ -5951,7 +5980,7 @@ function buildSessionGuideStageNodes({
       >
         <UnclearAttemptPrompt
           marked={false}
-          question="Was the previous puzzle clear?"
+          question={translate(locale, "session.unclear.defaultQuestion")}
           targetRef={targetRef}
           onTargetLayout={onTargetLayout}
           onToggle={noop}
@@ -5993,7 +6022,7 @@ function buildSessionGuideStageNodes({
     score: usesRail ? score : null,
     status: (
       <SessionStatusBar
-        closeAccessibilityLabel="Exit guide"
+        closeAccessibilityLabel={translate(locale, "screen.guideExitA11y")}
         compactMetrics={usesRail}
         confirmAbandon={false}
         metricsRef={step === "session_progress" ? targetRef : undefined}
@@ -6018,25 +6047,34 @@ function bundledCoreCustomEligiblePuzzleCount(theme: string | undefined): number
   return manifest.themeCounts?.[theme] ?? 0;
 }
 
-function screenTitleFor(tab: Tab): string {
+function screenTitleFor(tab: Tab, locale: SupportedLocale): string {
   if (tab === "analysis") {
-    return "Analysis";
+    return translate(locale, "common.analysis");
   }
-  return tab.charAt(0).toUpperCase() + tab.slice(1);
-}
-
-function screenSubtitleFor(tab: Tab): string | null {
   if (tab === "review") {
-    return "Scheduled mistake review";
+    return translate(locale, "tabs.review");
   }
   if (tab === "history") {
-    return "Rating trend and attempts";
+    return translate(locale, "tabs.history");
   }
   if (tab === "settings") {
-    return "Sync, data, and ratings";
+    return translate(locale, "tabs.settings");
+  }
+  return translate(locale, "tabs.practice");
+}
+
+function screenSubtitleFor(tab: Tab, locale: SupportedLocale): string | null {
+  if (tab === "review") {
+    return translate(locale, "screen.subtitle.review");
+  }
+  if (tab === "history") {
+    return translate(locale, "screen.subtitle.history");
+  }
+  if (tab === "settings") {
+    return translate(locale, "screen.subtitle.settings");
   }
   if (tab === "analysis") {
-    return "Native Stockfish diagnostics";
+    return translate(locale, "screen.subtitle.analysis");
   }
   return null;
 }

@@ -3,6 +3,7 @@ import type {
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
+  LanguagePreference,
   Puzzle,
   PracticeRunRecord,
   PracticeRunSnapshot,
@@ -134,6 +135,12 @@ export interface PracticeSettings {
   lightBoardTheme: BoardThemeId;
   darkBoardTheme: BoardThemeId;
   pieceSet: ChessPieceSetId;
+  /**
+   * Device-local language override: follow the OS language ("system") or force
+   * one supported locale. Device-local: iCloud progress sync and local-data
+   * import never carry it.
+   */
+  language?: LanguagePreference;
   /**
    * Release version whose What's New notes were last seen or skipped on this
    * device (for example "1.6.0"). Absent until recorded. Device-local: iCloud

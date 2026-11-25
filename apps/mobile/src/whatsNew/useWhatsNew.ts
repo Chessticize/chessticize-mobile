@@ -10,6 +10,7 @@ import {
   type WhatsNewContent,
   type WhatsNewPlatform
 } from "./whatsNewContent.ts";
+import { useTranslation } from "../i18n/index.ts";
 
 // Wires the What's New decision (packages/core) to the screen. The launch
 // decision is made once, from stored state, when the screen mounts:
@@ -47,6 +48,7 @@ export function useWhatsNew({
   presentable: boolean;
   service: PracticeService;
 }): WhatsNewControls {
+  const { locale } = useTranslation();
   const [effectiveAppVersion, setEffectiveAppVersion] = useState(appVersion);
   const [launchDecision] = useState(() => decideForLaunch(service, appVersion));
   const [pending, setPending] = useState(launchDecision.show);
@@ -78,7 +80,7 @@ export function useWhatsNew({
   }, [service]);
 
   return {
-    content: whatsNewContentFor(platform),
+    content: whatsNewContentFor(platform, locale),
     visible: requested || (pending && presentable),
     open,
     dismiss,
