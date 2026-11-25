@@ -19,18 +19,43 @@ const PROMOTION_LABELS: Readonly<Record<PieceSymbol, string>> = {
   r: "rook"
 };
 
-export function buildAccessibleMoveOptions(fen: string | null | undefined): AccessibleMoveOption[] {
+export type AccessibleMoveLabelInput = {
+  from: Square;
+  promotion?: PieceSymbol;
+  san: string;
+  to: Square;
+};
+
+export type BuildAccessibleMoveOptions = {
+  formatLabel?: (move: AccessibleMoveLabelInput) => string;
+};
+
+function defaultAccessibleMoveLabel(move: AccessibleMoveLabelInput): string {
+  return `${move.san}, ${move.from} to ${move.to}${move.promotion ? `, promote to ${PROMOTION_LABELS[move.promotion]}` : ""}`;
+}
+
+export function buildAccessibleMoveOptions(
+  fen: string | null | undefined,
+  options?: BuildAccessibleMoveOptions
+): AccessibleMoveOption[] {
   if (!fen) {
     return [];
   }
 
+  const formatLabel = options?.formatLabel ?? defaultAccessibleMoveLabel;
   try {
     return new Chess(fen).moves({ verbose: true }).map((move) => {
       const promotion = move.promotion as PieceSymbol | undefined;
       const uci = `${move.from}${move.to}${promotion ?? ""}`;
+      const labelInput: AccessibleMoveLabelInput = {
+        from: move.from,
+        ...(promotion ? { promotion } : {}),
+        san: move.san,
+        to: move.to
+      };
       return {
         from: move.from,
-        label: `${move.san}, ${move.from} to ${move.to}${promotion ? `, promote to ${PROMOTION_LABELS[promotion]}` : ""}`,
+        label: formatLabel(labelInput),
         ...(promotion ? { promotion } : {}),
         san: move.san,
         to: move.to,

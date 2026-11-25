@@ -33,6 +33,12 @@ import { customThemeLabel } from "../shared/themeCatalog.ts";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
 import { AppModal } from "../../AppModal.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import {
+  formatOrdinalForLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../../../i18n/index.ts";
 
 export type RunReorderPickupFeedback = {
   haptic: "medium";
@@ -48,12 +54,18 @@ export type SprintRulesGuidePresentation = {
   targetCorrect: number;
 };
 
-const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
-  standard: "Find the best move",
-  arrow_duel: "Choose the best move",
-  blitz: "Fast time control",
-  custom: "Time, theme, rating"
-};
+function practiceModeDescription(mode: SprintMode, locale: SupportedLocale): string {
+  switch (mode) {
+    case "arrow_duel":
+      return translate(locale, "practiceHome.modeDesc.arrow_duel");
+    case "blitz":
+      return translate(locale, "practiceHome.modeDesc.blitz");
+    case "custom":
+      return translate(locale, "practiceHome.modeDesc.custom");
+    default:
+      return translate(locale, "practiceHome.modeDesc.standard");
+  }
+}
 
 export type PracticeModeSummary = {
   mode: SprintMode;
@@ -105,6 +117,7 @@ export function PracticeHome({
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
   const progressMode = selectedRun?.mode ?? mode;
 
@@ -144,9 +157,9 @@ export function PracticeHome({
             <>
               <HomeStartHeader
                 headerTestID="practice-action-header"
-                startAccessibilityLabel={`Start ${modeLabel(mode)} sprint`}
+                startAccessibilityLabel={t("practiceHome.startModeSprintA11y", { mode: modeLabel(mode, locale) })}
                 startTestID="practice-start-button"
-                title="Start a Sprint"
+                title={t("practiceHome.startSprintTitle")}
                 titleTestID="practice-header-title"
                 onStart={() => onStartMode(mode)}
               />
@@ -220,6 +233,7 @@ function PracticeRunHome({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const { t } = useTranslation();
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
   const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
@@ -492,16 +506,17 @@ function PracticeRunHome({
   return (
     <View style={styles.homeRunPanel} testID="practice-run-management">
       <HomeStartHeader
-        actionLabel={presentation.homeEditing ? "Done" : "Start"}
+        actionLabel={presentation.homeEditing ? t("common.done") : t("common.start")}
         headerTestID="practice-action-header"
+        showPlayIcon={!presentation.homeEditing}
         startAccessibilityLabel={presentation.homeEditing
-          ? "Finish editing runs"
+          ? t("practiceHome.doneEditingA11y")
           : selectedRun
-            ? `Start ${selectedRun.name}`
-            : "Start a run"}
+            ? t("practiceHome.startA11y", { name: selectedRun.name })
+            : t("practiceHome.startGenericRunA11y")}
         startDisabled={!presentation.homeEditing && !selectedRun}
         startTestID={presentation.homeEditing ? "practice-run-home-done" : "practice-run-start"}
-        title={presentation.homeEditing ? "Edit Runs" : "Start a Run"}
+        title={presentation.homeEditing ? t("practiceHome.editRunsTitle") : t("practiceHome.startRunTitle")}
         titleTestID="practice-header-title"
         onStart={() => presentation.onIntent({
           type: presentation.homeEditing ? "toggle-home-edit" : "start-selected-run"
@@ -511,9 +526,9 @@ function PracticeRunHome({
       <AppText style={styles.homeHelperText} tone="secondary" variant="subheadline">
         {presentation.homeEditing
           ? Platform.OS === "web"
-            ? "Drag a card to reorder, or use the arrow buttons."
-            : "Touch and hold a card to drag, or use the arrow buttons."
-          : "Choose a run, then start when you are ready."}
+            ? t("practiceHome.editHelperWeb")
+            : t("practiceHome.editHelperNative")
+          : t("practiceHome.homeHelper")}
       </AppText>
 
       <View
@@ -522,9 +537,9 @@ function PracticeRunHome({
       >
         {sprintRulesGuide && !presentation.homeEditing && !sprintRulesGuideVisible ? (
           <Button
-            accessibilityLabel="How Sprint works"
+            accessibilityLabel={t("practiceHome.howSprintsWork")}
             icon="help"
-            label="How Sprint works"
+            label={t("practiceHome.howSprintsWork")}
             size="compact"
             testID="practice-sprint-rules-open"
             variant="plain"
@@ -534,8 +549,8 @@ function PracticeRunHome({
         <View style={styles.runManagementToolbarActions}>
           {!presentation.homeEditing ? (
             <Button
-              accessibilityLabel="Edit runs"
-              label="Edit"
+              accessibilityLabel={t("practiceHome.editRunsA11y")}
+              label={t("common.edit")}
               size="compact"
               testID="practice-run-home-edit"
               variant="plain"
@@ -543,9 +558,9 @@ function PracticeRunHome({
             />
           ) : null}
           <Button
-            accessibilityLabel="Add a run"
+            accessibilityLabel={t("practiceHome.addRunA11y")}
             icon="add"
-            label="Add Run"
+            label={t("practiceHome.addRun")}
             size="compact"
             testID="practice-add-run"
             variant="plain"
@@ -573,14 +588,14 @@ function PracticeRunHome({
 
       {presentation.runs.length === 0 ? (
         <Section testID="practice-runs-empty">
-          <AppText variant="headline">No runs on Home</AppText>
+          <AppText variant="headline">{t("practiceHome.runNoActiveTitle")}</AppText>
           <AppText tone="secondary" variant="subheadline">
-            Add a new run or restore one below. Saved ratings and history are still available.
+            {t("practiceHome.runNoActiveBody")}
           </AppText>
           <Button
-            accessibilityLabel="Add a new run"
+            accessibilityLabel={t("practiceHome.addNewRunA11y")}
             icon="add"
-            label="Add a Run"
+            label={t("practiceHome.addARun")}
             testID="practice-empty-add-run"
             onPress={() => presentation.onIntent({ type: "add-run" })}
           />
@@ -673,8 +688,8 @@ function PracticeRunHome({
 
       {showRestore ? (
         <Section
-          footer="Restoring a run keeps its existing rating and history."
-          header="Restore to Home"
+          footer={t("practiceHome.restoreSectionFooter")}
+          header={t("practiceHome.restoreSectionHeader")}
           rows
           testID="practice-run-restore-section"
         >
@@ -682,12 +697,12 @@ function PracticeRunHome({
             <ListRow
               key={run.id}
               icon={runIconName(run)}
-              subtitle={`Rating ${run.elo}`}
+              subtitle={t("common.ratingValue", { rating: run.elo })}
               title={run.name}
               trailing={(
                 <Button
-                  accessibilityLabel={`Restore ${run.name} to Home`}
-                  label="Restore"
+                  accessibilityLabel={t("practiceHome.runRestoreA11y", { name: run.name })}
+                  label={t("common.restore")}
                   size="compact"
                   testID={`practice-run-restore-${safeTestId(run.id)}`}
                   variant="secondary"
@@ -710,7 +725,10 @@ function SprintRulesGuide({
   onDismiss: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
-  const mistakeLimitDetail = `The ${ordinalWord(presentation.maxMistakes)} mistake ends the Sprint.`;
+  const { locale, t } = useTranslation();
+  const mistakeLimitDetail = t("practiceHome.rulesGuide.mistakeLimitDetail", {
+    ordinal: formatOrdinalForLocale(presentation.maxMistakes, locale)
+  });
   // One badge width for every rule so the descriptions share a column. The
   // width follows the text size; when it would take more than a third of the
   // card (narrow screens at accessibility sizes), badges stack above their copy.
@@ -729,7 +747,11 @@ function SprintRulesGuide({
 
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Finish the goal before the Sprint clock reaches zero. At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={t("practiceHome.rulesGuide.a11y", {
+        target: presentation.targetCorrect,
+        attempted: presentation.targetCorrect + 1,
+        mistakeLimitDetail
+      })}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -738,14 +760,14 @@ function SprintRulesGuide({
         testID="practice-sprint-rules-header"
       >
         <View style={[styles.sprintRulesGuideTitleBlock, dismissStacked ? styles.sprintRulesGuideTitleBlockStacked : null]}>
-          <Text style={styles.sprintRulesEyebrow}>YOUR FIRST SPRINT</Text>
+          <Text style={styles.sprintRulesEyebrow}>{t("practiceHome.rulesGuide.eyebrow")}</Text>
           <Text maxFontSizeMultiplier={TITLE_MAX_FONT_SCALE} style={styles.sprintRulesGuideTitle}>
-            Solve {presentation.targetCorrect} puzzles to pass
+            {t("practiceHome.rulesGuide.title", { target: presentation.targetCorrect })}
           </Text>
         </View>
         <Button
-          accessibilityLabel="Dismiss Sprint rules"
-          label="Got it"
+          accessibilityLabel={t("practiceHome.rulesGuide.dismissA11y")}
+          label={t("common.gotIt")}
           size="compact"
           style={dismissStacked ? styles.sprintRulesDismissButtonStacked : null}
           testID="practice-sprint-rules-dismiss"
@@ -761,34 +783,41 @@ function SprintRulesGuide({
         <SprintRuleRow
           layout={ruleLayout}
           badge={presentation.durationLabel}
-          detail="Finish the goal before the Sprint clock reaches zero. At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear."
-          label="Time limit"
+          detail={t("practiceHome.rulesGuide.timeLimitDetail")}
+          label={t("practiceHome.rulesGuide.timeLimitLabel")}
+          ruleKey="time-limit"
         />
         <SprintRuleRow
           layout={ruleLayout}
           badge={String(presentation.maxMistakes)}
           detail={mistakeLimitDetail}
-          label="Mistake limit"
+          label={t("practiceHome.rulesGuide.mistakeLimitLabel")}
+          ruleKey="mistake-limit"
           tone="danger"
         />
         <SprintRuleRow
           layout={ruleLayout}
-          badge="SLOW"
-          detail="The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
-          label="Slow warning"
+          badge={t("practiceHome.rulesGuide.slowBadge")}
+          detail={t("practiceHome.rulesGuide.slowDetail")}
+          label={t("practiceHome.rulesGuide.slowLabel")}
+          ruleKey="slow-warning"
           tone="warning"
         />
         <SprintRuleRow
           layout={ruleLayout}
-          badge="TIMEOUT"
-          detail="When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
-          label="Puzzle timeout"
+          badge={t("practiceHome.rulesGuide.timeoutBadge")}
+          detail={t("practiceHome.rulesGuide.timeoutDetail")}
+          label={t("practiceHome.rulesGuide.timeoutLabel")}
+          ruleKey="puzzle-timeout"
           tone="danger"
         />
       </View>
 
       <Text style={styles.sprintRulesGuideFootnote}>
-        Example: {presentation.targetCorrect} solved + 1 mistake = {presentation.targetCorrect + 1} attempted.
+        {t("practiceHome.rulesGuide.footnote", {
+          target: presentation.targetCorrect,
+          attempted: presentation.targetCorrect + 1
+        })}
       </Text>
     </View>
   );
@@ -803,16 +832,18 @@ function SprintRuleRow({
   detail,
   label,
   layout,
+  ruleKey,
   tone = "default"
 }: {
   badge: string;
   detail: string;
   label: string;
   layout: { badgeMinWidth: number; stacked: boolean };
+  ruleKey: string;
   tone?: "default" | "danger" | "warning";
 }): React.JSX.Element {
   const styles = useStyles();
-  const ruleTestId = safeTestId(label);
+  const ruleTestId = ruleKey;
 
   return (
     <View
@@ -898,15 +929,16 @@ function PracticeRunCard({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const { locale, t } = useTranslation();
   const details = run.kind === "custom"
-    ? `${run.themes.map(customThemeLabel).join(" + ")} · ${formatSprintTimingLabel({
+    ? `${run.themes.map((theme) => customThemeLabel(theme, locale)).join(" + ")} · ${formatSprintTimingLabel({
         ...defaultSprintConfig(run.mode),
         durationSeconds: run.durationSeconds,
         perPuzzleSeconds: run.perPuzzleSeconds
-      })}`
+      }, locale)}`
     : run.kind === "arrow_duel"
-      ? "Choose between two candidate moves"
-      : "Find the best move";
+      ? t("practiceHome.runDesc.arrow_duel")
+      : t("practiceHome.runDesc.standard");
 
   return (
     <RunCardDropSurface
@@ -941,8 +973,10 @@ function PracticeRunCard({
         accessibilityRole="button"
         accessibilityState={{ selected: active && !editing }}
         accessibilityLabel={editing
-          ? directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} rating`
-          : `Select ${run.name}, rating ${run.elo}, ${details}`}
+          ? directRunEditing
+            ? t("practiceHome.runEditA11y", { name: run.name })
+            : t("practiceHome.runEditRatingA11y", { name: run.name })
+          : t("practiceHome.runSelectA11y", { name: run.name, elo: run.elo, detail: details })}
         style={styles.homeRowSelectArea}
         testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
@@ -980,7 +1014,7 @@ function PracticeRunCard({
           <View style={styles.runEditActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Move ${run.name} up`}
+              accessibilityLabel={t("practiceHome.runMoveUpA11y", { name: run.name })}
               accessibilityState={{ disabled: !canMoveUp }}
               disabled={!canMoveUp}
               style={[styles.homeRowIconButton, !canMoveUp ? styles.homeRowIconButtonDisabled : null]}
@@ -991,7 +1025,7 @@ function PracticeRunCard({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Move ${run.name} down`}
+              accessibilityLabel={t("practiceHome.runMoveDownA11y", { name: run.name })}
               accessibilityState={{ disabled: !canMoveDown }}
               disabled={!canMoveDown}
               style={[styles.homeRowIconButton, !canMoveDown ? styles.homeRowIconButtonDisabled : null]}
@@ -1001,8 +1035,10 @@ function PracticeRunCard({
               <Icon color={appTheme.colors.accent.s600} name="chevronDown" size={18} weight="semibold" />
             </Pressable>
             <Button
-              accessibilityLabel={directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} rating`}
-              label={directRunEditing ? "Edit" : "Edit rating"}
+              accessibilityLabel={directRunEditing
+                ? t("practiceHome.runEditA11y", { name: run.name })
+                : t("practiceHome.runEditRatingA11y", { name: run.name })}
+              label={directRunEditing ? t("common.edit") : t("settings.ratings.editRowLabel")}
               size="compact"
               testID={`practice-run-edit-${safeTestId(run.id)}`}
               variant="secondary"
@@ -1010,7 +1046,7 @@ function PracticeRunCard({
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Remove ${run.name} from Home`}
+              accessibilityLabel={t("practiceHome.runRemoveA11y", { name: run.name })}
               style={[styles.homeRowIconButton, styles.homeRowRemoveButton]}
               testID={`practice-run-remove-${safeTestId(run.id)}`}
               onPress={() => onIntent({ type: "remove-run", runId: run.id })}
@@ -1243,6 +1279,7 @@ function RunCardDropSurface({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const { t } = useTranslation();
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
   const nativeDropPreviewOffset = useRef(new Animated.Value(dropPreviewOffsetY)).current;
   const nativeDragActiveRef = useRef(false);
@@ -1624,7 +1661,7 @@ function RunCardDropSurface({
           willChange: draggable ? "transform" : undefined,
           zIndex: dragging ? 20 : dropTarget ? 10 : undefined
         }}
-        title={draggable ? `Drag ${runName} to reorder` : undefined}
+        title={draggable ? t("practiceHome.runDragTitle", { name: runName }) : undefined}
         onContextMenu={(event) => {
           if (draggable) {
             event.preventDefault();
@@ -1743,7 +1780,7 @@ function RunCardDropSurface({
   return (
     <GestureDetector gesture={nativeDragGesture}>
       <Animated.View
-        accessibilityHint={draggable ? "Touch and hold, then drag vertically to reorder this run. Arrow buttons are also available." : undefined}
+        accessibilityHint={draggable ? t("practiceHome.runDragHint") : undefined}
         onLayout={handleNativeLayout}
         style={[
           style,
@@ -1808,6 +1845,7 @@ export function StartConflictPrompt({
   onResume: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <AppModal animationType="fade" onRequestClose={onCancel} transparent visible>
       <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
@@ -1817,22 +1855,22 @@ export function StartConflictPrompt({
           style={[styles.feedbackHandoffConfirmation, styles.startConflictCard]}
           testID="practice-start-conflict"
         >
-          <AppText variant="title">Unfinished Run</AppText>
+          <AppText variant="title">{t("practiceHome.startConflict.title")}</AppText>
           <AppText tone="secondary" variant="body">
-            Resume it, or discard it to start a new Run.
+            {t("practiceHome.startConflict.body")}
           </AppText>
           <View style={styles.feedbackHandoffActions}>
             <Button
-              accessibilityLabel="Resume the unfinished Run"
-              label="Resume"
+              accessibilityLabel={t("practiceHome.startConflict.resumeA11y")}
+              label={t("common.resume")}
               stretch
               testID="practice-start-conflict-resume"
               onPress={onResume}
             />
             {canDiscard ? (
               <Button
-                accessibilityLabel="Discard the unfinished Run and start a new Run"
-                label="Discard and start"
+                accessibilityLabel={t("practiceHome.startConflict.discardA11y")}
+                label={t("practiceHome.startConflict.discard")}
                 stretch
                 testID="practice-start-conflict-discard"
                 variant="destructive"
@@ -1840,8 +1878,8 @@ export function StartConflictPrompt({
               />
             ) : null}
             <Button
-              accessibilityLabel="Keep the unfinished Run and cancel"
-              label="Cancel"
+              accessibilityLabel={t("practiceHome.startConflict.cancelA11y")}
+              label={t("common.cancel")}
               stretch
               testID="practice-start-conflict-cancel"
               variant="secondary"
@@ -1855,10 +1893,11 @@ export function StartConflictPrompt({
 }
 
 function PracticeNoRunProgressCard(): React.JSX.Element {
+  const { t } = useTranslation();
   return (
-    <Section header="Progress" testID="practice-progress-no-run">
-      <AppText variant="headline">No run selected</AppText>
-      <AppText tone="secondary" variant="subheadline">Add or restore a run to see its current rating.</AppText>
+    <Section header={t("common.progress")} testID="practice-progress-no-run">
+      <AppText variant="headline">{t("practiceHome.noRunProgress.title")}</AppText>
+      <AppText tone="secondary" variant="subheadline">{t("practiceHome.noRunProgress.body")}</AppText>
     </Section>
   );
 }
@@ -1870,6 +1909,7 @@ function ResumeSprintCard({
   onResume: () => void;
   sprint: SprintState;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const isTacticalFocus = sprint.config.tacticalFocus !== undefined;
   const completedCount = sprint.correctCount + sprint.mistakeCount;
   const remaining = Math.max(
@@ -1879,19 +1919,33 @@ function ResumeSprintCard({
       : sprint.config.targetCorrect) -
       (isTacticalFocus ? completedCount : sprint.correctCount)
   );
+  const modeName = modeLabel(sprint.config.mode, locale);
   return (
     <Section rows>
       <ListRow
         accessibilityLabel={isTacticalFocus
-          ? `Resume Focused Run, ${completedCount} completed, ${remaining} left, ${sprint.mistakeCount} mistakes`
-          : `Resume ${modeLabel(sprint.config.mode)} sprint`}
+          ? t("practiceHome.resumeCard.focusedA11y", {
+              completed: completedCount,
+              remaining,
+              mistakes: sprint.mistakeCount
+            })
+          : t("practiceHome.resumeCard.sprintA11y", { mode: modeName })}
         icon="play"
         subtitle={isTacticalFocus
-          ? `Focused Run · ${completedCount} completed · ${remaining} left · ${sprint.mistakeCount} mistakes`
-          : `${modeLabel(sprint.config.mode)} · ${sprint.correctCount} solved · ${remaining} left · ${sprint.mistakeCount} mistakes`}
+          ? t("practiceHome.resumeCard.focusedSubtitle", {
+              completed: completedCount,
+              remaining,
+              mistakes: sprint.mistakeCount
+            })
+          : t("practiceHome.resumeCard.sprintSubtitle", {
+              mode: modeName,
+              solved: sprint.correctCount,
+              remaining,
+              mistakes: sprint.mistakeCount
+            })}
         testID="practice-resume-card"
-        title={isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
-        trailing={<AppText numberOfLines={1} tone="accent" variant="headline">Resume</AppText>}
+        title={isTacticalFocus ? t("practiceHome.resumeCard.focusedTitle") : t("practiceHome.resumeCard.sprintTitle")}
+        trailing={<AppText numberOfLines={1} tone="accent" variant="headline">{t("common.resume")}</AppText>}
         onPress={onResume}
       />
     </Section>
@@ -1908,6 +1962,7 @@ export function PausedSessionPanel({
   state: SprintState;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const { fontScale } = usePracticeViewport();
   const stackActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
@@ -1919,30 +1974,48 @@ export function PausedSessionPanel({
       : state.config.targetCorrect) -
       (isTacticalFocus ? completedCount : state.correctCount)
   );
+  const modeName = modeLabel(state.config.mode, locale);
   return (
     <View
       accessibilityLabel={isTacticalFocus
-        ? `Paused Focused Run, ${completedCount} completed, ${remaining} left, ${state.mistakeCount} mistakes`
-        : `Paused ${modeLabel(state.config.mode)} sprint, ${state.correctCount} solved, ${remaining} left`}
+        ? t("practiceHome.paused.focusedA11y", {
+            completed: completedCount,
+            remaining,
+            mistakes: state.mistakeCount
+          })
+        : t("practiceHome.paused.sprintA11y", {
+            mode: modeName,
+            solved: state.correctCount,
+            remaining
+          })}
       style={styles.pausedSessionPanel}
       testID="paused-session-panel"
     >
       <View style={styles.pausedSessionCopy}>
         <Text style={styles.sectionLabel}>
-          {isTacticalFocus ? "Focused Run paused" : "Sprint paused"}
+          {isTacticalFocus ? t("practiceHome.paused.focusedTitle") : t("practiceHome.paused.sprintTitle")}
         </Text>
         <Text style={styles.helperText}>
           {isTacticalFocus
-            ? `${completedCount} completed · ${remaining} left · ${state.mistakeCount} mistakes`
-            : `${modeLabel(state.config.mode)} · ${state.correctCount} solved · ${remaining} left · ${state.mistakeCount} mistakes`}
+            ? t("practiceHome.paused.focusedDetail", {
+                completed: completedCount,
+                remaining,
+                mistakes: state.mistakeCount
+              })
+            : t("practiceHome.paused.sprintDetail", {
+                mode: modeName,
+                solved: state.correctCount,
+                remaining,
+                mistakes: state.mistakeCount
+              })}
         </Text>
       </View>
       <View style={[styles.pausedSessionActions, stackActions ? styles.pausedSessionActionsStacked : null]}>
         <Button
           accessibilityLabel={isTacticalFocus
-            ? "Abandon paused Focused Run"
-            : "Abandon paused sprint"}
-          label="Abandon"
+            ? t("practiceHome.paused.abandonFocusedA11y")
+            : t("practiceHome.paused.abandonSprintA11y")}
+          label={t("practiceHome.paused.abandon")}
           size="compact"
           stretch={stackActions}
           testID="paused-session-abandon"
@@ -1951,9 +2024,9 @@ export function PausedSessionPanel({
         />
         <Button
           accessibilityLabel={isTacticalFocus
-            ? "Resume paused Focused Run"
-            : "Resume paused sprint"}
-          label="Resume"
+            ? t("practiceHome.paused.resumeFocusedA11y")
+            : t("practiceHome.paused.resumeSprintA11y")}
+          label={t("common.resume")}
           size="compact"
           stretch={stackActions}
           style={stackActions ? null : styles.pausedSessionResume}
@@ -1978,17 +2051,18 @@ function PracticeModeCard({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
-  const label = modeLabel(item.mode);
-  const detail = practiceModeDetailLabel(item);
-  const ratingLabel = item.rating === undefined ? null : `Rating ${item.rating}`;
+  const { locale, t } = useTranslation();
+  const label = modeLabel(item.mode, locale);
+  const detail = practiceModeDetailLabel(item, locale);
+  const ratingLabel = item.rating === undefined ? null : t("common.ratingValue", { rating: item.rating });
   const modeTestId = item.mode.replace("_", "-");
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={item.mode === "custom"
-        ? `Open Custom sprint setup, ${detail}`
-        : `Select ${label} mode, ${detail}`}
+        ? t("practiceHome.modeOpenCustomA11y", { detail })
+        : t("practiceHome.modeSelectA11y", { label, detail })}
       testID={`practice-mode-${modeTestId}`}
       style={({ pressed }) => [styles.homeRow, homeRowPositionStyle(styles, position), pressed ? styles.homeRowPressed : null]}
       onPress={onPress}
@@ -2006,7 +2080,7 @@ function PracticeModeCard({
             tone="secondary"
             variant="subheadline"
           >
-            {PRACTICE_MODE_DESCRIPTIONS[item.mode]}
+            {practiceModeDescription(item.mode, locale)}
           </AppText>
           <View
             accessibilityLabel={detail}
@@ -2078,8 +2152,9 @@ function runIconName(run: Pick<PracticeRunPresentation, "kind" | "mode">): IconN
 }
 
 function HomeStartHeader({
-  actionLabel = "Start",
+  actionLabel,
   headerTestID,
+  showPlayIcon = true,
   startAccessibilityLabel,
   startDisabled = false,
   startTestID,
@@ -2089,6 +2164,7 @@ function HomeStartHeader({
 }: {
   actionLabel?: string;
   headerTestID: string;
+  showPlayIcon?: boolean;
   startAccessibilityLabel: string;
   startDisabled?: boolean;
   startTestID: string;
@@ -2097,6 +2173,8 @@ function HomeStartHeader({
   onStart: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
+  const resolvedLabel = actionLabel ?? t("common.start");
   return (
     <View style={styles.homeStartHeader} testID={headerTestID}>
       <AppText accessibilityRole="header" style={styles.homeStartTitle} testID={titleTestID} variant="title">
@@ -2105,8 +2183,8 @@ function HomeStartHeader({
       <Button
         accessibilityLabel={startAccessibilityLabel}
         disabled={startDisabled}
-        icon={actionLabel === "Start" ? "play" : undefined}
-        label={actionLabel}
+        icon={showPlayIcon ? "play" : undefined}
+        label={resolvedLabel}
         size="compact"
         testID={startTestID}
         onPress={onStart}
@@ -2115,42 +2193,14 @@ function HomeStartHeader({
   );
 }
 
-function practiceModeDetailLabel(item: PracticeModeSummary): string {
+function practiceModeDetailLabel(item: PracticeModeSummary, locale: SupportedLocale): string {
   if (item.mode === "custom") {
-    return "Configure time, theme, and rating";
+    return translate(locale, "practiceHome.modeDetail.custom");
   }
-  return `${formatSprintTimingLabel(item.config)} · Rating ${item.rating ?? 600}`;
-}
-
-function ordinalWord(value: number): string {
-  const words: Readonly<Record<number, string>> = {
-    1: "first",
-    2: "second",
-    3: "third",
-    4: "fourth",
-    5: "fifth",
-    6: "sixth",
-    7: "seventh",
-    8: "eighth",
-    9: "ninth",
-    10: "tenth"
-  };
-  const word = words[value];
-  if (word) {
-    return word;
-  }
-
-  const modulo100 = value % 100;
-  const suffix = modulo100 >= 11 && modulo100 <= 13
-    ? "th"
-    : value % 10 === 1
-      ? "st"
-      : value % 10 === 2
-        ? "nd"
-        : value % 10 === 3
-          ? "rd"
-          : "th";
-  return `${value}${suffix}`;
+  return translate(locale, "practiceHome.modeDetail.timed", {
+    timing: formatSprintTimingLabel(item.config, locale),
+    rating: item.rating ?? 600
+  });
 }
 
 const useStyles = makeStyles((theme) => ({

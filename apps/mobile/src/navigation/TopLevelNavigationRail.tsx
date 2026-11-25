@@ -5,11 +5,13 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { makeStyles, useTheme } from "../theme";
+import { useTranslation } from "../i18n/index.ts";
 import { Icon } from "../components/ui/Icon.tsx";
 import {
   ANDROID_TAB_LABEL_MAX_FONT_SCALE,
   TOP_LEVEL_TABS,
   reviewTabBadge,
+  topLevelTabLabel,
   type TopLevelTab
 } from "./topLevelNavigation.ts";
 
@@ -28,9 +30,10 @@ export function TopLevelNavigationRail({
   selectedTab: TopLevelTab;
   onSelect: (tab: TopLevelTab) => void;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const styles = useStyles();
   const theme = useTheme();
-  const badge = reviewTabBadge(dueReviewCount, overdueReviewCount);
+  const badge = reviewTabBadge(dueReviewCount, overdueReviewCount, locale);
   return (
     <View
       accessibilityRole="tablist"
@@ -48,11 +51,12 @@ export function TopLevelNavigationRail({
       {TOP_LEVEL_TABS.map((item) => {
         const active = item.tab === selectedTab;
         const itemBadge = item.tab === "review" ? badge : null;
+        const localizedLabel = topLevelTabLabel(item.tab, locale);
         const color = active ? theme.colors.accent.s700 : theme.colors.text.secondary;
         return (
           <Pressable
             key={item.tab}
-            accessibilityLabel={[`${item.label} tab`, itemBadge?.accessibilityLabel].filter(Boolean).join(", ")}
+            accessibilityLabel={[t("tabs.tabA11y", { label: localizedLabel }), itemBadge?.accessibilityLabel].filter(Boolean).join(", ")}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             style={styles.item}
@@ -81,7 +85,7 @@ export function TopLevelNavigationRail({
               maxFontSizeMultiplier={ANDROID_TAB_LABEL_MAX_FONT_SCALE}
               style={[styles.label, { color }, active ? styles.labelActive : null]}
             >
-              {item.label}
+              {localizedLabel}
             </Text>
           </Pressable>
         );

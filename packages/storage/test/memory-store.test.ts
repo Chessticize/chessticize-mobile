@@ -358,6 +358,7 @@ test("PracticeService persists settings through the store boundary", () => {
     lightBoardTheme: "slate",
     darkBoardTheme: "graphite",
     pieceSet: "default",
+    language: "system",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -422,6 +423,7 @@ test("PracticeService persists settings through the store boundary", () => {
     lightBoardTheme: "green",
     darkBoardTheme: "walnut",
     pieceSet: "cburnett",
+    language: "system",
     arrowDuel: {
       opponentReplyEnabled: true
     },

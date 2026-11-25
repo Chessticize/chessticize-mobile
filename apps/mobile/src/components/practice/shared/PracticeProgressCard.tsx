@@ -5,6 +5,7 @@ import type { PracticeProgressSummary } from "../../../../../../packages/storage
 import { AppText, Section } from "../../ui/index.tsx";
 import { modeLabel } from "./practiceUtils.ts";
 import { makeStyles } from "../../../theme/index.ts";
+import { useTranslation } from "../../../i18n/index.ts";
 
 export function PracticeProgressCard({
   currentRating,
@@ -17,21 +18,30 @@ export function PracticeProgressCard({
   progress: PracticeProgressSummary;
   ratingContextLabel?: string;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const styles = useStyles();
+  const contextLabel = ratingContextLabel ?? modeLabel(mode, locale);
   const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
-    ? "Start training"
-    : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
+    ? t("practiceHome.progress.startTraining")
+    : t("practiceHome.progress.netDelta", {
+        delta: `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek}`
+      });
   const progressTone = progress.netThisWeek < 0
     ? styles.homeToneNegative
     : progress.correctThisWeek + progress.wrongThisWeek > 0
       ? styles.homeTonePositive
       : styles.homeToneNeutral;
   const progressContext = progress.accuracyThisWeek === null
-    ? "No attempts yet"
-    : `${progress.accuracyThisWeek}% accuracy · ${progress.wrongThisWeek} ${progress.wrongThisWeek === 1 ? "mistake" : "mistakes"}`;
+    ? t("practiceHome.progress.noAttemptsYet")
+    : t("practiceHome.progress.weeklyContext", {
+        accuracy: progress.accuracyThisWeek,
+        mistakes: t("common.mistakesCount", { count: progress.wrongThisWeek })
+      });
   const ratingDeltaLabel = progress.ratingDeltaThisWeek === null
-    ? "No rating change"
-    : `${progress.ratingDeltaThisWeek >= 0 ? "+" : ""}${progress.ratingDeltaThisWeek} this week`;
+    ? t("practiceHome.progress.noRatingChange")
+    : t("practiceHome.progress.ratingDeltaWeek", {
+        delta: `${progress.ratingDeltaThisWeek >= 0 ? "+" : ""}${progress.ratingDeltaThisWeek}`
+      });
   const ratingDeltaTone = progress.ratingDeltaThisWeek === null
     ? styles.homeToneNeutral
     : progress.ratingDeltaThisWeek < 0
@@ -39,21 +49,32 @@ export function PracticeProgressCard({
       : styles.homeTonePositive;
 
   return (
-    <Section header="Progress">
+    <Section header={t("common.progress")}>
       <View
         accessible
-        accessibilityLabel={`Progress summary, ${ratingContextLabel ?? modeLabel(mode)} rating ${currentRating}, ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
+        accessibilityLabel={t("practiceHome.progress.summaryA11y", {
+          context: contextLabel,
+          rating: currentRating,
+          ratingDelta: ratingDeltaLabel,
+          solved: progress.correctThisWeek,
+          weeklyDelta: progressDelta,
+          weeklyContext: progressContext
+        })}
         style={styles.homeProgressMetrics}
         testID="practice-progress-summary"
       >
         <View style={styles.homeProgressMetric} testID="practice-progress-rating-metric">
-          <AppText style={styles.homeProgressText} tone="secondary" variant="footnote">{ratingContextLabel ?? modeLabel(mode)} rating</AppText>
+          <AppText style={styles.homeProgressText} tone="secondary" variant="footnote">
+            {t("practiceHome.progress.contextRating", { context: contextLabel })}
+          </AppText>
           <AppText style={[styles.homeProgressValue, styles.homeProgressText]} variant="numeralLarge">{currentRating}</AppText>
           <AppText testID="practice-progress-rating-delta" style={[ratingDeltaTone, styles.homeProgressText]} variant="footnote">{ratingDeltaLabel}</AppText>
         </View>
         <View style={styles.homeProgressDivider} testID="practice-progress-divider" />
         <View style={styles.homeProgressMetric} testID="practice-progress-weekly-metric">
-          <AppText style={styles.homeProgressText} tone="secondary" variant="footnote">This Week</AppText>
+          <AppText style={styles.homeProgressText} tone="secondary" variant="footnote">
+            {t("practiceHome.progress.thisWeek")}
+          </AppText>
           <AppText testID="practice-progress-weekly-solved" style={[styles.homeProgressValue, styles.homeProgressText]} variant="numeralLarge">{progress.correctThisWeek}</AppText>
           <AppText testID="practice-progress-weekly-delta" style={[progressTone, styles.homeProgressText]} variant="footnote">{progressDelta}</AppText>
           <AppText style={styles.homeProgressText} testID="practice-progress-weekly-context" tone="secondary" variant="footnote">{progressContext}</AppText>

@@ -103,6 +103,7 @@ for (const label of STORE_LABELS) {
         lightBoardTheme: "green",
         darkBoardTheme: "walnut",
         pieceSet: "cburnett",
+        language: "system",
         arrowDuel: { opponentReplyEnabled: false },
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },

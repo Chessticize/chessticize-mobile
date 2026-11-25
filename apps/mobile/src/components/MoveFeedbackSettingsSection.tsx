@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { makeStyles } from "../theme/index.ts";
 import { useUiHaptics } from "../platform/uiHaptics.ts";
+import { useTranslation, type TranslateFn } from "../i18n/index.ts";
 import type {
   MoveFeedbackCue,
   MoveFeedbackPreferences,
@@ -21,14 +22,7 @@ export type {
   MoveFeedbackPreviewResult
 } from "./moveFeedbackPresentation.ts";
 
-const CUES: ReadonlyArray<{
-  cue: MoveFeedbackCue;
-  detail: string;
-  label: string;
-}> = [
-  { cue: "move", detail: "Light board cue", label: "Move" },
-  { cue: "capture", detail: "Deeper board cue", label: "Capture" }
-];
+const CUE_KEYS: ReadonlyArray<MoveFeedbackCue> = ["move", "capture"];
 
 export function MoveFeedbackSettingsSection({
   onPreferencesChange,
@@ -39,72 +33,90 @@ export function MoveFeedbackSettingsSection({
   onPreview?: MoveFeedbackPreviewer;
   preferences: MoveFeedbackPreferences;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [previewMessage, setPreviewMessage] = useState<string | null>(null);
+
+  function cueLabel(cue: MoveFeedbackCue): string {
+    return cue === "capture"
+      ? t("settings.feedback.previewCapture")
+      : t("settings.feedback.previewMove");
+  }
+
+  function cueDetail(cue: MoveFeedbackCue): string {
+    return cue === "capture"
+      ? t("settings.feedback.cueCaptureDetail")
+      : t("settings.feedback.cueMoveDetail");
+  }
 
   async function preview(cue: MoveFeedbackCue): Promise<void> {
     if (!onPreview) {
       return;
     }
-    setPreviewMessage(`Previewing ${cue} feedback…`);
+    setPreviewMessage(t("settings.feedback.previewing", { cue: cueLabel(cue).toLowerCase() }));
     try {
       const result = await onPreview(cue, preferences);
-      setPreviewMessage(previewResultMessage(cue, result));
+      setPreviewMessage(previewResultMessage(cue, result, t));
     } catch {
-      setPreviewMessage("Preview is unavailable in this browser.");
+      setPreviewMessage(t("settings.feedback.previewUnavailableBrowser"));
     }
   }
 
   return (
     <View testID="settings-move-feedback-content">
       <FeedbackToggleRow
-        detail="Brief board sounds for moves and captures."
+        detail={t("settings.feedback.soundEffectsDetail")}
         enabled={preferences.soundEnabled}
-        label="Sound effects"
+        label={t("settings.feedback.soundEffects")}
         controlTestID="settings-move-sound-toggle"
         onChange={(soundEnabled) => {
           onPreferencesChange({ ...preferences, soundEnabled });
-          setPreviewMessage(soundEnabled ? "Sound effects on" : "Sound effects off");
+          setPreviewMessage(soundEnabled
+            ? t("settings.feedback.soundEffectsOn")
+            : t("settings.feedback.soundEffectsOff"));
         }}
       />
       <View style={styles.separator} />
       <FeedbackToggleRow
-        detail="Touch feedback for moves, captures, and controls."
+        detail={t("settings.feedback.hapticFeedbackDetail")}
         enabled={preferences.hapticsEnabled}
-        label="Haptic feedback"
+        label={t("settings.feedback.hapticFeedback")}
         controlTestID="settings-move-haptics-toggle"
         onChange={(hapticsEnabled) => {
           onPreferencesChange({ ...preferences, hapticsEnabled });
-          setPreviewMessage(hapticsEnabled ? "Haptic feedback on" : "Haptic feedback off");
+          setPreviewMessage(hapticsEnabled
+            ? t("settings.feedback.hapticFeedbackOn")
+            : t("settings.feedback.hapticFeedbackOff"));
         }}
       />
       {onPreview ? <View style={styles.separator} /> : null}
       {onPreview ? (
         <View style={styles.previewBlock} testID="settings-move-feedback-previews">
           <View style={styles.previewHeading}>
-            <Text style={styles.rowLabel}>Try feedback</Text>
+            <Text style={styles.rowLabel}>{t("settings.feedback.tryFeedback")}</Text>
             <Text style={styles.helperText}>
-              Web demo only. Preview the proposed move and capture sounds;
-              haptics require the native app. Check this tab and device volume
-              if you do not hear them.
+              {t("settings.feedback.tryFeedbackDetail")}
             </Text>
           </View>
           <View style={styles.previewButtons}>
-            {CUES.map(({ cue, detail, label }) => (
-              <Pressable
-                key={cue}
-                accessibilityRole="button"
-                accessibilityLabel={`Preview ${cue} feedback`}
-                testID={`settings-move-feedback-preview-${cue}`}
-                style={styles.previewButton}
-                onPress={() => {
-                  void preview(cue);
-                }}
-              >
-                <Text style={styles.previewButtonLabel}>{label}</Text>
-                <Text style={styles.previewButtonDetail}>{detail}</Text>
-              </Pressable>
-            ))}
+            {CUE_KEYS.map((cue) => {
+              const label = cueLabel(cue);
+              return (
+                <Pressable
+                  key={cue}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("settings.feedback.previewCueA11y", { cue: label.toLowerCase() })}
+                  testID={`settings-move-feedback-preview-${cue}`}
+                  style={styles.previewButton}
+                  onPress={() => {
+                    void preview(cue);
+                  }}
+                >
+                  <Text style={styles.previewButtonLabel}>{label}</Text>
+                  <Text style={styles.previewButtonDetail}>{cueDetail(cue)}</Text>
+                </Pressable>
+              );
+            })}
           </View>
           {previewMessage ? (
             <Text
@@ -163,21 +175,21 @@ function FeedbackToggleRow({
 
 function previewResultMessage(
   cue: MoveFeedbackCue,
-  result: MoveFeedbackPreviewResult
+  result: MoveFeedbackPreviewResult,
+  t: TranslateFn
 ): string {
   const sound = result.sound === "played"
-    ? "browser sound requested"
+    ? t("settings.feedback.browserSoundRequested")
     : result.sound === "off"
-      ? "sound off"
-      : "sound unavailable";
+      ? t("settings.feedback.soundOff")
+      : t("settings.feedback.soundUnavailable");
   const haptics = result.haptics === "off"
-      ? "haptics off"
-      : "haptics require the native app";
-  return `${capitalize(cue)} preview: ${sound}; ${haptics}.`;
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+    ? t("settings.feedback.hapticsOff")
+    : t("settings.feedback.hapticsNativeRequired");
+  const cueName = cue === "capture"
+    ? t("settings.feedback.previewCapture")
+    : t("settings.feedback.previewMove");
+  return t("settings.feedback.previewResult", { cue: cueName, sound, haptics });
 }
 
 const useStyles = makeStyles((theme) => ({

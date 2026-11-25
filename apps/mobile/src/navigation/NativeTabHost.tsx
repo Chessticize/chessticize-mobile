@@ -11,6 +11,7 @@ import { Platform, StyleSheet, View, useWindowDimensions, type ColorValue } from
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tabs } from "react-native-screens";
 import { usePracticeViewport } from "../components/PracticeViewport.tsx";
+import { useTranslation } from "../i18n/index.ts";
 import { NAVIGATION_RAIL_WIDTH, TopLevelNavigationRail } from "./TopLevelNavigationRail.tsx";
 import {
   ANDROID_NAVIGATION_RAIL_MIN_WIDTH,
@@ -25,6 +26,7 @@ import {
   reconcileNativeTabSelection,
   resolveTopLevelChromePlacement,
   reviewTabBadge,
+  topLevelTabLabel,
   type NativeTabSelectionOutcome,
   type TopLevelTab
 } from "./topLevelNavigation.ts";
@@ -72,12 +74,13 @@ export function NativeTabHost({
   onSelectionOutcome,
   renderTab
 }: NativeTabHostProps): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const [selection, setSelection] = React.useState(() => initialNativeTabSelection(selectedTab));
   const windowInsets = useSafeAreaInsets();
   const { height, width } = usePracticeViewport();
   const { fontScale } = useWindowDimensions();
   const androidLabelFontSize = androidTabLabelFontSize(fontScale);
-  const badge = reviewTabBadge(dueReviewCount, overdueReviewCount);
+  const badge = reviewTabBadge(dueReviewCount, overdueReviewCount, locale);
   const iosMajor = Platform.OS === "ios" ? iosMajorVersion(Platform.Version) : 0;
   const controllerMode = nativeTabControllerMode(
     Platform.OS === "ios" && Platform.isPad ? "pad" : "phone",
@@ -124,14 +127,15 @@ export function NativeTabHost({
     >
       {TOP_LEVEL_TABS.map((item) => {
         const itemBadge = item.tab === "review" ? badge : null;
+        const localizedLabel = topLevelTabLabel(item.tab, locale);
         return (
           <Tabs.Screen
             key={item.tab}
             screenKey={item.tab}
-            title={item.label}
+            title={localizedLabel}
             badgeValue={itemBadge?.text}
             tabBarItemTestID={item.testID}
-            tabBarItemAccessibilityLabel={[`${item.label} tab`, itemBadge?.accessibilityLabel].filter(Boolean).join(", ")}
+            tabBarItemAccessibilityLabel={[t("tabs.tabA11y", { label: localizedLabel }), itemBadge?.accessibilityLabel].filter(Boolean).join(", ")}
             style={{ backgroundColor: colors.background }}
             ios={{
               icon: { type: "sfSymbol", name: item.sfSymbol },

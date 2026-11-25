@@ -18,6 +18,8 @@ import type {
   TacticalProfileScreen,
   TacticalProfileSignal
 } from "./tacticalProfilePresentation.ts";
+import { customThemeLabel } from "./practice/shared/themeCatalog.ts";
+import { type SupportedLocale, translate, useTranslation } from "../i18n/index.ts";
 
 export function useTacticalProfilePresentation(input: {
   service: PracticeService;
@@ -29,6 +31,7 @@ export function useTacticalProfilePresentation(input: {
   refreshKey?: unknown;
 }): TacticalProfilePresentation | undefined {
   const { injectedPresentation, onStartRequested, service } = input;
+  const { locale } = useTranslation();
   const [snapshot, setSnapshot] = useState<TacticalProfileSnapshot | undefined>(
     undefined
   );
@@ -93,8 +96,8 @@ export function useTacticalProfilePresentation(input: {
       return;
     }
     setPrepared(undefined);
-    setFocusedRunUnavailable(unavailableCopy(result.reason));
-  }, [service]);
+    setFocusedRunUnavailable(unavailableCopy(result.reason, locale));
+  }, [locale, service]);
 
   const onIntent = useCallback((intent: TacticalProfileIntent): void => {
     if (intent.type === "open-profile" || intent.type === "restore-recommendation") {
@@ -143,7 +146,7 @@ export function useTacticalProfilePresentation(input: {
       const result = service.prepareFocusedRun(intentTaskFamily);
       if (result.status !== "ready") {
         setPrepared(undefined);
-        setFocusedRunUnavailable(unavailableCopy(result.reason));
+        setFocusedRunUnavailable(unavailableCopy(result.reason, locale));
         setScreen("profile");
         return;
       }
@@ -154,10 +157,10 @@ export function useTacticalProfilePresentation(input: {
     }
     const handleUnavailable = (error: unknown): void => {
       setFocusedRunUnavailable(error instanceof FocusedRunUnavailableError
-        ? unavailableCopy(error.reason)
+        ? unavailableCopy(error.reason, locale)
         : {
-            title: "This focus changed",
-            body: "Your profile or nearby puzzle supply changed. Review the refreshed focus before starting."
+            title: translate(locale, "tacticalProfile.unavailable.focusChangedTitle"),
+            body: translate(locale, "tacticalProfile.unavailable.focusChangedBody")
           });
       refresh();
       setScreen("profile");
@@ -171,6 +174,7 @@ export function useTacticalProfilePresentation(input: {
     }
   }, [
     activeTaskFamily,
+    locale,
     onStartRequested,
     preflightFocusedRun,
     prepared,
@@ -187,7 +191,9 @@ export function useTacticalProfilePresentation(input: {
     if (!snapshot) {
       return undefined;
     }
-    const signals = snapshot.evaluation.signals.map(signalPresentation);
+    const signals = snapshot.evaluation.signals.map((signal) =>
+      signalPresentation(signal, locale)
+    );
     const resolvedTaskFamily = resolvedRecommendedTaskFamily(
       snapshot,
       activeTaskFamily
@@ -205,7 +211,7 @@ export function useTacticalProfilePresentation(input: {
       ...(selectedSignalId === undefined ? {} : { selectedSignalId }),
       ...(prepared === undefined
         ? {}
-        : { focusedRun: focusedRunPreview(prepared) }),
+        : { focusedRun: focusedRunPreview(prepared, locale) }),
       ...(focusedRunUnavailable === undefined ? {} : { focusedRunUnavailable }),
       onIntent
     };
@@ -213,6 +219,7 @@ export function useTacticalProfilePresentation(input: {
     activeTaskFamily,
     focusedRunUnavailable,
     injectedPresentation,
+    locale,
     onIntent,
     prepared,
     screen,
@@ -275,21 +282,22 @@ function homeLeadTaskFamily(
 }
 
 function signalPresentation(
-  signal: TacticalProfileSnapshot["evaluation"]["signals"][number]
+  signal: TacticalProfileSnapshot["evaluation"]["signals"][number],
+  locale: SupportedLocale
 ): TacticalProfileSignal {
   return {
     id: signal.id,
     taskFamily: signal.taskFamily,
     themeKey: signal.theme,
-    themeLabel: humanizeTheme(signal.theme),
+    themeLabel: localizedThemeName(signal.theme, locale),
     kind: presentationKind(signal.reason),
     distinctPuzzleCount: signal.distinctPuzzleCount,
     distinctSessionCount: signal.distinctSessionCount,
     priorityLabel: signal.status === "recommended"
       ? signal.confidence === "very_high"
-        ? "Recommended · strong evidence"
-        : "Recommended"
-      : "Collecting evidence",
+        ? translate(locale, "tacticalProfile.home.recommendedStrong")
+        : translate(locale, "tacticalProfile.home.recommendedStatus")
+      : translate(locale, "tacticalProfile.collectingEvidence"),
     status: signal.status
   };
 }
@@ -303,31 +311,42 @@ function presentationKind(
   return reason;
 }
 
-function focusedRunPreview(prepared: PreparedFocusedRun): FocusedRunPreview {
+function focusedRunPreview(
+  prepared: PreparedFocusedRun,
+  locale: SupportedLocale
+): FocusedRunPreview {
   return {
     taskFamily: prepared.plan.taskFamily,
     title: prepared.plan.reasons.length > 1
       ? prepared.plan.taskFamily === "arrow_duel"
-        ? "Arrow Duel focus"
-        : "Tactical focus"
-      : `${humanizeTheme(prepared.plan.reasons[0]?.theme ?? "Tactical")} focus`,
+        ? translate(locale, "tacticalProfile.preview.arrowDuelFocusTitle")
+        : translate(locale, "tacticalProfile.preview.tacticalFocusTitle")
+      : prepared.plan.reasons[0]?.theme
+        ? translate(locale, "tacticalProfile.preview.themeFocusTitle", {
+            theme: localizedThemeName(prepared.plan.reasons[0].theme, locale)
+          })
+        : translate(locale, "tacticalProfile.preview.tacticalFocusTitle"),
     ratingLabel: prepared.plan.taskFamily === "arrow_duel"
-      ? `Arrow Duel Rating ${prepared.plan.ratingAnchor.rating}`
-      : `Puzzle-solving Rating ${prepared.plan.ratingAnchor.rating}`,
-    durationLabel: formatDuration(prepared.config.durationSeconds),
+      ? translate(locale, "tacticalProfile.preview.arrowDuelRating", {
+          rating: prepared.plan.ratingAnchor.rating
+        })
+      : translate(locale, "tacticalProfile.preview.puzzleSolvingRating", {
+          rating: prepared.plan.ratingAnchor.rating
+        }),
+    durationLabel: formatDuration(prepared.config.durationSeconds, locale),
     totalPuzzleCount: prepared.puzzles.length,
     allocations: [
       ...prepared.plan.reasons.map((reason, index) => ({
         id: reason.theme,
-        label: humanizeTheme(reason.theme),
+        label: localizedThemeName(reason.theme, locale),
         puzzleCount: reason.count,
         tone: index === 0 ? "primary" as const : "secondary" as const
       })),
       {
         id: "mixed",
         label: prepared.plan.taskFamily === "arrow_duel"
-          ? "Mixed Arrow Duel"
-          : "Mixed practice",
+          ? translate(locale, "tacticalProfile.preview.mixedArrowDuel")
+          : translate(locale, "tacticalProfile.preview.mixedPractice"),
         puzzleCount: prepared.plan.mixedControlCount,
         tone: "mixed" as const
       }
@@ -339,38 +358,36 @@ function unavailableCopy(
   reason: Exclude<
     ReturnType<PracticeService["prepareFocusedRun"]>,
     { status: "ready" }
-  >["reason"]
+  >["reason"],
+  locale: SupportedLocale
 ): NonNullable<TacticalProfilePresentation["focusedRunUnavailable"]> {
   if (reason === "insufficient_inventory") {
     return {
-      title: "Not enough new puzzles nearby",
-      body: "This focus stays in your profile, but there are not enough unseen puzzles near your current Rating to keep the approved mix."
+      title: translate(locale, "tacticalProfile.unavailable.inventoryTitle"),
+      body: translate(locale, "tacticalProfile.unavailable.inventoryBody")
     };
   }
   if (reason === "no_fresh_evidence") {
     return {
-      title: "Play another mixed Run first",
-      body: "A fresh ordinary mixed Run helps us check whether this focus still applies before offering it again."
+      title: translate(locale, "tacticalProfile.unavailable.freshTitle"),
+      body: translate(locale, "tacticalProfile.unavailable.freshBody")
     };
   }
   return {
-    title: "Focused training is not ready",
-    body: "Keep playing ordinary mixed Runs while the app gathers the evidence and nearby puzzle supply needed for a safe focus."
+    title: translate(locale, "tacticalProfile.unavailable.genericTitle"),
+    body: translate(locale, "tacticalProfile.unavailable.genericBody")
   };
 }
 
-function humanizeTheme(theme: string): string {
-  const words = theme
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .trim();
-  return words.length === 0
-    ? "Tactical pattern"
-    : words[0]!.toUpperCase() + words.slice(1);
+function localizedThemeName(theme: string, locale: SupportedLocale): string {
+  const trimmed = theme.trim();
+  if (trimmed.length === 0) {
+    return translate(locale, "history.progress.tacticalPatternFallback");
+  }
+  return customThemeLabel(trimmed, locale);
 }
 
-function formatDuration(seconds: number): string {
-  return seconds % 60 === 0
-    ? `${seconds / 60} min`
-    : `${Math.ceil(seconds / 60)} min`;
+function formatDuration(seconds: number, locale: SupportedLocale): string {
+  const minutes = seconds % 60 === 0 ? seconds / 60 : Math.ceil(seconds / 60);
+  return translate(locale, "common.minutesShort", { count: minutes });
 }

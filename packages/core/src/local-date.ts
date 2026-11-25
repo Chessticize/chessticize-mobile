@@ -3,8 +3,15 @@ export interface LocalCalendarDateFormatOptions {
   timeZone?: string;
 }
 
+export interface LocalCalendarDateLabels {
+  scheduled: string;
+  today: string;
+  yesterday: string;
+}
+
 export interface LocalCalendarDateLabelOptions extends LocalCalendarDateFormatOptions {
   now: string | number | Date;
+  labels?: LocalCalendarDateLabels;
 }
 
 export function formatLocalCalendarDate(
@@ -48,7 +55,7 @@ export function formatLocalCalendarDateLabel(
     throw new Error("now must be a valid date");
   }
   if (date.getTime() > now.getTime()) {
-    return "Scheduled";
+    return options.labels?.scheduled ?? "Scheduled";
   }
 
   const dateParts = localCalendarDateParts(date, options.timeZone);
@@ -56,10 +63,10 @@ export function formatLocalCalendarDateLabel(
   const dateKey = localCalendarDatePartsKey(dateParts);
   const nowKey = localCalendarDatePartsKey(nowParts);
   if (dateKey === nowKey) {
-    return "Today";
+    return options.labels?.today ?? "Today";
   }
   if (dateKey === offsetLocalCalendarDateKey(nowParts, -1)) {
-    return "Yesterday";
+    return options.labels?.yesterday ?? "Yesterday";
   }
 
   return new Intl.DateTimeFormat(options.locale ?? "en-US", {

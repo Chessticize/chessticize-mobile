@@ -1,6 +1,13 @@
 export const ALL_THEME_SELECTION = "mixed";
 
+export type ThemeCatalogGroupId =
+  | "checkmates"
+  | "piece_tactics"
+  | "forcing_motifs"
+  | "pawns_and_endings";
+
 export type ThemeCatalogGroup = {
+  id?: ThemeCatalogGroupId;
   label: string;
   themes: readonly string[];
 };
@@ -12,10 +19,12 @@ export type ThemeChoiceIntent =
 
 export const SERVER_CURATED_THEME_GROUPS = [
   {
+    id: "checkmates",
     label: "Checkmates",
     themes: ["mateIn1", "mateIn2", "mateIn3", "mateIn4", "backRankMate", "smotheredMate"]
   },
   {
+    id: "piece_tactics",
     label: "Piece tactics",
     themes: [
       "fork",
@@ -30,10 +39,12 @@ export const SERVER_CURATED_THEME_GROUPS = [
     ]
   },
   {
+    id: "forcing_motifs",
     label: "Forcing motifs",
     themes: ["sacrifice", "deflection", "attraction", "intermezzo", "interference"]
   },
   {
+    id: "pawns_and_endings",
     label: "Pawns & endings",
     themes: ["advancedPawn", "pawnEndgame", "promotion", "zugzwang"]
   }

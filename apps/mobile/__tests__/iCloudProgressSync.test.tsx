@@ -312,6 +312,7 @@ function sampleSnapshot(): ProgressSyncSnapshot {
         arrowDuel: {
           opponentReplyEnabled: true
         },
+        language: "system",
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "smart" } },
         moveFeedback: { soundEnabled: true, hapticsEnabled: true },

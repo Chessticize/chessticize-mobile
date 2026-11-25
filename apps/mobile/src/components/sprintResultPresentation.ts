@@ -10,8 +10,10 @@ import {
   type SessionReplayItem,
   type SprintEndReason,
   type SprintResultSummary,
-  type SprintState
+  type SprintState,
+  type SupportedLocale
 } from "../../../../packages/core/src/index.ts";
+import { getActiveLocale, translate } from "../i18n/translate.ts";
 import type { ResultStat } from "./resultStat.ts";
 
 /** "ended": the puzzle supply ran out before the Sprint could pass or fail. */
@@ -102,22 +104,18 @@ export function formatClock(totalSeconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function spokenDuration(totalSeconds: number): string {
+function spokenDuration(totalSeconds: number, locale: SupportedLocale): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return [
-    minutes > 0 ? plural(minutes, "minute", "minutes") : null,
-    rest > 0 || minutes === 0 ? plural(rest, "second", "seconds") : null
+    minutes > 0 ? translate(locale, "common.minutesCount", { count: minutes }) : null,
+    rest > 0 || minutes === 0 ? translate(locale, "common.secondsCount", { count: rest }) : null
   ].filter((part): part is string => part !== null).join(" ");
 }
 
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
-function solveSeconds(seconds: number | undefined): string {
-  return seconds === undefined ? "—" : `${Math.round(seconds)}s`;
+function solveSeconds(seconds: number | undefined, locale: SupportedLocale): string {
+  return seconds === undefined ? "—" : translate(locale, "common.secondsCompact", { count: Math.round(seconds) });
 }
 
 /** Builds the view data from a finished session (production wiring). */
@@ -195,27 +193,42 @@ export function sprintResultDataFromSession(input: {
   };
 }
 
-function outcomePartsFor(data: SprintResultData): string[] {
+function outcomePartsFor(data: SprintResultData, locale: SupportedLocale): string[] {
   if (data.kind === "focusedRun") {
-    return [data.outcome === "abandoned" ? "Focused Run ended" : "Focused Run complete"];
+    return [
+      data.outcome === "abandoned"
+        ? translate(locale, "sprintResult.outcomeFocusedEnded")
+        : translate(locale, "sprintResult.outcomeFocusedComplete")
+    ];
   }
-  const subject = data.mode === "arrowDuel" ? "Arrow Duel" : "Sprint";
+  const subject = data.mode === "arrowDuel"
+    ? translate(locale, "common.arrowDuel")
+    : translate(locale, "common.sprint");
   if (data.outcome === "abandoned") {
-    return [`${subject} abandoned`];
+    return [translate(locale, "sprintResult.outcomeAbandoned", { subject })];
   }
   if (data.outcome === "ended") {
-    return [`${subject} ended`, "No more puzzles"];
+    return [
+      translate(locale, "sprintResult.outcomeEnded", { subject }),
+      translate(locale, "sprintResult.reasonNoMorePuzzles")
+    ];
   }
   if (data.outcome === "passed") {
-    return [`${subject} passed`];
+    return [translate(locale, "sprintResult.outcomePassed", { subject })];
   }
   switch (data.endReason) {
     case "max_mistakes":
-      return [`${subject} failed`, plural(data.mistakeCount, "mistake", "mistakes")];
+      return [
+        translate(locale, "sprintResult.outcomeFailed", { subject }),
+        translate(locale, "common.mistakesCount", { count: data.mistakeCount })
+      ];
     case "time_expired":
-      return [`${subject} failed`, "Time ran out"];
+      return [
+        translate(locale, "sprintResult.outcomeFailed", { subject }),
+        translate(locale, "sprintResult.reasonTimeRanOut")
+      ];
     default:
-      return [`${subject} failed`];
+      return [translate(locale, "sprintResult.outcomeFailed", { subject })];
   }
 }
 
@@ -228,25 +241,41 @@ export function unclearTotal(review: SprintResultData["review"]): number {
  * Review union, the Unclear sources, and that Replay leaves Review scheduling
  * alone (owner-approved wording, keeping the Unclear and In Review terms).
  */
-export function reviewExplanation(review: SprintResultData["review"]): string[] {
+export function reviewExplanation(
+  review: SprintResultData["review"],
+  locale: SupportedLocale = getActiveLocale()
+): string[] {
   const unclear = unclearTotal(review);
-  const groups = [
-    unclear > 0 ? `${unclear} Unclear` : null,
-    review.inReviewCount > 0 ? `${review.inReviewCount} In Review` : null
-  ].filter((part): part is string => part !== null).join(" and ");
+  const groupParts = [
+    unclear > 0 ? translate(locale, "sprintResult.explain.unclearCount", { count: unclear }) : null,
+    review.inReviewCount > 0 ? translate(locale, "sprintResult.explain.inReviewCount", { count: review.inReviewCount }) : null
+  ].filter((part): part is string => part !== null);
+  const groups = groupParts.length === 2
+    ? translate(locale, "sprintResult.explain.andJoin", { a: groupParts[0]!, b: groupParts[1]! })
+    : (groupParts[0] ?? "");
   const sources = [
-    review.unclear.markedByYou > 0 ? `${review.unclear.markedByYou} marked by you` : null,
-    review.unclear.afterSlow > 0 ? `${review.unclear.afterSlow} marked after Slow` : null,
-    review.unclear.afterTimedOut > 0 ? `${review.unclear.afterTimedOut} marked after Timed out` : null
+    review.unclear.markedByYou > 0
+      ? translate(locale, "sprintResult.explain.markedByYou", { count: review.unclear.markedByYou })
+      : null,
+    review.unclear.afterSlow > 0
+      ? translate(locale, "sprintResult.explain.markedAfterSlow", { count: review.unclear.afterSlow })
+      : null,
+    review.unclear.afterTimedOut > 0
+      ? translate(locale, "sprintResult.explain.markedAfterTimedOut", { count: review.unclear.afterTimedOut })
+      : null
   ].filter((part): part is string => part !== null);
   return [
-    `${plural(review.count, "puzzle", "puzzles")} to look at again${groups ? `: ${groups}` : ""}${
-      review.overlapCount > 0 ? ` (${review.overlapCount} ${review.overlapCount === 1 ? "is" : "are"} both)` : ""
-    }.`,
+    translate(locale, "sprintResult.explain.summaryLine", {
+      puzzles: translate(locale, "common.puzzlesCount", { count: review.count }),
+      groups: groups ? `: ${groups}` : "",
+      overlap: review.overlapCount > 0
+        ? translate(locale, "sprintResult.explain.bothCount", { count: review.overlapCount })
+        : ""
+    }),
     sources.length > 0
-      ? `Unclear: ${sources.join(", ")}. Unclear does not change your Sprint result.`
+      ? translate(locale, "sprintResult.explain.sourcesLine", { sources: sources.join(", ") })
       : null,
-    "Replaying them does not change when they come back in Review."
+    translate(locale, "sprintResult.explain.scheduleNote")
   ].filter((line): line is string => line !== null);
 }
 
@@ -259,69 +288,90 @@ export function sprintResultHapticIntent(data: SprintResultData): "success" | "w
   return data.outcome === "passed" ? "success" : data.outcome === "failed" ? "warning" : null;
 }
 
-export function presentSprintResult(data: SprintResultData): SprintResultPresentation {
+export function presentSprintResult(
+  data: SprintResultData,
+  locale: SupportedLocale = getActiveLocale()
+): SprintResultPresentation {
   const isFocusedRun = data.kind === "focusedRun";
   const outcomeTone = data.outcome === "passed" || data.outcome === "completed"
     ? "positive"
     : data.outcome === "failed" ? "negative" : "neutral";
-  const outcomeParts = outcomePartsFor(data);
+  const outcomeParts = outcomePartsFor(data, locale);
 
   const ratingAfter = data.ratingAfter ?? data.ratingBefore;
   const delta = ratingAfter - data.ratingBefore;
   const ratingColumn: StatColumn = data.ratingAfter === undefined
     ? {
         key: "rating",
-        label: "Rating",
-        value: "Unrated",
+        label: translate(locale, "common.rating"),
+        value: translate(locale, "sprintResult.ratingUnrated"),
         valueTone: "primary",
         valueIsWord: true,
-        detail: `${data.ratingBefore} unchanged`,
-        accessibilityLabel: `Rating unrated, ${data.ratingBefore} unchanged`
+        detail: translate(locale, "sprintResult.ratingUnchangedDetail", { rating: data.ratingBefore }),
+        accessibilityLabel: translate(locale, "sprintResult.ratingUnratedA11y", { rating: data.ratingBefore })
       }
     : {
         key: "rating",
-        label: "Rating",
+        label: translate(locale, "common.rating"),
         value: signedNumber(delta),
         valueTone: delta < 0 ? "negative" : delta > 0 ? "positive" : "primary",
         // No-break spaces keep the range on one line instead of breaking at the arrow.
-        detail: `${data.ratingBefore} ${ARROW} ${ratingAfter}`,
-        accessibilityLabel: `Rating ${
-          delta < 0 ? `minus ${-delta}` : delta > 0 ? `plus ${delta}` : "unchanged"
-        }, from ${data.ratingBefore} to ${ratingAfter}`
+        detail: `${data.ratingBefore}\u00A0${ARROW}\u00A0${ratingAfter}`,
+        accessibilityLabel: translate(locale, "sprintResult.ratingChangeA11y", {
+          deltaLabel: delta < 0
+            ? translate(locale, "sprintResult.ratingMinusA11y", { delta: -delta })
+            : delta > 0
+              ? translate(locale, "sprintResult.ratingPlusA11y", { delta })
+              : translate(locale, "sprintResult.ratingUnchangedWord"),
+          before: data.ratingBefore,
+          after: ratingAfter
+        })
       };
   const timeColumn: StatColumn = {
     key: "time",
-    label: "Time",
+    label: translate(locale, "common.time"),
     value: formatClock(data.elapsedSeconds),
     valueTone: "primary",
-    accessibilityLabel: `Time ${spokenDuration(data.elapsedSeconds)}`
+    accessibilityLabel: translate(locale, "sprintResult.timeA11y", {
+      duration: spokenDuration(data.elapsedSeconds, locale)
+    })
   };
   const average = data.pace?.averageSolveSeconds;
   const usual = data.pace?.usualSolveSeconds;
   const thirdColumn: StatColumn = data.pace
     ? {
         key: "pace",
-        label: "Avg solve",
-        value: solveSeconds(average),
+        label: translate(locale, "sprintResult.avgSolveLabel"),
+        value: solveSeconds(average, locale),
         valueTone: "primary",
-        ...(usual === undefined ? {} : { detail: `Usually ${solveSeconds(usual)}` }),
+        ...(usual === undefined ? {} : {
+          detail: translate(locale, "sprintResult.usuallyDetail", { time: solveSeconds(usual, locale) })
+        }),
         accessibilityLabel: average === undefined
-          ? "Average solve time unavailable"
-          : `Average solve ${Math.round(average)} seconds${
-              usual === undefined ? "" : `, usually ${Math.round(usual)} seconds on these themes`
-            }`
+          ? translate(locale, "sprintResult.avgSolveUnavailableA11y")
+          : usual === undefined
+            ? translate(locale, "sprintResult.avgSolveA11y", { seconds: Math.round(average) })
+            : translate(locale, "sprintResult.avgSolveWithUsualA11y", {
+                seconds: Math.round(average),
+                usual: Math.round(usual)
+              })
       }
     : {
         key: "streak",
-        label: "Best streak",
+        label: translate(locale, "common.bestStreak"),
         value: String(data.bestStreak),
         valueTone: "primary",
-        accessibilityLabel: `Best streak ${data.bestStreak}`
+        accessibilityLabel: translate(locale, "sprintResult.bestStreakA11y", { count: data.bestStreak })
       };
-  const summaryParts = [`${data.attempted} attempted`, `${data.accuracyPercent}% accuracy`];
+  const summaryParts = [
+    translate(locale, "sprintResult.attemptedCount", { count: data.attempted }),
+    translate(locale, "sprintResult.accuracyPercent", { percent: data.accuracyPercent })
+  ];
 
   return {
-    title: isFocusedRun ? "Focused Run Result" : "Sprint Result",
+    title: isFocusedRun
+      ? translate(locale, "sprintResult.titleFocused")
+      : translate(locale, "sprintResult.titleSprint"),
     showTrendAction: !isFocusedRun,
     outcomeLabel: outcomeParts.join(DOT),
     outcomeParts,
@@ -330,8 +380,8 @@ export function presentSprintResult(data: SprintResultData): SprintResultPresent
     solvedLabel: String(data.solved),
     targetLabel: String(data.target),
     scoreAccessibilityLabel: isFocusedRun
-      ? `Solved ${data.solved} of ${data.target} planned puzzles`
-      : `Solved ${data.solved} of ${data.target} to pass`,
+      ? translate(locale, "sprintResult.scoreFocusedA11y", { solved: data.solved, target: data.target })
+      : translate(locale, "sprintResult.scoreSprintA11y", { solved: data.solved, target: data.target }),
     progress: data.target > 0 ? Math.min(1, Math.max(0, data.solved / data.target)) : 0,
     summaryParts,
     summaryLine: summaryParts.join(DOT),
@@ -339,14 +389,20 @@ export function presentSprintResult(data: SprintResultData): SprintResultPresent
     review: data.review.count > 0
       ? {
           count: data.review.count,
-          title: `${data.review.count} to review`,
-          explanation: reviewExplanation(data.review),
-          replayAccessibilityLabel: `Replay ${plural(data.review.count, "attempt", "attempts")} to review`
+          title: translate(locale, "sprintResult.toReviewTitle", { count: data.review.count }),
+          explanation: reviewExplanation(data.review, locale),
+          replayAccessibilityLabel: translate(locale, "sprintResult.replayAttemptsA11y", {
+            attempts: translate(locale, "common.attemptsCount", { count: data.review.count })
+          })
         }
       : null,
-    primaryActionLabel: isFocusedRun ? "Back to Practice" : "Play again",
+    primaryActionLabel: isFocusedRun
+      ? translate(locale, "sprintResult.backToPractice")
+      : translate(locale, "common.playAgainLower"),
     replayMistakesLabel: data.mistakeReplayCount > 0
-      ? `Replay ${plural(data.mistakeReplayCount, "mistake", "mistakes")}`
+      ? translate(locale, "sprintResult.replayMistakes", {
+          mistakes: translate(locale, "common.mistakesCount", { count: data.mistakeReplayCount })
+        })
       : null
   };
 }

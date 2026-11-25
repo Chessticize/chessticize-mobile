@@ -31,11 +31,20 @@ export function reviewReminderUsageWindowStart(now: string | number | Date): str
   return new Date(nowDate.getTime() - SMART_HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
+export interface ComputeNextReminderOptions {
+  formatBody?: (dueCount: number) => string;
+}
+
+export function defaultReviewReminderBody(dueCount: number): string {
+  return `${dueCount} ${dueCount === 1 ? "review is" : "reviews are"} ready`;
+}
+
 export function computeNextReminder(
   queue: Pick<ReviewQueueState, "dueDay">[],
   usageHistory: ReviewReminderUsageEntry[],
   settings: ReviewReminderSettings,
-  now: string | number | Date
+  now: string | number | Date,
+  options?: ComputeNextReminderOptions
 ): ReviewReminderDecision | undefined {
   const nowDate = parseDate(now, "now");
   if (settings.kind === "off") {
@@ -55,6 +64,7 @@ export function computeNextReminder(
       : "future";
   const latestDueDay = dueDays[dueDays.length - 1]!;
   let candidate = nextLocalReminderAt(nowDate, reminderTime);
+  const formatBody = options?.formatBody ?? defaultReviewReminderBody;
   while (true) {
     const candidateReviewDay = reviewDayFor(candidate);
     const dueCount = dueDays.filter((dueDay) => dueDay <= candidateReviewDay).length;
@@ -63,7 +73,7 @@ export function computeNextReminder(
         scheduledAt: candidate.toISOString(),
         targetLocalDateTime: localDateTime(candidate),
         dueCount,
-        body: `${dueCount} ${dueCount === 1 ? "review is" : "reviews are"} ready`,
+        body: formatBody(dueCount),
         route: "review",
         workloadState
       };

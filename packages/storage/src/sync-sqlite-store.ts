@@ -81,6 +81,7 @@ import {
   defaultPracticeSettings,
   normalizeAppearancePreference,
   normalizeBoardTheme,
+  normalizeLanguagePreference,
   normalizePieceSet,
   normalizeReviewReminderPreference,
   normalizeWhatsNewSeenVersion,
@@ -275,6 +276,7 @@ interface AppSettingsRow {
   light_board_theme: PracticeSettings["lightBoardTheme"];
   dark_board_theme: PracticeSettings["darkBoardTheme"];
   piece_set: PracticeSettings["pieceSet"];
+  language: string;
   whats_new_seen_version: string | null;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
@@ -382,7 +384,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 25;
+export const CURRENT_SCHEMA_VERSION = 26;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -416,7 +418,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 21, to: 22, apply: migrateV21ToV22 },
   { from: 22, to: 23, apply: migrateV22ToV23 },
   { from: 23, to: 24, apply: migrateV23ToV24 },
-  { from: 24, to: 25, apply: migrateV24ToV25 }
+  { from: 24, to: 25, apply: migrateV24ToV25 },
+  { from: 25, to: 26, apply: migrateV25ToV26 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1045,6 +1048,7 @@ export class SyncSQLiteStore implements PracticeStore {
           light_board_theme,
           dark_board_theme,
           piece_set,
+          language,
           whats_new_seen_version,
           review_reminder_mode,
           review_reminder_fixed_local_time,
@@ -1055,7 +1059,7 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
@@ -1064,6 +1068,7 @@ export class SyncSQLiteStore implements PracticeStore {
           light_board_theme = excluded.light_board_theme,
           dark_board_theme = excluded.dark_board_theme,
           piece_set = excluded.piece_set,
+          language = excluded.language,
           whats_new_seen_version = excluded.whats_new_seen_version,
           review_reminder_mode = excluded.review_reminder_mode,
           review_reminder_fixed_local_time = excluded.review_reminder_fixed_local_time,
@@ -1083,6 +1088,7 @@ export class SyncSQLiteStore implements PracticeStore {
         cloned.lightBoardTheme,
         cloned.darkBoardTheme,
         cloned.pieceSet,
+        cloned.language ?? "system",
         cloned.whatsNewSeenVersion ?? null,
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
@@ -3172,6 +3178,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV22ToV23(db);
   migrateV23ToV24(db);
   migrateV24ToV25(db);
+  migrateV25ToV26(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -3180,6 +3187,7 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "light_board_theme") &&
     hasColumn(db, "app_settings", "dark_board_theme") &&
     hasColumn(db, "app_settings", "piece_set") &&
+    hasColumn(db, "app_settings", "language") &&
     hasColumn(db, "app_settings", "whats_new_seen_version") &&
     hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
@@ -4053,6 +4061,18 @@ function migrateV24ToV25(db: SyncSqliteDatabase): void {
   );
 }
 
+// Device-local language override: follow the system language ("system") or
+// choose an explicit locale. Excluded from CloudKit ProgressV2 sync.
+function migrateV25ToV26(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "language",
+    "ALTER TABLE app_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'system' " +
+      "CHECK (length(trim(language)) > 0)"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -4231,6 +4251,7 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     lightBoardTheme: normalizeBoardTheme(row.light_board_theme, DEFAULT_LIGHT_BOARD_THEME),
     darkBoardTheme: normalizeBoardTheme(row.dark_board_theme, DEFAULT_DARK_BOARD_THEME),
     pieceSet: normalizePieceSet(row.piece_set),
+    language: normalizeLanguagePreference(row.language),
     ...whatsNewSeenVersionField(row.whats_new_seen_version),
     sync: {
       iCloudEnabled: intToBool(row.sync_icloud_enabled)

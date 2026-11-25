@@ -1,13 +1,20 @@
 import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import {
-  formatLocalCalendarDate,
   type HistoryPerformance,
   type HistoryPerformancePoint
 } from "../../../../../../packages/core/src/index.ts";
 import { ratingLabelFromKey } from "../settings/SettingsPanel.tsx";
 import { makeStyles } from "../../../theme/index.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import {
+  formatDateForLocale,
+  formatLocalDateForLocale,
+  getActiveLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../../../i18n/index.ts";
 
 // Cap the rendered points so long ranges stay smooth without stacking
 // hundreds of segment Views; downsampling always keeps first and last.
@@ -55,11 +62,12 @@ export function HistoryRatingTrendChart({
   points: HistoryPerformancePoint[];
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   const displayed = downsampleHistoryRatingPoints(points, HISTORY_LINE_CHART_MAX_POINTS);
   if (displayed.length === 0) {
     return (
       <View style={styles.historyChartEmpty} testID="history-performance-chart">
-        <Text style={styles.helperText}>No rating data in this range.</Text>
+        <Text style={styles.helperText}>{t("history.chart.noData")}</Text>
       </View>
     );
   }
@@ -72,6 +80,7 @@ function HistoryRatingLineChart({
   points: HistoryPerformancePoint[];
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   // Segment geometry needs the layer's pixel width: percent-based math mixed
   // px rise with % run, which rendered detached segments at wrong angles.
   const [plotWidth, setPlotWidth] = useState(0);
@@ -85,7 +94,7 @@ function HistoryRatingLineChart({
   const pointY = (value: number) =>
     HISTORY_LINE_CHART_BASE_Y - ((value - min) / span) * HISTORY_LINE_CHART_PLOT_HEIGHT;
   const selectedPoint = selectedIndex === null ? null : points[selectedIndex];
-  const selectedPointLabel = selectedPoint ? historyRatingPointLabel(selectedPoint) : null;
+  const selectedPointLabel = selectedPoint ? historyRatingPointLabel(selectedPoint, locale) : null;
   const selectedX = selectedIndex === null
     ? 0
     : points.length > 1
@@ -138,7 +147,7 @@ function HistoryRatingLineChart({
         testID="history-chart-line"
         onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)}
         accessibilityRole="adjustable"
-        accessibilityLabel={selectedPointLabel ?? "Rating trend. Drag across the chart to inspect dates and ratings."}
+        accessibilityLabel={selectedPointLabel ?? t("history.chart.scrubberA11y")}
         onStartShouldSetResponderCapture={() => true}
         onMoveShouldSetResponderCapture={() => true}
         onStartShouldSetResponder={() => true}
@@ -191,9 +200,11 @@ function HistoryRatingLineChart({
               pointerEvents="none"
               testID="history-chart-tooltip"
             >
-              <Text style={styles.historyLineTooltipRating}>Rating {selectedPoint.value}</Text>
+              <Text style={styles.historyLineTooltipRating}>{t("common.ratingValue", { rating: selectedPoint.value })}</Text>
               <Text style={styles.historyLineTooltipDate}>
-                {selectedPoint.completedAt ? formatLocalCalendarDate(selectedPoint.completedAt) : formatHistoryRatingDate(selectedPoint.key)}
+                {selectedPoint.completedAt
+                  ? formatLocalDateForLocale(selectedPoint.completedAt, locale)
+                  : formatHistoryRatingDate(selectedPoint.key, locale)}
               </Text>
             </View>
           </>
@@ -235,18 +246,26 @@ function smoothHistoryRatingPoints(
   return smoothed;
 }
 
-function formatHistoryRatingDate(key: string): string {
+function formatHistoryRatingDate(key: string, locale: SupportedLocale): string {
   const embeddedIsoDate = key.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/)?.[0];
   const parsed = new Date(embeddedIsoDate ?? (key.includes("T") ? key : `${key}T12:00:00`));
   if (!Number.isFinite(parsed.getTime())) {
     return key;
   }
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDateForLocale(parsed, locale, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function historyRatingPointLabel(point: HistoryPerformancePoint): string {
-  const dateLabel = point.completedAt ? formatLocalCalendarDate(point.completedAt) : formatHistoryRatingDate(point.key);
-  return `${dateLabel} · Rating ${point.value}`;
+function historyRatingPointLabel(
+  point: HistoryPerformancePoint,
+  locale: SupportedLocale
+): string {
+  const dateLabel = point.completedAt
+    ? formatLocalDateForLocale(point.completedAt, locale)
+    : formatHistoryRatingDate(point.key, locale);
+  return translate(locale, "history.chart.pointA11y", {
+    date: dateLabel,
+    rating: point.value
+  });
 }
 
 export function emptyHistoryPerformance(): HistoryPerformance {
@@ -268,11 +287,12 @@ export function emptyHistoryPerformance(): HistoryPerformance {
 export function historyRatingKeyLabel(
   ratingKey: string,
   runName?: string,
-  runPerPuzzleSeconds?: number
+  runPerPuzzleSeconds?: number,
+  locale: SupportedLocale = getActiveLocale()
 ): string {
   const speed = runPerPuzzleSeconds ?? Number(ratingKey.match(/\/(\d+)\b/)?.[1]);
-  const speedLabel = speed ? ` · ${speed}s pace` : "";
-  return `${runName ?? ratingLabelFromKey(ratingKey)}${speedLabel}`;
+  const speedLabel = speed ? translate(locale, "review.paceSuffix", { seconds: speed }) : "";
+  return `${runName ?? ratingLabelFromKey(ratingKey, locale)}${speedLabel}`;
 }
 
 const useStyles = makeStyles((theme) => ({

@@ -1,4 +1,5 @@
-import type { PuzzleFeedback, SprintConfig, SprintMode } from "../../../../../../packages/core/src/index.ts";
+import type { PuzzleFeedback, SprintConfig, SprintMode, SupportedLocale } from "../../../../../../packages/core/src/index.ts";
+import { getActiveLocale, translate } from "../../../i18n/translate.ts";
 
 export const ANALYSIS_DEPTH = 20;
 
@@ -18,43 +19,61 @@ export const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
   width: 0
 } as const;
 
-export function modeLabel(mode: SprintMode): string {
+export function modeLabel(mode: SprintMode, locale: SupportedLocale = getActiveLocale()): string {
   if (mode === "arrow_duel") {
-    return "Arrow Duel";
+    return translate(locale, "common.arrowDuel");
   }
-  return mode.charAt(0).toUpperCase() + mode.slice(1);
+  if (mode === "custom") {
+    return translate(locale, "common.custom");
+  }
+  return translate(locale, "common.standard");
 }
 
 export const CUSTOM_INITIAL_RATING_MIN = 600;
 
 export const CUSTOM_INITIAL_RATING_MAX = 2200;
 
-export function formatSprintTimingLabel(config: SprintConfig): string {
-  return `${formatSprintDurationLabel(config.durationSeconds)} · ${config.perPuzzleSeconds}s pace`;
+export function formatSprintTimingLabel(
+  config: SprintConfig,
+  locale: SupportedLocale = getActiveLocale()
+): string {
+  return translate(locale, "common.paceShort", {
+    duration: formatSprintDurationLabel(config.durationSeconds, locale),
+    seconds: config.perPuzzleSeconds
+  });
 }
 
-export function formatSprintDurationLabel(seconds: number): string {
+export function formatSprintDurationLabel(
+  seconds: number,
+  locale: SupportedLocale = getActiveLocale()
+): string {
   if (seconds % 60 === 0) {
-    return `${seconds / 60} min`;
+    return translate(locale, "common.minutesShort", { count: seconds / 60 });
   }
-  return `${seconds}s`;
+  return translate(locale, "common.secondsCompact", { count: seconds });
 }
 
 export function formatCompactDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
 }
 
-export function formatDurationLabel(seconds: number): string {
+export function formatDurationLabel(
+  seconds: number,
+  locale: SupportedLocale = getActiveLocale()
+): string {
   if (seconds % 60 === 0) {
-    return `${seconds / 60}m`;
+    return translate(locale, "common.minutesShortLabel", { count: seconds / 60 });
   }
-  return `${seconds}s`;
+  return translate(locale, "common.secondsCompact", { count: seconds });
 }
 
 export type SessionFeedback = PuzzleFeedback | null;
 
-export function replyPreparationInstruction(seconds: number): string {
-  return `You’ll have ${seconds} ${seconds === 1 ? "second" : "seconds"} to play the best reply.`;
+export function replyPreparationInstruction(
+  seconds: number,
+  locale: SupportedLocale = getActiveLocale()
+): string {
+  return translate(locale, "session.prompt.replyPreparationInstruction", { count: seconds });
 }
 
 export function formatDuration(seconds: number): string {

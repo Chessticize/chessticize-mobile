@@ -28,9 +28,13 @@ import {
   analyzeFenWithUciEngine,
   type EngineAnalysisLine,
   formatWhitePerspectiveScore,
+  LANGUAGE_NATIVE_LABELS,
+  type LanguagePreference,
   RATING_FLOOR,
   type RatingRecord,
   stepManualRating,
+  SUPPORTED_LOCALES,
+  type SupportedLocale,
   type UciEngineTransport
 } from "../../../../../../packages/core/src/index.ts";
 import type { ReviewReminderPreference } from "../../../../../../packages/storage/src/practice-store.ts";
@@ -48,6 +52,7 @@ import {
   useTheme
 } from "../../../theme/index.ts";
 import { BoardAppearanceSettings } from "./BoardAppearanceSettings.tsx";
+import { getActiveLocale, translate, useI18n, useTranslation, type TranslateFn } from "../../../i18n/index.ts";
 import {
   type MoveFeedbackPreferences,
   type MoveFeedbackPreviewer,
@@ -62,11 +67,12 @@ import {
   Button,
   Icon,
   IconTile,
+  ListRow,
   Section,
   SegmentedControl,
   useListRowStyle
 } from "../../ui/index.tsx";
-import { WHATS_NEW_SETTINGS_LABEL } from "../../../whatsNew/whatsNewContent.ts";
+import { whatsNewSettingsLabel } from "../../../whatsNew/whatsNewContent.ts";
 import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
 import { AppModal } from "../../AppModal.tsx";
 import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
@@ -116,9 +122,12 @@ export function localReminderTarget(date: Date): string {
   return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export function progressSyncStatusMessage(result: ProgressV2SyncResult): string {
+export function progressSyncStatusMessage(
+  result: ProgressV2SyncResult,
+  locale: SupportedLocale = getActiveLocale()
+): string {
   if (result.status === "disabled") {
-    return "iCloud sync is off";
+    return translate(locale, "settings.sync.statusIsOff");
   }
   const importedCount = result.imported.ratings +
     result.imported.attempts +
@@ -126,23 +135,26 @@ export function progressSyncStatusMessage(result: ProgressV2SyncResult): string 
     result.imported.sprintSessions +
     result.imported.practiceRuns;
   if (importedCount === 0) {
-    return "Synced";
+    return translate(locale, "settings.sync.statusSynced");
   }
-  return `Synced ${importedCount} updates`;
+  return translate(locale, "settings.sync.statusSyncedUpdates", { count: importedCount });
 }
 
-export function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
+export function iCloudAccountStatusMessage(
+  status: ICloudAccountStatus,
+  locale: SupportedLocale = getActiveLocale()
+): string {
   switch (status) {
     case "available":
-      return "Ready";
+      return translate(locale, "settings.sync.statusReady");
     case "no_account":
-      return "Sign in to iCloud to sync";
+      return translate(locale, "settings.sync.statusNoAccount");
     case "restricted":
-      return "iCloud sync is restricted";
+      return translate(locale, "settings.sync.statusRestricted");
     case "could_not_determine":
-      return "Cannot determine iCloud status";
+      return translate(locale, "settings.sync.statusCouldNotDetermine");
     case "unavailable":
-      return "iCloud sync is unavailable";
+      return translate(locale, "settings.sync.statusUnavailableAccount");
   }
 }
 
@@ -175,10 +187,12 @@ export function SettingsPanel({
   iCloudSyncInProgress,
   iCloudSyncStatus,
   iCloudSyncSupportBundle,
+  language,
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
   notificationPermissionStatus,
   onAppearanceChange,
+  onLanguageChange,
   onMoveFeedbackPreferencesChange,
   pieceSet,
   reminderPlatform,
@@ -216,12 +230,14 @@ export function SettingsPanel({
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   appearance: AppearancePreference;
   darkBoardTheme: BoardThemeId;
+  language?: LanguagePreference;
   lightBoardTheme: BoardThemeId;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   onAppearanceChange: (appearance: AppearancePreference) => void;
   onDarkBoardThemeChange: (boardTheme: BoardThemeId) => void;
+  onLanguageChange?: (language: LanguagePreference) => void;
   onLightBoardThemeChange: (boardTheme: BoardThemeId) => void;
   onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
   onPieceSetChange: (pieceSet: ChessPieceSetId) => void;
@@ -234,11 +250,36 @@ export function SettingsPanel({
   showRatingControls: boolean;
   standardRating: number;
 }): React.JSX.Element {
+  const {
+    locale,
+    languagePreference: contextLanguagePreference,
+    setLanguagePreference: setContextLanguagePreference,
+    t
+  } = useI18n();
   const styles = useStyles();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [sprintGuideReady, setSprintGuideReady] = useState(false);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
   const releasePageUrl = applicationMetadata.releasePageUrl;
+  const activeLanguagePreference: LanguagePreference = language ?? contextLanguagePreference;
+  const activeLanguageValue = activeLanguagePreference === "system"
+    ? t("settings.language.system")
+    : LANGUAGE_NATIVE_LABELS[activeLanguagePreference];
+
+  function selectLanguagePreference(next: LanguagePreference): void {
+    if (onLanguageChange) {
+      onLanguageChange(next);
+    } else {
+      setContextLanguagePreference(next);
+    }
+    setLanguagePickerOpen(false);
+    const nextLocale: SupportedLocale = next === "system" ? locale : next;
+    const nextLabel = next === "system"
+      ? translate(nextLocale, "settings.language.system")
+      : LANGUAGE_NATIVE_LABELS[next];
+    setStatusMessage(translate(nextLocale, "settings.language.statusChanged", { language: nextLabel }));
+  }
 
   return (
     <View
@@ -255,31 +296,33 @@ export function SettingsPanel({
       testID="settings-panel"
     >
       {progressProtection.kind === "icloud_sync" ? (
-        <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
+        <SettingsSection title={t("settings.sync.section")} testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
-            label="Progress Sync"
-            value={iCloudSyncEnabled ? "On" : "Off"}
+            label={t("settings.sync.progressSync")}
+            value={iCloudSyncEnabled ? t("common.on") : t("common.off")}
             detail={iCloudSyncStatus}
             testID="settings-sync-status"
           />
           <SettingsSegmentedRow
-            accessibilityLabel="Progress Sync"
+            accessibilityLabel={t("settings.sync.progressSync")}
             options={[
-              { value: "on", label: "On", testID: "settings-icloud-sync-on" },
-              { value: "off", label: "Off", testID: "settings-icloud-sync-off" }
+              { value: "on", label: t("common.on"), testID: "settings-icloud-sync-on" },
+              { value: "off", label: t("common.off"), testID: "settings-icloud-sync-off" }
             ]}
             testID="settings-icloud-sync-controls"
             value={iCloudSyncEnabled ? "on" : "off"}
             onChange={(next) => {
               onSaveICloudSyncEnabled(next === "on");
-              setStatusMessage(next === "on" ? "iCloud sync enabled" : "iCloud sync disabled");
+              setStatusMessage(next === "on"
+                ? t("settings.sync.enabledStatus")
+                : t("settings.sync.disabledStatus"));
             }}
           />
           {iCloudSyncEnabled ? (
             <>
               <SettingsActionButton
-                label="Sync Now"
-                detail="Merge ratings, history, and review queue with your private iCloud."
+                label={t("settings.sync.syncNow")}
+                detail={t("settings.sync.syncNowDetail")}
                 loading={iCloudSyncInProgress}
                 testID="settings-sync-now"
                 onPress={() => {
@@ -296,14 +339,14 @@ export function SettingsPanel({
         </SettingsSection>
       ) : (
         <SettingsSection
-          title="Android Progress Backup"
+          title={t("settings.androidBackup.section")}
           testID="settings-android-backup-section"
           wide={adaptiveLayout.usesWideContent}
         >
           <SettingsRow
-            label="Backup & device transfer"
-            value="Managed by Android"
-            detail="Android can restore local progress after reinstall or device transfer when available. This is restore protection, not continuous sync."
+            label={t("settings.androidBackup.label")}
+            value={t("settings.androidBackup.value")}
+            detail={t("settings.androidBackup.detail")}
             testID="settings-android-backup-status"
           />
         </SettingsSection>
@@ -311,54 +354,55 @@ export function SettingsPanel({
 
       {arrowDuelOpponentReplyGlobalSetting ? (
         <SettingsSection
-          title="Arrow Duel"
+          title={t("settings.arrowDuel.section")}
           testID="settings-arrow-duel-section"
           wide={adaptiveLayout.usesWideContent}
         >
           <SettingsRow
-            label="Find the opponent’s best reply"
-            value={arrowDuelOpponentReplyGlobalSetting.enabled ? "On" : "Off"}
+            label={t("settings.arrowDuel.opponentReplyTitle")}
+            value={arrowDuelOpponentReplyGlobalSetting.enabled ? t("common.on") : t("common.off")}
             detail={arrowDuelOpponentReplyGlobalSetting.enabled
-              ? "After a correct arrow choice, we play the other move so you can find the opponent’s best reply. New Survival Runs use this setting with no reply timer; paused sessions keep their existing rule. Other Runs follow the reply choice and time saved in Edit Run, and their timers pause during the reply."
-              : "New Arrow Duel play checks only your arrow choice, including Survival. A correct choice completes the puzzle; a wrong choice enters Review. Paused sessions keep their existing rule. Turning this back on restores each saved Run’s reply choice and time."}
+              ? t("settings.arrowDuel.opponentReplyDetailOn")
+              : t("settings.arrowDuel.opponentReplyDetailOff")}
             testID="settings-arrow-duel-opponent-reply"
           />
           <SettingsSegmentedRow
-            accessibilityLabel="Find the opponent’s best reply"
+            accessibilityLabel={t("settings.arrowDuel.opponentReplyTitle")}
             options={[
-              { value: "on", label: "On", testID: "settings-arrow-duel-opponent-reply-on" },
-              { value: "off", label: "Off", testID: "settings-arrow-duel-opponent-reply-off" }
+              { value: "on", label: t("common.on"), testID: "settings-arrow-duel-opponent-reply-on" },
+              { value: "off", label: t("common.off"), testID: "settings-arrow-duel-opponent-reply-off" }
             ]}
             testID="settings-arrow-duel-opponent-reply-controls"
             value={arrowDuelOpponentReplyGlobalSetting.enabled ? "on" : "off"}
             onChange={(next) => {
               arrowDuelOpponentReplyGlobalSetting.onChange(next === "on");
               setStatusMessage(next === "on"
-                ? "Opponent replies are available, including in Survival"
-                : "Arrow Duel now checks only your arrow choice");
+                ? t("settings.arrowDuel.statusOn")
+                : t("settings.arrowDuel.statusOff"));
             }}
           />
         </SettingsSection>
       ) : null}
 
-      <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
+      <SettingsSection title={t("settings.reminders.section")} testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
-          label="Review Reminders"
-          value={reviewReminderPreferenceLabel(reviewReminderPreference)}
+          label={t("settings.reminders.rowLabel")}
+          value={reviewReminderPreferenceLabel(reviewReminderPreference, t)}
           detail={reviewReminderSettingsDetail({
             notificationPermissionStatus,
             preference: reviewReminderPreference,
             reminderPlatform,
-            scheduleStatus: reviewReminderScheduleStatus
+            scheduleStatus: reviewReminderScheduleStatus,
+            t
           })}
           testID="settings-review-reminders"
         />
         <SettingsSegmentedRow
-          accessibilityLabel="Review Reminders"
+          accessibilityLabel={t("settings.reminders.rowLabel")}
           options={[
-            { value: "smart", label: "Smart", testID: "settings-review-reminder-smart" },
-            { value: "fixed-1900", label: "19:00", testID: "settings-review-reminder-fixed-1900" },
-            { value: "off", label: "Off", testID: "settings-review-reminder-off" }
+            { value: "smart", label: t("settings.reminders.smartOption"), testID: "settings-review-reminder-smart" },
+            { value: "fixed-1900", label: t("settings.reminders.fixedOption"), testID: "settings-review-reminder-fixed-1900" },
+            { value: "off", label: t("settings.reminders.offOption"), testID: "settings-review-reminder-off" }
           ]}
           testID="settings-review-reminder-preferences"
           value={reviewReminderPreference.mode === "smart"
@@ -378,32 +422,36 @@ export function SettingsPanel({
         />
         {notificationPermissionStatus === "not_determined" && reviewReminderPreference.mode !== "off" ? (
           <SettingsActionRow
-            label="Enable Notifications"
+            label={t("settings.reminders.enableLabel")}
             detail={reminderPlatform === "android"
-              ? "Android shows its notification permission after this action"
-              : "Ask iOS permission after your first review session"}
+              ? t("settings.reminders.enableDetailAndroid")
+              : t("settings.reminders.enableDetailIos")}
             testID="settings-review-reminder-enable"
             onPress={() => {
               void onRequestReviewReminderPermission().then((status) => {
-                setStatusMessage(reviewReminderPermissionStatusMessage(status, reminderPlatform));
+                setStatusMessage(reviewReminderPermissionStatusMessage(status, reminderPlatform, t));
               });
             }}
           />
         ) : null}
         {notificationPermissionStatus === "denied" || notificationPermissionStatus === "channel_disabled" ? (
           <SettingsActionRow
-            label={reminderPlatform === "android" ? "Open Android Notification Settings" : "Open iOS Settings"}
+            label={reminderPlatform === "android"
+              ? t("settings.reminders.openSettingsAndroid")
+              : t("settings.reminders.openSettingsIos")}
             detail={reminderPlatform === "android"
-              ? "Restore app permission or the Review reminders channel in Android"
-              : "Notifications are blocked by iOS and cannot be requested again here"}
+              ? t("settings.reminders.openSettingsDetailAndroid")
+              : t("settings.reminders.openSettingsDetailIos")}
             testID="settings-review-reminder-open-settings"
             onPress={() => {
               void onOpenNotificationSettings().then(() => {
-                setStatusMessage(reminderPlatform === "android" ? "Opened Android notification settings" : "Opened iOS Settings");
+                setStatusMessage(reminderPlatform === "android"
+                  ? t("settings.reminders.openedAndroid")
+                  : t("settings.reminders.openedIos"));
               }).catch(() => {
                 setStatusMessage(reminderPlatform === "android"
-                  ? "Android notification settings are unavailable on this device"
-                  : "iOS Settings are unavailable on this device");
+                  ? t("settings.reminders.unavailableAndroid")
+                  : t("settings.reminders.unavailableIos"));
               });
             }}
           />
@@ -416,7 +464,7 @@ export function SettingsPanel({
       </SettingsSection>
 
       <SettingsSection
-        title="Move Feedback"
+        title={t("settings.feedback.section")}
         testID="settings-move-feedback-section"
         wide={adaptiveLayout.usesWideContent}
       >
@@ -428,16 +476,16 @@ export function SettingsPanel({
       </SettingsSection>
 
       <SettingsSection
-        title="Appearance"
+        title={t("settings.appearance.section")}
         testID="settings-appearance-section"
         wide={adaptiveLayout.usesWideContent}
       >
         <SettingsSegmentedRow
-          accessibilityLabel="Appearance"
+          accessibilityLabel={t("settings.appearance.section")}
           options={[
-            { value: "system", label: "System", testID: "settings-appearance-system" },
-            { value: "light", label: "Light", testID: "settings-appearance-light" },
-            { value: "dark", label: "Dark", testID: "settings-appearance-dark" }
+            { value: "system", label: t("common.system"), testID: "settings-appearance-system" },
+            { value: "light", label: t("common.light"), testID: "settings-appearance-light" },
+            { value: "dark", label: t("common.dark"), testID: "settings-appearance-dark" }
           ]}
           testID="settings-appearance-options"
           value={appearance}
@@ -454,12 +502,54 @@ export function SettingsPanel({
         />
       </SettingsSection>
 
+      <SettingsSection
+        title={t("settings.language.sectionTitle")}
+        testID="settings-language-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <SettingsRow
+          detail={activeLanguagePreference === "system"
+            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[locale] })
+            : undefined}
+          label={t("settings.language.label")}
+          testID="settings-language-row"
+          value={activeLanguageValue}
+          onPress={() => setLanguagePickerOpen((open) => !open)}
+        />
+        {languagePickerOpen ? (
+          <View testID="settings-language-options">
+            <ListRow
+              accessibilityLabel={t("settings.language.optionSystemA11y", {
+                resolved: LANGUAGE_NATIVE_LABELS[locale]
+              })}
+              selected={activeLanguagePreference === "system"}
+              subtitle={LANGUAGE_NATIVE_LABELS[locale]}
+              testID="settings-language-option-system"
+              title={t("settings.language.system")}
+              onPress={() => selectLanguagePreference("system")}
+            />
+            {SUPPORTED_LOCALES.map((candidate) => (
+              <ListRow
+                key={candidate}
+                accessibilityLabel={t("settings.language.optionA11y", {
+                  language: LANGUAGE_NATIVE_LABELS[candidate]
+                })}
+                selected={activeLanguagePreference === candidate}
+                testID={`settings-language-option-${candidate}`}
+                title={LANGUAGE_NATIVE_LABELS[candidate]}
+                onPress={() => selectLanguagePreference(candidate)}
+              />
+            ))}
+          </View>
+        ) : null}
+      </SettingsSection>
+
       {showRatingControls ? (
-        <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
+        <SettingsSection title={t("settings.ratings.section")} testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
-            label="Edit rating"
-            value={`Rating ${standardRating}`}
-            detail="Standard and Arrow Duel difficulty"
+            label={t("settings.ratings.editRowLabel")}
+            value={t("common.ratingValue", { rating: standardRating })}
+            detail={t("settings.ratings.editRowDetail")}
             testID="settings-standard-elo-row"
             onPress={() => onAdvancedRatingsOpenChange(!advancedRatingsOpen)}
           />
@@ -468,7 +558,10 @@ export function SettingsPanel({
               ratings={ratings}
               onAdjust={(ratingKey, nextRating) => {
                 const next = onAdjustRating(ratingKey, nextRating);
-                setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
+                setStatusMessage(t("settings.ratings.setStatus", {
+                  label: ratingLabelFromKey(ratingKey, locale),
+                  rating: next.rating
+                }));
               }}
             />
           ) : null}
@@ -476,19 +569,23 @@ export function SettingsPanel({
       ) : null}
 
       {showSprintGuideReset ? (
-        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+        <SettingsSection title={t("settings.guides.section")} testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
           <View style={styles.settingsBlock} testID="settings-guidance-reset-card">
             <View style={styles.settingsRowCopy}>
-              <AppText variant="body">Replay practice guides</AppText>
+              <AppText variant="body">{t("settings.guides.replayTitle")}</AppText>
               <AppText tone="secondary" variant="footnote">
-                Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
+                {t("settings.guides.replayDetail")}
               </AppText>
             </View>
             <Button
-              accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
+              accessibilityLabel={sprintGuideReady
+                ? t("settings.guides.resetDoneA11y")
+                : t("settings.guides.resetA11y")}
               disabled={sprintGuideReady}
               icon={sprintGuideReady ? "check" : "restore"}
-              label={sprintGuideReady ? "Guides reset" : "Reset guides"}
+              label={sprintGuideReady
+                ? t("settings.guides.resetDoneButton")
+                : t("settings.guides.resetButton")}
               size="compact"
               testID="settings-show-sprint-guide"
               variant="secondary"
@@ -505,7 +602,7 @@ export function SettingsPanel({
               testID="settings-sprint-guide-ready"
             >
               <AppText tone="positive" variant="footnote">
-                Guides reset. Each guide will replay the next time it applies.
+                {t("settings.guides.resetBanner")}
               </AppText>
             </View>
           ) : null}
@@ -521,14 +618,14 @@ export function SettingsPanel({
         wide={adaptiveLayout.usesWideContent}
       />
 
-      <SettingsSection title="About" testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
+      <SettingsSection title={t("settings.about.section")} testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
-          label={WHATS_NEW_SETTINGS_LABEL}
+          label={whatsNewSettingsLabel(locale)}
           testID="settings-whats-new"
           onPress={onOpenWhatsNew}
         />
         <SettingsRow
-          label="App Version"
+          label={t("settings.about.appVersion")}
           value={applicationMetadata.buildNumber
             ? `${applicationMetadata.versionName} (${applicationMetadata.buildNumber})`
             : applicationMetadata.versionName}
@@ -536,10 +633,10 @@ export function SettingsPanel({
         />
         {releasePageUrl ? (
           <SettingsExternalLinkRow
-            label="Android Releases"
+            label={t("settings.about.androidReleases")}
             value="GitHub"
-            detail="Manual Play-signed APK downloads"
-            linkLabel="Open GitHub Releases"
+            detail={t("settings.about.androidReleasesDetail")}
+            linkLabel={t("settings.about.androidReleasesLink")}
             testID="settings-android-releases"
             onPress={() => {
               void Linking.openURL(releasePageUrl);
@@ -547,19 +644,19 @@ export function SettingsPanel({
           />
         ) : null}
         <SettingsExternalLinkRow
-          label="License"
+          label={t("settings.about.license")}
           value="GPL-3.0-or-later"
-          detail="App source license"
-          linkLabel="Open license"
+          detail={t("settings.about.licenseDetail")}
+          linkLabel={t("settings.about.licenseLink")}
           testID="settings-license"
           onPress={() => {
             void Linking.openURL(applicationMetadata.sourceLicenseUrl);
           }}
         />
         <SettingsExternalLinkRow
-          label="Source"
+          label={t("settings.about.source")}
           value="GitHub"
-          detail="Public Chessticize mobile repository"
+          detail={t("settings.about.sourceDetail")}
           linkLabel="github.com/Chessticize/chessticize-mobile"
           testID="settings-source"
           onPress={() => {
@@ -567,17 +664,17 @@ export function SettingsPanel({
           }}
         />
         <SettingsExternalLinkRow
-          label="Stockfish"
-          value="Embedded"
-          detail="Stockfish 18 engine source used by the app"
-          linkLabel="StockfishEngine in source"
+          label={t("settings.about.stockfish")}
+          value={t("settings.about.stockfishValue")}
+          detail={t("settings.about.stockfishDetail")}
+          linkLabel={t("settings.about.stockfishLink")}
           testID="settings-stockfish-source"
           onPress={() => {
             void Linking.openURL(applicationMetadata.stockfishSourceUrl);
           }}
         />
         <SettingsExternalLinkRow
-          label="Puzzle Data"
+          label={t("settings.about.puzzleData")}
           value={bundledCoreManifest.source}
           detail={`${bundledCoreManifest.sourceLicense}. ${bundledCoreManifest.licenseNote} ${bundledCoreManifest.presolve}.`}
           linkLabel="database.lichess.org/#puzzles"
@@ -595,8 +692,8 @@ export function SettingsPanel({
       ) : null}
       {onOpenDiagnostics ? (
         <Button
-          accessibilityLabel="Open Stockfish diagnostics"
-          label="Stockfish Diagnostics"
+          accessibilityLabel={t("settings.dev.diagnosticsA11y")}
+          label={t("settings.dev.diagnostics")}
           size="compact"
           testID="settings-stockfish-diagnostics"
           variant="secondary"
@@ -622,6 +719,7 @@ function FeedbackSupportCard({
   supportEmailUrl: string;
   wide: boolean;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
@@ -637,13 +735,13 @@ function FeedbackSupportCard({
       await openFeedbackIssues(feedbackIssuesUrl);
       setConfirmationVisible(false);
     } catch {
-      setHandoffError("Couldn't open GitHub Issues. Try again.");
+      setHandoffError(t("settings.feedbackSupport.modalError"));
     }
   }
 
   return (
     <SettingsSection
-      title="Help & Feedback"
+      title={t("settings.feedbackSupport.section")}
       testID="settings-feedback-section"
       wide={wide}
     >
@@ -651,22 +749,24 @@ function FeedbackSupportCard({
         <View style={styles.feedbackSupportHeader}>
           <IconTile name="help" />
           <View style={styles.settingsRowCopy}>
-            <AppText variant="headline">Help improve Chessticize</AppText>
+            <AppText variant="headline">{t("settings.feedbackSupport.headline")}</AppText>
             <AppText tone="secondary" variant="subheadline">
-              Report a bug, request a feature, or see whether someone has already raised it.
+              {t("settings.feedbackSupport.subheadline")}
             </AppText>
           </View>
         </View>
         <View style={styles.settingsRowCopy}>
-          <AppText style={styles.settingsEmphasis} variant="footnote">Your data stays in the app</AppText>
+          <AppText style={styles.settingsEmphasis} variant="footnote">
+            {t("settings.feedbackSupport.privacyTitle")}
+          </AppText>
           <AppText tone="secondary" variant="footnote">
-            GitHub opens in your browser. Ratings, history, and puzzle data are not attached.
+            {t("settings.feedbackSupport.privacyDetail")}
           </AppText>
         </View>
         <Button
-          accessibilityLabel="Open GitHub Issues in browser"
+          accessibilityLabel={t("settings.feedbackSupport.openGithubA11y")}
           icon="external"
-          label="Open GitHub Issues"
+          label={t("settings.feedbackSupport.openGithub")}
           stretch
           testID="settings-feedback-open-github"
           variant="secondary"
@@ -676,16 +776,16 @@ function FeedbackSupportCard({
           }}
         />
         <AppText style={styles.settingsCaptionCentered} tone="secondary" variant="footnote">
-          You will review and submit your issue on GitHub.
+          {t("settings.feedbackSupport.reviewHint")}
         </AppText>
       </View>
       {supportBundle ? (
         <ICloudSyncSupportDiagnosticsEntry presentation={supportBundle} />
       ) : null}
       <SettingsExternalLinkRow
-        label="Email Support"
-        value="Email"
-        detail="Private questions and account support"
+        label={t("settings.feedbackSupport.emailLabel")}
+        value={t("settings.feedbackSupport.emailValue")}
+        detail={t("settings.feedbackSupport.emailDetail")}
         linkLabel={supportEmail}
         testID="settings-support-email"
         onPress={() => {
@@ -706,15 +806,17 @@ function FeedbackSupportCard({
               style={[styles.feedbackHandoffConfirmation, styles.feedbackHandoffCard]}
               testID="settings-feedback-handoff-confirmation"
             >
-              <Badge label="EXTERNAL BROWSER" tone="accent" />
-              <AppText variant="title">Continue to GitHub?</AppText>
+              <Badge label={t("settings.feedbackSupport.modalBadge")} tone="accent" />
+              <AppText variant="title">{t("settings.feedbackSupport.modalTitle")}</AppText>
               <AppText variant="body">
-                A new issue will open on github.com in your default browser. Chessticize does not attach your account, rating, history, or puzzle data.
+                {t("settings.feedbackSupport.modalBody")}
               </AppText>
               <View style={styles.settingsRowCopy}>
-                <AppText style={styles.settingsEmphasis} variant="footnote">You stay in control</AppText>
+                <AppText style={styles.settingsEmphasis} variant="footnote">
+                  {t("settings.feedbackSupport.modalControlTitle")}
+                </AppText>
                 <AppText tone="secondary" variant="footnote">
-                  Review what you share and submit it on GitHub. This is not an in-app submission.
+                  {t("settings.feedbackSupport.modalControlBody")}
                 </AppText>
               </View>
               {handoffError ? (
@@ -724,18 +826,18 @@ function FeedbackSupportCard({
               ) : null}
               <View style={styles.feedbackHandoffActions}>
                 <Button
-                  accessibilityLabel="Stay in Settings"
-                  label="Not now"
+                  accessibilityLabel={t("settings.feedbackSupport.modalCancelA11y")}
+                  label={t("common.notNow")}
                   stretch
                   testID="settings-feedback-handoff-cancel"
                   variant="secondary"
                   onPress={closeConfirmation}
                 />
                 <Button
-                  accessibilityLabel="Continue to GitHub Issues"
+                  accessibilityLabel={t("settings.feedbackSupport.modalContinueA11y")}
                   accessibilityRole="link"
                   icon="external"
-                  label="Continue to GitHub"
+                  label={t("settings.feedbackSupport.modalContinue")}
                   stretch
                   testID="settings-feedback-handoff-continue"
                   onPress={() => {
@@ -758,19 +860,20 @@ export function ReviewReminderPermissionPrompt({
   onDismiss: () => void;
   onEnable: () => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const { fontScale } = usePracticeViewport();
   const stackActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
   return (
     <View style={styles.reviewReminderPrompt} testID="review-reminder-permission-prompt">
       <View style={styles.reviewReminderPromptCopy}>
-        <Text style={styles.sectionLabel}>Review reminders</Text>
-        <Text style={styles.helperText}>Get a local reminder when missed puzzles are ready again.</Text>
+        <Text style={styles.sectionLabel}>{t("settings.reminders.promptTitle")}</Text>
+        <Text style={styles.helperText}>{t("settings.reminders.promptBody")}</Text>
       </View>
       <View style={[styles.confirmationActionRow, stackActions ? styles.confirmationActionsStacked : null]}>
         <Button
-          accessibilityLabel="Dismiss review reminder permission prompt"
-          label="Not Now"
+          accessibilityLabel={t("settings.reminders.promptDismissA11y")}
+          label={t("common.notNowTitle")}
           size="compact"
           stretch={stackActions}
           testID="review-reminder-permission-dismiss"
@@ -778,8 +881,8 @@ export function ReviewReminderPermissionPrompt({
           onPress={onDismiss}
         />
         <Button
-          accessibilityLabel="Enable review reminders"
-          label="Enable"
+          accessibilityLabel={t("settings.reminders.promptEnableA11y")}
+          label={t("common.enable")}
           size="compact"
           stretch={stackActions}
           testID="review-reminder-permission-enable"
@@ -844,6 +947,7 @@ function SettingsActionButton({
   onPress: () => void;
   testID: string;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const appTheme = useTheme();
   return (
@@ -853,7 +957,7 @@ function SettingsActionButton({
       </AppText>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={loading ? "Syncing progress" : label}
+        accessibilityLabel={loading ? t("settings.sync.syncingA11y") : label}
         accessibilityState={{ busy: loading, disabled: loading }}
         disabled={loading}
         testID={testID}
@@ -872,106 +976,112 @@ function SettingsActionButton({
           />
         ) : null}
         <AppText style={styles.settingsActionButtonText} testID={`${testID}-label`} tone="onAccent" variant="headline">
-          {loading ? "Syncing…" : label}
+          {loading ? t("settings.sync.syncing") : label}
         </AppText>
       </Pressable>
     </View>
   );
 }
 
-function reviewReminderPreferenceLabel(preference: ReviewReminderPreference): string {
+function reviewReminderPreferenceLabel(preference: ReviewReminderPreference, t: TranslateFn): string {
   if (preference.mode === "fixed") {
     return preference.fixedLocalTime;
   }
   if (preference.mode === "off") {
-    return "Off";
+    return t("settings.reminders.offOption");
   }
-  return "Smart";
+  return t("settings.reminders.smartOption");
 }
 
 function reviewReminderSettingsDetail({
   notificationPermissionStatus,
   preference,
   reminderPlatform,
-  scheduleStatus
+  scheduleStatus,
+  t
 }: {
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   preference: ReviewReminderPreference;
   reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   scheduleStatus: string;
+  t: TranslateFn;
 }): string {
   if (reminderPlatform === "ios") {
-    return reviewReminderPermissionDetail(notificationPermissionStatus);
+    return reviewReminderPermissionDetail(notificationPermissionStatus, t);
   }
   if (preference.mode === "off") {
-    return "Reminders are off. No notification is scheduled.";
+    return t("settings.reminders.detailOff");
   }
   switch (notificationPermissionStatus) {
     case "denied":
-      return "Blocked in Android notification settings. You can restore access.";
+      return t("settings.reminders.detailDeniedAndroid");
     case "channel_disabled":
-      return "The Review reminders channel is off in Android settings.";
+      return t("settings.reminders.detailChannelDisabledAndroid");
     case "not_determined":
-      return "Permission not requested. Enable from this screen when you are ready.";
+      return t("settings.reminders.detailNotDeterminedAndroid");
     case "unavailable":
-      return "Notifications unavailable on this device";
+      return t("settings.reminders.detailUnavailable");
     case "authorized":
       break;
   }
   if (scheduleStatus === "error") {
-    return "Android could not schedule the next reminder. Try changing the reminder setting.";
+    return t("settings.reminders.detailErrorAndroid");
   }
   if (scheduleStatus === "pending") {
-    return "Updating the next Android reminder.";
+    return t("settings.reminders.detailPendingAndroid");
   }
   if (scheduleStatus === "none") {
-    return "No review work is scheduled.";
+    return t("settings.reminders.detailNoneScheduled");
   }
   const [, , , , , workloadState, targetLocalDateTime] = scheduleStatus.split("|");
   if (scheduleStatus.startsWith("scheduled|") && targetLocalDateTime) {
     const target = targetLocalDateTime.replace("T", " ");
     const workload = workloadState === "overdue"
-      ? " Overdue review work is included."
+      ? t("settings.reminders.workloadOverdue")
       : workloadState === "due_today"
-        ? " Today's review work is included."
-        : " Future review work is included.";
-    return `Target ${target} local; Android may deliver later.${workload}`;
+        ? t("settings.reminders.workloadDueToday")
+        : t("settings.reminders.workloadFuture");
+    return t("settings.reminders.detailTargetAndroid", { target, workload });
   }
-  return "Local notifications enabled";
+  return t("settings.reminders.detailAuthorized");
 }
 
-function reviewReminderPermissionDetail(status: ReviewReminderPermissionStatus): string {
+function reviewReminderPermissionDetail(
+  status: ReviewReminderPermissionStatus,
+  t: TranslateFn
+): string {
   switch (status) {
     case "authorized":
-      return "Local notifications enabled";
+      return t("settings.reminders.detailAuthorized");
     case "denied":
-      return "Blocked in iOS Settings";
+      return t("settings.reminders.detailDeniedIos");
     case "channel_disabled":
-      return "Notifications disabled in Settings";
+      return t("settings.reminders.detailChannelDisabledIos");
     case "not_determined":
-      return "Permission not requested";
+      return t("settings.reminders.detailNotDeterminedIos");
     case "unavailable":
-      return "Notifications unavailable on this device";
+      return t("settings.reminders.detailUnavailable");
   }
 }
 
 function reviewReminderPermissionStatusMessage(
   status: ReviewReminderPermissionStatus,
-  reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"]
+  reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"],
+  t: TranslateFn
 ): string {
   switch (status) {
     case "authorized":
-      return "Notifications enabled";
+      return t("settings.reminders.statusAuthorized");
     case "denied":
       return reminderPlatform === "android"
-        ? "Notifications blocked in Android notification settings"
-        : "Notifications blocked in iOS Settings";
+        ? t("settings.reminders.statusDeniedAndroid")
+        : t("settings.reminders.statusDeniedIos");
     case "channel_disabled":
-      return "Review reminder notifications disabled in Settings";
+      return t("settings.reminders.statusChannelDisabled");
     case "not_determined":
-      return "Notification permission not requested";
+      return t("settings.reminders.statusNotDetermined");
     case "unavailable":
-      return "Notifications unavailable";
+      return t("settings.reminders.statusUnavailable");
   }
 }
 
@@ -986,13 +1096,14 @@ function AdvancedRatingsPanel({
   onAdjust: (ratingKey: string, nextRating: number) => void;
   ratings: Array<{ label: string; record: RatingRecord }>;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
       <View style={styles.settingsRowCopy}>
-        <AppText variant="headline">Difficulty controls</AppText>
+        <AppText variant="headline">{t("settings.ratings.difficultyControls")}</AppText>
         <AppText tone="secondary" variant="footnote">
-          Each rating helps Chessticize choose the right puzzle difficulty.
+          {t("settings.ratings.difficultyControlsDetail")}
         </AppText>
       </View>
       <View style={styles.advancedRatingRows}>
@@ -1001,13 +1112,29 @@ function AdvancedRatingsPanel({
             key={record.key}
             label={label}
             record={record}
-            testID={`settings-advanced-rating-${safeTestId(label)}`}
+            testID={`settings-advanced-rating-${ratingTestIdSlugFromKey(record.key, label)}`}
             onAdjust={onAdjust}
           />
         ))}
       </View>
     </View>
   );
+}
+
+function ratingTestIdSlugFromKey(ratingKey: string, fallbackLabel: string): string {
+  if (/\barrow[_ ]duel\b/.test(ratingKey)) {
+    return "arrow-duel";
+  }
+  if (/\bstandard\b/.test(ratingKey)) {
+    return "standard";
+  }
+  if (/\bblitz\b/.test(ratingKey)) {
+    return "blitz";
+  }
+  if (/\bcustom\b/.test(ratingKey)) {
+    return "custom";
+  }
+  return safeTestId(fallbackLabel) || safeTestId(ratingKey);
 }
 
 function AdvancedRatingRow({
@@ -1021,6 +1148,7 @@ function AdvancedRatingRow({
   record: RatingRecord;
   testID: string;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const appTheme = useTheme();
   const decrementDisabled = record.rating <= RATING_FLOOR;
@@ -1029,12 +1157,12 @@ function AdvancedRatingRow({
     <View style={styles.advancedRatingRow} testID={testID}>
       <View style={styles.advancedRatingCopy}>
         <AppText variant="body">{label}</AppText>
-        <AppText tone="secondary" variant="footnote">{advancedRatingBucketLabel(label, record.key)}</AppText>
+        <AppText tone="secondary" variant="footnote">{advancedRatingBucketLabel(label, record.key, t)}</AppText>
       </View>
       <View style={styles.advancedRatingControls}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label} rating`}
+          accessibilityLabel={t("settings.ratings.decreaseA11y", { label })}
           accessibilityState={{ disabled: decrementDisabled }}
           disabled={decrementDisabled}
           testID={`${testID}-decrease`}
@@ -1050,10 +1178,12 @@ function AdvancedRatingRow({
         >
           <Icon color={appTheme.colors.accent.s600} name="remove" size={18} weight="semibold" />
         </Pressable>
-        <AppText style={styles.advancedRatingValue} testID={`${testID}-value`} variant="body">Rating {record.rating}</AppText>
+        <AppText style={styles.advancedRatingValue} testID={`${testID}-value`} variant="body">
+          {t("common.ratingValue", { rating: record.rating })}
+        </AppText>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Increase ${label} rating`}
+          accessibilityLabel={t("settings.ratings.increaseA11y", { label })}
           testID={`${testID}-increase`}
           style={({ pressed }) => [styles.settingsStepperButton, pressed ? styles.settingsActionButtonPressed : null]}
           onPress={() => {
@@ -1068,22 +1198,25 @@ function AdvancedRatingRow({
   );
 }
 
-export function ratingLabelFromKey(ratingKey: string): string {
+export function ratingLabelFromKey(
+  ratingKey: string,
+  locale: SupportedLocale = getActiveLocale()
+): string {
   if (/\barrow[_ ]duel\b/.test(ratingKey)) {
-    return "Arrow Duel";
+    return translate(locale, "common.arrowDuel");
   }
   if (/\bblitz\b/.test(ratingKey)) {
-    return "Blitz";
+    return translate(locale, "common.blitz");
   }
   if (/\bcustom\b/.test(ratingKey)) {
-    return "Custom";
+    return translate(locale, "common.custom");
   }
-  return "Standard";
+  return translate(locale, "common.standard");
 }
 
-function advancedRatingBucketLabel(label: string, ratingKey: string): string {
+function advancedRatingBucketLabel(label: string, ratingKey: string, t: TranslateFn): string {
   const speed = ratingKey.match(/\/(\d+)\b/)?.[1];
-  return speed ? `${label} · ${speed}s pace` : label;
+  return speed ? t("common.ratingPaceBucket", { label, seconds: speed }) : label;
 }
 
 function SettingsSection({

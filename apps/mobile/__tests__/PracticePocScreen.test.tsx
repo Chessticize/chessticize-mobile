@@ -13835,7 +13835,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-tab-badge"))).toBe("1");
-    expect(findByTestId(renderer, "review-tab").props.accessibilityLabel).toBe("Review tab, 1 due reviews");
+    expect(findByTestId(renderer, "review-tab").props.accessibilityLabel).toBe("Review tab, 1 due review");
     expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
     expect(collectText(findByTestId(renderer, "review-action-header"))).not.toContain("Due reviews");
     expect(collectText(findByTestId(renderer, "review-action-header"))).toContain("Review");

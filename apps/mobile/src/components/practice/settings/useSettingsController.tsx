@@ -37,12 +37,18 @@ import {
   type BoardThemeId,
   type ChessPieceSetId
 } from "../../../theme/index.ts";
+import {
+  getActiveLocale,
+  resolvePreferredLocale,
+  translate,
+  useI18n,
+  type LanguagePreference
+} from "../../../i18n/index.ts";
 import type {
   ICloudSyncErrorDetailsPresentation,
   ICloudSyncSupportBundlePresentation
 } from "../../ICloudSyncErrorDetails.tsx";
 import type { MoveFeedbackPreferences } from "../../MoveFeedbackSettingsSection.tsx";
-import { reviewCountLabel } from "../review/ReviewPanel.tsx";
 import { errorMessage } from "../shared/practiceUtils.ts";
 import {
   iCloudAccountStatusMessage,
@@ -106,7 +112,11 @@ export function useSettingsController({
   const [settingsAdvancedRatingsOpen, setSettingsAdvancedRatingsOpen] = useState(false);
 
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
-  const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
+  const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => (
+    service.getSettings().sync.iCloudEnabled
+      ? translate(getActiveLocale(), "settings.sync.statusReady")
+      : translate(getActiveLocale(), "settings.sync.statusOff")
+  ));
   const [iCloudSyncInProgress, setICloudSyncInProgress] = useState(false);
 
   const iCloudAccountStatusRef =
@@ -134,6 +144,10 @@ export function useSettingsController({
     setDarkBoardTheme,
     setPieceSet
   } = useBoardAppearance();
+  const [language, setLanguageState] = useState<LanguagePreference>(
+    () => service.getSettings().language ?? "system"
+  );
+  const { locale, preferredLanguages, setLanguagePreference, t } = useI18n();
 
   const progressV2Diagnostics = service.getProgressV2Diagnostics();
   const activeProgressV2Phase = resolveProgressV2ActivePhase(progressV2Diagnostics.phase);
@@ -265,7 +279,7 @@ export function useSettingsController({
       } satisfies ICloudSyncSupportBundlePresentation
     : undefined;
   const effectiveSupportBundle = iCloudSyncSupportBundle ?? generatedSupportBundle;
-  const generatedErrorDetails = lastICloudSyncFailure && iCloudSyncStatus === "iCloud sync failed"
+  const generatedErrorDetails = lastICloudSyncFailure && iCloudSyncStatus === t("settings.sync.statusFailed")
     ? {
         copyText: formatICloudSyncFailureDiagnostic(
           lastICloudSyncFailure,
@@ -288,14 +302,14 @@ export function useSettingsController({
     const enabled = service.getSettings().sync.iCloudEnabled;
     setICloudSyncEnabled(enabled);
     if (!enabled) {
-      setICloudSyncStatus("Off");
+      setICloudSyncStatus(t("settings.sync.statusOff"));
       return;
     }
     if (!iCloudSyncClient) {
-      setICloudSyncStatus("Unavailable on this build");
+      setICloudSyncStatus(t("settings.sync.statusUnavailable"));
       return;
     }
-    setICloudSyncStatus("Ready");
+    setICloudSyncStatus(t("settings.sync.statusReady"));
     void runICloudProgressSync("startup");
     // Sync is intentionally triggered only when the client or backing service changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -358,10 +372,10 @@ export function useSettingsController({
     setICloudSyncEnabled(enabled);
     setSettingsRevision((current) => current + 1);
     if (!enabled) {
-      setICloudSyncStatus("Off");
+      setICloudSyncStatus(t("settings.sync.statusOff"));
       return;
     }
-    setICloudSyncStatus(iCloudSyncClient ? "Ready" : "Unavailable on this build");
+    setICloudSyncStatus(iCloudSyncClient ? t("settings.sync.statusReady") : t("settings.sync.statusUnavailable"));
     if (iCloudSyncClient) {
       void runICloudProgressSync("settings-enabled");
     }
@@ -412,14 +426,28 @@ export function useSettingsController({
     setPieceSet(saved.pieceSet);
   }
 
+  function saveLanguage(next: LanguagePreference): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      language: next
+    });
+    const savedLanguage = saved.language ?? "system";
+    setLanguageState(savedLanguage);
+    setLanguagePreference(savedLanguage);
+    setSettingsRevision((current) => current + 1);
+    const nextLocale = resolvePreferredLocale(preferredLanguages, savedLanguage);
+    refreshReviewReminder("language", true, nextLocale);
+  }
+
   async function runICloudProgressSync(reason: string): Promise<string> {
+    const activeLocale = getActiveLocale();
     if (!service.getSettings().sync.iCloudEnabled) {
-      setICloudSyncStatus("Off");
-      return "iCloud sync is off";
+      setICloudSyncStatus(translate(activeLocale, "settings.sync.statusOff"));
+      return translate(activeLocale, "settings.sync.statusIsOff");
     }
     if (!iCloudSyncClient) {
-      setICloudSyncStatus("Unavailable on this build");
-      return "iCloud sync is unavailable on this build";
+      setICloudSyncStatus(translate(activeLocale, "settings.sync.statusUnavailable"));
+      return translate(activeLocale, "settings.sync.statusUnavailableFull");
     }
     if (iCloudSyncInFlightRef.current) {
       return iCloudSyncInFlightRef.current;
@@ -435,12 +463,12 @@ export function useSettingsController({
       try {
         const accountStatus = await iCloudSyncClient.getAccountStatus();
         if (!isCurrent()) {
-          setICloudSyncStatus("Off");
-          return "iCloud sync is off";
+          setICloudSyncStatus(translate(getActiveLocale(), "settings.sync.statusOff"));
+          return translate(getActiveLocale(), "settings.sync.statusIsOff");
         }
         iCloudAccountStatusRef.current = accountStatus;
         if (accountStatus !== "available") {
-          const message = iCloudAccountStatusMessage(accountStatus);
+          const message = iCloudAccountStatusMessage(accountStatus, getActiveLocale());
           setICloudSyncStatus(message);
           return message;
         }
@@ -453,16 +481,23 @@ export function useSettingsController({
         refreshState();
         setICloudSyncEnabled(service.getSettings().sync.iCloudEnabled);
         setSettingsRevision((current) => current + 1);
-        const message = progressSyncStatusMessage(result);
+        const message = progressSyncStatusMessage(result, getActiveLocale());
         setICloudSyncStatus(message);
         return message;
       } catch (caught) {
         if (caught instanceof ProgressV2SyncCancelledError) {
-          const message = service.getSettings().sync.iCloudEnabled ? "Ready" : "Off";
-          setICloudSyncStatus(message);
-          return message === "Off" ? "iCloud sync is off" : "iCloud sync was superseded";
+          const enabled = service.getSettings().sync.iCloudEnabled;
+          const status = translate(
+            getActiveLocale(),
+            enabled ? "settings.sync.statusReady" : "settings.sync.statusOff"
+          );
+          setICloudSyncStatus(status);
+          return translate(
+            getActiveLocale(),
+            enabled ? "settings.sync.statusSuperseded" : "settings.sync.statusIsOff"
+          );
         }
-        const message = "iCloud sync failed";
+        const message = translate(getActiveLocale(), "settings.sync.statusFailed");
         setLastICloudSyncFailure(captureICloudSyncFailure(caught, {
           attempt: iCloudSyncAttemptLabel(reason),
           occurredAt: new Date(currentTimeMs()).toISOString()
@@ -506,13 +541,13 @@ export function useSettingsController({
     setReviewReminderPermissionPromptVisible(false);
   }
 
-  function refreshReviewReminder(reason: string, force = false): void {
+  function refreshReviewReminder(reason: string, force = false, localeOverride = locale): void {
     if (!scheduler) {
       setReviewReminderScheduleStatus("unavailable");
       return;
     }
     try {
-      const decision = computeReviewReminderDecision(service, nowIso());
+      const decision = computeReviewReminderDecision(service, nowIso(), localeOverride);
       const nextKey = reminderScheduleKey(decision);
       if (!force && reminderScheduleKeyRef.current === nextKey) {
         return;
@@ -547,7 +582,7 @@ export function useSettingsController({
       scheduledAt: new Date(nowMsRef.current + 5000).toISOString(),
       targetLocalDateTime: localReminderTarget(new Date(nowMsRef.current + 5000)),
       dueCount,
-      body: `${reviewCountLabel(dueCount)} ${dueCount === 1 ? "is" : "are"} ready`,
+      body: translate(locale, "notifications.reviewReminderBody", { count: dueCount }),
       route: "review",
       workloadState: "due_today"
     };
@@ -576,6 +611,7 @@ export function useSettingsController({
     iCloudSyncEnabled,
     iCloudSyncInProgress,
     iCloudSyncStatus,
+    language,
     lightBoardTheme,
     maybeShowReviewReminderPermissionPrompt,
     moveFeedbackPreferences,
@@ -591,6 +627,7 @@ export function useSettingsController({
     saveAppearance,
     saveDarkBoardTheme,
     saveICloudSyncEnabled,
+    saveLanguage,
     saveLightBoardTheme,
     saveMoveFeedbackPreferences,
     savePieceSet,

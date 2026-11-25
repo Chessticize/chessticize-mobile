@@ -27,13 +27,18 @@ import {
   type ReviewAnalysisLine,
   reviewAnalysisStartingFen,
   type ReviewContext,
-  reviewDueLabel,
   type ReviewQueueState,
   submitArrowDuelChoice,
   submitArrowDuelFollowUpMove,
   submitArrowDuelReply,
   submitLineMove
 } from "../../../../../../packages/core/src/index.ts";
+import {
+  formatReviewDueLabelForLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../../../i18n/index.ts";
 import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
 import { buildReviewEntry, type ReviewEntry } from "../../../backend/reviewEntry.ts";
 import { type AdaptiveLayout, PRACTICE_UI_PADDING as UI_PADDING } from "../../adaptivePracticeLayout.ts";
@@ -260,6 +265,7 @@ export function ReviewSession({
   const appTheme = useTheme();
   const { pieceSet } = useBoardAppearance();
   const pieceSprite = chessPieceSpriteFor(pieceSet);
+  const { locale, t } = useTranslation();
   const headerTextStyles = useReviewHeaderTextStyles();
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
@@ -426,7 +432,8 @@ export function ReviewSession({
             engineLines: shouldRunGuidedCurrentEval ? engineAnalysisLines : []
           }),
           shouldRunGuidedCurrentEval,
-          analysisEngineStatus
+          analysisEngineStatus,
+          locale
         )]
       : [];
   const analysisBlunderMove =
@@ -472,17 +479,22 @@ export function ReviewSession({
         ?? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
       : null;
   const reviewWhatIfDetail = explicitReplySideCopy
-    ? replyPreparationInstruction(reviewReplySeconds)
-    : `Find the opponent’s reply in ${reviewReplySeconds} ${
-        reviewReplySeconds === 1 ? "second" : "seconds"
-      }.`;
+    ? replyPreparationInstruction(reviewReplySeconds, locale)
+    : t("session.prompt.arrowDuelWhatIfFallbackDetail", { count: reviewReplySeconds });
   const analysisEngineLabel =
     analysisEngineStatus === "stockfish"
-      ? `SF 18 NNUE${analysisDepth > 0 ? ` · Depth ${analysisDepth}${analysisIsRunning ? `/${ANALYSIS_DEPTH}` : ""}` : ""}`
+      ? t("review.session.engineStockfish", {
+          depthSuffix: analysisDepth > 0
+            ? t("review.session.engineDepthSuffix", {
+                depth: analysisDepth,
+                runningSuffix: analysisIsRunning ? `/${ANALYSIS_DEPTH}` : ""
+              })
+            : ""
+        })
       : analysisEngineStatus === "thinking"
-        ? "Analyzing..."
+        ? t("review.session.engineAnalyzing")
         : analysisEngineStatus === "fallback" || analysisEngineStatus === "error"
-          ? "Local hint"
+          ? t("review.session.engineLocalHint")
           : "";
 
   useEffect(() => {
@@ -1192,7 +1204,7 @@ export function ReviewSession({
     && currentEntry.attempt?.unclear
     && onAttemptClearUnclear ? (
       <HistoryUnclearAction
-        actionLabel={isReplay ? "Mark clear" : "Clear"}
+        actionKind={isReplay ? "mark_clear" : "clear"}
         onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)}
       />
     ) : null;
@@ -1250,7 +1262,7 @@ export function ReviewSession({
           }
           promptHint={
             isArrowDuelFollowUpReview
-              ? "Follow the blue line to see why this move fails."
+              ? t("review.session.followBlueLine")
               : undefined
           }
           promptHintNumberOfLines={isArrowDuelFollowUpReview ? 2 : undefined}
@@ -1278,8 +1290,8 @@ export function ReviewSession({
         >
           <ReviewCircleButton
             accessibilityLabel={analysisEnabled
-              ? "Close analysis"
-              : isReplay ? "Exit replay" : "Exit review"}
+              ? t("review.session.closeAnalysisA11y")
+              : isReplay ? t("review.session.exitReplayA11y") : t("review.session.exitReviewA11y")}
             icon="close"
             testID="review-exit"
             onPress={analysisEnabled
@@ -1296,7 +1308,7 @@ export function ReviewSession({
             testID="review-title"
             variant="headline"
           >
-            {isReplay ? "Replay" : "Review"}
+            {isReplay ? t("common.replay") : t("tabs.review")}
           </AppText>
           <AppText
             allowFontScaling={false}
@@ -1306,7 +1318,7 @@ export function ReviewSession({
             tone="secondary"
             variant="footnote"
           >
-            {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
+            {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode, locale)}
           </AppText>
           {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
             <>
@@ -1336,14 +1348,14 @@ export function ReviewSession({
           {reviewHasPuzzleNavigation ? (
             <>
               <ReviewCircleButton
-                accessibilityLabel={isReplay ? "Previous replay puzzle" : "Previous review puzzle"}
+                accessibilityLabel={isReplay ? t("review.session.prevReplayA11y") : t("review.session.prevReviewA11y")}
                 disabled={!canReviewPrevious}
                 icon="chevronLeft"
                 testID="review-previous"
                 onPress={() => navigateReview(entryIndex - 1)}
               />
               <ReviewCircleButton
-                accessibilityLabel={isReplay ? "Next replay puzzle" : "Next review puzzle"}
+                accessibilityLabel={isReplay ? t("review.session.nextReplayA11y") : t("review.session.nextReviewA11y")}
                 disabled={!canReviewNext}
                 icon="chevronRight"
                 testID="review-next"
@@ -1355,7 +1367,7 @@ export function ReviewSession({
       </View>
       <View style={styles.reviewContextStrip} testID="review-context-strip">
         {currentEntry.source === "session" && !isReplay ? (
-          <Badge label="Sprint review" testID="review-source-pill" tone="neutral" />
+          <Badge label={t("review.session.sprintReviewBadge")} testID="review-source-pill" tone="neutral" />
         ) : null}
         {reviewRemainingSeconds !== null && !reviewReplyPromptActive ? (
           <View style={styles.reviewTimerSlot} testID="review-timer-slot">
@@ -1369,7 +1381,7 @@ export function ReviewSession({
                 reviewTimerExpired ? styles.reviewTimerTextExpired : null
               ]}
             >
-              {reviewTimerExpired ? "Time expired" : formatDuration(reviewRemainingSeconds)}
+              {reviewTimerExpired ? t("review.session.timeExpired") : formatDuration(reviewRemainingSeconds)}
             </Text>
           </View>
         ) : null}
@@ -1398,8 +1410,8 @@ export function ReviewSession({
                     testID={`review-guided-eval-line-${index}`}
                   >
                     <AnalysisLineContent
-                      label={line.label}
-                      move={line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
+                      label={localizeAnalysisLineLabel(line.label, locale)}
+                      move={formatAnalysisLineMoveLabel(line, index, locale)}
                       score={line.score}
                     />
                   </View>
@@ -1411,23 +1423,23 @@ export function ReviewSession({
                 {analysisEnabled ? (
                   <>
                     <View style={styles.analysisToolbarButtons}>
-                      <ReviewCircleButton accessibilityLabel="Close analysis" icon="close" testID="review-close-analysis" onPress={closeAnalysis} />
+                      <ReviewCircleButton accessibilityLabel={t("review.session.closeAnalysisA11y")} icon="close" testID="review-close-analysis" onPress={closeAnalysis} />
                       <ReviewCircleButton
-                        accessibilityLabel="Analysis back"
+                        accessibilityLabel={t("review.session.analysisBackA11y")}
                         disabled={!canAnalysisBack}
                         icon="chevronLeft"
                         testID="review-analysis-back"
                         onPress={stepAnalysisBack}
                       />
                       <ReviewCircleButton
-                        accessibilityLabel="Analysis forward"
+                        accessibilityLabel={t("review.session.analysisForwardA11y")}
                         disabled={!canAnalysisForward}
                         icon="chevronRight"
                         testID="review-analysis-forward"
                         onPress={stepAnalysisForward}
                       />
-                      <ReviewCircleButton accessibilityLabel="Reset analysis" icon="reset" testID="review-analysis-reset" onPress={resetAnalysisPosition} />
-                      <ReviewCircleButton accessibilityLabel="Flip board" icon="flip" testID="review-analysis-flip" onPress={() => setManualBoardFlip((current) => !current)} />
+                      <ReviewCircleButton accessibilityLabel={t("review.session.resetAnalysisA11y")} icon="reset" testID="review-analysis-reset" onPress={resetAnalysisPosition} />
+                      <ReviewCircleButton accessibilityLabel={t("review.session.flipBoardA11y")} icon="flip" testID="review-analysis-flip" onPress={() => setManualBoardFlip((current) => !current)} />
                     </View>
                     <AppText
                       numberOfLines={1}
@@ -1442,9 +1454,9 @@ export function ReviewSession({
                 ) : (
                   <>
                     <Button
-                      accessibilityLabel="Analyze position"
+                      accessibilityLabel={t("review.session.analyzePositionA11y")}
                       icon="search"
-                      label="Analysis"
+                      label={t("common.analysis")}
                       size="compact"
                       testID="review-analysis-button"
                       variant="secondary"
@@ -1452,7 +1464,7 @@ export function ReviewSession({
                     />
                     {currentEntry.source !== "due" ? (
                       <ReviewCircleButton
-                        accessibilityLabel="Reset puzzle"
+                        accessibilityLabel={t("review.session.resetPuzzleA11y")}
                         disabled={reviewBoardLocked}
                         icon="reset"
                         testID="review-reset-puzzle"
@@ -1468,11 +1480,11 @@ export function ReviewSession({
                 {analysisEngineStatus === "error" ? (
                   <Section testID="review-analysis-error">
                     <AppText tone="negative" variant="subheadline">
-                      Stockfish couldn't start. Check the bundled engine and try again.
+                      {t("review.session.engineStartError")}
                     </AppText>
                     <Button
-                      accessibilityLabel="Retry Stockfish analysis"
-                      label="Retry analysis"
+                      accessibilityLabel={t("review.session.retryAnalysisA11y")}
+                      label={t("review.session.retryAnalysis")}
                       size="compact"
                       testID="review-analysis-retry"
                       variant="secondary"
@@ -1485,30 +1497,34 @@ export function ReviewSession({
                 ) : null}
                 {analysisLines.length > 0 ? (
                   <Section rows testID="review-analysis-lines">
-                    {analysisLines.map((line, index) => (
-                      <Pressable
-                        key={`${line.move}-${index}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={[line.score, formatAnalysisLineMoveLabel(line, index), line.label]
-                          .filter((part, partIndex, parts) => partIndex < 2 || part !== parts[1])
-                          .join(" ")}
-                        accessibilityState={{ disabled: !line.move }}
-                        disabled={!line.move}
-                        style={({ pressed }) => [styles.analysisLineRow, pressed && line.move ? styles.settingsRowPressed : null]}
-                        testID={`review-analysis-line-${index}`}
-                        onPress={() => {
-                          if (line.move) {
-                            void playAnalysisCandidateMove(line.move);
-                          }
-                        }}
-                      >
-                        <AnalysisLineContent
-                          label={line.label}
-                          move={formatAnalysisLineMoveLabel(line, index)}
-                          score={line.score}
-                        />
-                      </Pressable>
-                    ))}
+                    {analysisLines.map((line, index) => {
+                      const displayLabel = localizeAnalysisLineLabel(line.label, locale);
+                      const displayMove = formatAnalysisLineMoveLabel(line, index, locale);
+                      return (
+                        <Pressable
+                          key={`${line.move}-${index}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={[line.score, displayMove, displayLabel]
+                            .filter((part, partIndex, parts) => partIndex < 2 || part !== parts[1])
+                            .join(" ")}
+                          accessibilityState={{ disabled: !line.move }}
+                          disabled={!line.move}
+                          style={({ pressed }) => [styles.analysisLineRow, pressed && line.move ? styles.settingsRowPressed : null]}
+                          testID={`review-analysis-line-${index}`}
+                          onPress={() => {
+                            if (line.move) {
+                              void playAnalysisCandidateMove(line.move);
+                            }
+                          }}
+                        >
+                          <AnalysisLineContent
+                            label={displayLabel}
+                            move={displayMove}
+                            score={line.score}
+                          />
+                        </Pressable>
+                      );
+                    })}
                   </Section>
                 ) : null}
               </>
@@ -1546,12 +1562,26 @@ export function ReviewSession({
       <View
         accessible
         accessibilityLabel={feedback
-          ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved
-              ? "Puzzle complete."
-              : isReplay ? "Continue the replay." : "Continue the review."}`
+          ? `${feedback.result === "correct" ? t("session.announcement.correct") : t("session.announcement.wrong")}. ${feedback.puzzleSolved
+              ? t("session.announcement.puzzleComplete")
+              : isReplay ? t("review.session.continueReplay") : t("review.session.continueReview")}`
           : analysisEnabled
-            ? `Analysis ${analysisEngineLabel || "ready"}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.${lastMove ? ` Last move ${lastMove.from} to ${lastMove.to}.` : ""}`
-            : `${isReplay ? "Replay" : "Review"} puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
+            ? t("review.session.announcementAnalysis", {
+                status: analysisEngineLabel || t("review.session.announcementReadyLower"),
+                sideLabel: sideToMoveAccessibilityLabel(reviewSideToMove, locale),
+                lastMoveSuffix: lastMove
+                  ? t("review.session.announcementLastMoveSuffix", {
+                      from: lastMove.from,
+                      to: lastMove.to
+                    })
+                  : ""
+              })
+            : t("review.session.announcementPuzzle", {
+                title: isReplay ? t("common.replay") : t("tabs.review"),
+                current: reviewProgressPosition,
+                total: reviewProgressTotal,
+                sideLabel: sideToMoveAccessibilityLabel(reviewSideToMove, locale)
+              })}
         accessibilityLiveRegion="polite"
         style={styles.accessibilityAnnouncement}
         testID="review-announcement"
@@ -1638,7 +1668,7 @@ export function ReviewSession({
                 optionalSettingsHint={opponentReplySettingsHint}
                 testIDPrefix="review-arrow-duel"
                 title={explicitReplySideCopy
-                  ? `What would ${moveSideDisplayName(reviewPromptSide)} play after the other move?`
+                  ? t("session.prompt.arrowDuelReplyTitle", { side: moveSideDisplayName(reviewPromptSide, locale) })
                   : undefined}
                 titleSide={explicitReplySideCopy ? reviewPromptSide : undefined}
                 veryCompactTitle={boardSize < 250}
@@ -1647,13 +1677,13 @@ export function ReviewSession({
             {reviewTimedOut ? (
               <View
                 accessible
-                accessibilityLabel="Timed out"
+                accessibilityLabel={t("session.timedOut")}
                 accessibilityLiveRegion="assertive"
                 accessibilityRole="alert"
                 style={styles.puzzleTimeoutOverlay}
                 testID="review-puzzle-timeout-overlay"
               >
-                <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
+                <Text style={styles.puzzleTimeoutOverlayTitle}>{t("session.timedOut")}</Text>
               </View>
             ) : null}
             {reviewState.kind === "arrow_duel"
@@ -1904,6 +1934,7 @@ function ReviewScheduleControl({
   service: PracticeService;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const contextKey = `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
   const [review, setReview] = useState<ReviewQueueState | undefined>(() => service.getReviewQueueState(context));
   const [confirmationVisible, setConfirmationVisible] = useState(false);
@@ -1928,7 +1959,7 @@ function ReviewScheduleControl({
       setReview(enrolled);
       onReviewChanged?.(initiatingAttemptId);
     } catch {
-      setFailure("Couldn't add to Review. Try again.");
+      setFailure(t("review.addError"));
     }
   }
 
@@ -1941,7 +1972,7 @@ function ReviewScheduleControl({
       onReviewChanged?.();
       onRemoved?.();
     } catch {
-      setFailure("Couldn't remove from Review. Try again.");
+      setFailure(t("review.removeError"));
     }
   }
 
@@ -1949,7 +1980,7 @@ function ReviewScheduleControl({
     <ReviewActionRow icon="clock" iconTone="accent" testID="review-schedule-control">
       <ActionRowCopy>
         <AppText testID="review-schedule-state" variant="headline">
-          {review ? reviewDueLabel(review, currentTimeMs()) : "Not scheduled for Review"}
+          {review ? formatReviewDueLabelForLocale(review, currentTimeMs(), locale) : t("review.notScheduled")}
         </AppText>
         {failure ? (
           <AppText testID="review-schedule-error" tone="negative" variant="footnote">{failure}</AppText>
@@ -1958,9 +1989,9 @@ function ReviewScheduleControl({
       {actionVisible ? (
         <>
           <RowTextAction
-            accessibilityLabel={review ? "Remove this puzzle from Review" : "Add this puzzle to Review"}
+            accessibilityLabel={review ? t("review.removeFromReviewA11y") : t("review.addToReviewA11y")}
             destructive={review !== undefined}
-            label={review ? "Remove from Review" : "Add to Review"}
+            label={review ? t("review.removeFromReview") : t("review.addToReview")}
             testID={review ? "review-schedule-remove" : "review-schedule-add"}
             onPress={review ? () => setConfirmationVisible(true) : addToReview}
           />
@@ -1977,23 +2008,23 @@ function ReviewScheduleControl({
                 style={styles.reviewScheduleConfirmation}
                 testID="review-schedule-removal-confirmation"
               >
-                <AppText accessibilityRole="header" variant="title">Remove from Review?</AppText>
+                <AppText accessibilityRole="header" variant="title">{t("review.removeModalTitle")}</AppText>
                 <AppText tone="secondary" variant="body">
-                  Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
+                  {t("review.removeModalBody")}
                 </AppText>
                 {failure ? <AppText tone="negative" variant="footnote">{failure}</AppText> : null}
                 <View style={styles.feedbackHandoffActions}>
                   <Button
-                    accessibilityLabel="Confirm removing this puzzle from Review"
-                    label="Remove from Review"
+                    accessibilityLabel={t("review.removeConfirmA11y")}
+                    label={t("review.removeFromReview")}
                     stretch
                     testID="review-schedule-removal-confirm"
                     variant="destructive"
                     onPress={confirmRemoval}
                   />
                   <Button
-                    accessibilityLabel="Cancel removing this puzzle from Review"
-                    label="Cancel"
+                    accessibilityLabel={t("review.removeCancelA11y")}
+                    label={t("common.cancel")}
                     stretch
                     testID="review-schedule-removal-cancel"
                     variant="secondary"
@@ -2032,6 +2063,7 @@ export function HistoryAttemptReplayUnavailable({
   service: PracticeService;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const headerTextStyles = useReviewHeaderTextStyles();
   const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
@@ -2042,7 +2074,7 @@ export function HistoryAttemptReplayUnavailable({
       <View style={styles.reviewHeaderRow}>
         <View style={styles.reviewTopNav}>
           <View style={styles.reviewTopNavSide}>
-            <ReviewCircleButton accessibilityLabel="Exit replay" icon="close" testID="review-exit" onPress={onReturn} />
+            <ReviewCircleButton accessibilityLabel={t("review.session.exitReplayA11y")} icon="close" testID="review-exit" onPress={onReturn} />
           </View>
           <View style={styles.editorRowLabel}>
             <AppText
@@ -2053,7 +2085,7 @@ export function HistoryAttemptReplayUnavailable({
               testID="review-title"
               variant="headline"
             >
-              Replay
+              {t("common.replay")}
             </AppText>
             <AppText
               allowFontScaling={false}
@@ -2061,7 +2093,7 @@ export function HistoryAttemptReplayUnavailable({
               tone="secondary"
               variant="footnote"
             >
-              Replay unavailable
+              {t("review.session.replayUnavailable")}
             </AppText>
           </View>
           <View style={[styles.reviewTopNavSide, styles.reviewTopNavSideTrailing]} />
@@ -2071,7 +2103,7 @@ export function HistoryAttemptReplayUnavailable({
         <View style={styles.unavailableMessage}>
           <IconTile name="warning" tone="warning" />
           <AppText style={styles.unavailableMessageText} testID="history-replay-unavailable" variant="body">
-            {historyReplayUnavailableMessage(replayAvailability)}
+            {historyReplayUnavailableMessage(replayAvailability, locale)}
           </AppText>
         </View>
       </Section>
@@ -2094,25 +2126,28 @@ export function HistoryAttemptReplayUnavailable({
 }
 
 function HistoryUnclearAction({
-  actionLabel = "Clear",
+  actionKind = "clear",
   onClear
 }: {
-  actionLabel?: "Clear" | "Mark clear";
+  actionKind?: "clear" | "mark_clear";
   onClear: () => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <ReviewActionRow
-      accessibilityLabel="This attempt is marked unclear"
+      accessibilityLabel={t("review.session.unclearA11y")}
       icon="help"
       iconTone="warning"
       testID="history-attempt-unclear"
     >
       <ActionRowCopy>
-        <AppText variant="headline">Marked as unclear</AppText>
+        <AppText variant="headline">{t("review.session.unclearTitle")}</AppText>
       </ActionRowCopy>
       <RowTextAction
-        accessibilityLabel={actionLabel === "Mark clear" ? "Mark attempt clear" : "Clear unclear mark"}
-        label={actionLabel}
+        accessibilityLabel={actionKind === "mark_clear"
+          ? t("review.session.markClearA11y")
+          : t("review.session.clearUnclearA11y")}
+        label={actionKind === "mark_clear" ? t("review.session.markClear") : t("common.clear")}
         testID="history-attempt-clear-unclear"
         onPress={onClear}
       />
@@ -2128,32 +2163,59 @@ function reviewContextForHistoryAttempt(attempt: AttemptEvent | HistoryAttemptVi
 }
 
 function historyReplayUnavailableMessage(
-  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>,
+  locale: SupportedLocale
 ): string {
   return replayAvailability.reason === "arrow-candidates-unavailable"
-    ? "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
+    ? translate(locale, "review.session.unavailable.arrowCandidates")
     : replayAvailability.reason === "puzzle-unavailable"
-      ? "This puzzle is no longer available on this device, so the attempt cannot be replayed."
-      : "The saved mode or rating context is invalid, so this attempt cannot be replayed safely.";
+      ? translate(locale, "review.session.unavailable.puzzleMissing")
+      : translate(locale, "review.session.unavailable.invalidContext");
 }
 
-function formatAnalysisLineMoveLabel(line: ReviewAnalysisLine, index: number): string {
-  return line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`;
+function localizeAnalysisLineLabel(
+  label: ReviewAnalysisLine["label"],
+  locale: SupportedLocale
+): string {
+  if (label === "Current position") {
+    return translate(locale, "review.session.currentPosition");
+  }
+  if (label === "Top move") {
+    return translate(locale, "review.session.topMove");
+  }
+  if (label === "Candidate") {
+    return translate(locale, "review.session.candidate");
+  }
+  return label;
+}
+
+function formatAnalysisLineMoveLabel(
+  line: ReviewAnalysisLine,
+  index: number,
+  locale: SupportedLocale
+): string {
+  if (line.label === "Current position") {
+    return line.san === "Current position"
+      ? translate(locale, "review.session.currentPosition")
+      : line.san;
+  }
+  return `${index + 1}. ${line.san}`;
 }
 
 function formatGuidedCurrentEvalLine(
   line: ReviewAnalysisLine,
   isWaitingForStockfish: boolean,
-  status: AnalysisEngineStatus
+  status: AnalysisEngineStatus,
+  locale: SupportedLocale
 ): ReviewAnalysisLine {
   if (!isWaitingForStockfish || line.score !== "eval --") {
     return line;
   }
   if (status === "fallback") {
-    return { ...line, score: "No SF" };
+    return { ...line, score: translate(locale, "review.session.noStockfishShort") };
   }
   if (status === "error") {
-    return { ...line, score: "SF error" };
+    return { ...line, score: translate(locale, "review.session.stockfishErrorShort") };
   }
   return { ...line, score: "..." };
 }

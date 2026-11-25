@@ -1,6 +1,7 @@
 import React from "react";
 import { View } from "react-native";
 import { makeStyles } from "../theme/index.ts";
+import { useTranslation } from "../i18n/index.ts";
 
 export function SessionMistakeIndicator({
   count,
@@ -9,10 +10,11 @@ export function SessionMistakeIndicator({
   count: number;
   max: number;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View
-      accessibilityLabel={`Mistakes ${count} of ${max}`}
+      accessibilityLabel={t("session.status.mistakesOfA11y", { count, max })}
       style={styles.indicator}
       testID="session-mistakes"
     >

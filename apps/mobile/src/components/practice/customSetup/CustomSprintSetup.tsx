@@ -4,6 +4,7 @@ import {
   ALL_THEMES_FILTER,
   type CustomThemeFilter,
   customThemeLabel,
+  themeCatalogGroupLabel,
   type ThemeCatalogPresentation
 } from "../shared/themeCatalog.ts";
 import { type CustomSprintConfigRecord, SERVER_CURATED_THEMES, type ThemeChoiceIntent } from "../../../../../../packages/core/src/index.ts";
@@ -11,6 +12,13 @@ import type { PracticeProgressSummary } from "../../../../../../packages/storage
 import { AppText, Icon, ListRow, Section, useListRowStyle } from "../../ui/index.tsx";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
 import { useUiHaptics } from "../../../platform/uiHaptics.ts";
+import {
+  formatDateForLocale,
+  getActiveLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../../../i18n/index.ts";
 import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegion.tsx";
 import {
   CUSTOM_INITIAL_RATING_MAX,
@@ -87,22 +95,23 @@ export function CustomSprintSetup({
   onStart: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const requiredPuzzleCount = targetCorrect + maxMistakes;
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
-    previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
+    previousCustomConfigRowModel(config, ratingForKey(config.ratingKey), locale)
   );
   return (
     <View style={styles.customSetupPanel} testID="custom-sprint-setup">
       <SprintStartHeader
-        closeAccessibilityLabel="Close custom sprint setup"
+        closeAccessibilityLabel={t("customSetup.closeA11y")}
         closeTestID="custom-close"
         headerTestID="custom-action-header"
-        startAccessibilityLabel="Start custom sprint"
+        startAccessibilityLabel={t("customSetup.startA11y")}
         startDisabled={!canStartWithLocalPuzzles}
         startTestID="start-sprint-button"
-        title="Custom Sprint"
+        title={t("customSetup.title")}
         titleTestID="custom-header-title"
         onClose={onClose}
         onStart={onStart}
@@ -121,24 +130,24 @@ export function CustomSprintSetup({
           onChange={(theme) => onThemeIntent({ type: "toggle-theme", theme })}
         />
         <CustomOptionRow
-          label="Duration"
-          value={formatDurationLabel(durationSeconds)}
+          label={t("customSetup.durationLabel")}
+          value={formatDurationLabel(durationSeconds, locale)}
           stepperTestID="custom-duration-stepper"
           options={CUSTOM_DURATION_OPTIONS.map((option) => ({
             value: option,
-            label: formatDurationLabel(option),
+            label: formatDurationLabel(option, locale),
             testID: `custom-duration-${option}`
           }))}
           selected={durationSeconds}
           onChange={onDurationChange}
         />
         <CustomOptionRow
-          label="Time per puzzle"
-          value={`${perPuzzleSeconds} sec`}
+          label={t("customSetup.perPuzzleLabel")}
+          value={t("common.secondsShort", { count: perPuzzleSeconds })}
           stepperTestID="custom-per-puzzle-stepper"
           options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
             value: option,
-            label: `${option}s`,
+            label: t("common.secondsCompact", { count: option }),
             testID: `custom-per-puzzle-${option}`
           }))}
           selected={perPuzzleSeconds}
@@ -153,7 +162,7 @@ export function CustomSprintSetup({
           value={initialRating}
         />
         <CustomValueRow
-          label="Estimated puzzles"
+          label={t("customSetup.estimatedPuzzlesLabel")}
           value={`~${targetCorrect}`}
           testID="custom-summary-target"
           valueTestID="custom-target-count"
@@ -169,10 +178,10 @@ export function CustomSprintSetup({
       <PracticeProgressCard currentRating={initialRating} mode={customMode} progress={progress} />
 
       <View style={styles.previousConfigList} testID="custom-previous-configs">
-        <AppText accessibilityRole="header" style={styles.previousConfigHeader} variant="title">Previous configs</AppText>
+        <AppText accessibilityRole="header" style={styles.previousConfigHeader} variant="title">{t("customSetup.previousConfigsTitle")}</AppText>
         {previousRows.length === 0 ? (
           <AppText style={styles.previousConfigHeader} testID="custom-previous-empty" tone="secondary" variant="footnote">
-            Start a custom sprint to save this setup.
+            {t("customSetup.previousConfigsEmpty")}
           </AppText>
         ) : (
           <Section rows>
@@ -204,6 +213,7 @@ function CustomEligibilityNotice({
   hasEnoughLocalPuzzles: boolean;
   requiredPuzzleCount: number;
 }): React.JSX.Element | null {
+  const { t } = useTranslation();
   if (hasEnoughLocalPuzzles) {
     return null;
   }
@@ -213,8 +223,11 @@ function CustomEligibilityNotice({
       <ListRow
         icon="warning"
         iconTone="warning"
-        subtitle={`Current offline pack has ${availablePuzzleCount} eligible puzzles; this setup may need up to ${requiredPuzzleCount}. Broaden theme or rating coverage before a scored release pack.`}
-        title="Local pack warning"
+        subtitle={t("customSetup.localPackWarningBody", {
+          available: availablePuzzleCount,
+          required: requiredPuzzleCount
+        })}
+        title={t("customSetup.localPackWarningTitle")}
       />
     </Section>
   );
@@ -231,18 +244,22 @@ export function CustomModeChoiceRow({
 }): React.JSX.Element {
   const styles = useStyles();
   const rowStyle = useListRowStyle();
+  const { t } = useTranslation();
   const options: Array<{ value: "custom" | "arrow_duel"; label: string; detail: string; testID: string }> = [
-    { value: "custom", label: "Regular Puzzles", detail: "Board moves", testID: "custom-mode-regular" },
-    { value: "arrow_duel", label: "Arrow Duel", detail: "Two candidates", testID: "custom-mode-arrow-duel" }
+    { value: "custom", label: t("customSetup.modeRegular"), detail: t("customSetup.modeRegularDetail"), testID: "custom-mode-regular" },
+    { value: "arrow_duel", label: t("common.arrowDuel"), detail: t("customSetup.modeArrowDuelDetail"), testID: "custom-mode-arrow-duel" }
   ];
   return (
     <View style={rowStyle} testID={testID}>
-      <AppText style={styles.customModeLabel} variant="body">Mode</AppText>
+      <AppText style={styles.customModeLabel} variant="body">{t("common.mode")}</AppText>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
           <ChoiceChip
             key={option.value}
-            accessibilityLabel={`${option.label} custom sprint mode, ${option.detail}`}
+            accessibilityLabel={t("customSetup.modeOptionA11y", {
+              label: option.label,
+              detail: option.detail
+            })}
             accessibilityRole="button"
             accessibilityState={{ selected: value === option.value }}
             label={option.label}
@@ -273,19 +290,20 @@ function CustomInitialRatingRow({
   const editorLayout = useEditorRowLayout();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const { t } = useTranslation();
   if (!played) {
     return (
       <View
-        accessibilityLabel={`Starting rating, rating ${value}. Sets the initial puzzle difficulty for this Run.`}
+        accessibilityLabel={t("customSetup.startingRatingRowA11y", { rating: value })}
         style={[rowStyle, editorLayout.row]}
         testID="custom-initial-rating-row"
       >
         <View style={editorLayout.copy}>
-          <AppText variant="body">Starting rating</AppText>
-          <AppText tone="secondary" variant="footnote">Sets initial puzzle difficulty</AppText>
+          <AppText variant="body">{t("customSetup.startingRatingLabel")}</AppText>
+          <AppText tone="secondary" variant="footnote">{t("customSetup.startingRatingHint")}</AppText>
         </View>
         <View style={editorLayout.controls}>
-          <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
+          <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">{t("common.ratingValue", { rating: value })}</AppText>
           <CustomRatingStepper onChange={onChange} value={value} />
         </View>
       </View>
@@ -299,15 +317,15 @@ function CustomInitialRatingRow({
       <Pressable
         accessible
         accessibilityRole="button"
-        accessibilityLabel={`Edit rating, rating ${value}`}
+        accessibilityLabel={t("customSetup.editRatingRowA11y", { rating: value })}
         accessibilityState={{ expanded: editOpen }}
         style={({ pressed }) => [rowStyle, editorLayout.row, pressed ? styles.editorRowPressed : null]}
         testID="custom-initial-rating-row"
         onPress={() => onEditOpenChange(!editOpen)}
       >
-        <AppText style={editorLayout.copy} variant="body">Edit rating</AppText>
+        <AppText style={editorLayout.copy} variant="body">{t("settings.ratings.editRowLabel")}</AppText>
         <View style={editorLayout.controls}>
-          <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">Rating {value}</AppText>
+          <AppText numberOfLines={1} testID="custom-initial-rating-value" tone="secondary" variant="body">{t("common.ratingValue", { rating: value })}</AppText>
           <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
         </View>
       </Pressable>
@@ -315,7 +333,7 @@ function CustomInitialRatingRow({
         <>
           <View style={styles.editorCellSeparator} />
           <View style={rowStyle} testID="custom-initial-rating-editor">
-            <AppText style={styles.editorRowLabel} variant="body">Adjustment</AppText>
+            <AppText style={styles.editorRowLabel} variant="body">{t("customSetup.adjustmentLabel")}</AppText>
             <CustomRatingStepper onChange={onChange} value={value} />
           </View>
         </>
@@ -332,6 +350,7 @@ function CustomRatingStepper({
   value: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   const canDecrease = value > CUSTOM_INITIAL_RATING_MIN;
   const canIncrease = value < CUSTOM_INITIAL_RATING_MAX;
   const decrease = () => {
@@ -347,14 +366,14 @@ function CustomRatingStepper({
   return (
     <View style={styles.customStepperCompact} testID="custom-initial-rating-stepper">
       <StepperButton
-        accessibilityLabel="Decrease rating"
+        accessibilityLabel={t("customSetup.decreaseRatingA11y")}
         direction="decrease"
         disabled={!canDecrease}
         testID="custom-initial-rating-stepper-decrease"
         onPress={decrease}
       />
       <StepperButton
-        accessibilityLabel="Increase rating"
+        accessibilityLabel={t("customSetup.increaseRatingA11y")}
         direction="increase"
         disabled={!canIncrease}
         testID="custom-initial-rating-stepper-increase"
@@ -460,16 +479,17 @@ function ThemeCatalogChoiceRow({
   testID: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const [expanded, setExpanded] = useState(!showDisclosure);
   const selectedThemeLabels = selectedThemes
     .filter((theme) => theme !== ALL_THEMES_FILTER)
-    .map(customThemeLabel);
+    .map((theme) => customThemeLabel(theme, locale));
   const selectedThemeDetail = selectedThemeLabels.length === 0
-    ? "All themes"
+    ? t("customSetup.allThemes")
     : selectedThemeLabels.join(" · ");
   const allChip = (
     <ThemeChoiceChip
-      label={showDisclosure ? "All themes" : undefined}
+      label={showDisclosure ? t("customSetup.allThemes") : undefined}
       option={ALL_THEMES_FILTER}
       selected={selectedThemes.includes(ALL_THEMES_FILTER)}
       onPress={() => onChange(ALL_THEMES_FILTER)}
@@ -480,7 +500,7 @@ function ThemeCatalogChoiceRow({
     <View style={styles.themeCatalogSection} testID={testID}>
       {showDisclosure ? (
         <Pressable
-          accessibilityLabel={expanded ? "Hide Run themes" : "Show Run themes"}
+          accessibilityLabel={expanded ? t("customSetup.hideRunThemesA11y") : t("customSetup.showRunThemesA11y")}
           accessibilityRole="button"
           accessibilityState={{ expanded }}
           style={styles.historyThemeDisclosure}
@@ -488,9 +508,9 @@ function ThemeCatalogChoiceRow({
           onPress={() => setExpanded((current) => !current)}
         >
           <View style={styles.historyThemeDisclosureCopy}>
-            <AppText variant="body">Themes</AppText>
+            <AppText variant="body">{t("common.themes")}</AppText>
             <AppText
-              accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
+              accessibilityLabel={t("customSetup.selectedThemesA11y", { themes: selectedThemeDetail })}
               ellipsizeMode="tail"
               numberOfLines={1}
               testID="practice-run-theme-selection-detail"
@@ -508,8 +528,8 @@ function ThemeCatalogChoiceRow({
       ) : (
         <View style={styles.themeCatalogHeadingRow}>
           <View style={styles.editorRowLabel}>
-            <AppText variant="body">Themes</AppText>
-            <AppText tone="secondary" variant="footnote">Choose one or more</AppText>
+            <AppText variant="body">{t("common.themes")}</AppText>
+            <AppText tone="secondary" variant="footnote">{t("customSetup.chooseOneOrMore")}</AppText>
           </View>
           {allChip}
         </View>
@@ -524,8 +544,8 @@ function ThemeCatalogChoiceRow({
           ) : null}
           <View style={styles.themeCatalogGroupGrid}>
             {presentation.groups.map((group) => (
-              <View key={group.label} style={styles.themeCatalogGroupCard}>
-                <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+              <View key={group.id ?? group.label} style={styles.themeCatalogGroupCard}>
+                <Text style={styles.themeCatalogGroupLabel}>{themeCatalogGroupLabel(group, locale)}</Text>
                 <View style={styles.themeCatalogGroupOptions}>
                   {group.themes.map((theme) => (
                     <ThemeChoiceChip
@@ -610,19 +630,23 @@ function ThemeChoiceChip({
   option: CustomThemeFilter;
   selected: boolean;
 }): React.JSX.Element {
-  const visibleLabel = label ?? customThemeLabel(option);
+  const { locale, t } = useTranslation();
+  const visibleLabel = label ?? customThemeLabel(option, locale);
   const representsAllThemes = option === ALL_THEMES_FILTER;
+  const canonicalSlug = representsAllThemes ? "mixed" : safeTestId(customThemeLabel(option, "en"));
   return (
     <ChoiceChip
       accessibilityHint={representsAllThemes
-        ? "Selects all themes and clears named theme selections"
-        : "Adds or removes this theme"}
-      accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${visibleLabel} puzzle theme`}
+        ? t("customSetup.allThemesHint")
+        : t("customSetup.themeToggleHint")}
+      accessibilityLabel={representsAllThemes
+        ? t("customSetup.allThemesA11y")
+        : t("customSetup.themeA11y", { label: visibleLabel })}
       accessibilityRole={representsAllThemes ? "button" : "checkbox"}
       accessibilityState={representsAllThemes ? { selected } : { checked: selected }}
       label={visibleLabel}
       selected={selected}
-      testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(visibleLabel)}`}
+      testID={`custom-theme-${canonicalSlug}`}
       onPress={onPress}
     />
   );
@@ -646,6 +670,7 @@ export function CustomOptionRow<T extends number>({
   const styles = useStyles();
   const editorLayout = useEditorRowLayout();
   const rowStyle = useListRowStyle();
+  const { t } = useTranslation();
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selected));
   const previousOption = options[selectedIndex - 1];
   const nextOption = options[selectedIndex + 1];
@@ -657,7 +682,7 @@ export function CustomOptionRow<T extends number>({
         <AppText numberOfLines={1} tone="secondary" variant="body">{value}</AppText>
         <View style={styles.customStepperCompact} testID={stepperTestID}>
           <StepperButton
-            accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+            accessibilityLabel={t("runEditor.decreaseA11y", { label: label.toLowerCase() })}
             direction="decrease"
             disabled={!previousOption}
             testID={`${stepperTestID}-decrease`}
@@ -668,7 +693,7 @@ export function CustomOptionRow<T extends number>({
             }}
           />
           <StepperButton
-            accessibilityLabel={`Increase ${label.toLowerCase()}`}
+            accessibilityLabel={t("runEditor.increaseA11y", { label: label.toLowerCase() })}
             direction="increase"
             disabled={!nextOption}
             testID={`${stepperTestID}-increase`}
@@ -708,13 +733,23 @@ export function PreviousCustomConfigRow({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const { t } = useTranslation();
   const ratingLabel = historyRatingKeyLabel(config.ratingKey);
-  const metaLabel = `${config.themeLabel} · ${config.timing} · Last ${config.lastPlayed}`;
+  const metaLabel = t("customSetup.previousMeta", {
+    themes: config.themeLabel,
+    timing: config.timing,
+    lastPlayed: config.lastPlayed
+  });
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Use ${ratingLabel} custom sprint, ${config.mode}, ${metaLabel}, rating ${config.rating}`}
+      accessibilityLabel={t("customSetup.previousRowA11y", {
+        ratingLabel,
+        mode: config.mode,
+        meta: metaLabel,
+        rating: config.rating
+      })}
       style={({ pressed }) => [rowStyle, pressed ? styles.editorRowPressed : null]}
       testID={`custom-previous-${config.id}`}
       onPress={onPress}
@@ -731,7 +766,7 @@ export function PreviousCustomConfigRow({
         </AppText>
       </View>
       <View style={styles.previousConfigRating}>
-        <AppText numberOfLines={1} tone="secondary" variant="footnote">Rating</AppText>
+        <AppText numberOfLines={1} tone="secondary" variant="footnote">{t("common.rating")}</AppText>
         <AppText numberOfLines={1} tone="secondary" variant="numeralRow">{config.rating}</AppText>
       </View>
       <View testID={`custom-previous-${config.id}-chevron`}>
@@ -741,28 +776,34 @@ export function PreviousCustomConfigRow({
   );
 }
 
-function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string {
+function customThemeSelectionLabel(
+  themes: readonly CustomThemeFilter[],
+  locale: SupportedLocale
+): string {
   if (themes.length === 0) {
-    return customThemeLabel(ALL_THEMES_FILTER);
+    return customThemeLabel(ALL_THEMES_FILTER, locale);
   }
-  return themes.map(customThemeLabel).join(", ");
+  return themes.map((theme) => customThemeLabel(theme, locale)).join(", ");
 }
 
 export function previousCustomConfigRowModel(
   config: CustomSprintConfigRecord,
-  rating: number
+  rating: number,
+  locale: SupportedLocale = getActiveLocale()
 ): PreviousCustomConfig {
   const themes = customThemesFromStoredValue(config);
   return {
     id: safeTestId(config.id),
-    mode: config.mode === "arrow_duel" ? "Arrow Duel" : "Regular Puzzles",
+    mode: config.mode === "arrow_duel"
+      ? translate(locale, "common.arrowDuel")
+      : translate(locale, "customSetup.modeRegular"),
     customMode: config.mode === "arrow_duel" ? "arrow_duel" : "custom",
     themes,
-    themeLabel: customThemeSelectionLabel(themes),
+    themeLabel: customThemeSelectionLabel(themes, locale),
     durationSeconds: config.durationSeconds,
     perPuzzleSeconds: config.perPuzzleSeconds,
-    timing: formatSprintTimingLabel(config),
-    lastPlayed: formatConfigLastPlayed(config.lastStartedAt),
+    timing: formatSprintTimingLabel(config, locale),
+    lastPlayed: formatConfigLastPlayed(config.lastStartedAt, locale),
     ratingKey: config.ratingKey,
     rating
   };
@@ -774,12 +815,12 @@ function customThemesFromStoredValue(
   return normalizeStoredThemeChoiceSelection(config.themes);
 }
 
-function formatConfigLastPlayed(lastStartedAt: string): string {
+function formatConfigLastPlayed(lastStartedAt: string, locale: SupportedLocale): string {
   const date = new Date(lastStartedAt);
   if (Number.isNaN(date.getTime())) {
-    return "Recently";
+    return translate(locale, "customSetup.recently");
   }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDateForLocale(date, locale, { month: "short", day: "numeric" });
 }
 
 const useStyles = makeStyles((theme) => ({

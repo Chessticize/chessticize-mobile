@@ -5,6 +5,14 @@ import {
   SafeAreaInsetsContext
 } from "react-native-safe-area-context";
 import { PracticeViewportProvider } from "../../mobile/src/components/PracticeViewport.tsx";
+import {
+  DEFAULT_LOCALE,
+  I18nProvider,
+  isSupportedLocale,
+  LANGUAGE_NATIVE_LABELS,
+  SUPPORTED_LOCALES,
+  type SupportedLocale
+} from "../../mobile/src/i18n/index.ts";
 import { darkTheme, lightTheme, ThemeProvider } from "../../mobile/src/theme/index.ts";
 import "../src/lab.css";
 import { installLabIconFont } from "../src/labIconFont.ts";
@@ -75,10 +83,37 @@ function LabThemeScope({
   );
 }
 
+// Wraps a story in the selected Lab locale so every story can be inspected
+// across all supported languages from the toolbar or `globals=locale:<tag>`.
+function LabLocaleScope({
+  children,
+  localeGlobal
+}: React.PropsWithChildren<{ localeGlobal: unknown }>): React.JSX.Element {
+  const labLocale: SupportedLocale =
+    typeof localeGlobal === "string" && isSupportedLocale(localeGlobal)
+      ? localeGlobal
+      : DEFAULT_LOCALE;
+  React.useLayoutEffect(() => {
+    document.documentElement.lang = labLocale;
+    document.documentElement.dataset.labLocale = labLocale;
+  }, [labLocale]);
+
+  return (
+    <I18nProvider languagePreference={labLocale} locale={labLocale}>
+      {children}
+    </I18nProvider>
+  );
+}
+
 installLabIconFont();
 
 const preview: Preview = {
   decorators: [
+    (Story, context) => (
+      <LabLocaleScope localeGlobal={context.globals.locale}>
+        <Story />
+      </LabLocaleScope>
+    ),
     // The Text size toolbar (or `globals=textSize:largest` in a story URL) shows any
     // story at the largest accessibility size, the way the large-text stories do.
     (Story, context) => (
@@ -108,6 +143,18 @@ const preview: Preview = {
     )
   ],
   globalTypes: {
+    locale: {
+      description: "Interaction Lab language",
+      toolbar: {
+        dynamicTitle: true,
+        icon: "globe",
+        items: SUPPORTED_LOCALES.map((code) => ({
+          title: `${LANGUAGE_NATIVE_LABELS[code]} (${code})`,
+          value: code
+        })),
+        title: "Language"
+      }
+    },
     textSize: {
       description: "Simulated Dynamic Type size",
       toolbar: {
@@ -134,6 +181,7 @@ const preview: Preview = {
     }
   },
   initialGlobals: {
+    locale: DEFAULT_LOCALE,
     textSize: "default",
     theme: "light",
     viewport: {

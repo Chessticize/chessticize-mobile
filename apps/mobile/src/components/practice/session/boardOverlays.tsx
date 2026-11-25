@@ -4,6 +4,8 @@ import type { Square } from "chess.js";
 import { type MoveSide, sideToMoveAccessibilityLabel } from "../shared/moveSide.ts";
 import { MoveSideGlyph } from "../shared/Glyphs.tsx";
 import { makeStyles, type Theme, useTheme } from "../../../theme/index.ts";
+import { getActiveLocale, translate, useTranslation } from "../../../i18n/index.ts";
+import type { SupportedLocale } from "../../../../../../packages/core/src/index.ts";
 import { arrowFromTo, type BoardMove } from "../shared/boardMove.ts";
 
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
@@ -21,7 +23,7 @@ export function ArrowDuelWhatIfOverlay({
   onAction,
   optionalSettingsHint,
   testIDPrefix,
-  title = "What if you made\nthe other move?",
+  title,
   titleSide,
   veryCompactTitle = false
 }: {
@@ -35,8 +37,10 @@ export function ArrowDuelWhatIfOverlay({
   titleSide?: MoveSide;
   veryCompactTitle?: boolean;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
-  const accessibilityTitle = title.replace(/\s+/g, " ");
+  const resolvedTitle = title ?? t("session.prompt.arrowDuelWhatIfDefaultTitle");
+  const accessibilityTitle = resolvedTitle.replace(/\s+/g, " ");
   return (
     <View
       pointerEvents={actionLabel && onAction ? "auto" : "none"}
@@ -64,7 +68,7 @@ export function ArrowDuelWhatIfOverlay({
                 compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
                 veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
               ]}>
-                What would
+                {t("session.prompt.arrowDuelWhatIfLeadBefore")}
               </Text>
               <View
                 style={[
@@ -85,7 +89,7 @@ export function ArrowDuelWhatIfOverlay({
                 compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
                 veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
               ]}>
-                play
+                {t("session.prompt.arrowDuelWhatIfLeadAfter")}
               </Text>
             </View>
             <Text style={[
@@ -93,7 +97,7 @@ export function ArrowDuelWhatIfOverlay({
               compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
               veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
             ]}>
-              after the other move?
+              {t("session.prompt.arrowDuelWhatIfSecondLine")}
             </Text>
           </View>
         ) : (
@@ -101,7 +105,7 @@ export function ArrowDuelWhatIfOverlay({
             style={styles.arrowDuelWhatIfTitle}
             testID={`${testIDPrefix}-what-if-title`}
           >
-            {title}
+            {resolvedTitle}
           </Text>
         )}
         <Text
@@ -229,11 +233,12 @@ export function LastMoveOverlay({
   move: BoardMove;
   overlayTestID: string;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View
       accessible
-      accessibilityLabel={`Last move ${move.from} to ${move.to}`}
+      accessibilityLabel={t("chess.boardLastMove", { from: move.from, to: move.to })}
       accessibilityRole="image"
       pointerEvents="none"
       style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
@@ -269,14 +274,15 @@ export function moveFeedbackTint(theme: Theme, result: "correct" | "wrong"): str
 
 export function sessionBoardAccessibilityLabel(
   side: MoveSide | null,
-  lastMove: BoardMove | null
+  lastMove: BoardMove | null,
+  locale: SupportedLocale = getActiveLocale()
 ): string {
-  const parts = ["Chess board"];
+  const parts = [translate(locale, "chess.boardLabel")];
   if (side) {
-    parts.push(sideToMoveAccessibilityLabel(side));
+    parts.push(sideToMoveAccessibilityLabel(side, locale));
   }
   if (lastMove) {
-    parts.push(`Last move ${lastMove.from} to ${lastMove.to}`);
+    parts.push(translate(locale, "chess.boardLastMove", { from: lastMove.from, to: lastMove.to }));
   }
   return parts.join(". ");
 }
@@ -305,6 +311,7 @@ export function ArrowCandidateOverlay({
   candidates: string[];
   testID?: string;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const appTheme = useTheme();
   const squareSize = boardSize / 8;
@@ -318,7 +325,7 @@ export function ArrowCandidateOverlay({
   return (
     <View
       accessible
-      accessibilityLabel={`Arrow Duel candidates: ${candidates.join(", ")}`}
+      accessibilityLabel={t("chess.arrowDuelCandidatesA11y", { candidates: candidates.join(", ") })}
       accessibilityValue={{ text: candidates.join(", ") }}
       style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
       pointerEvents="none"

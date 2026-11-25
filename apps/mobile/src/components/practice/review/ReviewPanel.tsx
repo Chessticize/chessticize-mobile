@@ -3,14 +3,20 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import type { GestureType } from "react-native-gesture-handler";
 import {
   type AttemptEvent,
-  formatLocalCalendarDate,
-  formatReviewDay,
   isReviewOverdue,
   reviewQueueForecast,
   type ReviewQueueItem,
   type ReviewQueueState,
   type SessionReplayItem
 } from "../../../../../../packages/core/src/index.ts";
+import {
+  formatLocalDateForLocale,
+  formatReviewDayForLocale,
+  getActiveLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../../../i18n/index.ts";
 import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 import {
@@ -50,24 +56,44 @@ function reviewItemSpeedSeconds(
 }
 
 function reviewItemSourceSprintLabel(
-  review: Pick<ReviewQueueState, "mode" | "ratingKey">
+  review: Pick<ReviewQueueState, "mode" | "ratingKey">,
+  locale: SupportedLocale
 ): string {
   const speed = reviewItemSpeedSeconds(review);
-  const speedLabel = speed === null ? null : `${speed}s pace`;
-  return `Source sprint: ${modeLabel(review.mode)}${speedLabel ? ` · ${speedLabel}` : ""}`;
+  const speedSuffix = speed === null
+    ? ""
+    : translate(locale, "review.paceSuffix", { seconds: speed });
+  return translate(locale, "review.sourceSprint", {
+    mode: modeLabel(review.mode, locale),
+    speedSuffix
+  });
 }
 
-function reviewQueueFilterLabel(filter: ReviewTodayFilter): string {
+function reviewItemCompactSourceLabel(
+  review: Pick<ReviewQueueState, "mode" | "ratingKey">,
+  locale: SupportedLocale
+): string {
+  const speed = reviewItemSpeedSeconds(review);
+  const speedSuffix = speed === null
+    ? ""
+    : translate(locale, "review.paceSuffix", { seconds: speed });
+  return `${modeLabel(review.mode, locale)}${speedSuffix}`;
+}
+
+function reviewQueueFilterLabel(
+  filter: ReviewTodayFilter,
+  locale: SupportedLocale
+): string {
   if (filter === "all") {
-    return "All";
+    return translate(locale, "review.filterAll");
   }
   if (filter === "overdue") {
-    return "Overdue";
+    return translate(locale, "review.filterOverdue");
   }
   if (filter === "missed_twice") {
-    return "Missed 2+ times";
+    return translate(locale, "review.filterMissedTwice");
   }
-  return "Arrow Duel";
+  return translate(locale, "common.arrowDuel");
 }
 
 const REVIEW_TODAY_FILTERS: readonly ReviewTodayFilter[] = [
@@ -77,10 +103,16 @@ const REVIEW_TODAY_FILTERS: readonly ReviewTodayFilter[] = [
   "arrow_duel"
 ];
 
-function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueueItem[], nowMs: number): {
+function reviewQueueSummary(
+  queue: ReviewQueueState[],
+  filteredItems: ReviewQueueItem[],
+  nowMs: number,
+  locale: SupportedLocale
+): {
   dueStatusLabel: string;
   filteredCount: number;
   oldestDueLabel: string;
+  oldestDueSubline: string;
   overdueCount: number;
   tomorrowCount: number;
   nextSevenDaysCount: number;
@@ -88,18 +120,29 @@ function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueu
 } {
   const forecast = reviewQueueForecast(queue, nowMs);
   const filteredOverdueCount = filteredItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
+  const oldestDay = forecast.totalCount > 0 && forecast.todayCount > 0
+    ? formatReviewDayForLocale(queue.map((review) => review.dueDay).sort()[0]!, locale)
+    : null;
+  const nextDay = forecast.totalCount > 0 && forecast.todayCount === 0
+    ? formatReviewDayForLocale(forecast.nextDueDay!, locale)
+    : null;
   return {
     dueStatusLabel: filteredItems.length === 0
-      ? "No matching scheduled reviews"
+      ? translate(locale, "review.dueStatusEmpty")
       : filteredOverdueCount > 0
-        ? "Overdue now"
-        : "Ready now",
+        ? translate(locale, "review.dueStatusOverdue")
+        : translate(locale, "review.dueStatusReady"),
     filteredCount: filteredItems.length,
-    oldestDueLabel: forecast.totalCount === 0
-      ? "Next review appears after a missed puzzle reaches its due time"
-      : forecast.todayCount > 0
-        ? `Oldest due ${formatReviewDay(queue.map((review) => review.dueDay).sort()[0]!)}`
-        : `Next review due ${formatReviewDay(forecast.nextDueDay!)}`,
+    oldestDueLabel: oldestDay !== null
+      ? translate(locale, "review.oldestDueDate", { day: oldestDay })
+      : nextDay !== null
+        ? translate(locale, "review.nextReviewDueDate", { day: nextDay })
+        : translate(locale, "review.oldestDueNone"),
+    oldestDueSubline: oldestDay !== null
+      ? translate(locale, "review.sublineOldest", { day: oldestDay })
+      : nextDay !== null
+        ? translate(locale, "review.sublineNext", { day: nextDay })
+        : translate(locale, "review.sublineNextFallback"),
     overdueCount: forecast.overdueCount,
     tomorrowCount: forecast.tomorrowCount,
     nextSevenDaysCount: forecast.nextSevenDaysCount,
@@ -175,6 +218,7 @@ export function ReviewPanel({
   systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const sessionEntries = sessionReplayItems.map((item): ReviewEntry => buildServiceReviewEntry(service, {
     puzzle: item.puzzle,
     mode: item.attempt.mode,
@@ -223,17 +267,17 @@ export function ReviewPanel({
     ratingKey: item.review.ratingKey,
     source: "due"
   }));
-  const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs);
-  const selectedReviewFilterLabel = reviewQueueFilterLabel(queueFilter);
+  const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs, locale);
+  const selectedReviewFilterLabel = reviewQueueFilterLabel(queueFilter, locale);
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : reviewToday.dueItems.length === 0
-      ? "You're done for today"
-      : "No matching scheduled reviews";
+      ? t("review.doneForToday")
+      : t("review.dueStatusEmpty");
   const reviewDueFilterLabel = filteredDueEntries.length > 0
     ? `${selectedReviewFilterLabel} · ${queueSummary.dueStatusLabel}`
-    : "No matching scheduled reviews";
-  const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
+    : t("review.dueStatusEmpty");
+  const reviewDueSubline = queueSummary.oldestDueSubline;
   const reviewFilterControlActive = filtersExpanded || queueFilter !== "all";
   // Three side-by-side counts break their labels mid-word at large text sizes.
   const forecastStacked = useWindowDimensions().fontScale >= REVIEW_FORECAST_STACK_FONT_SCALE;
@@ -362,7 +406,7 @@ export function ReviewPanel({
         <FilterButton
           key={filter}
           active={queueFilter === filter}
-          label={reviewQueueFilterLabel(filter)}
+          label={reviewQueueFilterLabel(filter, locale)}
           testID={reviewQuickFilterTestID(filter)}
           onPress={() => setQueueFilter(filter)}
         />
@@ -389,9 +433,14 @@ export function ReviewPanel({
   return (
     <View style={styles.historyPanel} testID="review-panel">
       <View style={styles.historyHeaderRow} testID="review-action-header">
-        <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">Review</AppText>
+        <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">{t("tabs.review")}</AppText>
         <ToolbarIconButton
-          accessibilityLabel={`${filtersExpanded ? "Hide" : "Show"} review filters${queueFilter === "all" ? "" : `, ${selectedReviewFilterLabel} selected`}`}
+          accessibilityLabel={t("review.filterToggleA11y", {
+            action: filtersExpanded ? t("survival.hub.hide") : t("survival.hub.show"),
+            selectedSuffix: queueFilter === "all"
+              ? ""
+              : t("review.filterToggleSelectedSuffix", { label: selectedReviewFilterLabel })
+          })}
           accessibilityState={{ expanded: filtersExpanded }}
           active={reviewFilterControlActive}
           testID="review-filter-toggle"
@@ -403,13 +452,29 @@ export function ReviewPanel({
 
       <View
         accessibilityLabel={dailyReviewTotal === 0
-          ? `Today, no reviews scheduled, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`
-          : `Today, ${completedReviews.length} of ${dailyReviewTotal} reviews completed, ${reviewToday.dueItems.length} remaining${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
+          ? t("review.dueCardEmptyA11y", {
+              tomorrow: queueSummary.tomorrowCount,
+              next7: queueSummary.nextSevenDaysCount,
+              total: queueSummary.totalCount,
+              filterLabel: reviewDueFilterLabel
+            })
+          : t("review.dueCardActiveA11y", {
+              completed: completedReviews.length,
+              dailyTotal: dailyReviewTotal,
+              remaining: reviewToday.dueItems.length,
+              overdueSuffix: queueSummary.overdueCount > 0
+                ? t("review.overdueSuffix", { count: queueSummary.overdueCount })
+                : "",
+              tomorrow: queueSummary.tomorrowCount,
+              next7: queueSummary.nextSevenDaysCount,
+              total: queueSummary.totalCount,
+              filterLabel: reviewDueFilterLabel
+            })}
         style={styles.reviewDueCard}
         testID="review-due-card"
       >
         <View style={styles.editorRowLabel}>
-          <AppText variant="headline">Today</AppText>
+          <AppText variant="headline">{t("common.today")}</AppText>
           <AppText testID="review-due-summary" tone="secondary" variant="subheadline">
             {reviewDueSummaryLabel}
           </AppText>
@@ -428,15 +493,19 @@ export function ReviewPanel({
       </View>
 
       <View
-        accessibilityLabel={`${reviewCountLabel(queueSummary.tomorrowCount)} tomorrow, ${reviewCountLabel(queueSummary.nextSevenDaysCount)} in the next 7 days, ${reviewCountLabel(queueSummary.totalCount)} total`}
+        accessibilityLabel={t("review.forecastA11y", {
+          tomorrow: reviewCountLabel(queueSummary.tomorrowCount, locale),
+          next7: reviewCountLabel(queueSummary.nextSevenDaysCount, locale),
+          total: reviewCountLabel(queueSummary.totalCount, locale)
+        })}
         style={[styles.reviewForecastRow, forecastStacked ? styles.reviewForecastRowStacked : null]}
         testID="review-forecast"
       >
-        <ReviewForecastMetric label="Tomorrow" count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" stacked={forecastStacked} />
+        <ReviewForecastMetric label={t("review.forecastTomorrow")} count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" stacked={forecastStacked} />
         <View style={forecastStacked ? styles.reviewForecastDividerStacked : styles.reviewForecastDivider} />
-        <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" stacked={forecastStacked} />
+        <ReviewForecastMetric label={t("review.forecastNext7Days")} count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" stacked={forecastStacked} />
         <View style={forecastStacked ? styles.reviewForecastDividerStacked : styles.reviewForecastDivider} />
-        <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" stacked={forecastStacked} />
+        <ReviewForecastMetric label={t("review.forecastTotal")} count={queueSummary.totalCount} countTestID="review-total-count" stacked={forecastStacked} />
       </View>
 
       <View style={styles.reviewFilterControlSlot} testID="review-filter-controls">
@@ -445,10 +514,10 @@ export function ReviewPanel({
       </View>
 
       <Button
-        accessibilityLabel="Start due review"
+        accessibilityLabel={t("review.startDueA11y")}
         disabled={filteredDueEntries.length === 0}
         icon="play"
-        label={`Review ${queueSummary.filteredCount}`}
+        label={t("review.startDueLabel", { count: queueSummary.filteredCount })}
         stretch
         testID="review-start-due"
         onPress={() => startReviewEntries(filteredDueEntries)}
@@ -458,29 +527,33 @@ export function ReviewPanel({
         <View style={styles.reviewDevControls} testID="review-dev-controls">
           {onPromoteNextFutureReviewsToDue ? (
             <Button
-              accessibilityLabel="Make next future review date due today"
-              label="Make next due today"
+              accessibilityLabel={t("review.dev.promoteA11y")}
+              label={t("review.dev.promoteLabel")}
               size="compact"
               stretch
               testID="review-dev-promote-next-due"
               variant="secondary"
               onPress={() => {
                 const result = onPromoteNextFutureReviewsToDue();
-                setDevStatus(reviewDuePromotionStatus(result));
+                setDevStatus(reviewDuePromotionStatus(result, locale));
               }}
             />
           ) : null}
           {onScheduleTestReviewReminder ? (
             <Button
-              accessibilityLabel="Schedule a test review notification"
-              label="Test notification"
+              accessibilityLabel={t("review.dev.testNotifA11y")}
+              label={t("review.dev.testNotifLabel")}
               size="compact"
               stretch
               testID="review-dev-test-notification"
               variant="secondary"
               onPress={() => {
                 void onScheduleTestReviewReminder().then((result) => {
-                  setDevStatus(result.scheduled ? `Test notification scheduled ${formatLocalCalendarDate(result.scheduledAt ?? "")}` : "No test notification scheduled");
+                  setDevStatus(result.scheduled
+                    ? t("review.dev.testNotifScheduled", {
+                        date: formatLocalDateForLocale(result.scheduledAt ?? "", locale)
+                      })
+                    : t("review.dev.testNotifNone"));
                 });
               }}
             />
@@ -496,7 +569,7 @@ export function ReviewPanel({
         <ReviewSectionToggle
           count={filteredReviewToday.dueItems.length}
           expanded={todayReviewsExpanded}
-          label="Today to review"
+          label={t("review.section.todayToReview")}
           toggleTestID="review-today-to-review-toggle"
           onPress={() => setTodayReviewsExpanded((expanded) => !expanded)}
         />
@@ -521,7 +594,7 @@ export function ReviewPanel({
             </React.Fragment>
           )) : (
             <AppText style={styles.groupedEmpty} testID="review-today-to-review-empty" tone="secondary" variant="subheadline">
-              No reviews match this filter.
+              {t("review.emptyDueFiltered")}
             </AppText>
           )}
         </CollapsibleRegion>
@@ -531,7 +604,7 @@ export function ReviewPanel({
         <ReviewSectionToggle
           count={filteredCompletedReviews.length}
           expanded={completedReviewsExpanded}
-          label="Completed today"
+          label={t("review.section.completedToday")}
           toggleTestID="review-completed-today-toggle"
           onPress={() => setCompletedReviewsExpanded((expanded) => !expanded)}
         />
@@ -550,7 +623,7 @@ export function ReviewPanel({
             </React.Fragment>
           )) : (
             <AppText style={styles.groupedEmpty} testID="review-today-history-empty" tone="secondary" variant="subheadline">
-              No completed reviews match this filter.
+              {t("review.emptyCompletedFiltered")}
             </AppText>
           )}
         </CollapsibleRegion>
@@ -560,32 +633,25 @@ export function ReviewPanel({
   );
 }
 
-function reviewDuePromotionStatus(result: ReviewQueueDuePromotionResult): string {
+function reviewDuePromotionStatus(
+  result: ReviewQueueDuePromotionResult,
+  locale: SupportedLocale
+): string {
   if (result.promotedCount === 0) {
-    return "No future reviews to promote";
+    return translate(locale, "review.dev.noFutureToPromote");
   }
-  const reviewLabel = result.promotedCount === 1 ? "1 review" : `${result.promotedCount} reviews`;
-  return `${reviewLabel} from ${result.promotedDate ?? "next due date"} due today`;
-}
-
-function reviewDueCardSubline(label: string): string {
-  if (label.startsWith("Oldest due ")) {
-    return `Oldest: ${label.slice("Oldest due ".length)}`;
-  }
-  if (label.startsWith("Next review due ")) {
-    return `Next: ${label.slice("Next review due ".length)}`;
-  }
-  if (label.startsWith("Next review appears ")) {
-    return "Next: after the first missed puzzle is due";
-  }
-  return label;
+  return translate(locale, "review.dev.promotedStatus", {
+    reviews: reviewCountLabel(result.promotedCount, locale),
+    date: result.promotedDate ?? translate(locale, "review.dev.nextDueDateFallback")
+  });
 }
 
 function ReviewFilterSummary({ label }: { label: string }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <View
-      accessibilityLabel={`Review filter summary, ${label}`}
+      accessibilityLabel={t("review.filterSummaryA11y", { label })}
       testID="review-active-filter-summary"
     >
       <View style={styles.historyChipContent}>
@@ -599,37 +665,39 @@ function ReviewFilterSummary({ label }: { label: string }): React.JSX.Element {
 
 function reviewTodayActivityLabel(
   history: ReviewTodayHistoryPresentation,
-  nowMs: number
+  nowMs: number,
+  locale: SupportedLocale
 ): string {
   if (!history.activity.at) {
-    return "Scheduled for review";
+    return translate(locale, "review.activity.scheduled");
   }
-  const activity = reviewRelativeDayLabel(history.activity.at, nowMs);
+  const when = reviewRelativeDayLabel(history.activity.at, nowMs, locale);
   if (history.activity.kind === "last_retry") {
-    return `Last retry ${activity}`;
+    return translate(locale, "review.activity.lastRetry", { when });
   }
   if (history.activity.kind === "first_missed") {
-    return `First missed ${activity}`;
+    return translate(locale, "review.activity.firstMissed", { when });
   }
-  return `Added to Review ${activity}`;
+  return translate(locale, "review.activity.addedToReview", { when });
 }
 
-function reviewRelativeDayLabel(value: string, nowMs: number): string {
+function reviewRelativeDayLabel(
+  value: string,
+  nowMs: number,
+  locale: SupportedLocale
+): string {
   const date = new Date(value);
   const now = new Date(nowMs);
   if (!Number.isFinite(date.getTime()) || !Number.isFinite(now.getTime())) {
-    return formatLocalCalendarDate(value);
+    return formatLocalDateForLocale(value, locale);
   }
   const dateDay = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   const nowDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const daysAgo = Math.max(0, Math.round((nowDay - dateDay) / (24 * 60 * 60 * 1000)));
   if (daysAgo === 0) {
-    return "today";
+    return translate(locale, "review.relative.todayLower");
   }
-  if (daysAgo === 1) {
-    return "1 day ago";
-  }
-  return `${daysAgo} days ago`;
+  return translate(locale, "review.relative.daysAgo", { count: daysAgo });
 }
 
 function ReviewQueueItemCard({
@@ -644,18 +712,21 @@ function ReviewQueueItemCard({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const { locale, t } = useTranslation();
   const { history, item } = presentation;
-  const activityLabel = reviewTodayActivityLabel(history, nowMs);
-  const source = reviewItemSourceSprintLabel(item.review);
-  const compactSource = source.replace(/^Source sprint: /, "");
-  const attemptSummaryLabel = `${reviewAttemptMetricLabel(history.attemptCount, "attempt")} · ${reviewAttemptMetricLabel(history.missCount, "miss")}`;
+  const activityLabel = reviewTodayActivityLabel(history, nowMs, locale);
+  const source = reviewItemSourceSprintLabel(item.review, locale);
+  const compactSource = reviewItemCompactSourceLabel(item.review, locale);
+  const attemptsText = t("common.attemptsCount", { count: history.attemptCount });
+  const missesText = t("review.row.missesCount", { count: history.missCount });
+  const attemptSummaryLabel = `${attemptsText} · ${missesText}`;
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}-${safeTestId(item.review.ratingKey)}`;
   const accessibilityLabel = [
-    `Start ${modeLabel(item.review.mode)} review`,
-    "Scheduled retry",
+    t("review.row.startReviewA11y", { mode: modeLabel(item.review.mode, locale) }),
+    t("review.row.scheduledRetry"),
     activityLabel,
-    reviewAttemptMetricLabel(history.attemptCount, "attempt"),
-    reviewAttemptMetricLabel(history.missCount, "miss"),
+    attemptsText,
+    missesText,
     source
   ].join(", ");
 
@@ -671,7 +742,7 @@ function ReviewQueueItemCard({
         <IconTile name="review" />
       </View>
       <View style={styles.settingsRowCopy}>
-        <AppText variant="headline">{modeLabel(item.review.mode)}</AppText>
+        <AppText variant="headline">{modeLabel(item.review.mode, locale)}</AppText>
         <AppText testID={`${rowTestId}-context`} tone="secondary" variant="subheadline">{activityLabel}</AppText>
         <AppText testID={`${rowTestId}-meta`} tone="secondary" variant="footnote">
           {[attemptSummaryLabel, compactSource].filter(Boolean).join(" · ")}
@@ -682,11 +753,6 @@ function ReviewQueueItemCard({
       </View>
     </Pressable>
   );
-}
-
-function reviewAttemptMetricLabel(count: number, singular: "attempt" | "miss"): string {
-  const plural = singular === "attempt" ? "attempts" : "misses";
-  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function ReviewSectionToggle({
@@ -703,10 +769,15 @@ function ReviewSectionToggle({
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${expanded ? "Collapse" : "Expand"} ${label}, ${reviewCountLabel(count)}`}
+      accessibilityLabel={t("review.section.toggleA11y", {
+        action: expanded ? t("review.section.collapse") : t("review.section.expand"),
+        label,
+        countLabel: reviewCountLabel(count, locale)
+      })}
       accessibilityState={{ expanded }}
       testID={toggleTestID}
       style={styles.reviewSectionToggle}
@@ -736,8 +807,9 @@ function TodayReviewAttemptRow({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const { locale, t } = useTranslation();
   const isWrong = item.attempt.result === "wrong";
-  const resultLabel = isWrong ? "Wrong" : "Correct";
+  const resultLabel = isWrong ? t("common.wrong") : t("common.correct");
   const elapsedSeconds = Math.max(
     0,
     Math.round((new Date(item.attempt.completedAt).getTime() - new Date(item.attempt.startedAt).getTime()) / 1000)
@@ -745,7 +817,10 @@ function TodayReviewAttemptRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open ${modeLabel(item.attempt.mode)} ${resultLabel.toLowerCase()} review for analysis or retry`}
+      accessibilityLabel={t("review.todayRowA11y", {
+        mode: modeLabel(item.attempt.mode, locale),
+        result: resultLabel.toLowerCase()
+      })}
       testID={`review-today-attempt-${item.attempt.id}`}
       style={({ pressed }) => [rowStyle, styles.attemptRow, pressed ? styles.settingsRowPressed : null]}
       onPress={onOpen}
@@ -756,7 +831,7 @@ function TodayReviewAttemptRow({
       />
       <View style={styles.settingsRowCopy}>
         <View style={styles.historyAttemptHeader}>
-          <AppText variant="headline">{modeLabel(item.attempt.mode)}</AppText>
+          <AppText variant="headline">{modeLabel(item.attempt.mode, locale)}</AppText>
           <AppText
             testID={`review-today-attempt-${item.attempt.id}-result`}
             tone={isWrong ? "negative" : "positive"}
@@ -765,8 +840,12 @@ function TodayReviewAttemptRow({
             {resultLabel}
           </AppText>
         </View>
-        <AppText tone="secondary" variant="footnote">Puzzle {item.puzzle.id} · {elapsedSeconds}s</AppText>
-        <AppText tone="secondary" variant="footnote">{formatLocalCalendarDate(item.attempt.completedAt)} · Review or retry</AppText>
+        <AppText tone="secondary" variant="footnote">
+          {t("common.puzzleNumber", { id: item.puzzle.id })} · {t("common.secondsCompact", { count: elapsedSeconds })}
+        </AppText>
+        <AppText tone="secondary" variant="footnote">
+          {t("review.todayRowDetail", { date: formatLocalDateForLocale(item.attempt.completedAt, locale) })}
+        </AppText>
       </View>
       <View style={styles.attemptRowChevron}>
         <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
@@ -805,8 +884,11 @@ function ReviewForecastMetric({
   );
 }
 
-export function reviewCountLabel(count: number): string {
-  return `${count} ${count === 1 ? "review" : "reviews"}`;
+export function reviewCountLabel(
+  count: number,
+  locale: SupportedLocale = getActiveLocale()
+): string {
+  return translate(locale, "common.reviewsCount", { count });
 }
 
 const useStyles = makeStyles((theme) => ({

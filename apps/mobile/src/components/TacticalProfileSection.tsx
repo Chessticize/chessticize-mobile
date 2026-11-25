@@ -18,6 +18,7 @@ import type {
   TacticalProfilePresentation,
   TacticalProfileSignal
 } from "./tacticalProfilePresentation.ts";
+import { type SupportedLocale, translate, useTranslation } from "../i18n/index.ts";
 
 export function TacticalProfileHomeCard({
   presentation
@@ -26,18 +27,23 @@ export function TacticalProfileHomeCard({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { locale, t } = useTranslation();
   const primarySignal = homeLeadSignalFor(presentation);
-  const content = homeContentFor(presentation, primarySignal);
+  const content = homeContentFor(presentation, locale, primarySignal);
   const recommendationCount = recommendedThemeLabels(presentation).length;
   const taskFamilies = recommendedTaskFamilies(presentation.signals);
   const canOpen = presentation.phase !== "building";
 
   return (
-    <Section header="Training focus" surfaceStyle={styles.homeSurface} testID="training-focus-section">
+    <Section header={t("tacticalProfile.sectionHeader")} surfaceStyle={styles.homeSurface} testID="training-focus-section">
       <View
-        accessibilityLabel={`Training focus. ${content.title}. ${content.body}${
-          presentation.assurance === "provisional" ? " Early estimate." : ""
-        }`}
+        accessibilityLabel={t("tacticalProfile.homeCardA11y", {
+          title: content.title,
+          body: content.body,
+          earlyEstimateSuffix: presentation.assurance === "provisional"
+            ? t("tacticalProfile.earlyEstimateA11ySuffix")
+            : ""
+        })}
         style={styles.homeCard}
         testID="training-focus-card"
       >
@@ -52,13 +58,13 @@ export function TacticalProfileHomeCard({
           </View>
           {presentation.assurance === "provisional" ? (
             <Text numberOfLines={1} style={styles.earlyEstimateLabel} testID="training-focus-early-estimate">
-              Early estimate
+              {t("history.progress.earlyEstimate")}
             </Text>
           ) : null}
         </View>
         {primarySignal && taskFamilies.length > 1 ? (
           <Text style={styles.modeLabel} testID="training-focus-primary-mode">
-            {taskFamilyLabel(primarySignal.taskFamily)}
+            {taskFamilyLabel(primarySignal.taskFamily, locale)}
           </Text>
         ) : null}
         <AppText variant="headline">{content.title}</AppText>
@@ -77,7 +83,7 @@ export function TacticalProfileHomeCard({
             onPress={() => presentation.onIntent({ type: "open-profile" })}
           >
             <AppText style={styles.cardActionText} tone="accent" variant="body">
-              {homeActionLabel(presentation, recommendationCount)}
+              {homeActionLabel(presentation, recommendationCount, locale)}
             </AppText>
             <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
           </Pressable>
@@ -110,6 +116,7 @@ function TacticalProfileScreen({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const activeTaskFamily = activeTaskFamilyFor(presentation);
   const taskFamilies = signalTaskFamilies(presentation.signals);
   const familySignals = presentation.signals.filter(
@@ -132,10 +139,10 @@ function TacticalProfileScreen({
   return (
     <View style={styles.flow} testID="tactical-profile-screen">
       <FlowTopBar
-        backLabel="Back to Practice"
-        subtitle={taskFamilyLabel(activeTaskFamily)}
+        backLabel={t("sprintResult.backToPractice")}
+        subtitle={taskFamilyLabel(activeTaskFamily, locale)}
         subtitleTestID="tactical-profile-active-mode"
-        title="Tactical profile"
+        title={t("tacticalProfile.screenTitle")}
         onBack={() => presentation.onIntent({ type: "close-profile" })}
       />
       {taskFamilies.length > 1 ? (
@@ -148,15 +155,17 @@ function TacticalProfileScreen({
       ) : null}
       <View style={styles.intro}>
         <AppText accessibilityRole="header" variant="title">
-          {profileHeadingFor(presentation, familySignals)}
+          {profileHeadingFor(presentation, familySignals, locale)}
         </AppText>
-        <AppText tone="secondary" variant="subheadline">{profileBodyFor(presentation)}</AppText>
-        <AppText tone="secondary" variant="footnote">{profileContextFor(presentation)}</AppText>
+        <AppText tone="secondary" variant="subheadline">{profileBodyFor(presentation, locale)}</AppText>
+        <AppText tone="secondary" variant="footnote">{profileContextFor(presentation, locale)}</AppText>
       </View>
 
       {recommendedSignals.length > 0 ? (
         <Section
-          header={recommendedSignals.length === 1 ? "Recommended focus" : "Ranked focus"}
+          header={recommendedSignals.length === 1
+            ? t("tacticalProfile.recommendedFocusHeader")
+            : t("tacticalProfile.rankedFocusHeader")}
           rows
           testID="tactical-profile-recommendations"
         >
@@ -172,7 +181,7 @@ function TacticalProfileScreen({
       ) : null}
 
       {watchSignals.length > 0 ? (
-        <Section header="Collecting evidence" rows testID="tactical-profile-watch-signals">
+        <Section header={t("tacticalProfile.collectingEvidence")} rows testID="tactical-profile-watch-signals">
           {watchSignals.map((signal) => (
             <SignalRow
               key={signal.id}
@@ -185,14 +194,12 @@ function TacticalProfileScreen({
 
       {hiddenSignalCount > 0 ? (
         <AppText style={styles.note} testID="tactical-profile-more-signals" tone="secondary" variant="footnote">
-          {hiddenSignalCount === 1
-            ? "1 more pattern is being monitored in the background."
-            : `${hiddenSignalCount} more patterns are being monitored in the background.`}
+          {t("tacticalProfile.morePatternsMonitored", { count: hiddenSignalCount })}
         </AppText>
       ) : null}
 
       {recommendedSignals.length > 0 && presentation.focusedRunUnavailable ? (
-        <Section header="Focused Run availability" rows testID="focused-run-unavailable">
+        <Section header={t("tacticalProfile.focusedRunAvailabilityHeader")} rows testID="focused-run-unavailable">
           <ListRow
             icon="warning"
             iconTone="warning"
@@ -204,9 +211,9 @@ function TacticalProfileScreen({
 
       {canPreview ? (
         <FlowActions
-          primaryLabel="Preview focused Run"
+          primaryLabel={t("tacticalProfile.previewFocusedRun")}
           primaryTestID="tactical-profile-preview-run"
-          secondaryLabel="Not now"
+          secondaryLabel={t("common.notNow")}
           secondaryTestID="tactical-profile-not-now"
           onPrimary={() => presentation.onIntent({ type: "preview-focused-run" })}
           onSecondary={() => presentation.onIntent({ type: "suppress-recommendation" })}
@@ -223,6 +230,7 @@ function RecommendationExplanation({
 }): React.JSX.Element {
   const styles = useStyles();
   const rowStyle = useListRowStyle();
+  const { locale, t } = useTranslation();
   const signal = selectedSignalFor(presentation);
   if (!signal) {
     return <TacticalProfileScreen presentation={presentation} />;
@@ -235,23 +243,28 @@ function RecommendationExplanation({
     );
   const reasons = [
     {
-      title: "What we compared",
-      body: `Your results on this theme were compared with similar-difficulty ${taskFamilyComparisonLabel(signal.taskFamily)} in ordinary mixed Runs.`
+      id: "compared",
+      title: t("tacticalProfile.explanation.comparedTitle"),
+      body: t("tacticalProfile.explanation.comparedBody", {
+        comparison: taskFamilyComparisonLabel(signal.taskFamily, locale)
+      })
     },
     {
-      title: "Why this is actionable",
-      body: "The pattern repeats across different puzzles and sessions, and it is large enough to matter in training."
+      id: "actionable",
+      title: t("tacticalProfile.explanation.actionableTitle"),
+      body: t("tacticalProfile.explanation.actionableBody")
     },
     {
-      title: "What does not decide this",
-      body: "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof of a theme weakness."
+      id: "not-decided",
+      title: t("tacticalProfile.explanation.notDecidedTitle"),
+      body: t("tacticalProfile.explanation.notDecidedBody")
     }
   ];
 
   return (
     <View style={styles.flow} testID="tactical-profile-explanation">
       <FlowTopBar
-        backLabel="Back to Tactical Profile"
+        backLabel={t("tacticalProfile.backToProfile")}
         title={signal.themeLabel}
         onBack={() => presentation.onIntent({ type: "open-profile" })}
       />
@@ -259,14 +272,14 @@ function RecommendationExplanation({
       <Section>
         <View style={styles.metaLine}>
           <SignalKindBadge kind={signal.kind} />
-          <AppText tone="secondary" variant="footnote">{taskFamilyLabel(signal.taskFamily)}</AppText>
+          <AppText tone="secondary" variant="footnote">{taskFamilyLabel(signal.taskFamily, locale)}</AppText>
         </View>
-        <AppText accessibilityRole="header" variant="title">{signalSummary(signal)}</AppText>
+        <AppText accessibilityRole="header" variant="title">{signalSummary(signal, locale)}</AppText>
         <EvidenceLine signal={signal} variant="flow" />
       </Section>
       <Section rows>
         {reasons.map((reason) => (
-          <View key={reason.title} style={[rowStyle, styles.textRow]}>
+          <View key={reason.id} style={[rowStyle, styles.textRow]}>
             <View style={styles.rowCopy}>
               <AppText variant="headline">{reason.title}</AppText>
               <AppText tone="secondary" variant="subheadline">{reason.body}</AppText>
@@ -276,9 +289,9 @@ function RecommendationExplanation({
       </Section>
       {canPreview ? (
         <FlowActions
-          primaryLabel="Preview focused Run"
+          primaryLabel={t("tacticalProfile.previewFocusedRun")}
           primaryTestID="tactical-profile-explanation-preview"
-          secondaryLabel="Not now"
+          secondaryLabel={t("common.notNow")}
           secondaryTestID="tactical-profile-explanation-not-now"
           onPrimary={() => presentation.onIntent({ type: "preview-focused-run" })}
           onSecondary={() => presentation.onIntent({ type: "suppress-recommendation" })}
@@ -295,36 +308,40 @@ function FocusedRunPreviewScreen({
 }): React.JSX.Element {
   const styles = useStyles();
   const rowStyle = useListRowStyle();
+  const { locale, t } = useTranslation();
   const preview = presentation.focusedRun;
   if (!preview || preview.taskFamily !== activeTaskFamilyFor(presentation)) {
     return <TacticalProfileScreen presentation={presentation} />;
   }
   const guardrails = [
-    focusedRunRatingGuardrail(preview.taskFamily),
-    "Recently seen and scheduled Review puzzles avoided",
-    "The mix stays fixed after the Run starts",
-    "Mixed practice keeps the session broad"
+    focusedRunRatingGuardrail(preview.taskFamily, locale),
+    t("tacticalProfile.focusedRun.guardrailAvoidRecent"),
+    t("tacticalProfile.focusedRun.guardrailFixedMix"),
+    t("tacticalProfile.focusedRun.guardrailMixedPractice")
   ];
 
   return (
     <View style={styles.flow} testID="focused-run-preview">
       <FlowTopBar
-        backLabel="Back to Tactical Profile"
+        backLabel={t("tacticalProfile.backToProfile")}
         title={preview.title}
         onBack={() => presentation.onIntent({ type: "open-profile" })}
       />
       <EarlyEstimateNotice presentation={presentation} />
       <View style={styles.intro}>
         <AppText accessibilityRole="header" variant="title">
-          {preview.totalPuzzleCount} puzzles · {preview.durationLabel}
+          {t("tacticalProfile.focusedRun.puzzlesAndDuration", {
+            count: preview.totalPuzzleCount,
+            duration: preview.durationLabel
+          })}
         </AppText>
         <AppText style={styles.semibold} testID="focused-run-rating-anchor" tone="accent" variant="subheadline">
           {preview.ratingLabel}
         </AppText>
       </View>
-      <Section header="Training mix">
+      <Section header={t("tacticalProfile.focusedRun.trainingMixHeader")}>
         <AppText tone="secondary" variant="subheadline">
-          Explicit quotas keep one theme from taking over. Only the two clearest focuses can enter one Run.
+          {t("tacticalProfile.focusedRun.trainingMixBody")}
         </AppText>
         <View style={styles.allocationBar} testID="focused-run-allocation-bar">
           {preview.allocations.map((allocation) => (
@@ -350,20 +367,20 @@ function FocusedRunPreviewScreen({
           ))}
         </View>
       </Section>
-      <Section header="How puzzles are chosen" rows>
-        {guardrails.map((guardrail) => (
-          <View key={guardrail} style={rowStyle}>
+      <Section header={t("tacticalProfile.focusedRun.howChosenHeader")} rows>
+        {guardrails.map((guardrail, index) => (
+          <View key={index} style={rowStyle}>
             <AppText style={styles.rowCopy} variant="body">{guardrail}</AppText>
           </View>
         ))}
       </Section>
       <AppText style={[styles.note, styles.centeredText]} tone="secondary" variant="footnote">
-        Later ordinary mixed Runs decide whether this focus still applies. This preview does not change your saved Runs.
+        {t("tacticalProfile.focusedRun.footnote")}
       </AppText>
       <FlowActions
-        primaryLabel="Start focused Run"
+        primaryLabel={t("tacticalProfile.focusedRun.startButton")}
         primaryTestID="focused-run-start"
-        secondaryLabel="Not now"
+        secondaryLabel={t("common.notNow")}
         secondaryTestID="focused-run-not-now"
         onPrimary={() => presentation.onIntent({ type: "start-focused-run" })}
         onSecondary={() => presentation.onIntent({ type: "suppress-recommendation" })}
@@ -379,6 +396,7 @@ function SuppressedRecommendation({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={[styles.flow, styles.suppressedFlow]} testID="tactical-profile-suppressed">
       <View style={styles.suppressedHero}>
@@ -386,17 +404,17 @@ function SuppressedRecommendation({
           <Icon color={theme.colors.text.tertiary} name="check" size={28} weight="semibold" />
         </View>
         <AppText accessibilityRole="header" style={styles.centeredText} variant="title">
-          Focus hidden for now
+          {t("tacticalProfile.suppressed.title")}
         </AppText>
         <AppText style={styles.centeredText} tone="secondary" variant="body">
-          We will keep gathering evidence in mixed Runs without emphasizing this recommendation.
+          {t("tacticalProfile.suppressed.body")}
         </AppText>
       </View>
       <EarlyEstimateNotice presentation={presentation} />
       <FlowActions
-        primaryLabel="Show recommendation again"
+        primaryLabel={t("tacticalProfile.suppressed.restore")}
         primaryTestID="tactical-profile-restore"
-        secondaryLabel="Back to Practice"
+        secondaryLabel={t("sprintResult.backToPractice")}
         secondaryTestID="tactical-profile-back-home"
         onPrimary={() => presentation.onIntent({ type: "restore-recommendation" })}
         onSecondary={() => presentation.onIntent({ type: "close-profile" })}
@@ -416,6 +434,7 @@ function SignalRow({
 }): React.JSX.Element {
   const styles = useStyles();
   const rowStyle = useListRowStyle();
+  const { locale, t } = useTranslation();
   return (
     <View style={[rowStyle, styles.textRow]} testID={`tactical-profile-signal-${signal.id}`}>
       <View style={styles.signalCopy}>
@@ -433,10 +452,10 @@ function SignalRow({
           </View>
         </View>
         <SignalKindBadge kind={signal.kind} />
-        <AppText variant="body">{signalSummary(signal)}</AppText>
+        <AppText variant="body">{signalSummary(signal, locale)}</AppText>
         <EvidenceLine signal={signal} variant="flow" />
         <Button
-          label="Why this focus?"
+          label={t("tacticalProfile.whyThisFocus")}
           size="compact"
           style={styles.inlineAction}
           testID={`tactical-profile-explain-${signal.id}`}
@@ -459,9 +478,10 @@ function TaskFamilySelector({
 }): React.JSX.Element {
   const styles = useStyles();
   const uiHaptics = useUiHaptics();
+  const { locale, t } = useTranslation();
   return (
     <View
-      accessibilityLabel="Choose tactical profile mode"
+      accessibilityLabel={t("tacticalProfile.chooseModeA11y")}
       style={styles.taskFamilySelector}
       testID="tactical-profile-task-family-selector"
     >
@@ -486,10 +506,10 @@ function TaskFamilySelector({
             }}
           >
             <AppText tone={selected ? "accent" : "primary"} variant="headline">
-              {taskFamilyLabel(taskFamily)}
+              {taskFamilyLabel(taskFamily, locale)}
             </AppText>
             <AppText tone="secondary" variant="footnote">
-              {TASK_FAMILY_COPY[taskFamily].selectorBody}
+              {taskFamilySelectorBody(taskFamily, locale)}
             </AppText>
           </Pressable>
         );
@@ -506,7 +526,8 @@ function EvidenceLine({
   variant?: "home" | "flow";
 }): React.JSX.Element {
   const styles = useStyles();
-  const text = `${formatCount(signal.distinctPuzzleCount, "different puzzle", "different puzzles")} · ${formatCount(signal.distinctSessionCount, "session", "sessions")}`;
+  const { t } = useTranslation();
+  const text = `${t("tacticalProfile.differentPuzzlesCount", { count: signal.distinctPuzzleCount })} · ${t("common.sessionsCount", { count: signal.distinctSessionCount })}`;
   if (variant === "flow") {
     return (
       <AppText
@@ -531,13 +552,14 @@ function SignalKindBadge({
 }: {
   kind: TacticalProfileSignal["kind"];
 }): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <Badge
       label={kind === "speed"
-        ? "Completed-puzzle speed"
+        ? t("history.progress.signalSpeed")
         : kind === "both"
-          ? "Reliability & speed"
-          : "Solve reliability"}
+          ? t("history.progress.signalBoth")
+          : t("history.progress.signalSolveRate")}
       tone={kind === "speed" ? "warning" : "accent"}
     />
   );
@@ -618,60 +640,71 @@ function selectedSignalFor(
     ?? presentation.signals[0];
 }
 
-function signalSummary(signal: TacticalProfileSignal): string {
+function signalSummary(signal: TacticalProfileSignal, locale: SupportedLocale): string {
   if (signal.kind === "speed") {
-    return "You solve these correctly, but more slowly than comparable puzzles.";
+    return translate(locale, "tacticalProfile.summary.speed");
   }
   if (signal.kind === "both") {
-    return "You complete these less reliably and solve completed puzzles more slowly than comparable puzzles.";
+    return translate(locale, "tacticalProfile.summary.both");
   }
-  return "You complete these less reliably than comparable puzzles.";
+  return translate(locale, "tacticalProfile.summary.solveRate");
 }
 
 function profileHeadingFor(
   presentation: TacticalProfilePresentation,
-  signals: readonly TacticalProfileSignal[]
+  signals: readonly TacticalProfileSignal[],
+  locale: SupportedLocale
 ): string {
   if (activeTaskFamilyUnavailable(presentation)) {
-    return `${taskFamilyLabel(activeTaskFamilyFor(presentation))} insights aren't ready`;
+    return translate(locale, "tacticalProfile.heading.unavailable", {
+      family: taskFamilyLabel(activeTaskFamilyFor(presentation), locale)
+    });
   }
   if (presentation.phase === "balanced") {
-    return "Recent play looks balanced";
+    return translate(locale, "history.progress.balancedTitle");
   }
   if (presentation.phase === "collecting") {
-    return "Still collecting evidence";
+    return translate(locale, "history.progress.collectingTitle");
   }
   if (signals.length > 1) {
-    return "Your clearest training opportunities";
+    return translate(locale, "tacticalProfile.heading.opportunities");
   }
-  return signals[0]?.themeLabel ?? "Your tactical profile";
+  return signals[0]?.themeLabel ?? translate(locale, "tacticalProfile.heading.fallback");
 }
 
-function profileBodyFor(presentation: TacticalProfilePresentation): string {
+function profileBodyFor(
+  presentation: TacticalProfilePresentation,
+  locale: SupportedLocale
+): string {
   if (activeTaskFamilyUnavailable(presentation)) {
-    return "Playing more mixed Runs won't unlock recommendations yet.";
+    return translate(locale, "tacticalProfile.body.unavailable");
   }
   if (presentation.phase === "balanced") {
-    return "Your recent completed puzzles look balanced after accounting for difficulty and Run settings.";
+    return translate(locale, "tacticalProfile.body.balanced");
   }
   if (presentation.phase === "collecting") {
-    return "Keep playing mixed Runs. We need results from more different puzzles and sessions before recommending a focus.";
+    return translate(locale, "tacticalProfile.body.collecting");
   }
-  return "Recommendations separate evidence, practical impact, and training priority.";
+  return translate(locale, "tacticalProfile.body.ready");
 }
 
-function profileContextFor(presentation: TacticalProfilePresentation): string {
+function profileContextFor(
+  presentation: TacticalProfilePresentation,
+  locale: SupportedLocale
+): string {
   if (activeTaskFamilyUnavailable(presentation)) {
-    return "Your practice history remains saved for a future validated model.";
+    return translate(locale, "tacticalProfile.context.unavailable");
   }
+  const runLabel = taskFamilyRunLabel(activeTaskFamilyFor(presentation), locale);
   if (presentation.assurance === "provisional") {
-    return `This is an early estimate based on ordinary mixed ${taskFamilyRunLabel(activeTaskFamilyFor(presentation))} Runs. It may change as the model is validated with more players. Review and focused Runs do not shape discovery.`;
+    return translate(locale, "tacticalProfile.context.provisional", { runLabel });
   }
-  return `Based on ordinary mixed ${taskFamilyRunLabel(activeTaskFamilyFor(presentation))} Runs. Review and focused Runs do not shape discovery.`;
+  return translate(locale, "tacticalProfile.context.validated", { runLabel });
 }
 
 function homeContentFor(
   presentation: TacticalProfilePresentation,
+  locale: SupportedLocale,
   primarySignal?: TacticalProfileSignal
 ): {
   status: string;
@@ -681,33 +714,33 @@ function homeContentFor(
 } {
   if (presentation.phase === "building") {
     return {
-      status: "Building profile",
-      title: "Finding stable patterns",
-      body: "Preparing a local profile from your mixed Run history.",
+      status: translate(locale, "tacticalProfile.home.buildingStatus"),
+      title: translate(locale, "tacticalProfile.home.buildingTitle"),
+      body: translate(locale, "tacticalProfile.home.buildingBody"),
       tone: "blue"
     };
   }
   if (allTaskFamiliesUnavailable(presentation)) {
     return {
-      status: "Not available yet",
-      title: "Training insights aren't ready",
-      body: "Personalized training is not enabled in this version. Your practice history remains saved.",
+      status: translate(locale, "tacticalProfile.home.unavailableStatus"),
+      title: translate(locale, "tacticalProfile.home.unavailableTitle"),
+      body: translate(locale, "tacticalProfile.home.unavailableBody"),
       tone: "neutral"
     };
   }
   if (presentation.phase === "collecting") {
     return {
-      status: "Collecting evidence",
-      title: "More information needed",
-      body: "Keep playing mixed Runs. We will recommend a focus after a pattern repeats across different puzzles and sessions.",
+      status: translate(locale, "tacticalProfile.collectingEvidence"),
+      title: translate(locale, "tacticalProfile.home.collectingTitle"),
+      body: translate(locale, "tacticalProfile.home.collectingBody"),
       tone: "neutral"
     };
   }
   if (presentation.phase === "balanced") {
     return {
-      status: "Balanced",
-      title: "Recent play looks balanced",
-      body: "There is no meaningful weakness to emphasize right now.",
+      status: translate(locale, "tacticalProfile.home.balancedStatus"),
+      title: translate(locale, "history.progress.balancedTitle"),
+      body: translate(locale, "tacticalProfile.home.balancedBody"),
       tone: "green"
     };
   }
@@ -720,27 +753,46 @@ function homeContentFor(
       (signal) => signal.taskFamily === otherTaskFamily
     ).length;
     return {
-      status: `${taskFamilies.length} modes with recommendations`,
-      title: `${primarySignal.themeLabel} is your clearest focus`,
+      status: translate(locale, "tacticalProfile.home.multiModeStatus", {
+        count: taskFamilies.length
+      }),
+      title: translate(locale, "tacticalProfile.home.clearestFocus", {
+        theme: primarySignal.themeLabel
+      }),
       body: otherTaskFamily
-        ? `${taskFamilyLabel(otherTaskFamily)} also has ${formatCount(otherCount, "recommendation", "recommendations")}.`
-        : "Another mode also has a recommendation.",
+        ? translate(locale, "tacticalProfile.home.otherFamilyHasRecs", {
+            family: taskFamilyLabel(otherTaskFamily, locale),
+            recommendations: translate(locale, "tacticalProfile.home.recommendationsCount", {
+              count: otherCount
+            })
+          })
+        : translate(locale, "tacticalProfile.home.anotherModeHasRec"),
       tone: "blue"
     };
   }
   const themeLabels = recommendedThemeLabels(presentation);
   if (themeLabels.length > 1 && primarySignal) {
     return {
-      status: `${themeLabels.length} recommendations`,
-      title: `${primarySignal.themeLabel} is your clearest focus`,
-      body: secondaryFocusSummary(themeLabels.slice(1)),
+      status: translate(locale, "tacticalProfile.home.recommendationsCount", {
+        count: themeLabels.length
+      }),
+      title: translate(locale, "tacticalProfile.home.clearestFocus", {
+        theme: primarySignal.themeLabel
+      }),
+      body: secondaryFocusSummary(themeLabels.slice(1), locale),
       tone: "blue"
     };
   }
   return {
-    status: "Recommended",
-    title: primarySignal ? `${primarySignal.themeLabel} may need attention` : "A training focus is ready",
-    body: primarySignal ? signalSummary(primarySignal) : "Review the evidence before choosing focused training.",
+    status: translate(locale, "tacticalProfile.home.recommendedStatus"),
+    title: primarySignal
+      ? translate(locale, "tacticalProfile.home.themeMayNeedAttention", {
+          theme: primarySignal.themeLabel
+        })
+      : translate(locale, "tacticalProfile.home.focusReadyFallback"),
+    body: primarySignal
+      ? signalSummary(primarySignal, locale)
+      : translate(locale, "tacticalProfile.home.reviewEvidenceFallback"),
     tone: "blue"
   };
 }
@@ -750,6 +802,7 @@ function EarlyEstimateNotice({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element | null {
+  const { t } = useTranslation();
   if (presentation.assurance !== "provisional") {
     return null;
   }
@@ -758,9 +811,9 @@ function EarlyEstimateNotice({
       <ListRow
         icon="warning"
         iconTone="warning"
-        subtitle="Use this as a training suggestion while we validate the model with more players."
+        subtitle={t("tacticalProfile.earlyEstimateBody")}
         testID="tactical-profile-early-estimate"
-        title="Early estimate"
+        title={t("history.progress.earlyEstimate")}
       />
     </Section>
   );
@@ -853,67 +906,82 @@ function activeTaskFamilyFor(
     ?? "line";
 }
 
-function taskFamilyLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return TASK_FAMILY_COPY[taskFamily].label;
+function taskFamilyLabel(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "common.arrowDuel")
+    : translate(locale, "history.progress.taskFamilyLine");
 }
 
-function taskFamilyRunLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return TASK_FAMILY_COPY[taskFamily].runLabel;
+function taskFamilySelectorBody(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "tacticalProfile.family.arrowDuelSelectorBody")
+    : translate(locale, "tacticalProfile.family.lineSelectorBody");
 }
 
-function taskFamilyComparisonLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return TASK_FAMILY_COPY[taskFamily].comparisonLabel;
+function taskFamilyRunLabel(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "common.arrowDuel")
+    : translate(locale, "tacticalProfile.family.lineRunLabel");
 }
 
-function focusedRunRatingGuardrail(taskFamily: TacticalProfileTaskFamily): string {
-  return TASK_FAMILY_COPY[taskFamily].ratingGuardrail;
+function taskFamilyComparisonLabel(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "tacticalProfile.family.arrowDuelComparisonLabel")
+    : translate(locale, "tacticalProfile.family.lineComparisonLabel");
 }
 
-const TASK_FAMILY_COPY = {
-  line: {
-    label: "Puzzle solving",
-    selectorBody: "Standard, Blitz & Custom",
-    runLabel: "puzzle-solving",
-    comparisonLabel: "puzzles",
-    ratingGuardrail: "Rebuilt for your current Rating before each new Run"
-  },
-  arrow_duel: {
-    label: "Arrow Duel",
-    selectorBody: "Choose between two moves",
-    runLabel: "Arrow Duel",
-    comparisonLabel: "Arrow Duel choices",
-    ratingGuardrail: "Rebuilt for your current Arrow Duel Rating before each new Run"
-  }
-} satisfies Record<TacticalProfileTaskFamily, {
-  label: string;
-  selectorBody: string;
-  runLabel: string;
-  comparisonLabel: string;
-  ratingGuardrail: string;
-}>;
+function focusedRunRatingGuardrail(
+  taskFamily: TacticalProfileTaskFamily,
+  locale: SupportedLocale
+): string {
+  return taskFamily === "arrow_duel"
+    ? translate(locale, "tacticalProfile.family.arrowDuelRatingGuardrail")
+    : translate(locale, "tacticalProfile.family.lineRatingGuardrail");
+}
 
 function homeActionLabel(
   presentation: TacticalProfilePresentation,
-  recommendationCount: number
+  recommendationCount: number,
+  locale: SupportedLocale
 ): string {
   if (presentation.phase !== "ready") {
-    return "View tactical profile";
+    return translate(locale, "tacticalProfile.action.viewProfile");
   }
-  return recommendationCount > 1 ? "Review focuses" : "Review focus";
+  return recommendationCount > 1
+    ? translate(locale, "tacticalProfile.action.reviewFocuses")
+    : translate(locale, "tacticalProfile.action.reviewFocus");
 }
 
-function secondaryFocusSummary(themeLabels: readonly string[]): string {
+function secondaryFocusSummary(
+  themeLabels: readonly string[],
+  locale: SupportedLocale
+): string {
   if (themeLabels.length === 1) {
-    return `${themeLabels[0]} is also worth reviewing.`;
+    return translate(locale, "tacticalProfile.secondary.one", {
+      theme: themeLabels[0]!
+    });
   }
   if (themeLabels.length === 2) {
-    return `${themeLabels[0]} and ${themeLabels[1]} are also worth reviewing.`;
+    return translate(locale, "tacticalProfile.secondary.two", {
+      first: themeLabels[0]!,
+      second: themeLabels[1]!
+    });
   }
-  return `There are ${themeLabels.length} more themes worth reviewing.`;
-}
-
-function formatCount(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
+  return translate(locale, "tacticalProfile.secondary.many", {
+    count: themeLabels.length
+  });
 }
 
 type Styles = ReturnType<typeof useStyles>;

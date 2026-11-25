@@ -30,6 +30,7 @@ import {
   type BoardThemeId,
   type ChessPieceSetId
 } from "./src/theme";
+import { I18nProvider, useTranslation, type LanguagePreference } from "./src/i18n";
 
 enableTestControlsFromLaunchConfig();
 
@@ -63,6 +64,9 @@ function App() {
   const [pieceSet, setPieceSet] = React.useState<ChessPieceSetId>(
     () => platformCapabilities?.storage.practiceService.getSettings().pieceSet ?? "default"
   );
+  const [languagePreference, setLanguagePreference] = React.useState<LanguagePreference>(
+    () => platformCapabilities?.storage.practiceService.getSettings().language ?? "system"
+  );
   React.useEffect(() => {
     if (platformCapabilities) {
       const settings = platformCapabilities.storage.practiceService.getSettings();
@@ -70,6 +74,7 @@ function App() {
       setLightBoardTheme(settings.lightBoardTheme);
       setDarkBoardTheme(settings.darkBoardTheme);
       setPieceSet(settings.pieceSet);
+      setLanguagePreference(settings.language ?? "system");
     }
   }, [platformCapabilities]);
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
@@ -111,42 +116,47 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider
-        appearance={appearance}
-        darkBoardTheme={darkBoardTheme}
-        lightBoardTheme={lightBoardTheme}
-        pieceSet={pieceSet}
-        onAppearanceChange={setAppearance}
-        onDarkBoardThemeChange={setDarkBoardTheme}
-        onLightBoardThemeChange={setLightBoardTheme}
-        onPieceSetChange={setPieceSet}
+      <I18nProvider
+        languagePreference={languagePreference}
+        onLanguagePreferenceChange={setLanguagePreference}
       >
-        {platformCapabilities ? (
-          <PracticePocScreen
-            platformCapabilities={platformCapabilities}
-            arrowDuelTargetCorrect={arrowDuelTargetCorrect}
-            currentTimeMs={currentTimeMs}
-            customTargetCorrect={customTargetCorrect}
-            sprintGuidanceEnabled
-            puzzleSelectionId={puzzleSelectionId}
-            puzzleSelectionSeed={puzzleSelectionSeed}
-            personalBestChallengeDesignPreview={marketingCaptureFixture?.personalBestChallengeDesignPreview}
-            runManagementEnabled
-            settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
-              ? 420
-              : undefined}
-            sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
-              ? { initialActiveState: marketingCaptureFixture.initialActiveState }
-              : undefined}
-            standardTargetCorrect={standardTargetCorrect}
-            systemBack={systemBack}
-            tacticalProfilePresentation={marketingCaptureFixture?.tacticalProfilePresentation}
-            themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
-          />
-        ) : (
-          <LoadingScreen loadError={loadError} />
-        )}
-      </ThemeProvider>
+        <ThemeProvider
+          appearance={appearance}
+          darkBoardTheme={darkBoardTheme}
+          lightBoardTheme={lightBoardTheme}
+          pieceSet={pieceSet}
+          onAppearanceChange={setAppearance}
+          onDarkBoardThemeChange={setDarkBoardTheme}
+          onLightBoardThemeChange={setLightBoardTheme}
+          onPieceSetChange={setPieceSet}
+        >
+          {platformCapabilities ? (
+            <PracticePocScreen
+              platformCapabilities={platformCapabilities}
+              arrowDuelTargetCorrect={arrowDuelTargetCorrect}
+              currentTimeMs={currentTimeMs}
+              customTargetCorrect={customTargetCorrect}
+              sprintGuidanceEnabled
+              puzzleSelectionId={puzzleSelectionId}
+              puzzleSelectionSeed={puzzleSelectionSeed}
+              personalBestChallengeDesignPreview={marketingCaptureFixture?.personalBestChallengeDesignPreview}
+              runManagementEnabled
+              settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
+                ? 420
+                : undefined}
+              sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
+                ? { initialActiveState: marketingCaptureFixture.initialActiveState }
+                : undefined}
+              standardTargetCorrect={standardTargetCorrect}
+              systemBack={systemBack}
+              tacticalProfilePresentation={marketingCaptureFixture?.tacticalProfilePresentation}
+              themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
+            />
+          ) : (
+            <LoadingScreen loadError={loadError} />
+          )}
+        </ThemeProvider>
+      </I18nProvider>
     </SafeAreaProvider>
   );
 }
@@ -178,10 +188,11 @@ function preparePlatformState(
 
 function LoadingScreen({ loadError }: { loadError: string | undefined }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <View style={styles.loadingRoot}>
       <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
-        {loadError ? "Puzzle pack unavailable" : "Loading puzzle pack"}
+        {loadError ? t("loading.errorTitle") : t("loading.title")}
       </Text>
       {loadError ? <Text style={styles.loadingDetail}>{loadError}</Text> : null}
     </View>

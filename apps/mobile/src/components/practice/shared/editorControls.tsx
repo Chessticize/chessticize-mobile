@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, useWindowDimensions, View, type ViewStyle } from "react-native";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { useTranslation } from "../../../i18n/index.ts";
 import { Icon } from "../../ui/index.tsx";
 import { useUiHaptics } from "../../../platform/uiHaptics.ts";
 import { typography as baseTypography } from "../../../theme/scales.ts";
@@ -19,6 +20,7 @@ export function EditorSwitch({
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const uiHaptics = useUiHaptics();
   return (
@@ -26,7 +28,7 @@ export function EditorSwitch({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="switch"
       accessibilityState={{ checked: enabled }}
-      accessibilityValue={{ text: enabled ? "On" : "Off" }}
+      accessibilityValue={{ text: enabled ? t("common.on") : t("common.off") }}
       style={styles.runTimingToggle}
       testID={testID}
       onPress={() => {

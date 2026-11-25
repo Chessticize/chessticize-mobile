@@ -9,6 +9,7 @@ import { SessionMistakeIndicator } from "../../SessionMistakeIndicator.tsx";
 import { CloseGlyph, MoreGlyph, PauseGlyph, PlayGlyph, SessionScoreGlyph } from "../shared/Glyphs.tsx";
 import { PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE, PRACTICE_SESSION_HUD_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
 import { makeStyles } from "../../../theme/index.ts";
+import { useTranslation } from "../../../i18n/index.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 import { Button } from "../../ui/index.tsx";
 
@@ -30,8 +31,9 @@ export function PuzzleTimingIndicator({
   targetRef?: React.RefObject<View | null>;
   timeoutSeconds: number | null;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
-  const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
+  const label = t("session.timing.label", { time: formatCompactDuration(elapsedSeconds) });
   const remainingSeconds = timeoutSeconds === null ? null : timeoutSeconds - elapsedSeconds;
   const countdownSeconds = phase !== "timed_out"
     && remainingSeconds !== null
@@ -40,7 +42,7 @@ export function PuzzleTimingIndicator({
     : null;
   const accessibilityLabel = countdownSeconds === null
     ? label
-    : `${label}, ${countdownSeconds} seconds until timeout`;
+    : t("session.timing.countdownA11y", { label, count: countdownSeconds });
 
   return (
     <View
@@ -120,7 +122,7 @@ function hudValueTextSize({
 }
 
 export function SessionStatusBar({
-  closeAccessibilityLabel = "Abandon sprint",
+  closeAccessibilityLabel,
   compactMetrics = false,
   confirmAbandon,
   leaveConfirmationMinHeight,
@@ -158,7 +160,9 @@ export function SessionStatusBar({
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   const styles = useStyles();
+  const resolvedCloseAccessibilityLabel = closeAccessibilityLabel ?? t("session.status.abandonSprintA11y");
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const isPersonalBest = personalBest !== undefined;
   const previousSurvivalBest = personalBest?.bestScore;
@@ -184,11 +188,11 @@ export function SessionStatusBar({
   const stacksLeaveConfirmation = stackLeaveConfirmation || stacksLeaveActions;
   const [metricsWidth, setMetricsWidth] = useState<number | null>(null);
   const progressText = isPersonalBest
-    ? `${state.correctCount} solved`
+    ? t("session.status.solvedCount", { count: state.correctCount })
     : isTacticalFocus
     ? `${completedAttempts} / ${plannedAttempts}`
     : `${state.correctCount} / ${state.config.targetCorrect}`;
-  const policyText = isTacticalFocus ? "Unrated" : null;
+  const policyText = isTacticalFocus ? t("session.status.unrated") : null;
   const hudValueRole = compactMetrics ? baseTypography.numeralRow : baseTypography.numeral;
   const sharedValueTexts = stacksTimer
     ? [progressText, policyText]
@@ -212,10 +216,10 @@ export function SessionStatusBar({
   const progressMetric = (
     <View
       accessibilityLabel={isPersonalBest
-        ? `Solved ${state.correctCount}`
+        ? t("session.status.solvedA11y", { count: state.correctCount })
         : isTacticalFocus
-        ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
-        : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
+        ? t("session.status.puzzlesOfA11y", { completed: completedAttempts, total: plannedAttempts })
+        : t("session.status.progressOfA11y", { solved: state.correctCount, target: state.config.targetCorrect })}
       style={[
         styles.sessionMetricBlock,
         isPersonalBest ? styles.personalBestProgressMetricBlock : null
@@ -242,7 +246,9 @@ export function SessionStatusBar({
   );
   const timerMetric = isPersonalBest ? null : (
     <View
-      accessibilityLabel={state.config.runClock === "untimed" ? `Elapsed ${timerText}` : `Timer ${timerText}`}
+      accessibilityLabel={state.config.runClock === "untimed"
+        ? t("session.status.elapsedA11y", { time: timerText })
+        : t("session.status.timerA11y", { time: timerText })}
       style={[styles.sessionMetricBlock, stacksTimer ? styles.sessionMetricBlockFullRow : null]}
       testID="session-timer-block"
     >
@@ -265,7 +271,7 @@ export function SessionStatusBar({
   );
   const policyMetric = isTacticalFocus ? (
     <View
-      accessibilityLabel="Rating unchanged"
+      accessibilityLabel={t("session.status.ratingUnchangedA11y")}
       style={styles.sessionMetricBlock}
       testID="session-rating-policy"
     >
@@ -282,12 +288,12 @@ export function SessionStatusBar({
           sharedValueStyle
         ]}
       >
-        Unrated
+        {policyText}
       </Text>
     </View>
   ) : (
     <View
-      accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
+      accessibilityLabel={t("session.status.mistakesOfA11y", { count: state.mistakeCount, max: state.config.maxMistakes })}
       style={[
         styles.sessionMetricBlock,
         styles.sessionMetricBlockTrailing,
@@ -313,7 +319,7 @@ export function SessionStatusBar({
         {showsSessionHeaderAction ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={closeAccessibilityLabel}
+            accessibilityLabel={resolvedCloseAccessibilityLabel}
             testID="session-abandon"
             style={styles.sessionNavButton}
             onPress={onClose ?? (() => onConfirmAbandonChange(true))}
@@ -333,7 +339,11 @@ export function SessionStatusBar({
           numberOfLines={1}
           style={styles.sessionNavTitle}
         >
-          {isPersonalBest ? "Survival" : isTacticalFocus ? "Focused Run" : modeLabel(mode)}
+          {isPersonalBest
+            ? t("common.survival")
+            : isTacticalFocus
+              ? t("common.focusedRun")
+              : modeLabel(mode, locale)}
         </Text>
         <View style={styles.sessionNavActions} testID="session-nav-actions">
           {isPersonalBest ? (
@@ -341,7 +351,9 @@ export function SessionStatusBar({
           ) : onPause ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isTacticalFocus ? "Pause Focused Run" : "Pause sprint"}
+              accessibilityLabel={isTacticalFocus
+                ? t("session.status.pauseFocusedA11y")
+                : t("session.status.pauseSprintA11y")}
               testID="session-pause"
               style={styles.sessionNavButton}
               onPress={onPause}
@@ -351,7 +363,9 @@ export function SessionStatusBar({
           ) : onResume ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
+              accessibilityLabel={isTacticalFocus
+                ? t("session.status.resumeFocusedA11y")
+                : t("session.status.resumeSprintA11y")}
               testID="session-resume"
               style={styles.sessionNavButton}
               onPress={onResume}
@@ -407,16 +421,16 @@ export function SessionStatusBar({
           testID="session-abandon-confirmation"
         >
           <View style={styles.sessionAbandonCopy}>
-            <Text style={styles.survivalExitTitle}>Survival paused</Text>
+            <Text style={styles.survivalExitTitle}>{t("session.status.survivalPausedTitle")}</Text>
             <Text style={styles.survivalExitBest} testID="personal-best-exit-best">
               {hasNewSurvivalBest
-                ? `New best ${savedSurvivalBest} · already saved`
+                ? t("session.status.survivalNewBestSaved", { best: savedSurvivalBest })
                 : previousSurvivalBest === null
-                  ? "No best yet · solve 1 to set it"
-                : `Best ${savedSurvivalBest} · saved`}
+                  ? t("session.status.survivalNoBestYet")
+                : t("session.status.survivalBestSaved", { best: savedSurvivalBest })}
             </Text>
             <Text style={styles.helperText}>
-              Your puzzle is hidden. Resume here, or leave it paused and continue any time.
+              {t("session.status.survivalPausedBody")}
             </Text>
           </View>
           <View
@@ -426,8 +440,8 @@ export function SessionStatusBar({
             ]}
           >
             <Button
-              accessibilityLabel="Leave Survival paused"
-              label="Leave paused"
+              accessibilityLabel={t("session.status.survivalLeavePausedA11y")}
+              label={t("session.status.survivalLeavePaused")}
               size="compact"
               stretch={stacksLeaveActions}
               style={stacksLeaveActions ? null : styles.survivalExitAction}
@@ -439,8 +453,8 @@ export function SessionStatusBar({
               }}
             />
             <Button
-              accessibilityLabel="Resume Survival"
-              label="Resume"
+              accessibilityLabel={t("session.status.survivalResumeA11y")}
+              label={t("common.resume")}
               size="compact"
               stretch={stacksLeaveActions}
               style={stacksLeaveActions ? null : styles.survivalExitAction}
@@ -488,6 +502,7 @@ export function SessionAbandonConfirmation({
   onAbandon: () => void;
   onCancel: () => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const { fontScale } = usePracticeViewport();
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
@@ -502,12 +517,12 @@ export function SessionAbandonConfirmation({
         ]}
       >
         <Text style={styles.listText} testID="session-abandon-title">
-          {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
+          {isTacticalFocus ? t("session.abandon.focusedTitle") : t("session.abandon.sprintTitle")}
         </Text>
         <Text style={styles.helperText} testID="session-abandon-description">
           {isTacticalFocus
-            ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
-            : "This ends the Sprint and records it as abandoned."}
+            ? t("session.abandon.focusedBody")
+            : t("session.abandon.sprintBody")}
         </Text>
       </View>
       <View
@@ -519,9 +534,9 @@ export function SessionAbandonConfirmation({
       >
         <Button
           accessibilityLabel={isTacticalFocus
-            ? "Cancel abandoning Focused Run"
-            : "Cancel abandon sprint"}
-          label="Cancel"
+            ? t("session.abandon.cancelFocusedA11y")
+            : t("session.abandon.cancelSprintA11y")}
+          label={t("common.cancel")}
           size="compact"
           stretch={stacksLeaveActions}
           testID="session-abandon-cancel"
@@ -530,9 +545,9 @@ export function SessionAbandonConfirmation({
         />
         <Button
           accessibilityLabel={isTacticalFocus
-            ? "Confirm abandoning Focused Run"
-            : "Confirm abandon sprint"}
-          label="Abandon"
+            ? t("session.abandon.confirmFocusedA11y")
+            : t("session.abandon.confirmSprintA11y")}
+          label={t("session.abandon.abandonAction")}
           size="compact"
           stretch={stacksLeaveActions}
           testID="session-abandon-confirm"
@@ -578,6 +593,7 @@ export function SessionScoreStrip({
   compact?: boolean;
   state: SprintState;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const styles = useStyles();
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const completedCount = state.correctCount + state.mistakeCount;
@@ -591,8 +607,16 @@ export function SessionScoreStrip({
   return (
     <View
       accessibilityLabel={isTacticalFocus
-        ? `Focused Run: completed ${completedCount}, correct ${state.correctCount}, left ${leftCount}`
-        : `Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
+        ? t("session.status.scoreFocusedA11y", {
+            completed: completedCount,
+            correct: state.correctCount,
+            left: leftCount
+          })
+        : t("session.status.scoreSprintA11y", {
+            solved: state.correctCount,
+            mistakes: state.mistakeCount,
+            left: leftCount
+          })}
       style={[
         styles.sessionScoreStrip,
         compact ? styles.sessionScoreStripCompact : null
@@ -600,7 +624,7 @@ export function SessionScoreStrip({
       testID="session-score-strip"
     >
       <SessionScoreMetric
-        label={isTacticalFocus ? "Completed" : "Solved"}
+        label={isTacticalFocus ? t("session.status.scoreCompleted") : t("common.solved")}
         metricTestID={isTacticalFocus ? "session-score-completed" : "session-score-solved"}
         compact={compact}
         showLabel={isTacticalFocus}
@@ -608,7 +632,7 @@ export function SessionScoreStrip({
         value={isTacticalFocus ? completedCount : state.correctCount}
       />
       <SessionScoreMetric
-        label={isTacticalFocus ? "Correct" : "Mistakes"}
+        label={isTacticalFocus ? t("common.correct") : t("common.mistakes")}
         metricTestID={isTacticalFocus ? "session-score-correct" : "session-score-mistakes"}
         compact={compact}
         showLabel={isTacticalFocus}
@@ -616,7 +640,7 @@ export function SessionScoreStrip({
         value={isTacticalFocus ? state.correctCount : state.mistakeCount}
       />
       <SessionScoreMetric
-        label="Left"
+        label={t("session.status.scoreLeft")}
         metricTestID="session-score-left"
         compact={compact}
         showLabel={isTacticalFocus}

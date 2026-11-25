@@ -10,8 +10,6 @@ import {
 } from "react-native";
 import {
   type AttemptSource,
-  formatLocalCalendarDate,
-  formatLocalCalendarDateLabel,
   historyAttemptSpeedSeconds,
   type HistoryAttemptView,
   type HistoryAttentionReason,
@@ -35,9 +33,21 @@ import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegio
 import { FilterButton } from "../shared/FilterButton.tsx";
 import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
 import { AttemptStatusTile } from "../shared/AttemptStatusTile.tsx";
-import { ALL_THEMES_FILTER, customThemeLabel, type ThemeCatalogPresentation } from "../shared/themeCatalog.ts";
+import {
+  ALL_THEMES_FILTER,
+  customThemeLabel,
+  themeCatalogGroupLabel,
+  type ThemeCatalogPresentation
+} from "../shared/themeCatalog.ts";
 import { historyRatingKeyLabel, HistoryRatingTrendChart } from "./HistoryRatingChart.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import {
+  formatLocalDateForLocale,
+  formatLocalDateLabelForLocale,
+  type SupportedLocale,
+  translate,
+  useTranslation
+} from "../../../i18n/index.ts";
 
 export function HistoryPanel({
   adaptiveLayout,
@@ -110,6 +120,7 @@ export function HistoryPanel({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const { locale, t } = useTranslation();
   const visibleAttempts = attempts;
   const attentionOnly = attentionReasons.length > 0;
   const ratingPoints = performance.charts.rating;
@@ -125,20 +136,21 @@ export function HistoryPanel({
     sideFilter,
     sourceFilter,
     themeFilters: namedThemeFilters,
-    timeRange
+    timeRange,
+    locale
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
       <View style={styles.historyHeaderRow} testID="history-action-header">
-        <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">History</AppText>
+        <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">{t("tabs.history")}</AppText>
         <View style={styles.historyHeaderActions}>
           {onOpenProgress ? (
             <HistoryProgressEntryButton onPress={onOpenProgress} />
           ) : null}
           {filtersExpanded ? (
             <Button
-              accessibilityLabel="Reset history filters"
-              label="Reset filters"
+              accessibilityLabel={t("history.resetFiltersA11y")}
+              label={t("history.resetFilters")}
               size="compact"
               testID="history-filter-reset"
               variant="plain"
@@ -146,7 +158,7 @@ export function HistoryPanel({
             />
           ) : null}
           <ToolbarIconButton
-            accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
+            accessibilityLabel={filtersExpanded ? t("history.hideFiltersA11y") : t("history.showFiltersA11y")}
             accessibilityState={{ expanded: filtersExpanded }}
             active={filtersExpanded}
             testID="history-filter-toggle"
@@ -170,58 +182,58 @@ export function HistoryPanel({
           />
           <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
           <HistoryChipRow testID="history-source-filters">
-            <FilterButton active={sourceFilter === "all"} label="All sources" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
-            <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
-            <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
+            <FilterButton active={sourceFilter === "all"} label={t("history.source.all")} testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
+            <FilterButton active={sourceFilter === "sprint"} label={t("history.source.sprint")} testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
+            <FilterButton active={sourceFilter === "scheduled_review"} label={t("history.source.review")} testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
           </HistoryChipRow>
           <HistoryChipRow testID="history-result-filters">
-            <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
-            <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
-            <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
-            <FilterButton active={resultFilter === "incomplete"} label="Incomplete" testID="history-result-incomplete" onPress={() => onResultFilterChange("incomplete")} />
+            <FilterButton active={resultFilter === "all"} label={t("history.result.all")} testID="history-result-all" onPress={() => onResultFilterChange("all")} />
+            <FilterButton active={resultFilter === "correct"} label={t("history.result.correct")} testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
+            <FilterButton active={resultFilter === "wrong"} label={t("history.result.wrong")} testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
+            <FilterButton active={resultFilter === "incomplete"} label={t("history.result.incomplete")} testID="history-result-incomplete" onPress={() => onResultFilterChange("incomplete")} />
           </HistoryChipRow>
           <HistoryChipRow testID="history-rating-range-filters">
-            {HISTORY_RATING_RANGE_FILTERS.map((ratingRange) => (
+            {HISTORY_RATING_RANGE_IDS.map((ratingRangeId) => (
               <FilterButton
-                key={ratingRange.id}
-                active={ratingRangeFilter === ratingRange.id}
-                label={ratingRange.label}
-                testID={`history-rating-range-${ratingRange.id}`}
-                onPress={() => onRatingRangeFilterChange(ratingRange.id)}
+                key={ratingRangeId}
+                active={ratingRangeFilter === ratingRangeId}
+                label={historyRatingRangeLabel(ratingRangeId, locale)}
+                testID={`history-rating-range-${ratingRangeId}`}
+                onPress={() => onRatingRangeFilterChange(ratingRangeId)}
               />
             ))}
           </HistoryChipRow>
           <View
-            accessibilityLabel="Attention filters, match any"
+            accessibilityLabel={t("history.attention.groupA11y")}
             style={styles.historyFilterGroup}
             testID="history-attention-flags"
           >
-            <AppText style={styles.historyFilterGroupLabel} tone="secondary" variant="footnote">Attention</AppText>
+            <AppText style={styles.historyFilterGroupLabel} tone="secondary" variant="footnote">{t("history.attention.label")}</AppText>
             <HistoryChipRow testID="history-attention-flag-options">
               <FilterButton
                 active={attentionReasons.includes("unclear")}
-                label="Unclear"
+                label={t("history.attention.unclear")}
                 testID="history-attention-flag-unclear"
                 onPress={() => onAttentionReasonChange("unclear")}
               />
               <FilterButton
                 active={attentionReasons.includes("in_review")}
-                label="In review"
+                label={t("history.attention.inReview")}
                 testID="history-attention-flag-in-review"
                 onPress={() => onAttentionReasonChange("in_review")}
               />
               <FilterButton
                 active={attentionReasons.includes("incomplete")}
-                label="Incomplete"
+                label={t("history.attention.incomplete")}
                 testID="history-attention-flag-incomplete"
                 onPress={() => onAttentionReasonChange("incomplete")}
               />
             </HistoryChipRow>
           </View>
           <HistoryChipRow testID="history-side-filters">
-            <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
-            <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
-            <FilterButton active={sideFilter === "black"} label="Black" testID="history-side-black" onPress={() => onSideFilterChange("black")} />
+            <FilterButton active={sideFilter === "all"} label={t("history.side.both")} testID="history-side-all" onPress={() => onSideFilterChange("all")} />
+            <FilterButton active={sideFilter === "white"} label={t("common.white")} testID="history-side-white" onPress={() => onSideFilterChange("white")} />
+            <FilterButton active={sideFilter === "black"} label={t("common.black")} testID="history-side-black" onPress={() => onSideFilterChange("black")} />
           </HistoryChipRow>
           {themeCatalogPresentation ? (
             <HistoryThemeCatalogFilter
@@ -233,7 +245,7 @@ export function HistoryPanel({
             <HistoryChipRow testID="history-theme-filters">
               <FilterButton
                 active={themeFilters.includes(ALL_THEMES_FILTER)}
-                label="All themes"
+                label={t("customSetup.allThemes")}
                 testID="history-theme-all"
                 onPress={() => onThemeFilterIntent({ type: "select-all-themes" })}
               />
@@ -241,7 +253,7 @@ export function HistoryPanel({
                 <FilterButton
                   key={theme}
                   active={themeFilters.includes(theme)}
-                  label={theme}
+                  label={customThemeLabel(theme, locale)}
                   testID={`history-theme-${theme}`}
                   onPress={() => onThemeFilterIntent({ type: "toggle-theme", theme })}
                 />
@@ -257,7 +269,7 @@ export function HistoryPanel({
         />
         {attentionOnly ? (
           <AppText style={styles.historyFootnote} testID="history-attention-explanation" tone="secondary" variant="footnote">
-            Needs attention includes Incomplete, Unclear, or In Review Sprint attempts.
+            {t("history.attention.explanation")}
           </AppText>
         ) : null}
       </View>
@@ -266,14 +278,14 @@ export function HistoryPanel({
         <View style={styles.historyPerformanceCard} testID="history-performance-card">
           <View style={styles.historyPerformanceHeader}>
             <View style={styles.settingsRowCopy}>
-              <AppText variant="headline">Rating Trend</AppText>
+              <AppText variant="headline">{t("history.chart.title")}</AppText>
               <AppText testID="history-performance-context" tone="secondary" variant="footnote">
-                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
+                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds, locale)} · ${historyRangeLabel(timeRange, locale)}`}
               </AppText>
             </View>
             <View style={styles.historyMetricSummary}>
               <AppText testID="history-chart-value" style={styles.historyAccuracy} variant="numeral">{latestRating ? String(latestRating) : "—"}</AppText>
-              <AppText testID="history-chart-label" tone="secondary" variant="caption">Rating</AppText>
+              <AppText testID="history-chart-label" tone="secondary" variant="caption">{t("common.rating")}</AppText>
             </View>
           </View>
           <HistoryRatingTrendChart points={ratingPoints} />
@@ -284,11 +296,17 @@ export function HistoryPanel({
 
       <View style={styles.historyPageRow}>
         <AppText tone="secondary" variant="footnote">
-          {page.total === 0 ? "0 results" : `${page.offset + 1}-${Math.min(page.offset + attempts.length, page.total)} of ${page.total}`}
+          {page.total === 0
+            ? t("history.page.zeroResults")
+            : t("history.page.range", {
+                from: page.offset + 1,
+                to: Math.min(page.offset + attempts.length, page.total),
+                total: page.total
+              })}
         </AppText>
         <View style={styles.iconButtonRow}>
           <ToolbarIconButton
-            accessibilityLabel="Previous history page"
+            accessibilityLabel={t("history.page.prevA11y")}
             accessibilityState={{ disabled: page.offset === 0 }}
             disabled={page.offset === 0}
             testID="history-page-previous"
@@ -297,7 +315,7 @@ export function HistoryPanel({
             <Icon color={appTheme.colors.accent.s600} name="chevronLeft" size={17} testID="chevron-left-glyph" weight="semibold" />
           </ToolbarIconButton>
           <ToolbarIconButton
-            accessibilityLabel="Next history page"
+            accessibilityLabel={t("history.page.nextA11y")}
             accessibilityState={{ disabled: !page.hasMore }}
             disabled={!page.hasMore}
             testID="history-page-next"
@@ -310,13 +328,13 @@ export function HistoryPanel({
       {visibleAttempts.length === 0 ? (
         <View style={styles.groupedList}>
           <AppText
-            accessibilityLabel="History has no attempts"
+            accessibilityLabel={t("history.emptyA11y")}
             style={styles.groupedEmpty}
             testID="history-empty-state"
             tone="secondary"
             variant="body"
           >
-            No attempts
+            {t("history.emptyTitle")}
           </AppText>
         </View>
       ) : (
@@ -347,17 +365,18 @@ function HistoryThemeCatalogFilter({
   selectedThemes: readonly string[];
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const selectedThemeLabels = selectedThemes
     .filter((theme) => theme !== ALL_THEMES_FILTER)
-    .map(customThemeLabel);
+    .map((theme) => customThemeLabel(theme, locale));
   const selectedThemeDetail = selectedThemeLabels.length === 0
-    ? "All themes"
+    ? t("customSetup.allThemes")
     : selectedThemeLabels.join(" · ");
   return (
     <View style={styles.historyThemeFilterSection} testID="history-theme-filters">
       <Pressable
-        accessibilityLabel={expanded ? "Hide theme filters" : "Show theme filters"}
+        accessibilityLabel={expanded ? t("history.themes.hideA11y") : t("history.themes.showA11y")}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         style={styles.historyThemeDisclosure}
@@ -365,9 +384,9 @@ function HistoryThemeCatalogFilter({
         onPress={() => setExpanded((current) => !current)}
       >
         <View style={styles.historyThemeDisclosureCopy}>
-          <AppText variant="headline">Themes</AppText>
+          <AppText variant="headline">{t("common.themes")}</AppText>
           <AppText
-            accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
+            accessibilityLabel={t("customSetup.selectedThemesA11y", { themes: selectedThemeDetail })}
             ellipsizeMode="tail"
             numberOfLines={1}
             testID="history-theme-selection-detail"
@@ -390,34 +409,37 @@ function HistoryThemeCatalogFilter({
           <View style={styles.historyThemeAllRow}>
             <FilterButton
               active={selectedThemes.includes(ALL_THEMES_FILTER)}
-              label="All themes"
+              label={t("customSetup.allThemes")}
               testID="history-theme-all"
               onPress={() => onThemeIntent({ type: "select-all-themes" })}
             />
           </View>
-          {presentation.groups.map((group) => (
-            <View key={group.label} style={styles.themeCatalogGroup}>
-              <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.historyChipScroller}
-                testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
-              >
-                <View style={[styles.themeCatalogRailContent, styles.historyChipScrollerContent]}>
-                  {group.themes.map((theme) => (
-                    <FilterButton
-                      key={theme}
-                      active={selectedThemes.includes(theme)}
-                      label={customThemeLabel(theme)}
-                      testID={`history-theme-${safeTestId(customThemeLabel(theme))}`}
-                      onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
-                    />
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          ))}
+          {presentation.groups.map((group) => {
+            const canonicalGroupLabel = themeCatalogGroupLabel(group, "en");
+            return (
+              <View key={group.id ?? group.label} style={styles.themeCatalogGroup}>
+                <Text style={styles.themeCatalogGroupLabel}>{themeCatalogGroupLabel(group, locale)}</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.historyChipScroller}
+                  testID={`history-theme-filter-rail-${safeTestId(canonicalGroupLabel)}`}
+                >
+                  <View style={[styles.themeCatalogRailContent, styles.historyChipScrollerContent]}>
+                    {group.themes.map((theme) => (
+                      <FilterButton
+                        key={theme}
+                        active={selectedThemes.includes(theme)}
+                        label={customThemeLabel(theme, locale)}
+                        testID={`history-theme-${safeTestId(customThemeLabel(theme, "en"))}`}
+                        onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            );
+          })}
       </CollapsibleRegion>
     </View>
   );
@@ -425,6 +447,7 @@ function HistoryThemeCatalogFilter({
 
 type HistoryActiveFilterInput = {
   attentionReasons: readonly HistoryAttentionReason[];
+  locale: SupportedLocale;
   ratingKey: string | null;
   runName?: string;
   runPerPuzzleSeconds?: number;
@@ -438,6 +461,7 @@ type HistoryActiveFilterInput = {
 
 function historyActiveFilterLabels({
   attentionReasons,
+  locale,
   ratingKey,
   runName,
   runPerPuzzleSeconds,
@@ -449,40 +473,46 @@ function historyActiveFilterLabels({
   timeRange
 }: HistoryActiveFilterInput): string[] {
   const labels = [
-    historyRangeLabel(timeRange),
-    ratingKey ? historyRatingKeyLabel(ratingKey, runName, runPerPuzzleSeconds) : "All puzzles"
+    historyRangeLabel(timeRange, locale),
+    ratingKey
+      ? historyRatingKeyLabel(ratingKey, runName, runPerPuzzleSeconds, locale)
+      : translate(locale, "history.themes.allPuzzlesLower")
   ];
   if (sourceFilter !== "all") {
-    labels.push(sourceFilter === "scheduled_review" ? "Source: Review" : "Source: Sprint");
+    labels.push(
+      sourceFilter === "scheduled_review"
+        ? translate(locale, "history.activeFilter.sourceReview")
+        : translate(locale, "history.activeFilter.sourceSprint")
+    );
   }
   if (resultFilter !== "all") {
     labels.push(
       resultFilter === "correct"
-        ? "Result: Correct"
+        ? translate(locale, "history.activeFilter.resultCorrect")
         : resultFilter === "wrong"
-          ? "Result: Wrong"
-          : "Result: Incomplete"
+          ? translate(locale, "history.activeFilter.resultWrong")
+          : translate(locale, "history.activeFilter.resultIncomplete")
     );
   }
   if (ratingRangeFilter !== "all") {
-    labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
+    labels.push(historyRatingRangeLabel(ratingRangeFilter, locale));
   }
   if (attentionReasons.length === 1) {
     labels.push(
       attentionReasons[0] === "unclear"
-        ? "Attention: Unclear"
+        ? translate(locale, "history.activeFilter.attentionUnclear")
         : attentionReasons[0] === "in_review"
-          ? "Attention: In review"
-          : "Attention: Incomplete"
+          ? translate(locale, "history.activeFilter.attentionInReview")
+          : translate(locale, "history.activeFilter.attentionIncomplete")
     );
   }
   if (sideFilter !== "all") {
-    labels.push(sideFilter === "white" ? "White" : "Black");
+    labels.push(sideFilter === "white" ? translate(locale, "common.white") : translate(locale, "common.black"));
   }
   if (themeFilters.length === 1) {
-    labels.push(customThemeLabel(themeFilters[0]!));
+    labels.push(customThemeLabel(themeFilters[0]!, locale));
   } else if (themeFilters.length > 1) {
-    labels.push(`${themeFilters.length} themes selected`);
+    labels.push(translate(locale, "history.activeFilter.themesSelected", { count: themeFilters.length }));
   }
   return labels;
 }
@@ -517,12 +547,28 @@ function HistoryActiveFilterStrip({
   );
 }
 
-const HISTORY_RATING_RANGE_FILTERS: ReadonlyArray<{ id: HistoryRatingRangeFilter; label: string }> = [
-  { id: "all", label: "All ratings" },
-  { id: "under1000", label: "<1000" },
-  { id: "1000-1399", label: "1000-1399" },
-  { id: "1400-plus", label: "1400+" }
+const HISTORY_RATING_RANGE_IDS: readonly HistoryRatingRangeFilter[] = [
+  "all",
+  "under1000",
+  "1000-1399",
+  "1400-plus"
 ];
+
+function historyRatingRangeLabel(
+  id: HistoryRatingRangeFilter,
+  locale: SupportedLocale
+): string {
+  if (id === "all") {
+    return translate(locale, "history.ratingRange.all");
+  }
+  if (id === "under1000") {
+    return "<1000";
+  }
+  if (id === "1000-1399") {
+    return "1000-1399";
+  }
+  return "1400+";
+}
 
 function HistoryChipRow({
   children,
@@ -559,11 +605,12 @@ function HistoryRatingFilters({
   runsByRatingKey: ReadonlyMap<string, { name: string; perPuzzleSeconds: number }>;
   selectedRatingKey: string | null;
 }): React.JSX.Element {
+  const { locale, t } = useTranslation();
   return (
     <HistoryChipRow testID="history-rating-filters">
       <FilterButton
         active={selectedRatingKey === null}
-        label="All Puzzles"
+        label={t("history.themes.allPuzzlesTitle")}
         testID="history-rating-all"
         onPress={() => onRatingKeyChange(null)}
       />
@@ -574,7 +621,8 @@ function HistoryRatingFilters({
           label={historyRatingKeyLabel(
             ratingKey,
             runsByRatingKey.get(ratingKey)?.name,
-            runsByRatingKey.get(ratingKey)?.perPuzzleSeconds
+            runsByRatingKey.get(ratingKey)?.perPuzzleSeconds,
+            locale
           )}
           testID={`history-rating-${ratingKey}`}
           onPress={() => onRatingKeyChange(ratingKey)}
@@ -591,13 +639,14 @@ function HistoryRangeFilters({
   onTimeRangeChange: (range: HistoryTimeRange) => void;
   timeRange: HistoryTimeRange;
 }): React.JSX.Element {
+  const { locale } = useTranslation();
   return (
     <HistoryChipRow testID="history-range-filters">
       {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
         <FilterButton
           key={range}
           active={timeRange === range}
-          label={historyRangeLabel(range)}
+          label={historyRangeLabel(range, locale)}
           testID={`history-range-${range}`}
           onPress={() => onTimeRangeChange(range)}
         />
@@ -613,10 +662,25 @@ function HistoryAttentionFilter({
   attentionOnly: boolean;
   onChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
+  const { t } = useTranslation();
+  const options: readonly SegmentOption<"needs-attention" | "all">[] = [
+    {
+      accessibilityLabel: t("history.attention.needsAttentionA11y"),
+      label: t("history.attention.needsAttention"),
+      testID: "history-attention-needs-attention",
+      value: "needs-attention"
+    },
+    {
+      accessibilityLabel: t("history.attention.allA11y"),
+      label: t("common.all"),
+      testID: "history-attention-all",
+      value: "all"
+    }
+  ];
   return (
     <SegmentedControl
-      accessibilityLabel="History view"
-      options={HISTORY_ATTENTION_OPTIONS}
+      accessibilityLabel={t("history.attention.viewA11y")}
+      options={options}
       semantics="radio"
       testID="history-attention-filter"
       value={attentionOnly ? "needs-attention" : "all"}
@@ -624,16 +688,6 @@ function HistoryAttentionFilter({
     />
   );
 }
-
-const HISTORY_ATTENTION_OPTIONS: readonly SegmentOption<"needs-attention" | "all">[] = [
-  {
-    accessibilityLabel: "Needs attention: Sprint attempts that are Incomplete, unclear, or in Review",
-    label: "Needs attention",
-    testID: "history-attention-needs-attention",
-    value: "needs-attention"
-  },
-  { accessibilityLabel: "All attempts", label: "All", testID: "history-attention-all", value: "all" }
-];
 
 function HistoryAttemptRow({
   attempt,
@@ -647,6 +701,7 @@ function HistoryAttemptRow({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const { locale, t } = useTranslation();
   const detail = normalizeHistoryAttemptDetail(attempt);
   const persistedTimingStatus = attempt.timingStatus
     ?? (attempt.result === "timed_out" ? "timed_out" : null);
@@ -657,40 +712,53 @@ function HistoryAttemptRow({
   const isCorrect = detail.result === "correct";
   const isUnclear = isAttemptMarkedUnclear(attempt);
   const dateLabel = detail.completedAt === null
-    ? "Date unavailable"
-    : formatLocalCalendarDateLabel(detail.completedAt, { now: nowMs });
-  const exactDateLabel = detail.completedAt === null ? null : formatLocalCalendarDate(detail.completedAt);
+    ? t("history.attempt.dateUnavailable")
+    : formatLocalDateLabelForLocale(detail.completedAt, nowMs, locale);
+  const exactDateLabel = detail.completedAt === null
+    ? null
+    : formatLocalDateForLocale(detail.completedAt, locale);
   const accessibleDateLabel = exactDateLabel === null || dateLabel === exactDateLabel
     ? dateLabel
     : `${dateLabel}, ${exactDateLabel}`;
   const visibleThemes = attempt.curatedThemes;
   const pace = historyAttemptSpeedSeconds(attempt);
-  const paceLabel = pace === null ? null : `${pace}s pace`;
+  const paceLabel = pace === null ? null : t("review.paceLabel", { seconds: pace });
   const resultLabel = isIncomplete
-    ? "Incomplete"
-    : isTimedOut ? "Timed out" : isWrong ? "Wrong move" : isCorrect ? "Correct" : "Result unavailable";
-  const submittedMoveLabel = isIncomplete
-    ? "Sprint ended before completion"
+    ? t("history.result.incomplete")
     : isTimedOut
-    ? "No move submitted"
-    : detail.submittedMove === null || detail.expectedMove === null
-    ? "Moves unavailable"
-    : isWrong
-      ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
-      : `Move ${detail.submittedMove}`;
-  const sourceLabel = historyAttemptSourceLabel(detail.source);
-  const themeContext = visibleThemes.map(customThemeLabel).join(", ");
+      ? t("session.timedOut")
+      : isWrong
+        ? t("session.announcement.wrong")
+        : isCorrect
+          ? t("common.correct")
+          : t("history.attempt.resultUnavailable");
+  const submittedMoveLabel = isIncomplete
+    ? t("history.attempt.incompleteDetail")
+    : isTimedOut
+      ? t("history.attempt.noMoveSubmitted")
+      : detail.submittedMove === null || detail.expectedMove === null
+        ? t("history.attempt.movesUnavailable")
+        : isWrong
+          ? t("history.attempt.playedVsBest", { played: detail.submittedMove, best: detail.expectedMove })
+          : t("history.attempt.movePlayed", { move: detail.submittedMove });
+  const sourceLabel = historyAttemptSourceLabel(detail.source, locale);
+  const themeContext = visibleThemes.map((theme) => customThemeLabel(theme, locale)).join(", ");
   const compactContext = [themeContext, paceLabel].filter(Boolean).join(" · ");
-  const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
-  const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
+  const puzzleIdentity = t("history.attempt.idAndRating", {
+    id: attempt.puzzleId,
+    rating: attempt.puzzleRating
+  });
+  const durationLabel = detail.elapsedSeconds === null
+    ? t("history.attempt.durationUnavailable")
+    : t("common.secondsCompact", { count: detail.elapsedSeconds });
   const compactMeta = [sourceLabel, durationLabel, paceLabel, dateLabel].filter(Boolean).join(" · ");
   const accessibleMeta = [sourceLabel, durationLabel, paceLabel, accessibleDateLabel].filter(Boolean).join(" · ");
   const rowAccessibilityLabel = [
-    `Replay ${historyAttemptModeLabel(detail.mode)} puzzle`,
+    t("history.attempt.replayA11y", { mode: historyAttemptModeLabel(detail.mode, locale) }),
     resultLabel,
     submittedMoveLabel,
-    isUnclear ? "Marked unclear" : null,
-    timingStatus === "slow" ? "Slow" : isTimedOut ? "Timed out" : null,
+    isUnclear ? t("history.attempt.markedUnclear") : null,
+    timingStatus === "slow" ? t("history.attempt.badgeSlow") : isTimedOut ? t("session.timedOut") : null,
     puzzleIdentity,
     compactContext,
     accessibleMeta
@@ -714,7 +782,7 @@ function HistoryAttemptRow({
       />
       <View style={styles.attemptRowCopy}>
         <View style={styles.historyAttemptHeader}>
-          <AppText variant="headline">{attempt.runName ?? historyAttemptModeLabel(detail.mode)}</AppText>
+          <AppText variant="headline">{attempt.runName ?? historyAttemptModeLabel(detail.mode, locale)}</AppText>
           <AppText
             testID={`history-attempt-${attempt.id}-result`}
             tone={isCorrect ? "positive" : isTimedOut || isWrong ? "negative" : "secondary"}
@@ -725,10 +793,10 @@ function HistoryAttemptRow({
         </View>
         <View accessibilityLabel={puzzleIdentity} style={styles.attemptRowIdentity} testID={`history-attempt-${attempt.id}-identity`}>
           <AppText ellipsizeMode="tail" numberOfLines={1} style={styles.attemptRowIdentityId} tone="secondary" variant="footnote">
-            {`ID ${attempt.puzzleId}`}
+            {t("history.attempt.idLabel", { id: attempt.puzzleId })}
           </AppText>
           <AppText numberOfLines={1} style={styles.attemptRowIdentityRating} tone="secondary" variant="footnote">
-            {`\u00A0· Rating ${attempt.puzzleRating}`}
+            {t("history.attempt.ratingSuffix", { rating: attempt.puzzleRating })}
           </AppText>
         </View>
         {visibleThemes.length > 0 ? (
@@ -739,10 +807,10 @@ function HistoryAttemptRow({
       {isUnclear || timingStatus === "slow" ? (
         <View style={styles.attemptRowTrailingBadges}>
           {isUnclear ? (
-            <Badge label="Unclear" testID={`history-attempt-${attempt.id}-unclear`} tone="warning" />
+            <Badge label={t("history.attempt.badgeUnclear")} testID={`history-attempt-${attempt.id}-unclear`} tone="warning" />
           ) : null}
           {timingStatus === "slow" ? (
-            <Badge label="Slow" testID={`history-attempt-${attempt.id}-${timingStatus}`} tone="warning" />
+            <Badge label={t("history.attempt.badgeSlow")} testID={`history-attempt-${attempt.id}-${timingStatus}`} tone="warning" />
           ) : null}
         </View>
       ) : null}
@@ -778,6 +846,7 @@ export function ThemeTagRail({
   themes: readonly string[];
 }): React.JSX.Element {
   const styles = useStyles();
+  const { locale } = useTranslation();
   if (fadeEnd) {
     return (
       <View style={styles.themeTagRailFadeFrame}>
@@ -804,7 +873,7 @@ export function ThemeTagRail({
       <View style={[styles.historyThemeRail, centered ? styles.historyThemeRailCentered : null]}>
         {themes.map((theme) => (
           <View key={theme} style={styles.historyThemeChip} testID={`${testID}-${safeTestId(theme)}`}>
-            <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
+            <Text style={styles.historyThemeChipText}>{customThemeLabel(theme, locale)}</Text>
           </View>
         ))}
       </View>
@@ -815,28 +884,34 @@ export function ThemeTagRail({
 // Opacities of the surface-colored strips that fade the rail's trailing edge.
 const THEME_TAG_RAIL_FADE_STEPS = [0.25, 0.5, 0.75, 1] as const;
 
-function historyAttemptModeLabel(mode: SprintMode | null): string {
-  return mode === null ? "Unknown mode" : modeLabel(mode);
+function historyAttemptModeLabel(mode: SprintMode | null, locale: SupportedLocale): string {
+  return mode === null ? translate(locale, "history.unknownMode") : modeLabel(mode, locale);
 }
 
-function historyAttemptSourceLabel(source: AttemptSource | null): string {
-  return source === "scheduled_review" ? "Review" : source === "sprint" ? "Sprint" : "Unknown source";
+function historyAttemptSourceLabel(source: AttemptSource | null, locale: SupportedLocale): string {
+  if (source === "scheduled_review") {
+    return translate(locale, "history.source.review");
+  }
+  if (source === "sprint") {
+    return translate(locale, "history.source.sprint");
+  }
+  return translate(locale, "history.unknownSource");
 }
 
-function historyRangeLabel(range: HistoryTimeRange): string {
+function historyRangeLabel(range: HistoryTimeRange, locale: SupportedLocale): string {
   if (range === "7d") {
-    return "7 days";
+    return translate(locale, "history.range.7d");
   }
   if (range === "30d") {
-    return "30 days";
+    return translate(locale, "history.range.30d");
   }
   if (range === "90d") {
-    return "90 days";
+    return translate(locale, "history.range.90d");
   }
   if (range === "1y") {
-    return "1 year";
+    return translate(locale, "history.range.1y");
   }
-  return "All Time";
+  return translate(locale, "history.range.max");
 }
 
 const useStyles = makeStyles((theme) => ({

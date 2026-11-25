@@ -6,6 +6,7 @@ import type {
 } from "./practice-store.ts";
 import type { ProgressSyncSnapshot } from "./progress-sync.ts";
 import {
+  isSupportedLocale,
   OPPONENT_REPLY_MAX_SECONDS,
   parseReleaseVersion,
   type PracticeRunRecord,
@@ -62,6 +63,7 @@ export function normalizeLegacyProgressSyncSnapshot(
         lightBoardTheme: defaults.lightBoardTheme,
         darkBoardTheme: defaults.darkBoardTheme,
         pieceSet: defaults.pieceSet,
+        language: defaults.language,
         sync: settings.sync,
         arrowDuel: defaults.arrowDuel,
         notifications: settings.notifications,
@@ -101,6 +103,7 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     !isOptional(value.lightBoardTheme, isBoardThemeId) ||
     !isOptional(value.darkBoardTheme, isBoardThemeId) ||
     !isOptional(value.pieceSet, isChessPieceSetId) ||
+    !isOptional(value.language, isLanguagePreference) ||
     !isOptional(value.whatsNewSeenVersion, isReleaseVersionText) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
@@ -128,6 +131,10 @@ function isReleaseVersionText(value: unknown): boolean {
 
 function isAppearancePreference(value: unknown): boolean {
   return value === "system" || value === "light" || value === "dark";
+}
+
+function isLanguagePreference(value: unknown): boolean {
+  return value === "system" || isSupportedLocale(value);
 }
 
 function isArrowDuelReplyCueStage(value: unknown): boolean {
