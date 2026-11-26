@@ -136,10 +136,31 @@ test("localized static website ships all 9 locales with zero JavaScript and vali
       assert.ok(html.includes(`<html lang="${locale}">`), `${pagePath} missing lang="${locale}"`);
       assert.ok(!/<script\b/i.test(html), `${pagePath} must not contain any <script> tags`);
       assert.ok(!/google-analytics|googletagmanager|segment\.com|mixpanel|plausible|fathom/i.test(html));
+      assert.ok(html.includes('class="locale-menu"'), `${pagePath} missing header locale menu`);
       assert.ok(html.includes('class="section-shell locale-switcher"'), `${pagePath} missing locale switcher`);
       assert.ok(html.includes('hreflang="x-default"'), `${pagePath} missing x-default hreflang`);
       for (const loc of EXPECTED_APP_LOCALES) {
         assert.ok(html.includes(`hreflang="${loc}"`), `${pagePath} missing hreflang="${loc}"`);
+      }
+      if (pagePath === `site/${locale}/index.html`) {
+        for (const frame of [
+          "phone-practice-home.webp",
+          "phone-dark-arrow-duel.webp",
+          "phone-review.webp",
+          "phone-tactical-profile.webp",
+          "phone-focused-run.webp",
+          "ipad-dark-arrow-duel.webp"
+        ]) {
+          assert.ok(
+            html.includes(`../assets/screenshots/${locale}/${frame}`),
+            `${pagePath} missing localized screenshot ${locale}/${frame}`
+          );
+          assert.equal(
+            existsSync(path.join(REPO_ROOT, `site/assets/screenshots/${locale}/${frame}`)),
+            true,
+            `Missing localized screenshot asset site/assets/screenshots/${locale}/${frame}`
+          );
+        }
       }
       if (pagePath.endsWith("android/index.template.html")) {
         assert.ok(html.includes("{{ANDROID_APK_URL}}"), `${pagePath} missing {{ANDROID_APK_URL}} token`);
@@ -156,6 +177,7 @@ test("localized static website ships all 9 locales with zero JavaScript and vali
   ]) {
     const html = readText(enPage);
     assert.ok(!/<script\b/i.test(html), `${enPage} must not contain any <script> tags`);
+    assert.ok(html.includes('class="locale-menu"'), `${enPage} missing header locale menu`);
     assert.ok(html.includes('class="section-shell locale-switcher"'), `${enPage} missing locale switcher`);
     assert.ok(html.includes('hreflang="ja"'), `${enPage} missing hreflang="ja"`);
   }

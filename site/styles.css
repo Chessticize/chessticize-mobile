@@ -154,6 +154,79 @@ footer nav a:hover {
   border: 1px solid var(--line);
   border-radius: 999px;
 }
+.locale-menu {
+  position: relative;
+}
+.locale-menu summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 630;
+  line-height: 1.2;
+  list-style: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.locale-menu summary::-webkit-details-marker {
+  display: none;
+}
+.locale-menu summary:hover,
+.locale-menu[open] summary {
+  border-color: var(--blue);
+  color: var(--blue-deep);
+}
+.locale-globe,
+.locale-chevron {
+  flex-shrink: 0;
+}
+.locale-chevron {
+  transition: transform 150ms ease;
+}
+.locale-menu[open] .locale-chevron {
+  transform: rotate(180deg);
+}
+.locale-menu-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  gap: 2px;
+  min-width: 196px;
+  max-width: calc(100vw - 28px);
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 18px 40px rgba(16, 36, 66, 0.16);
+  list-style: none;
+}
+.locale-menu-list a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 560;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.locale-menu-list a:hover {
+  background: var(--blue-pale);
+  color: var(--blue-deep);
+}
+.locale-menu-list a[aria-current="page"] {
+  background: var(--blue-pale);
+  color: var(--blue-deep);
+  font-weight: 700;
+}
 
 .online-notice {
   display: grid;
@@ -649,8 +722,15 @@ footer nav {
   .site-header {
     min-height: 64px;
   }
-  .site-header nav a:not(.nav-source) {
+  .site-header nav {
+    gap: 8px 10px;
+  }
+  .site-header nav > a:not(.nav-source) {
     display: none;
+  }
+  .locale-menu summary {
+    padding: 6px 9px;
+    font-size: 0.82rem;
   }
   h1 {
     font-size: clamp(2.4rem, 11.5vw, 3.35rem);
@@ -789,9 +869,31 @@ footer nav {
     color: #ced9e7;
   }
   .site-header .nav-source,
+  .locale-menu summary,
   .button-light {
     border-color: #3a506c;
     background: #142b46;
+  }
+  .locale-menu summary {
+    color: #edf5ff;
+  }
+  .locale-menu summary:hover,
+  .locale-menu[open] summary {
+    border-color: #74b5ff;
+    color: #9acbff;
+  }
+  .locale-menu-list {
+    border-color: #3a506c;
+    background: #102238;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+  }
+  .locale-menu-list a {
+    color: #e4eef9;
+  }
+  .locale-menu-list a:hover,
+  .locale-menu-list a[aria-current="page"] {
+    background: #163252;
+    color: #9acbff;
   }
   .button-light:hover {
     background: #1b395c;
@@ -846,7 +948,8 @@ footer nav {
     scroll-behavior: auto;
   }
   .store-badge-link,
-  .button {
+  .button,
+  .locale-chevron {
     transition: none;
   }
 }

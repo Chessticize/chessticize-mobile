@@ -1,11 +1,15 @@
 {
   "schemaVersion": 2,
-  "sourceCollection": "mobile-1.6-current",
+  "sourceCollection": "mobile-1.7-current",
   "generator": "scripts/prepare-landing-page-assets.mjs",
   "sources": [
     {
-      "collection": "mobile-1.6/app-store-raw-b2ba-normal-final",
-      "appSourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207"
+      "collection": "mobile-1.7/app-store-raw-en",
+      "appSourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b"
+    },
+    {
+      "collection": "mobile-1.7/localized-site-captures",
+      "appSourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b"
     },
     {
       "collection": "mobile-1.6/duo-inner-b2ba-final",
@@ -15,124 +19,124 @@
   ],
   "assets": [
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/practice-home.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "2aad9303c5af3446d210867887c890f1fbb96f1fe1fd203284874b15a224c5af",
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "d9e38942e7f392a5f009ac9c69341c2f34a3aa2b34c935fb3659e8ac176908a2",
       "output": "site/assets/screenshots/phone-practice-home.webp",
-      "outputSha256": "4ab647244581cb33945d483ef89ee5630570743f4119e15089c6d499b571f3ac",
+      "outputSha256": "b2f97ac186347e1af4dd3a1c260fb1015782295e54da0eedda61bc41a27abecc",
       "width": 660,
       "height": 1434,
-      "bytes": 52802
+      "bytes": 52690
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/dark-arrow-duel.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "ffdb20038aa42e06e7a9cf2b7b26bfbc3f31402ac819799e7eca6bf84a002c2e",
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "a444c5f165049aeacd7e63e54d9733d36b5b44e5d6392bb0b7a0e83ddd839b19",
       "output": "site/assets/screenshots/phone-dark-arrow-duel.webp",
-      "outputSha256": "6e07435cd9992804d80c28affed2515c94e4b47ccf6e9121310b2a7ca0be1b2c",
+      "outputSha256": "eacabba4e368019ad8133821f048e9ab7c93379163faa44893c15ddad38e06fe",
       "width": 660,
       "height": 1434,
-      "bytes": 28168
+      "bytes": 28158
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/tactical-profile.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "82da74ea6e2e93bd39a9598be57b0f819366f95351a96be6ef0939c323fec08c",
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "00f829c2666a2bfad061ee3de44e426190dc7fb351dda5acdd7f54dcea7f6dbf",
       "output": "site/assets/screenshots/phone-tactical-profile.webp",
-      "outputSha256": "9b12cdc1ac7556a31af51f252138402424f607123956c9522097defe8791482a",
+      "outputSha256": "a58f77916ff609fb2756eb89e9dc7caf721c35f9f01a85da2cae2f9d8c4a07b6",
       "width": 660,
       "height": 1434,
-      "bytes": 64284
+      "bytes": 64792
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/focused-run.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "7ae659a23b09d1b9f4aad851e88340d9ece89b4c498c709af547c63323a7f8d5",
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "59aa3e33ef5f33d09ab0dc7ada13f4b3edd8ccc4e13684809a59bd2b9886ddcd",
       "output": "site/assets/screenshots/phone-focused-run.webp",
-      "outputSha256": "3f3473b175813f648916c7964fe8efeac56e66354ac77159bba5a267ff77e167",
+      "outputSha256": "c9c4421a8d98829ca9a1a3de8a392e1adc8c33d0a1add28ff8a22f9d00d5c7d2",
       "width": 660,
       "height": 1434,
-      "bytes": 52846
+      "bytes": 52800
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/survival.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "072c9f3505cde4c9c33c67fc5894a752d8f0fa992b2665bdebf8df190d6fe458",
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/survival.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "5504ee2946b9b53a93961af7ce504047d6b5eba479921803de5140236b15b21f",
       "output": "site/assets/screenshots/phone-survival.webp",
-      "outputSha256": "fc94775a9afef19afae9a29975292d23b57ad9d8220a120367645c0ebf4b09eb",
+      "outputSha256": "ad180ea90eb86b948f7553a9a88e139a74d35a2cab5ba78f678f3c91f87defd8",
       "width": 660,
       "height": 1434,
-      "bytes": 47618
+      "bytes": 47532
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/review.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "e7b9e8ed85ba245b11b87b3ab0c28bbfe7463bd0ac1ecce9dca5a1531ad679f9",
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "d63a9907ee589592ffeb44d504387d251dd96b5a8fc512681615bc8e1e1e4d02",
       "output": "site/assets/screenshots/phone-review.webp",
-      "outputSha256": "88b77a7449438fced9a59f64ab20dc0b49b75a4f379cb53651d1171819902ef8",
+      "outputSha256": "ecad679b17b20be139e0a3a62291c0194a4c62c243d46f19a988f17b994a406d",
       "width": 660,
       "height": 1434,
-      "bytes": 33940
+      "bytes": 33834
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/ipad-13-inch-landscape/practice-home.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "725f10f808211249b60059cd5e85a335a0cac47affcdf2ada0356331bd42221c",
+      "source": "mobile-1.7/app-store-raw-en/ipad-13-inch-landscape/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "698678554be4fe5a2044d4762a40d3c970aa07f524f7e5813f4b33787909564e",
       "output": "site/assets/screenshots/ipad-practice-home.webp",
-      "outputSha256": "a4a260eaabc2fde00b3fc36dd2e9e2e93214cc47528b804b986c735c6a1b0ce7",
+      "outputSha256": "f3ed0b8e48ca43b17eed42cd19c0a17bfffbc96d16897f1acfd1cccb9b7160b6",
       "width": 1440,
       "height": 1080,
-      "bytes": 37470
+      "bytes": 37840
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/ipad-13-inch-landscape/dark-arrow-duel.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "e61b26294a3862518dfd3fb212cf6721822d6bdbbf40fdcfd8983b9321fd319c",
+      "source": "mobile-1.7/app-store-raw-en/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "c89b0f755eb5f806947be10af1fb64f333fc315dfc4ecf6268aaf606b356dc5f",
       "output": "site/assets/screenshots/ipad-dark-arrow-duel.webp",
-      "outputSha256": "2cd86238076756dc2b3e8314d7449578c70d4c97cd9546f3b6c3a093fca8dcdd",
+      "outputSha256": "9646913dc6382be051b308462d1c00e62ede1a497985622163029c2a638cae38",
       "width": 1440,
       "height": 1080,
-      "bytes": 25200
+      "bytes": 24992
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/ipad-13-inch-landscape/tactical-profile.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "261e6035bb2d18510e75c7c9789d13912deca143dada94f4167ab5535b9d0105",
+      "source": "mobile-1.7/app-store-raw-en/ipad-13-inch-landscape/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "afd178baa0579060a4941946ce0d200c9660b98e4689b51882a4996aff3a4180",
       "output": "site/assets/screenshots/ipad-tactical-profile.webp",
-      "outputSha256": "ffd828aa384e8cc0925f89dd29d1076127858bc709b63c2a9ae525a93e787279",
+      "outputSha256": "e9985a6bf6fd3a4b0f718dd31a75830a196e529ada7eff236a004afab08ce6ff",
       "width": 1440,
       "height": 1080,
-      "bytes": 44936
+      "bytes": 45632
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/ipad-13-inch-landscape/focused-run.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "b7a7dc964d379bc6118117936f99c43c9de335a079b51dfa548330f5a04e25e2",
+      "source": "mobile-1.7/app-store-raw-en/ipad-13-inch-landscape/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "b916f620a1a832b6ea69df9401aff1d4b71525af748619b7ee988a469dcb1cf8",
       "output": "site/assets/screenshots/ipad-focused-run.webp",
-      "outputSha256": "e2c65483ce0f0cae5c25cad38e02e1c675c8ccc2ccb1d420ca2e0f300cff47a3",
+      "outputSha256": "75251e9e7c1a2151508fb7ad4c89ffe8e64fc38be10362c53c66e250ad8c8888",
       "width": 1440,
       "height": 1080,
-      "bytes": 41370
+      "bytes": 41926
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/ipad-13-inch-landscape/survival.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "b2a6eda0a65a44f5cada7f33c1e9f8b1b3c0d9424fc3cef97ba9b8253257d3c8",
+      "source": "mobile-1.7/app-store-raw-en/ipad-13-inch-landscape/survival.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "67d3d30fbe46982374e7307f5cae2833d21d56b84f0bc5e3094cb61653b3af0d",
       "output": "site/assets/screenshots/ipad-survival.webp",
-      "outputSha256": "876bc0f6248ba7c6f7341b0241135e5c10dc6083efb69aa574a13b32822433c3",
+      "outputSha256": "e1d83fb413fb0d7f3444af8bfce55859823e3e3e19206bee7e11f5b6423dd797",
       "width": 1440,
       "height": 1080,
-      "bytes": 37758
+      "bytes": 36650
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/ipad-13-inch-landscape/review.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "e6d189f484f49ad4db483a7b67cbc4737473faf162621b3c5cfef8281c0631bd",
+      "source": "mobile-1.7/app-store-raw-en/ipad-13-inch-landscape/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "2bb55d8493b74a6d7be47f47007735165cf665924934f4fb804d0a9c6c0d6703",
       "output": "site/assets/screenshots/ipad-review.webp",
-      "outputSha256": "de5c8fc961f8d6f32d0ffc11ff96bc1c3a5ee82846df625247b627d8a15274f0",
+      "outputSha256": "b487b9d90056a411d1c9164a05520e5b59a3ab33072801f74b7f4575cf0efdb6",
       "width": 1440,
       "height": 1080,
-      "bytes": 24956
+      "bytes": 24986
     },
     {
       "source": "mobile-1.6/duo-inner-b2ba-final/iphone-duo-inner-landscape/dark-arrow-duel.png",
@@ -146,14 +150,542 @@
       "bytes": 31260
     },
     {
-      "source": "mobile-1.6/app-store-raw-b2ba-normal-final/iphone-6.9-inch-portrait/{practice-home,dark-arrow-duel,tactical-profile,focused-run,survival,review}.png",
-      "sourceCommit": "b2ba55b8d8e1b443c82490b9e1508d733ecc9207",
-      "sourceSha256": "7c7738741b99574704f279625376c2075cd168c44fa9243ad7d56d2fc222437a",
+      "locale": "zh-Hans",
+      "source": "mobile-1.7/localized-site-captures/zh-Hans/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "2191455a7bb39740f95a1fa4307cbd251a2754a62d698a9b7430c7bd7571bb31",
+      "output": "site/assets/screenshots/zh-Hans/phone-practice-home.webp",
+      "outputSha256": "f60e0c92c724a74e01869ccfbde51c7a6c9d3c1a83f68c1f8ab8b14b4b9f0466",
+      "width": 660,
+      "height": 1434,
+      "bytes": 43814
+    },
+    {
+      "locale": "zh-Hans",
+      "source": "mobile-1.7/localized-site-captures/zh-Hans/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "179f43ff0c5710fb99a131b7677732e88276237154ee53bdf69eb5062ca86598",
+      "output": "site/assets/screenshots/zh-Hans/phone-dark-arrow-duel.webp",
+      "outputSha256": "682bec91796bba5284512e6a5a6a0c25f63ff2e4545468a496c442031a44bc93",
+      "width": 660,
+      "height": 1434,
+      "bytes": 26238
+    },
+    {
+      "locale": "zh-Hans",
+      "source": "mobile-1.7/localized-site-captures/zh-Hans/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "e4645fcd1053db458f2b661859721f5798559a4fea7f4c335af696ca53abf9c9",
+      "output": "site/assets/screenshots/zh-Hans/phone-review.webp",
+      "outputSha256": "42c48dff0ebd1f4609c7082f19cd4558947965d165bc7b19ede5079c8239d21e",
+      "width": 660,
+      "height": 1434,
+      "bytes": 27988
+    },
+    {
+      "locale": "zh-Hans",
+      "source": "mobile-1.7/localized-site-captures/zh-Hans/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "ac7483d06341c2745afffada204b8b70c884b91275b78166f952e8c8720a93c1",
+      "output": "site/assets/screenshots/zh-Hans/phone-tactical-profile.webp",
+      "outputSha256": "817c8f77ff76df16103acf0e9a0026b4223c7b00ace6beb28707de1f97fd702b",
+      "width": 660,
+      "height": 1434,
+      "bytes": 52478
+    },
+    {
+      "locale": "zh-Hans",
+      "source": "mobile-1.7/localized-site-captures/zh-Hans/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "bff104607888be28a89a1e2cb8eb613667809cd6d0c09532abb2098a17e746f4",
+      "output": "site/assets/screenshots/zh-Hans/phone-focused-run.webp",
+      "outputSha256": "983192e54a798b994d3a4e7c82fc3774a834ac1e14a1b4b340fd28d5b1ec2963",
+      "width": 660,
+      "height": 1434,
+      "bytes": 44764
+    },
+    {
+      "locale": "zh-Hans",
+      "source": "mobile-1.7/localized-site-captures/zh-Hans/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "e1cbf37929678dd72b391065b3c27e01de95bc7d21ddecb20a3f0b287eb9cd75",
+      "output": "site/assets/screenshots/zh-Hans/ipad-dark-arrow-duel.webp",
+      "outputSha256": "1da2c988b9c12979fc9a7536dd2bd93693c25c716427b4609b1a9a4b66c795d7",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 22796
+    },
+    {
+      "locale": "zh-Hant",
+      "source": "mobile-1.7/localized-site-captures/zh-Hant/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "21b003f5c98373ecb68a69a6f80e52b122c8871358b3ee8e3651e7813cf2d052",
+      "output": "site/assets/screenshots/zh-Hant/phone-practice-home.webp",
+      "outputSha256": "2809b95670d2f82f014dee822c497dca34bdc5e21f91a34a07d97d0d3fed7760",
+      "width": 660,
+      "height": 1434,
+      "bytes": 45220
+    },
+    {
+      "locale": "zh-Hant",
+      "source": "mobile-1.7/localized-site-captures/zh-Hant/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "dd5d17ae64f3801cd9ae9321d5f244ad635e14a74371e6534e322733b231bd6f",
+      "output": "site/assets/screenshots/zh-Hant/phone-dark-arrow-duel.webp",
+      "outputSha256": "8e20dce8b676757fba05cce312092a285520ed2c00760fa91547bb58b4b6462f",
+      "width": 660,
+      "height": 1434,
+      "bytes": 26506
+    },
+    {
+      "locale": "zh-Hant",
+      "source": "mobile-1.7/localized-site-captures/zh-Hant/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "e33ef6e410dfca7309e5721efe085d7dca6b23ba5f926c787aec4df9f26527c3",
+      "output": "site/assets/screenshots/zh-Hant/phone-review.webp",
+      "outputSha256": "6d95528918f5cce115f165b77d35fcf1125eb5b4beb939535deca54a9f11ae19",
+      "width": 660,
+      "height": 1434,
+      "bytes": 28756
+    },
+    {
+      "locale": "zh-Hant",
+      "source": "mobile-1.7/localized-site-captures/zh-Hant/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "17134f1f4ebb2c2e50fd1c0af833672ffd643a9737c18ff992841533fa29c818",
+      "output": "site/assets/screenshots/zh-Hant/phone-tactical-profile.webp",
+      "outputSha256": "088a368f39a360a2bf820cefd0801a31aed8906f2a5135cd12f15ed3f0ff1170",
+      "width": 660,
+      "height": 1434,
+      "bytes": 54072
+    },
+    {
+      "locale": "zh-Hant",
+      "source": "mobile-1.7/localized-site-captures/zh-Hant/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "47a203f9b22eeed3fccbf07bc946b63a6db1ac63df0b4fa42f81ceb5effc8a8c",
+      "output": "site/assets/screenshots/zh-Hant/phone-focused-run.webp",
+      "outputSha256": "ad3e9f73ee3eee76eb97c9687108787102d914cfae02f7cd93d68273240bd67f",
+      "width": 660,
+      "height": 1434,
+      "bytes": 46126
+    },
+    {
+      "locale": "zh-Hant",
+      "source": "mobile-1.7/localized-site-captures/zh-Hant/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "0d72fa861d5ae5343547a563a7d3d30d886498b0ba3dc68086c9da7fecbfd883",
+      "output": "site/assets/screenshots/zh-Hant/ipad-dark-arrow-duel.webp",
+      "outputSha256": "0f6b3d742413e4f76b7c953cc5511d44357032c464e7639ca43eb00779ed3e9f",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 22868
+    },
+    {
+      "locale": "ja",
+      "source": "mobile-1.7/localized-site-captures/ja/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "2dff7f049b6392cb8ac807ac1647e23893da838078c0771881dbf031cd541eab",
+      "output": "site/assets/screenshots/ja/phone-practice-home.webp",
+      "outputSha256": "ea9b3249df18e3fdeb77a2ad3e28814436cb613229ab62aada9ba0851990b9a9",
+      "width": 660,
+      "height": 1434,
+      "bytes": 42090
+    },
+    {
+      "locale": "ja",
+      "source": "mobile-1.7/localized-site-captures/ja/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "642edba2dbda598d8236fd6973d5663c34c9d12a083091390543c927199a6d20",
+      "output": "site/assets/screenshots/ja/phone-dark-arrow-duel.webp",
+      "outputSha256": "7a7b91236a9bb5db02b564af9e56e9cf4b64f4f781c63925a8060ecfc6ec788f",
+      "width": 660,
+      "height": 1434,
+      "bytes": 25914
+    },
+    {
+      "locale": "ja",
+      "source": "mobile-1.7/localized-site-captures/ja/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "279674cb446297835dbe6b7b7f520b3df9646abe39a1a15a89ad23f99b365072",
+      "output": "site/assets/screenshots/ja/phone-review.webp",
+      "outputSha256": "7d529b8914a74e56e76ee788a36b44d6da8498e335354a04e9ab99488e4cd520",
+      "width": 660,
+      "height": 1434,
+      "bytes": 30934
+    },
+    {
+      "locale": "ja",
+      "source": "mobile-1.7/localized-site-captures/ja/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "e81e859f435b5b8feae92adebcc0383a7839ccc080e62b3567044ac0c5d460ea",
+      "output": "site/assets/screenshots/ja/phone-tactical-profile.webp",
+      "outputSha256": "44ff2651c8081b7e6a509df16e9f0d3f15f979357cc2301104b08793289ef96f",
+      "width": 660,
+      "height": 1434,
+      "bytes": 55952
+    },
+    {
+      "locale": "ja",
+      "source": "mobile-1.7/localized-site-captures/ja/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "344d18e36da6711525dac8e44ed3b2fb75f1dd98829b9cb3a678d9698975f12f",
+      "output": "site/assets/screenshots/ja/phone-focused-run.webp",
+      "outputSha256": "c437022fe9c1002d01214bbee1a680cbe9d076cf1917ae6c783bad6ddb22b0b0",
+      "width": 660,
+      "height": 1434,
+      "bytes": 43590
+    },
+    {
+      "locale": "ja",
+      "source": "mobile-1.7/localized-site-captures/ja/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "1c2acf3528ac10d60e0159fe9dfe9e3035dad2167c14dd0f2796013ef80aaaa4",
+      "output": "site/assets/screenshots/ja/ipad-dark-arrow-duel.webp",
+      "outputSha256": "cab187955af5f6e38122508ff1e651fca139ce0e14abef587a16ff9925f9b59b",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 22860
+    },
+    {
+      "locale": "ko",
+      "source": "mobile-1.7/localized-site-captures/ko/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "700b753719eac0aae78c03c05178567b53fecc3c1a56829e1cf967cca9444009",
+      "output": "site/assets/screenshots/ko/phone-practice-home.webp",
+      "outputSha256": "4e5f0a46f026703854b28dac0122dc7501adc4d0b2336d9a9fa7d85d654f412f",
+      "width": 660,
+      "height": 1434,
+      "bytes": 39416
+    },
+    {
+      "locale": "ko",
+      "source": "mobile-1.7/localized-site-captures/ko/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "2f7747c5a2de096a3f6355d2d4d5961a3dc1d64d7f5d439221378743c02b40c8",
+      "output": "site/assets/screenshots/ko/phone-dark-arrow-duel.webp",
+      "outputSha256": "68386b61cc781c7ac1a95d56612667be8d459961b77584421a91dd22b8bb9228",
+      "width": 660,
+      "height": 1434,
+      "bytes": 26198
+    },
+    {
+      "locale": "ko",
+      "source": "mobile-1.7/localized-site-captures/ko/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "8cbc724f80c5709831e9a7060766f23e090b7cecf40416ca959b3d6a727e5c55",
+      "output": "site/assets/screenshots/ko/phone-review.webp",
+      "outputSha256": "e8e69af6f3c764b7f49bb04bc3b7a73cd342d1c16bc120be2520f3a1a21c3218",
+      "width": 660,
+      "height": 1434,
+      "bytes": 27800
+    },
+    {
+      "locale": "ko",
+      "source": "mobile-1.7/localized-site-captures/ko/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "d67f0827b944b897c6c3d455d6f666bd29ff792aba4a74baafe42a4d341dd922",
+      "output": "site/assets/screenshots/ko/phone-tactical-profile.webp",
+      "outputSha256": "14549d0480b3c94c192dbca601eabb58aad2288f6f4711c3d85910858210abb4",
+      "width": 660,
+      "height": 1434,
+      "bytes": 46004
+    },
+    {
+      "locale": "ko",
+      "source": "mobile-1.7/localized-site-captures/ko/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "778a2208a43355c73372cfacfea7a198c77931fadde5cbfcd6a62600f4d148a5",
+      "output": "site/assets/screenshots/ko/phone-focused-run.webp",
+      "outputSha256": "50c0449e846ad4857405692ea1c403b3099b361a9091f36fefa4b4e705f8e2f1",
+      "width": 660,
+      "height": 1434,
+      "bytes": 39032
+    },
+    {
+      "locale": "ko",
+      "source": "mobile-1.7/localized-site-captures/ko/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "5f71abb79a4801b490799118209a6f2fb627f61cb4259e5bdd69b3ab9c1a400c",
+      "output": "site/assets/screenshots/ko/ipad-dark-arrow-duel.webp",
+      "outputSha256": "3106504f4577184382e56309188330cdc0a50b7ea9260cf437c4907c4e5a449d",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 22998
+    },
+    {
+      "locale": "es",
+      "source": "mobile-1.7/localized-site-captures/es/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "80b5d4cc77d7e43e1f2ddc46559ff0f1630baa36ce72eea598096857f026965b",
+      "output": "site/assets/screenshots/es/phone-practice-home.webp",
+      "outputSha256": "9b684ec4f4fe547162cb57b9c5e5e751e292a6956bd700f96da71842eb45694c",
+      "width": 660,
+      "height": 1434,
+      "bytes": 57004
+    },
+    {
+      "locale": "es",
+      "source": "mobile-1.7/localized-site-captures/es/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "5abd742cf677b6ce333ac5336ef12882da4ed8771a963fbcca91a51f6643336f",
+      "output": "site/assets/screenshots/es/phone-dark-arrow-duel.webp",
+      "outputSha256": "113dd45917f18e53f9e8df73f0fd427e8fb702b347320c87c183f6846d0fae05",
+      "width": 660,
+      "height": 1434,
+      "bytes": 27776
+    },
+    {
+      "locale": "es",
+      "source": "mobile-1.7/localized-site-captures/es/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "7d329db7fb03541e7fec0070e387f0208216ee1e3904dd145e994369b07b8c5b",
+      "output": "site/assets/screenshots/es/phone-review.webp",
+      "outputSha256": "a65a2e2d6bacb1f60edcd0a7ce4cbfd363d795c887b84aeb2f66fd50d6e77b83",
+      "width": 660,
+      "height": 1434,
+      "bytes": 33398
+    },
+    {
+      "locale": "es",
+      "source": "mobile-1.7/localized-site-captures/es/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "c700907cd3a4c41cfd420fa906ff3987e56912b9026701e689deabec0cf7f9ee",
+      "output": "site/assets/screenshots/es/phone-tactical-profile.webp",
+      "outputSha256": "6f2fea7c977da556a358798d775f13f6104a60634f5ff53abb9d4dce225dd559",
+      "width": 660,
+      "height": 1434,
+      "bytes": 61968
+    },
+    {
+      "locale": "es",
+      "source": "mobile-1.7/localized-site-captures/es/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "87cbdfcc46b6e05e206d25daff164d9e5f0c17cdfa54ad7b57c93b86e9241754",
+      "output": "site/assets/screenshots/es/phone-focused-run.webp",
+      "outputSha256": "10db730c8c48b7761d3522e2e405f8de88fbf41898c9b8e984323e509c7281fb",
+      "width": 660,
+      "height": 1434,
+      "bytes": 57402
+    },
+    {
+      "locale": "es",
+      "source": "mobile-1.7/localized-site-captures/es/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "22b0b7c5e6f9db4482482c6ce79714c2c6069a6b9bbf73536b231dba93d87cc7",
+      "output": "site/assets/screenshots/es/ipad-dark-arrow-duel.webp",
+      "outputSha256": "60082f1d11886e54bc10a0dda200737bf79aeb531467592c93cbd65f4a7069f6",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 24092
+    },
+    {
+      "locale": "de",
+      "source": "mobile-1.7/localized-site-captures/de/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "f78a0d92b50c48406dc804906d2e085df8e8cf318c6fc6a66156b69ad618b8fc",
+      "output": "site/assets/screenshots/de/phone-practice-home.webp",
+      "outputSha256": "4b1169bd7b00521826bdd21cfd261a4ada4b8a55cdabc21dd53b76fee6397a3c",
+      "width": 660,
+      "height": 1434,
+      "bytes": 51640
+    },
+    {
+      "locale": "de",
+      "source": "mobile-1.7/localized-site-captures/de/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "fa265ba30955a0b880527d3b66ab5d042495d26c59b2a1a2ccadbbcf6b45c3eb",
+      "output": "site/assets/screenshots/de/phone-dark-arrow-duel.webp",
+      "outputSha256": "ea66c6f202598773a25949e2ee12d16e915422ab46cfe49a5aa22a2eba4b568f",
+      "width": 660,
+      "height": 1434,
+      "bytes": 26646
+    },
+    {
+      "locale": "de",
+      "source": "mobile-1.7/localized-site-captures/de/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "d07a8635596f7527272b1e5522e3e9d2c08b2949ecbda4af27fbdcef7fb27294",
+      "output": "site/assets/screenshots/de/phone-review.webp",
+      "outputSha256": "c808533c03e95a1d9f679d62c01497078eea787ce83588accb7b613d136d1af4",
+      "width": 660,
+      "height": 1434,
+      "bytes": 33480
+    },
+    {
+      "locale": "de",
+      "source": "mobile-1.7/localized-site-captures/de/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "0d92cdf5ab5b1554730645e3eb0797e39911a9511dc2633c0073bb761fa1421d",
+      "output": "site/assets/screenshots/de/phone-tactical-profile.webp",
+      "outputSha256": "3d75bb6ae22c888fe8e3bd0137eb28cc3a0e3e9e03ed4575711b5d94adff9689",
+      "width": 660,
+      "height": 1434,
+      "bytes": 61686
+    },
+    {
+      "locale": "de",
+      "source": "mobile-1.7/localized-site-captures/de/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "585d5e608f950c2896cdb7996a1a703dcc446546fa8e292b9071c001b8d2036b",
+      "output": "site/assets/screenshots/de/phone-focused-run.webp",
+      "outputSha256": "9b9a6b67271bc5b2471823d1b75cde8618e6d120324685f6926c7b1cbbfe872e",
+      "width": 660,
+      "height": 1434,
+      "bytes": 49456
+    },
+    {
+      "locale": "de",
+      "source": "mobile-1.7/localized-site-captures/de/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "c9bb7de32b0e2ff0d7a2fcbea51c97e23418bce7e029089de73415eede127cd2",
+      "output": "site/assets/screenshots/de/ipad-dark-arrow-duel.webp",
+      "outputSha256": "5638e6efd9530dd277719bc329ee693f0820ce98e0ae430df098a3910ceebc2f",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 23494
+    },
+    {
+      "locale": "fr",
+      "source": "mobile-1.7/localized-site-captures/fr/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "2cffec3d95eb3972907ec44281e30bbb545fcfd48f9e266ba59345bb64b2d56d",
+      "output": "site/assets/screenshots/fr/phone-practice-home.webp",
+      "outputSha256": "fb27756469ccd531d2534e76159beeb19855aeeeb72286bc01f6b4877ac064a7",
+      "width": 660,
+      "height": 1434,
+      "bytes": 55332
+    },
+    {
+      "locale": "fr",
+      "source": "mobile-1.7/localized-site-captures/fr/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "4c8e51b8f473e6d72e6606b8bb68f53c955183659f2e43b502744090e0dfbdca",
+      "output": "site/assets/screenshots/fr/phone-dark-arrow-duel.webp",
+      "outputSha256": "65848e7fc84958fdcf855ce21d8c43a90a3ea226488dc4e592b89918ca52aad3",
+      "width": 660,
+      "height": 1434,
+      "bytes": 28388
+    },
+    {
+      "locale": "fr",
+      "source": "mobile-1.7/localized-site-captures/fr/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "1fb145220b6242275ae177d2a07dcf7f2d3e1eee04a63ceec9b917e16171807c",
+      "output": "site/assets/screenshots/fr/phone-review.webp",
+      "outputSha256": "c8b9c97d35d6a6cbcf66e69abc2a5d23a93c17d5c04b0214d0f1a926fb34e35a",
+      "width": 660,
+      "height": 1434,
+      "bytes": 34498
+    },
+    {
+      "locale": "fr",
+      "source": "mobile-1.7/localized-site-captures/fr/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "a56a9a220be358d2f9afd90143fcd596976146a2bbffd4101f0baceaa5761e62",
+      "output": "site/assets/screenshots/fr/phone-tactical-profile.webp",
+      "outputSha256": "d1d137e66566d3c4a4f36cc4a64fbefd93e4c8b3a5f6fc62854f6298cc4a440e",
+      "width": 660,
+      "height": 1434,
+      "bytes": 61172
+    },
+    {
+      "locale": "fr",
+      "source": "mobile-1.7/localized-site-captures/fr/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "44b43302ff7977085183a8305b04f763d6b4a6268add2fb23d17708f712d618f",
+      "output": "site/assets/screenshots/fr/phone-focused-run.webp",
+      "outputSha256": "d59f4b3990df9e1ba0381c135a85c8b5c367b01a968eeeade9b947f3c9eb972b",
+      "width": 660,
+      "height": 1434,
+      "bytes": 52104
+    },
+    {
+      "locale": "fr",
+      "source": "mobile-1.7/localized-site-captures/fr/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "da254064d8b27bbd01fd47c0aee9af843ac4dff1ca24ed31d8db9bd83970104e",
+      "output": "site/assets/screenshots/fr/ipad-dark-arrow-duel.webp",
+      "outputSha256": "3badc010117a742c688a65006fb9b5435609e757c4313f6c51a094dfa00500e6",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 24614
+    },
+    {
+      "locale": "pt-BR",
+      "source": "mobile-1.7/localized-site-captures/pt-BR/iphone-6.9-inch-portrait/practice-home.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "8c7a5bef360eb846b653c99576293497498e9c7266a151d664f76028b2ff326b",
+      "output": "site/assets/screenshots/pt-BR/phone-practice-home.webp",
+      "outputSha256": "0ebe2553a3d97ebd310e13be14828dae150634980f901ad78a6fb5bb0b616b6b",
+      "width": 660,
+      "height": 1434,
+      "bytes": 53292
+    },
+    {
+      "locale": "pt-BR",
+      "source": "mobile-1.7/localized-site-captures/pt-BR/iphone-6.9-inch-portrait/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "5e073bed38cdd6c9008422e5e37addccdb16e41c8ce0279dcd3422e0fb157f50",
+      "output": "site/assets/screenshots/pt-BR/phone-dark-arrow-duel.webp",
+      "outputSha256": "45688dc98907f57d36ae9fd634a766eaf719d9d3a845bb44041d94ee8cf999b8",
+      "width": 660,
+      "height": 1434,
+      "bytes": 27966
+    },
+    {
+      "locale": "pt-BR",
+      "source": "mobile-1.7/localized-site-captures/pt-BR/iphone-6.9-inch-portrait/review.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "385c0ac00c1f810b8ec9e83d0f6b018d3009f3a6a74abc814b555a8d87a79a90",
+      "output": "site/assets/screenshots/pt-BR/phone-review.webp",
+      "outputSha256": "0301205a478166f55716b6b328c4963391585607907b9e8e9b80ba9c9fd3daed",
+      "width": 660,
+      "height": 1434,
+      "bytes": 33728
+    },
+    {
+      "locale": "pt-BR",
+      "source": "mobile-1.7/localized-site-captures/pt-BR/iphone-6.9-inch-portrait/tactical-profile.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "878aae7b62a9246fdadfe6ebecb7da4530cd07f758799c42cc5276d7c7df8e31",
+      "output": "site/assets/screenshots/pt-BR/phone-tactical-profile.webp",
+      "outputSha256": "daa461bb63910419f9184ef2c923ad4cb35a12113ac159a65dd90ae73b10692b",
+      "width": 660,
+      "height": 1434,
+      "bytes": 61180
+    },
+    {
+      "locale": "pt-BR",
+      "source": "mobile-1.7/localized-site-captures/pt-BR/iphone-6.9-inch-portrait/focused-run.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "8447208f12114736c04785f2f25427a57545ecf0d13f4def3fc531153affbfcc",
+      "output": "site/assets/screenshots/pt-BR/phone-focused-run.webp",
+      "outputSha256": "553c6210e77b32c10c4845c8d941ee89c1973ef19afb7fb5fafc0e1c6b1c16ea",
+      "width": 660,
+      "height": 1434,
+      "bytes": 53540
+    },
+    {
+      "locale": "pt-BR",
+      "source": "mobile-1.7/localized-site-captures/pt-BR/ipad-13-inch-landscape/dark-arrow-duel.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "7c88dcb8ac1ab572f720a2825817a9739d4bf79d8995ebe8cb58ea0af73fd54f",
+      "output": "site/assets/screenshots/pt-BR/ipad-dark-arrow-duel.webp",
+      "outputSha256": "0a24aae4b4d2c5f66e9068c47eaebff8a6632ae077283171f7bede2dde4a075f",
+      "width": 1440,
+      "height": 1080,
+      "bytes": 24002
+    },
+    {
+      "source": "mobile-1.7/app-store-raw-en/iphone-6.9-inch-portrait/{practice-home,dark-arrow-duel,tactical-profile,focused-run,survival,review}.png",
+      "sourceCommit": "da056ef2a6b1d25f3d854572bd12db316418354b",
+      "sourceSha256": "b571f717fe7255916b8a9f2d3d9ceb3a6e6194fd5057087c5a08acc07081cd03",
       "output": "site/assets/screenshots/contact-sheet.webp",
-      "outputSha256": "6e303e351bb04755818ba334494fdd4e01167e3fa7361a52f8294c5c77282ade",
+      "outputSha256": "924b4429f2f09fcda04552ccdd9d36e16cfc9915cd3cd27ccab389e30c817dbb",
       "width": 660,
       "height": 956,
-      "bytes": 59800
+      "bytes": 59784
     },
     {
       "source": "apps/mobile/store-assets/android/play-icon-512.png",

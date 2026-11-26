@@ -140,15 +140,19 @@ describe('public landing page', () => {
     );
   });
 
-  it('ships approved 1.6 screenshot derivatives with verifiable provenance', () => {
+  it('ships approved 1.7 screenshot derivatives with verifiable provenance', () => {
     expect(manifest.schemaVersion).toBe(2);
-    expect(manifest.sourceCollection).toBe('mobile-1.6-current');
+    expect(manifest.sourceCollection).toBe('mobile-1.7-current');
     expect(manifest.generator).toBe('scripts/prepare-landing-page-assets.mjs');
     expect(manifest.sources).toEqual(
       expect.arrayContaining([
         {
-          collection: 'mobile-1.6/app-store-raw-b2ba-normal-final',
-          appSourceCommit: 'b2ba55b8d8e1b443c82490b9e1508d733ecc9207',
+          collection: 'mobile-1.7/app-store-raw-en',
+          appSourceCommit: 'da056ef2a6b1d25f3d854572bd12db316418354b',
+        },
+        {
+          collection: 'mobile-1.7/localized-site-captures',
+          appSourceCommit: 'da056ef2a6b1d25f3d854572bd12db316418354b',
         },
         {
           collection: 'mobile-1.6/duo-inner-b2ba-final',
@@ -157,7 +161,7 @@ describe('public landing page', () => {
         },
       ]),
     );
-    expect(manifest.assets).toHaveLength(15);
+    expect(manifest.assets).toHaveLength(63);
     expect(assetGenerator).toContain('--source-root');
     expect(assetGenerator).toContain('--duo-source-root');
     expect(assetGenerator).toContain('withoutEnlargement: true');
@@ -174,6 +178,11 @@ describe('public landing page', () => {
       expect(asset.height).toBeGreaterThan(0);
       expect(asset.source).not.toMatch(/^\//);
       expect(asset.source).not.toMatch(/Users\/|scratch\//);
+      if (asset.source.startsWith('mobile-1.7/')) {
+        expect(asset.sourceCommit).toBe(
+          'da056ef2a6b1d25f3d854572bd12db316418354b',
+        );
+      }
       if (asset.source.startsWith('mobile-1.6/')) {
         expect(asset.sourceCommit).toBe(
           'b2ba55b8d8e1b443c82490b9e1508d733ecc9207',
