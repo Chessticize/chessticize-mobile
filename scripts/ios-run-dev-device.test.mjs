@@ -42,6 +42,22 @@ test("device resolution accepts a name, UDID or CoreDevice identifier", () => {
   assert.equal(resolveIosDeviceTarget(payload, "CORE-PHONE").udid, "00008150-PHONE");
 });
 
+test("device resolution accepts physical devices when devicectl jsonVersion 5 omits reality", () => {
+  const v5Payload = {
+    result: {
+      devices: [
+        device({ identifier: "SIM-1", udid: "SIM-1", name: "iPhone 18 Pro", reality: "simulated" }),
+        device({ identifier: "VIS-1", udid: "00008112-V", name: "shuz Vision Pro", platform: "visionOS", reality: undefined }),
+        device({ identifier: "CORE-1", udid: "00008150-PHONE", name: "shuz-iPhone", platform: "iOS", reality: undefined }),
+      ],
+    },
+  };
+  assert.equal(resolveIosDeviceTarget(v5Payload, "shuz-iPhone").udid, "00008150-PHONE");
+  assert.equal(resolveIosDeviceTarget(v5Payload).udid, "00008150-PHONE");
+  assert.throws(() => resolveIosDeviceTarget(v5Payload, "iPhone 18 Pro"), /found 0/u);
+  assert.throws(() => resolveIosDeviceTarget(v5Payload, "shuz Vision Pro"), /found 0/u);
+});
+
 test("device resolution ignores Simulators and non-iOS devices", () => {
   assert.throws(() => resolveIosDeviceTarget(payload, "iPhone 17"), /found 0/u);
   assert.throws(() => resolveIosDeviceTarget(payload, "SIM-1"), /found 0/u);
