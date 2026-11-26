@@ -5,6 +5,7 @@ import {
   formatLocalizedDate,
   formatLocalizedNumber,
   formatReviewDay,
+  resolveFormattingLocale,
   reviewDueLabel,
   selectPluralCategory,
   type AccessibleMoveLabelInput,
@@ -15,13 +16,19 @@ import { deMessages } from "./locales/de.ts";
 import { enMessages, type EnMessages, type LocaleCatalog, type MessageKey } from "./locales/en.ts";
 import { esMessages } from "./locales/es.ts";
 import { frMessages } from "./locales/fr.ts";
+import { jaMessages } from "./locales/ja.ts";
+import { koMessages } from "./locales/ko.ts";
 import { ptBRMessages } from "./locales/pt-BR.ts";
 import { zhHansMessages } from "./locales/zh-Hans.ts";
+import { zhHantMessages } from "./locales/zh-Hant.ts";
 import type { MessageValue, TranslateArgs } from "./types.ts";
 
 const REGISTERED_CATALOGS: Record<SupportedLocale, LocaleCatalog> = {
   en: enMessages,
   "zh-Hans": zhHansMessages,
+  "zh-Hant": zhHantMessages,
+  ja: jaMessages,
+  ko: koMessages,
   es: esMessages,
   de: deMessages,
   fr: frMessages,
@@ -29,6 +36,7 @@ const REGISTERED_CATALOGS: Record<SupportedLocale, LocaleCatalog> = {
 };
 
 let activeLocale: SupportedLocale = DEFAULT_LOCALE;
+let activePreferredLanguages: readonly string[] = [DEFAULT_LOCALE];
 
 export function getActiveLocale(): SupportedLocale {
   return activeLocale;
@@ -36,6 +44,14 @@ export function getActiveLocale(): SupportedLocale {
 
 export function setActiveLocale(locale: SupportedLocale): void {
   activeLocale = locale;
+}
+
+export function getActivePreferredLanguages(): readonly string[] {
+  return activePreferredLanguages;
+}
+
+export function setActivePreferredLanguages(preferredLanguages: readonly string[]): void {
+  activePreferredLanguages = preferredLanguages;
 }
 
 export function registerLocaleCatalog(locale: SupportedLocale, catalog: LocaleCatalog): void {
@@ -100,21 +116,26 @@ export function createTranslator(locale: SupportedLocale): TranslateFn {
 export function formatNumberForLocale(
   value: number,
   locale: SupportedLocale = activeLocale,
-  options?: Intl.NumberFormatOptions
+  options?: Intl.NumberFormatOptions,
+  preferredLanguages: readonly string[] = activePreferredLanguages
 ): string {
-  return formatLocalizedNumber(value, locale, options);
+  return formatLocalizedNumber(value, intlLocaleTag(locale, preferredLanguages), options);
 }
 
 export function formatDateForLocale(
   date: Date,
   locale: SupportedLocale = activeLocale,
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
+  preferredLanguages: readonly string[] = activePreferredLanguages
 ): string {
-  return formatLocalizedDate(date, locale, options);
+  return formatLocalizedDate(date, intlLocaleTag(locale, preferredLanguages), options);
 }
 
-function intlLocaleTag(locale: SupportedLocale): string {
-  return locale === "en" ? "en-US" : locale;
+function intlLocaleTag(
+  locale: SupportedLocale,
+  preferredLanguages: readonly string[] = activePreferredLanguages
+): string {
+  return resolveFormattingLocale(locale, preferredLanguages);
 }
 
 export function formatLocalDateForLocale(

@@ -59,6 +59,21 @@ describe("i18n runtime & locale catalogs", () => {
     expect(translate("zh-Hans", "themes.smotheredMate")).toBe("闷杀");
     expect(translate("zh-Hans", "common.puzzlesCount", { count: 3 })).toBe("3 题");
 
+    expect(translate("zh-Hant", "tabs.practice")).toBe("練習");
+    expect(translate("zh-Hant", "themes.fork")).toBe("捉雙");
+    expect(translate("zh-Hant", "themes.smotheredMate")).toBe("悶殺");
+    expect(translate("zh-Hant", "common.puzzlesCount", { count: 3 })).toBe("3 題");
+
+    expect(translate("ja", "tabs.practice")).toBe("練習");
+    expect(translate("ja", "themes.fork")).toBe("フォーク");
+    expect(translate("ja", "themes.backRankMate")).toBe("バックランクメイト");
+    expect(translate("ja", "common.puzzlesCount", { count: 3 })).toBe("3 問");
+
+    expect(translate("ko", "tabs.practice")).toBe("연습");
+    expect(translate("ko", "themes.fork")).toBe("포크");
+    expect(translate("ko", "themes.smotheredMate")).toBe("스머더드 메이트");
+    expect(translate("ko", "common.puzzlesCount", { count: 3 })).toBe("3문제");
+
     expect(translate("es", "tabs.practice")).toBe("Práctica");
     expect(translate("es", "themes.backRankMate")).toBe("Mate del pasillo");
     expect(translate("es", "themes.smotheredMate")).toBe("Mate de la coz");
@@ -96,7 +111,7 @@ describe("i18n runtime & locale catalogs", () => {
     expect(readDevicePreferredLanguages()).toEqual([DEFAULT_LOCALE]);
   });
 
-  it("has 100% key parity, non-empty values, and matching placeholders across all 6 locales", () => {
+  it("has 100% key parity, non-empty values, and matching placeholders across all 9 locales", () => {
     const enKeys = Object.keys(enMessages).sort() as MessageKey[];
     expect(enKeys.length).toBeGreaterThan(200);
 
@@ -207,15 +222,34 @@ describe("i18n runtime & locale catalogs", () => {
     for (const locale of SUPPORTED_LOCALES) {
       expect(infoPlist).toContain(`<string>${locale}</string>`);
       expect(localesConfig).toContain(`android:name="${locale}"`);
+      const lprojPath = join(appRoot, "ios", "ChessticizeMobile", `${locale}.lproj`, "InfoPlist.strings");
+      expect(existsSync(lprojPath)).toBe(true);
+      expect(pbxproj).toContain(`${locale}.lproj/InfoPlist.strings`);
     }
     expect(pbxproj).toContain('"zh-Hans"');
+    expect(pbxproj).toContain('"zh-Hant"');
     expect(pbxproj).toContain('"pt-BR"');
+    expect(pbxproj).toContain("InfoPlist.strings in Resources");
     expect(manifest).toContain('android:localeConfig="@xml/locales_config"');
 
-    for (const qualifier of ["values", "values-zh-rCN", "values-es", "values-de", "values-fr", "values-pt-rBR"]) {
+    for (const qualifier of [
+      "values",
+      "values-zh-rCN",
+      "values-zh-rTW",
+      "values-zh-rHK",
+      "values-ja",
+      "values-ko",
+      "values-es",
+      "values-de",
+      "values-fr",
+      "values-pt-rBR"
+    ]) {
       const stringsPath = join(appRoot, "android", "app", "src", "main", "res", qualifier, "strings.xml");
       expect(existsSync(stringsPath)).toBe(true);
-      expect(readFileSync(stringsPath, "utf8")).toContain('<string name="app_name">Chessticize</string>');
+      const xml = readFileSync(stringsPath, "utf8");
+      expect(xml).toContain('<string name="app_name">Chessticize</string>');
+      expect(xml).toContain('<string name="review_reminders_channel_name">');
+      expect(xml).toContain('<string name="review_reminders_channel_description">');
     }
   });
 });

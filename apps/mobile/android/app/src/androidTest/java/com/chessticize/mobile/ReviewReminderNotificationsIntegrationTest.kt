@@ -59,8 +59,8 @@ class ReviewReminderNotificationsIntegrationTest {
       val manager = context.getSystemService(NotificationManager::class.java)
       val channel = manager.getNotificationChannel(ReviewReminderAlarmContract.CHANNEL_ID)
       assertNotNull(channel)
-      assertEquals(ReviewReminderAlarmContract.CHANNEL_NAME, channel.name.toString())
-      assertEquals(ReviewReminderAlarmContract.CHANNEL_DESCRIPTION, channel.description)
+      assertEquals(context.getString(R.string.review_reminders_channel_name), channel.name.toString())
+      assertEquals(context.getString(R.string.review_reminders_channel_description), channel.description)
     }
   }
 

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Chessticize</string>
+    <string name="review_reminders_channel_name">Rappels de révision</string>
+    <string name="review_reminders_channel_description">Rappels lorsque des révisions sont prêtes dans Chessticize</string>
 </resources>

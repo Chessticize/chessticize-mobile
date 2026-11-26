@@ -1,6 +1,9 @@
 export const SUPPORTED_LOCALES = [
   "en",
   "zh-Hans",
+  "zh-Hant",
+  "ja",
+  "ko",
   "es",
   "de",
   "fr",
@@ -15,6 +18,9 @@ export const DEFAULT_LOCALE: SupportedLocale = "en";
 export const LANGUAGE_NATIVE_LABELS: Readonly<Record<SupportedLocale, string>> = {
   en: "English",
   "zh-Hans": "简体中文",
+  "zh-Hant": "繁體中文",
+  ja: "日本語",
+  ko: "한국어",
   es: "Español",
   de: "Deutsch",
   fr: "Français",
@@ -71,18 +77,72 @@ export function matchSupportedLocale(tag: string | null | undefined): SupportedL
   if (language === "pt") {
     return "pt-BR";
   }
+  if (language === "ja") {
+    return "ja";
+  }
+  if (language === "ko") {
+    return "ko";
+  }
   if (language === "zh") {
     const restLower = subtags.slice(1).map((part) => part.toLowerCase());
-    if (restLower.includes("hant") || restLower.includes("tw") || restLower.includes("hk") || restLower.includes("mo")) {
-      return undefined;
+    if (restLower.includes("hant")) {
+      return "zh-Hant";
     }
-    if (restLower.length === 0 || restLower.includes("hans") || restLower.includes("cn") || restLower.includes("sg")) {
+    if (restLower.includes("hans")) {
       return "zh-Hans";
     }
-    return undefined;
+    if (restLower.includes("tw") || restLower.includes("hk") || restLower.includes("mo")) {
+      return "zh-Hant";
+    }
+    if (restLower.length === 0 || restLower.includes("cn") || restLower.includes("sg")) {
+      return "zh-Hans";
+    }
+    return "zh-Hans";
   }
 
   return undefined;
+}
+
+export function extractRegionSubtag(tag: string | null | undefined): string | undefined {
+  if (typeof tag !== "string") {
+    return undefined;
+  }
+  const normalized = tag.trim().replace(/_/g, "-");
+  if (normalized.length === 0) {
+    return undefined;
+  }
+  const subtags = normalized.split("-").filter((part) => part.length > 0);
+  for (let i = 1; i < subtags.length; i += 1) {
+    const part = subtags[i]!;
+    if (part.length === 1) {
+      // Stop before BCP 47 extension or private-use singletons (-u-, -t-, -x-).
+      break;
+    }
+    if (/^[A-Za-z]{2}$/.test(part)) {
+      return part.toUpperCase();
+    }
+    if (/^[0-9]{3}$/.test(part)) {
+      return part;
+    }
+  }
+  return undefined;
+}
+
+export function resolveFormattingLocale(
+  locale: SupportedLocale,
+  preferredLanguages?: readonly string[]
+): string {
+  const deviceRegion = preferredLanguages?.map(extractRegionSubtag).find(Boolean);
+  if (deviceRegion) {
+    const baseSubtags = locale.split("-");
+    const last = baseSubtags[baseSubtags.length - 1];
+    const withoutRegion =
+      baseSubtags.length > 1 && last && (/^[A-Za-z]{2}$/.test(last) || /^[0-9]{3}$/.test(last))
+        ? baseSubtags.slice(0, -1).join("-")
+        : locale;
+    return `${withoutRegion}-${deviceRegion}`;
+  }
+  return locale === "en" ? "en-US" : locale;
 }
 
 export function resolvePreferredLocale(
@@ -129,7 +189,7 @@ export function selectPluralCategory(count: number, locale: SupportedLocale): Pl
   if (rules) {
     return rules.select(count) as PluralCategory;
   }
-  if (locale === "zh-Hans") {
+  if (locale === "zh-Hans" || locale === "zh-Hant" || locale === "ja" || locale === "ko") {
     return "other";
   }
   if (locale === "fr") {
@@ -140,7 +200,7 @@ export function selectPluralCategory(count: number, locale: SupportedLocale): Pl
 
 export function formatLocalizedNumber(
   value: number,
-  locale: SupportedLocale,
+  locale: string,
   options?: Intl.NumberFormatOptions
 ): string {
   try {
@@ -155,7 +215,7 @@ export function formatLocalizedNumber(
 
 export function formatLocalizedDate(
   date: Date,
-  locale: SupportedLocale,
+  locale: string,
   options?: Intl.DateTimeFormatOptions
 ): string {
   try {

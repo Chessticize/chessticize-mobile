@@ -206,7 +206,7 @@ test("language defaults to following the system and normalizes supported or unkn
   } as PracticeSettings;
   assert.equal(clonePracticeSettings(legacySettings).language, "system");
 
-  for (const language of ["system", "en", "zh-Hans", "es", "de", "fr", "pt-BR"] as const) {
+  for (const language of ["system", "en", "zh-Hans", "zh-Hant", "ja", "ko", "es", "de", "fr", "pt-BR"] as const) {
     assert.equal(
       clonePracticeSettings({ ...defaultPracticeSettings(), language }).language,
       language
@@ -222,7 +222,14 @@ test("language defaults to following the system and normalizes supported or unkn
   assert.equal(
     clonePracticeSettings({
       ...defaultPracticeSettings(),
-      language: "ja" as unknown as "en"
+      language: "zh-TW" as unknown as "en"
+    }).language,
+    "zh-Hant"
+  );
+  assert.equal(
+    clonePracticeSettings({
+      ...defaultPracticeSettings(),
+      language: "it" as unknown as "en"
     }).language,
     "system"
   );

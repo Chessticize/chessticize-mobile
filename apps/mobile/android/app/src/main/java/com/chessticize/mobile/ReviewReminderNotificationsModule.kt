@@ -228,10 +228,10 @@ internal object ReviewReminderNotifications {
     }
     val channel = NotificationChannel(
       ReviewReminderAlarmContract.CHANNEL_ID,
-      ReviewReminderAlarmContract.CHANNEL_NAME,
+      context.getString(R.string.review_reminders_channel_name),
       NotificationManager.IMPORTANCE_DEFAULT,
     ).apply {
-      description = ReviewReminderAlarmContract.CHANNEL_DESCRIPTION
+      description = context.getString(R.string.review_reminders_channel_description)
     }
     notificationManager(context).createNotificationChannel(channel)
   }
@@ -362,6 +362,9 @@ class ReviewReminderLifecycleReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent?) {
     if (intent?.action !in RECONSTRUCTION_ACTIONS) {
       return
+    }
+    if (intent?.action == Intent.ACTION_LOCALE_CHANGED) {
+      ReviewReminderNotifications.ensureChannel(context)
     }
     ReviewReminderAlarmScheduler.rebuild(context)
   }
