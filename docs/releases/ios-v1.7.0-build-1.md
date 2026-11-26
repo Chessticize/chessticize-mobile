@@ -1,6 +1,6 @@
 # Chessticize iOS 1.7.0 (build 1)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US` (with localized store copy for `zh-Hans`, `zh-Hant`, `ja`, `ko`, `es-ES`, `de-DE`, `fr-FR`, `pt-BR`)
 - Platform: `iOS`
 - Public version: `1.7.0`
@@ -89,7 +89,7 @@ Chessticize 1.7.0 brings full 9-language localization (`English`, `简体中文`
 
 ## Release-note review
 
-- [ ] Owner reviewed and approved the 1.7.0 release notes and localized store copy before tagging.
+- [x] Owner reviewed and approved the 1.7.0 release notes and localized store copy before tagging.
 - [x] Every store-copy block across all 9 locales contains two bullets, no raw URLs, and is at most 300 Unicode characters.
 - [x] The release-details link names the exact source tag (`ios-v1.7.0-build-1`); publication follows tagging.
 - [x] Privacy, offline, iCloud Sync, reminder, Stockfish, and open-source disclosures remain accurate for iOS.

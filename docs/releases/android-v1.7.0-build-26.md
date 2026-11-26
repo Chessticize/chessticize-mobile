@@ -1,6 +1,6 @@
 # Chessticize Android 1.7.0 (build 26)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US` (with localized store copy for `zh-CN`, `zh-TW`, `ja-JP`, `ko-KR`, `es-ES`, `de-DE`, `fr-FR`, `pt-BR`)
 - Platform: `Android`
 - Public version: `1.7.0`
@@ -89,7 +89,7 @@ Chessticize 1.7.0 brings full 9-language localization (`English`, `简体中文`
 
 ## Release-note review
 
-- [ ] Owner reviewed and approved the 1.7.0 release notes and localized store copy before tagging.
+- [x] Owner reviewed and approved the 1.7.0 release notes and localized store copy before tagging.
 - [x] Every store-copy block across all 9 locales contains two bullets, no raw URLs, and is at most 300 Unicode characters.
 - [x] The release-details link names the exact source tag (`android-v1.7.0-build-26`); publication follows tagging.
 - [x] Privacy, offline, Android backup, reminder, Stockfish, and open-source disclosures remain accurate for Android.
