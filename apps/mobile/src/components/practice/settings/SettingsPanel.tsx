@@ -252,6 +252,7 @@ export function SettingsPanel({
 }): React.JSX.Element {
   const {
     locale,
+    systemLocale,
     languagePreference: contextLanguagePreference,
     setLanguagePreference: setContextLanguagePreference,
     t
@@ -274,7 +275,7 @@ export function SettingsPanel({
       setContextLanguagePreference(next);
     }
     setLanguagePickerOpen(false);
-    const nextLocale: SupportedLocale = next === "system" ? locale : next;
+    const nextLocale: SupportedLocale = next === "system" ? systemLocale : next;
     const nextLabel = next === "system"
       ? translate(nextLocale, "settings.language.system")
       : LANGUAGE_NATIVE_LABELS[next];
@@ -302,7 +303,7 @@ export function SettingsPanel({
       >
         <SettingsRow
           detail={activeLanguagePreference === "system"
-            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[locale] })
+            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[systemLocale] })
             : undefined}
           expanded={languagePickerOpen}
           label={t("settings.language.label")}
@@ -315,11 +316,11 @@ export function SettingsPanel({
           <View testID="settings-language-options">
             <ListRow
               accessibilityLabel={t("settings.language.optionSystemA11y", {
-                resolved: LANGUAGE_NATIVE_LABELS[locale]
+                resolved: LANGUAGE_NATIVE_LABELS[systemLocale]
               })}
               accessory={activeLanguagePreference === "system" ? "check" : "none"}
               selected={activeLanguagePreference === "system"}
-              subtitle={LANGUAGE_NATIVE_LABELS[locale]}
+              subtitle={LANGUAGE_NATIVE_LABELS[systemLocale]}
               testID="settings-language-option-system"
               title={t("settings.language.system")}
               onPress={() => selectLanguagePreference("system")}
@@ -343,94 +344,44 @@ export function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      {progressProtection.kind === "icloud_sync" ? (
-        <SettingsSection title={t("settings.sync.section")} testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
-          <SettingsRow
-            label={t("settings.sync.progressSync")}
-            value={iCloudSyncEnabled ? t("common.on") : t("common.off")}
-            detail={iCloudSyncStatus}
-            testID="settings-sync-status"
-          />
-          <SettingsSegmentedRow
-            accessibilityLabel={t("settings.sync.progressSync")}
-            options={[
-              { value: "on", label: t("common.on"), testID: "settings-icloud-sync-on" },
-              { value: "off", label: t("common.off"), testID: "settings-icloud-sync-off" }
-            ]}
-            testID="settings-icloud-sync-controls"
-            value={iCloudSyncEnabled ? "on" : "off"}
-            onChange={(next) => {
-              onSaveICloudSyncEnabled(next === "on");
-              setStatusMessage(next === "on"
-                ? t("settings.sync.enabledStatus")
-                : t("settings.sync.disabledStatus"));
-            }}
-          />
-          {iCloudSyncEnabled ? (
-            <>
-              <SettingsActionButton
-                label={t("settings.sync.syncNow")}
-                detail={t("settings.sync.syncNowDetail")}
-                loading={iCloudSyncInProgress}
-                testID="settings-sync-now"
-                onPress={() => {
-                  void onSyncICloudNow().then((message) => {
-                    setStatusMessage(message);
-                  });
-                }}
-              />
-              {iCloudSyncErrorDetails ? (
-                <ICloudSyncErrorDetails presentation={iCloudSyncErrorDetails} />
-              ) : null}
-            </>
-          ) : null}
-        </SettingsSection>
-      ) : (
-        <SettingsSection
-          title={t("settings.androidBackup.section")}
-          testID="settings-android-backup-section"
-          wide={adaptiveLayout.usesWideContent}
-        >
-          <SettingsRow
-            label={t("settings.androidBackup.label")}
-            value={t("settings.androidBackup.value")}
-            detail={t("settings.androidBackup.detail")}
-            testID="settings-android-backup-status"
-          />
-        </SettingsSection>
-      )}
+      <SettingsSection
+        title={t("settings.appearance.section")}
+        testID="settings-appearance-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <SettingsSegmentedRow
+          accessibilityLabel={t("settings.appearance.section")}
+          options={[
+            { value: "system", label: t("common.system"), testID: "settings-appearance-system" },
+            { value: "light", label: t("common.light"), testID: "settings-appearance-light" },
+            { value: "dark", label: t("common.dark"), testID: "settings-appearance-dark" }
+          ]}
+          testID="settings-appearance-options"
+          value={appearance}
+          onChange={onAppearanceChange}
+        />
+        <BoardAppearanceSettings
+          appearance={appearance}
+          darkBoardTheme={darkBoardTheme}
+          lightBoardTheme={lightBoardTheme}
+          pieceSet={pieceSet}
+          onDarkBoardThemeChange={onDarkBoardThemeChange}
+          onLightBoardThemeChange={onLightBoardThemeChange}
+          onPieceSetChange={onPieceSetChange}
+        />
+      </SettingsSection>
 
-      {arrowDuelOpponentReplyGlobalSetting ? (
-        <SettingsSection
-          title={t("settings.arrowDuel.section")}
-          testID="settings-arrow-duel-section"
-          wide={adaptiveLayout.usesWideContent}
-        >
-          <SettingsRow
-            label={t("settings.arrowDuel.opponentReplyTitle")}
-            value={arrowDuelOpponentReplyGlobalSetting.enabled ? t("common.on") : t("common.off")}
-            detail={arrowDuelOpponentReplyGlobalSetting.enabled
-              ? t("settings.arrowDuel.opponentReplyDetailOn")
-              : t("settings.arrowDuel.opponentReplyDetailOff")}
-            testID="settings-arrow-duel-opponent-reply"
-          />
-          <SettingsSegmentedRow
-            accessibilityLabel={t("settings.arrowDuel.opponentReplyTitle")}
-            options={[
-              { value: "on", label: t("common.on"), testID: "settings-arrow-duel-opponent-reply-on" },
-              { value: "off", label: t("common.off"), testID: "settings-arrow-duel-opponent-reply-off" }
-            ]}
-            testID="settings-arrow-duel-opponent-reply-controls"
-            value={arrowDuelOpponentReplyGlobalSetting.enabled ? "on" : "off"}
-            onChange={(next) => {
-              arrowDuelOpponentReplyGlobalSetting.onChange(next === "on");
-              setStatusMessage(next === "on"
-                ? t("settings.arrowDuel.statusOn")
-                : t("settings.arrowDuel.statusOff"));
-            }}
-          />
-        </SettingsSection>
-      ) : null}
+      <SettingsSection
+        title={t("settings.feedback.section")}
+        testID="settings-move-feedback-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <MoveFeedbackSettingsSection
+          preferences={moveFeedbackPreferences}
+          onPreferencesChange={onMoveFeedbackPreferencesChange}
+          onPreview={moveFeedbackPreviewer}
+        />
+      </SettingsSection>
 
       <SettingsSection title={t("settings.reminders.section")} testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
@@ -511,44 +462,94 @@ export function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      <SettingsSection
-        title={t("settings.feedback.section")}
-        testID="settings-move-feedback-section"
-        wide={adaptiveLayout.usesWideContent}
-      >
-        <MoveFeedbackSettingsSection
-          preferences={moveFeedbackPreferences}
-          onPreferencesChange={onMoveFeedbackPreferencesChange}
-          onPreview={moveFeedbackPreviewer}
-        />
-      </SettingsSection>
+      {arrowDuelOpponentReplyGlobalSetting ? (
+        <SettingsSection
+          title={t("settings.arrowDuel.section")}
+          testID="settings-arrow-duel-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <SettingsRow
+            label={t("settings.arrowDuel.opponentReplyTitle")}
+            value={arrowDuelOpponentReplyGlobalSetting.enabled ? t("common.on") : t("common.off")}
+            detail={arrowDuelOpponentReplyGlobalSetting.enabled
+              ? t("settings.arrowDuel.opponentReplyDetailOn")
+              : t("settings.arrowDuel.opponentReplyDetailOff")}
+            testID="settings-arrow-duel-opponent-reply"
+          />
+          <SettingsSegmentedRow
+            accessibilityLabel={t("settings.arrowDuel.opponentReplyTitle")}
+            options={[
+              { value: "on", label: t("common.on"), testID: "settings-arrow-duel-opponent-reply-on" },
+              { value: "off", label: t("common.off"), testID: "settings-arrow-duel-opponent-reply-off" }
+            ]}
+            testID="settings-arrow-duel-opponent-reply-controls"
+            value={arrowDuelOpponentReplyGlobalSetting.enabled ? "on" : "off"}
+            onChange={(next) => {
+              arrowDuelOpponentReplyGlobalSetting.onChange(next === "on");
+              setStatusMessage(next === "on"
+                ? t("settings.arrowDuel.statusOn")
+                : t("settings.arrowDuel.statusOff"));
+            }}
+          />
+        </SettingsSection>
+      ) : null}
 
-      <SettingsSection
-        title={t("settings.appearance.section")}
-        testID="settings-appearance-section"
-        wide={adaptiveLayout.usesWideContent}
-      >
-        <SettingsSegmentedRow
-          accessibilityLabel={t("settings.appearance.section")}
-          options={[
-            { value: "system", label: t("common.system"), testID: "settings-appearance-system" },
-            { value: "light", label: t("common.light"), testID: "settings-appearance-light" },
-            { value: "dark", label: t("common.dark"), testID: "settings-appearance-dark" }
-          ]}
-          testID="settings-appearance-options"
-          value={appearance}
-          onChange={onAppearanceChange}
-        />
-        <BoardAppearanceSettings
-          appearance={appearance}
-          darkBoardTheme={darkBoardTheme}
-          lightBoardTheme={lightBoardTheme}
-          pieceSet={pieceSet}
-          onDarkBoardThemeChange={onDarkBoardThemeChange}
-          onLightBoardThemeChange={onLightBoardThemeChange}
-          onPieceSetChange={onPieceSetChange}
-        />
-      </SettingsSection>
+      {progressProtection.kind === "icloud_sync" ? (
+        <SettingsSection title={t("settings.sync.section")} testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
+          <SettingsRow
+            label={t("settings.sync.progressSync")}
+            value={iCloudSyncEnabled ? t("common.on") : t("common.off")}
+            detail={iCloudSyncStatus}
+            testID="settings-sync-status"
+          />
+          <SettingsSegmentedRow
+            accessibilityLabel={t("settings.sync.progressSync")}
+            options={[
+              { value: "on", label: t("common.on"), testID: "settings-icloud-sync-on" },
+              { value: "off", label: t("common.off"), testID: "settings-icloud-sync-off" }
+            ]}
+            testID="settings-icloud-sync-controls"
+            value={iCloudSyncEnabled ? "on" : "off"}
+            onChange={(next) => {
+              onSaveICloudSyncEnabled(next === "on");
+              setStatusMessage(next === "on"
+                ? t("settings.sync.enabledStatus")
+                : t("settings.sync.disabledStatus"));
+            }}
+          />
+          {iCloudSyncEnabled ? (
+            <>
+              <SettingsActionButton
+                label={t("settings.sync.syncNow")}
+                detail={t("settings.sync.syncNowDetail")}
+                loading={iCloudSyncInProgress}
+                testID="settings-sync-now"
+                onPress={() => {
+                  void onSyncICloudNow().then((message) => {
+                    setStatusMessage(message);
+                  });
+                }}
+              />
+              {iCloudSyncErrorDetails ? (
+                <ICloudSyncErrorDetails presentation={iCloudSyncErrorDetails} />
+              ) : null}
+            </>
+          ) : null}
+        </SettingsSection>
+      ) : (
+        <SettingsSection
+          title={t("settings.androidBackup.section")}
+          testID="settings-android-backup-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <SettingsRow
+            label={t("settings.androidBackup.label")}
+            value={t("settings.androidBackup.value")}
+            detail={t("settings.androidBackup.detail")}
+            testID="settings-android-backup-status"
+          />
+        </SettingsSection>
+      )}
 
       {showRatingControls ? (
         <SettingsSection title={t("settings.ratings.section")} testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>

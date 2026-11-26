@@ -15538,8 +15538,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-sync-now-detail"))).toBe(
       "Merge ratings, history, and review queue with your private iCloud."
     );
-    expect(testIdOrder(renderer, "settings-sync-section", "settings-notifications-section")).toBeLessThan(0);
-    expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "settings-notifications-section", "settings-sync-section")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "settings-sync-section", "settings-profile-section")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");
     expect(findByTestId(renderer, "settings-review-reminders")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Smart");
@@ -15636,7 +15636,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
-  it("persists formal Move Feedback settings after Notifications without preview controls", async () => {
+  it("persists formal Move Feedback settings after Appearance and before Notifications without preview controls", async () => {
     const service = createMobilePracticeService("random1000");
     const moveFeedbackClient = new FakeMoveFeedbackClient();
     const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
@@ -15648,7 +15648,7 @@ describe("PracticePocScreen", () => {
     expect(
       testIdOrder(
         renderer,
-        "settings-notifications-section",
+        "settings-appearance-section",
         "settings-move-feedback-section"
       )
     ).toBeLessThan(0);
@@ -15656,7 +15656,7 @@ describe("PracticePocScreen", () => {
       testIdOrder(
         renderer,
         "settings-move-feedback-section",
-        "settings-profile-section"
+        "settings-notifications-section"
       )
     ).toBeLessThan(0);
     expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
