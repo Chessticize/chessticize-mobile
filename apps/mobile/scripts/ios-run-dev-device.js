@@ -55,7 +55,7 @@ function physicalIosDevices(payload) {
         udid: hardware.udid ?? device.identifier
       };
     })
-    .filter((device) => device.reality === "physical" && device.platform === "iOS");
+    .filter((device) => (device.reality === "physical" || device.reality === undefined) && device.platform === "iOS");
 }
 
 // Resolves a name, hardware UDID or CoreDevice identifier to exactly one
