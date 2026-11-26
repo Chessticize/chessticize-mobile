@@ -53,6 +53,21 @@ function buildHreflangLinks(origin, localeKeys, pageSlug) {
   return lines.join("\n");
 }
 
+function buildHeaderLocaleMenu(config, currentLocale, pageSlug) {
+  const localeKeys = Object.keys(config.locales);
+  const current = config.locales[currentLocale];
+  const navLabel = current.languageNavLabel;
+  const items = localeKeys
+    .map((loc) => {
+      const label = esc(config.locales[loc].nativeLabel);
+      const href = esc(pageRelativeHref(currentLocale, loc, pageSlug));
+      const ariaCurrent = loc === currentLocale ? ' aria-current="page"' : "";
+      return `<li><a href="${href}" lang="${esc(loc)}"${ariaCurrent}>${label}</a></li>`;
+    })
+    .join("");
+  return `<details class="locale-menu"><summary aria-label="${esc(navLabel)}: ${esc(current.nativeLabel)}"><svg class="locale-globe" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>${esc(current.nativeLabel)}</span><svg class="locale-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><ul class="locale-menu-list" aria-label="${esc(navLabel)}">${items}</ul></details>`;
+}
+
 function buildLanguageSwitcher(config, currentLocale, pageSlug) {
   const localeKeys = Object.keys(config.locales);
   const navLabel = config.locales[currentLocale].languageNavLabel;
@@ -76,7 +91,9 @@ function renderLocalizedIndex(config, locale) {
   const localeKeys = Object.keys(config.locales);
   const canonical = pageCanonicalUrl(config.siteOrigin, locale, "");
   const hreflangs = buildHreflangLinks(config.siteOrigin, localeKeys, "");
+  const headerLocaleMenu = buildHeaderLocaleMenu(config, locale, "");
   const switcher = buildLanguageSwitcher(config, locale, "");
+  const locScreenshots = `../assets/screenshots/${locale}`;
 
   return `<!DOCTYPE html>
 <html lang="${esc(locale)}">
@@ -92,7 +109,7 @@ ${hreflangs}
     <meta property="og:type" content="website" />
     <meta property="og:title" content="${esc(p.ogTitle)}" />
     <meta property="og:description" content="${esc(p.ogDescription)}" />
-    <meta property="og:image" content="${config.siteOrigin}/assets/screenshots/phone-practice-home.webp" />
+    <meta property="og:image" content="${config.siteOrigin}/assets/screenshots/${esc(locale)}/phone-practice-home.webp" />
     <title>${esc(p.title)}</title>
   </head>
   <body>
@@ -105,7 +122,7 @@ ${hreflangs}
         <a href="#review">${esc(n.review)}</a><a href="#practice">${esc(n.focusedPractice)}</a
         ><a href="#privacy">${esc(n.privacy)}</a><a href="./support/">${esc(n.support)}</a
         ><a href="${WEB_APP_URL}">${esc(n.playOnline)}</a
-        ><a class="nav-source" href="${GITHUB_URL}">${esc(n.source)}</a>
+        >${headerLocaleMenu}<a class="nav-source" href="${GITHUB_URL}">${esc(n.source)}</a>
       </nav>
     </header>
     <aside class="online-notice section-shell" aria-label="${esc(p.onlineNoticeAria)}">
@@ -145,10 +162,10 @@ ${hreflangs}
         </div>
         <div class="hero-phones" aria-label="${esc(p.heroPhonesAria)}">
           <figure class="phone-frame">
-            <img src="../assets/screenshots/phone-practice-home.webp" width="660" height="1434" alt="${esc(p.altPracticeHome)}" fetchpriority="high" />
+            <img src="${locScreenshots}/phone-practice-home.webp" width="660" height="1434" alt="${esc(p.altPracticeHome)}" fetchpriority="high" />
           </figure>
           <figure class="phone-frame">
-            <img src="../assets/screenshots/phone-dark-arrow-duel.webp" width="660" height="1434" alt="${esc(p.altDarkArrowDuel)}" fetchpriority="high" />
+            <img src="${locScreenshots}/phone-dark-arrow-duel.webp" width="660" height="1434" alt="${esc(p.altDarkArrowDuel)}" fetchpriority="high" />
           </figure>
         </div>
       </section>
@@ -158,7 +175,7 @@ ${hreflangs}
           <p>${esc(p.reviewBody)}</p>
         </div>
         <figure class="phone-frame review-phone">
-          <img src="../assets/screenshots/phone-review.webp" width="660" height="1434" alt="${esc(p.altReview)}" loading="lazy" />
+          <img src="${locScreenshots}/phone-review.webp" width="660" height="1434" alt="${esc(p.altReview)}" loading="lazy" />
         </figure>
       </section>
       <section id="practice" class="practice-section" aria-labelledby="practice-title">
@@ -169,10 +186,10 @@ ${hreflangs}
           </div>
           <div class="practice-phones" aria-label="${esc(p.practicePhonesAria)}">
             <figure class="phone-frame">
-              <img src="../assets/screenshots/phone-tactical-profile.webp" width="660" height="1434" alt="${esc(p.altTacticalProfile)}" loading="lazy" />
+              <img src="${locScreenshots}/phone-tactical-profile.webp" width="660" height="1434" alt="${esc(p.altTacticalProfile)}" loading="lazy" />
             </figure>
             <figure class="phone-frame focused-run-phone">
-              <img src="../assets/screenshots/phone-focused-run.webp" width="660" height="1434" alt="${esc(p.altFocusedRun)}" loading="lazy" />
+              <img src="${locScreenshots}/phone-focused-run.webp" width="660" height="1434" alt="${esc(p.altFocusedRun)}" loading="lazy" />
             </figure>
           </div>
         </div>
@@ -188,7 +205,7 @@ ${hreflangs}
           </div>
           <div class="wide-screens" aria-label="${esc(p.wideScreensAria)}">
             <figure class="wide-frame ipad-frame">
-              <img src="../assets/screenshots/ipad-dark-arrow-duel.webp" width="1440" height="1080" alt="${esc(p.altIpad)}" loading="lazy" />
+              <img src="${locScreenshots}/ipad-dark-arrow-duel.webp" width="1440" height="1080" alt="${esc(p.altIpad)}" loading="lazy" />
             </figure>
             <figure class="wide-frame duo-frame">
               <img src="../assets/screenshots/duo-dark-arrow-duel.webp" width="1440" height="1013" alt="${esc(p.altDuo)}" loading="lazy" />
@@ -234,6 +251,7 @@ function renderLocalizedSupport(config, locale) {
   const localeKeys = Object.keys(config.locales);
   const canonical = pageCanonicalUrl(config.siteOrigin, locale, "support");
   const hreflangs = buildHreflangLinks(config.siteOrigin, localeKeys, "support");
+  const headerLocaleMenu = buildHeaderLocaleMenu(config, locale, "support");
   const switcher = buildLanguageSwitcher(config, locale, "support");
 
   return `<!doctype html>
@@ -260,6 +278,7 @@ ${hreflangs}
         <a href="../#puzzle-story">${esc(n.howItWorks)}</a>
         <a href="../#privacy">${esc(n.privacy)}</a>
         <a href="../android/">${esc(n.android)}</a>
+        ${headerLocaleMenu}
         <a class="nav-source" href="${GITHUB_URL}">${esc(n.source)}</a>
       </nav>
     </header>
@@ -334,6 +353,7 @@ function renderLocalizedAccessibility(config, locale) {
   const localeKeys = Object.keys(config.locales);
   const canonical = pageCanonicalUrl(config.siteOrigin, locale, "accessibility");
   const hreflangs = buildHreflangLinks(config.siteOrigin, localeKeys, "accessibility");
+  const headerLocaleMenu = buildHeaderLocaleMenu(config, locale, "accessibility");
   const switcher = buildLanguageSwitcher(config, locale, "accessibility");
 
   return `<!doctype html>
@@ -360,6 +380,7 @@ ${hreflangs}
         <a href="../#puzzle-story">${esc(n.howItWorks)}</a>
         <a href="../#privacy">${esc(n.privacy)}</a>
         <a href="../support/">${esc(n.support)}</a>
+        ${headerLocaleMenu}
         <a class="nav-source" href="${GITHUB_URL}">${esc(n.source)}</a>
       </nav>
     </header>
@@ -435,6 +456,7 @@ function renderLocalizedAndroidTemplate(config, locale) {
   const localeKeys = Object.keys(config.locales);
   const canonical = pageCanonicalUrl(config.siteOrigin, locale, "android");
   const hreflangs = buildHreflangLinks(config.siteOrigin, localeKeys, "android");
+  const headerLocaleMenu = buildHeaderLocaleMenu(config, locale, "android");
   const switcher = buildLanguageSwitcher(config, locale, "android");
 
   return `<!doctype html>
@@ -461,6 +483,7 @@ ${hreflangs}
         <a href="../#puzzle-story">${esc(n.howItWorks)}</a>
         <a href="../#privacy">${esc(n.privacy)}</a>
         <a href="../support/">${esc(n.support)}</a>
+        ${headerLocaleMenu}
         <a class="nav-source" href="${GITHUB_URL}">${esc(n.source)}</a>
       </nav>
     </header>
@@ -538,16 +561,22 @@ ${switcher}
 function injectIntoCanonicalEnglishPage(filePath, config, pageSlug) {
   const localeKeys = Object.keys(config.locales);
   const hreflangs = buildHreflangLinks(config.siteOrigin, localeKeys, pageSlug);
+  const headerLocaleMenu = buildHeaderLocaleMenu(config, "en", pageSlug);
   const switcher = buildLanguageSwitcher(config, "en", pageSlug);
   let html = readFileSync(filePath, "utf8");
 
-  // Strip any previous generated hreflang block & locale-switcher block so script is idempotent
+  // Strip any previous generated blocks so script is idempotent
   html = html.replace(/\n\s*<!-- hreflang:start -->[\s\S]*?<!-- hreflang:end -->/g, "");
+  html = html.replace(/<!-- header-locale:start -->[\s\S]*?<!-- header-locale:end -->\s*/g, "");
   html = html.replace(/\n\s*<!-- locale-switcher:start -->[\s\S]*?<!-- locale-switcher:end -->/g, "");
 
   html = html.replace(
     /(<link[\s\S]*?rel="canonical"[\s\S]*?>)/,
     `$1\n    <!-- hreflang:start -->\n${hreflangs}\n    <!-- hreflang:end -->`
+  );
+  html = html.replace(
+    /(<a\s+class="nav-source")/,
+    `<!-- header-locale:start -->${headerLocaleMenu}<!-- header-locale:end -->$1`
   );
   html = html.replace(
     /(\s*<\/footer>)/,

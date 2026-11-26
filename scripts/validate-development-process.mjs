@@ -324,11 +324,11 @@ assert.match(androidDownloadPageModule, /assets\.length !== 3/);
 assert.match(androidDownloadPageModule, /com\.chessticize\.mobile/);
 assert.match(landingPageAssetGenerator, /--source-root/);
 assert.equal(landingPageAssetManifest.schemaVersion, 2);
-assert.equal(landingPageAssetManifest.sourceCollection, "mobile-1.6-current");
-assert.equal(landingPageAssetManifest.assets.length, 15);
+assert.equal(landingPageAssetManifest.sourceCollection, "mobile-1.7-current");
+assert.equal(landingPageAssetManifest.assets.length, 63);
 assert.ok(
   landingPageAssetManifest.sources.some(
-    ({ appSourceCommit }) => appSourceCommit === "b2ba55b8d8e1b443c82490b9e1508d733ecc9207"
+    ({ appSourceCommit }) => appSourceCommit === "da056ef2a6b1d25f3d854572bd12db316418354b"
   )
 );
 assert.ok(

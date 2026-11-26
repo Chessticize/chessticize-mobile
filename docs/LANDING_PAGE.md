@@ -32,20 +32,29 @@ at any depth. It references its stylesheet and icon at both `/` and the legacy
 `/chessticize-mobile/` prefix, so it also renders during the transition on the
 `github.io` project path.
 
-## Preparing the 1.6 refresh
+## Preparing the 1.7 refresh
 
-The landing page uses approved, sanitized native 1.6 captures. The committed
+The landing page uses approved, sanitized native 1.7 captures across all nine
+app locales (`en`, `zh-Hans`, `zh-Hant`, `ja`, `ko`, `es`, `de`, `fr`, `pt-BR`),
+alongside the retained genuine iPhone Duo inner-display capture. The committed
 WebP files are derivatives only: the original PNG captures stay in ignored
 `scratch/` storage. `site/assets/marketing-assets.json` records each derivative,
 its output hash, logical source collection, source hash, and capture commit.
 It deliberately records no local absolute paths.
 
-The current capture collection is App source commit
-`b2ba55b8d8e1b443c82490b9e1508d733ecc9207` for iPhone, iPad, and the
-genuine iPhone Duo inner display. The Duo capture also records its separate
-runner commit `2c0ce5e82c6ed67c608cfd5543120d7ab6d222d6`; that is capture-runner
-provenance, not the App source. These are not a claim that captures were made
-from a later release or `main`.
+The current capture collection combines:
+
+- App source commit `da056ef2a6b1d25f3d854572bd12db316418354b` (1.7.0 mobile
+  source) for English and localized iPhone (`iPhone 18 Pro Max`) and iPad
+  (`iPad Pro 13-inch (M5)`) screenshots; and
+- App source commit `b2ba55b8d8e1b443c82490b9e1508d733ecc9207` (with capture
+  runner commit `2c0ce5e82c6ed67c608cfd5543120d7ab6d222d6`) for the retained
+  genuine iPhone Duo inner-display capture.
+
+Every page includes a zero-JavaScript language picker (`<details class="locale-menu">`)
+in the sticky header and a matching language switcher in the footer, linking
+across all nine localized routes (`/` for English plus `/<locale>/` for the
+eight localized routes) with matching `hreflang` metadata.
 
 The five portrait iPhone captures share a CSS device frame with a black bezel,
 screen corners clipped by the device frame, and a proportional Dynamic Island
