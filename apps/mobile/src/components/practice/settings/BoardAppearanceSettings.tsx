@@ -12,6 +12,7 @@ import {
 } from "../../../theme/index.ts";
 import { useUiHaptics } from "../../../platform/uiHaptics.ts";
 import { useTranslation } from "../../../i18n/index.ts";
+import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import { AppText, SegmentedControl } from "../../ui/index.tsx";
 import { CHESS_PIECE_SET_OPTIONS, chessPieceSpriteFor } from "../shared/chessPieceSprite.ts";
 
@@ -63,6 +64,8 @@ export function BoardAppearanceSettings({
   const appTheme = useTheme();
   const uiHaptics = useUiHaptics();
   const { t } = useTranslation();
+  const { fontScale } = usePracticeViewport();
+  const usesTwoColumnGrid = fontScale >= 1.5 || appTheme.typography.caption.fontSize >= 18;
   const [systemBoardMode, setSystemBoardMode] = useState<PreviewMode>(appTheme.name);
 
   useEffect(() => {
@@ -141,6 +144,7 @@ export function BoardAppearanceSettings({
                 key={option.id}
                 style={({ pressed }) => [
                   styles.optionTile,
+                  usesTwoColumnGrid ? styles.optionTileLargeText : null,
                   selected ? styles.optionTileSelected : null,
                   pressed ? styles.optionTilePressed : null
                 ]}
@@ -158,7 +162,9 @@ export function BoardAppearanceSettings({
                   </View>
                 </View>
                 <AppText
-                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  numberOfLines={2}
                   style={selected ? styles.optionLabelSelected : styles.optionLabel}
                   variant="caption"
                 >
@@ -192,6 +198,7 @@ export function BoardAppearanceSettings({
                 key={option.id}
                 style={({ pressed }) => [
                   styles.optionTile,
+                  usesTwoColumnGrid ? styles.optionTileLargeText : null,
                   selected ? styles.optionTileSelected : null,
                   pressed ? styles.optionTilePressed : null
                 ]}
@@ -212,7 +219,9 @@ export function BoardAppearanceSettings({
                   />
                 </View>
                 <AppText
-                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  numberOfLines={2}
                   style={selected ? styles.optionLabelSelected : styles.optionLabel}
                   variant="caption"
                 >
@@ -434,6 +443,9 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center",
     paddingHorizontal: 6,
     paddingVertical: 6
+  },
+  optionTileLargeText: {
+    flexBasis: "46%"
   },
   optionTileSelected: {
     backgroundColor: theme.colors.accent.s50,

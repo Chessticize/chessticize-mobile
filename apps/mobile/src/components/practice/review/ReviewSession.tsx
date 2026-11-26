@@ -1219,9 +1219,7 @@ export function ReviewSession({
       style={[
         styles.practicePromptStack,
         {
-          width: adaptiveLayout.usesSessionRail
-            ? adaptiveLayout.sessionRailWidth
-            : boardSize
+          width: adaptiveLayout.sessionColumnWidth
         }
       ]}
     >
@@ -1233,9 +1231,7 @@ export function ReviewSession({
           currentPuzzle={currentPuzzle}
           explicitReplySideCopy={explicitReplySideCopy}
           frameHeight={adaptiveLayout.promptFrameHeight}
-          hideSideGlyph={explicitReplySideCopy && (
-            adaptiveLayout.usesSessionRail ? adaptiveLayout.sessionRailWidth : boardSize
-          ) < 240}
+          hideSideGlyph={explicitReplySideCopy && adaptiveLayout.sessionColumnWidth < 240}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           legacyPracticePromptTestIDs
           phase={reviewReplyPromptPhase}

@@ -1074,7 +1074,15 @@ function SurvivalTopBar({
       >
         <Icon color={theme.colors.accent.s600} name="chevronLeft" size={20} weight="semibold" />
       </Pressable>
-      <AppText numberOfLines={1} style={styles.topBarTitle} variant="headline">{title}</AppText>
+      <AppText
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+        numberOfLines={2}
+        style={styles.topBarTitle}
+        variant="headline"
+      >
+        {title}
+      </AppText>
       {trailing ?? <View style={styles.topBarButton} />}
     </View>
   );
@@ -1540,6 +1548,7 @@ const useStyles = makeStyles((theme) => ({
   },
   topBarTitle: {
     flex: 1,
+    minWidth: 0,
     textAlign: "center"
   },
   typeOption: {
