@@ -358,6 +358,23 @@ describe("Settings language selector", () => {
     expect(onLanguageChange).toHaveBeenCalledWith("zh-Hans");
     expect(textOf(renderer, "settings-language-row")).toContain("简体中文");
     expect(extractText(renderer.root.findByProps({ testID: "settings-language-row-trailing" }))).toContain("简体中文");
+
+    // Re-open the picker while an explicit override is active: the System row must still show the
+    // device's resolved system language (English), not the active override (简体中文).
+    act(() => {
+      renderer.root.findByProps({ testID: "settings-language-row" }).props.onPress();
+    });
+    const systemOptionWhileOverridden = textOf(renderer, "settings-language-option-system");
+    expect(systemOptionWhileOverridden).toContain("English");
+    expect(systemOptionWhileOverridden).not.toContain("简体中文");
+
+    // Switching back to System should restore the device locale and report status in that locale.
+    act(() => {
+      renderer.root.findByProps({ testID: "settings-language-option-system" }).props.onPress();
+    });
+    expect(onLanguageChange).toHaveBeenLastCalledWith("system");
+    expect(textOf(renderer, "settings-language-row")).toContain("Follow device language (English)");
+    expect(textOf(renderer, "settings-status-message")).toContain("System");
   });
 });
 

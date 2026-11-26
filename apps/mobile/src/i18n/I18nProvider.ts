@@ -17,6 +17,7 @@ import {
 
 export type I18nContextValue = {
   locale: SupportedLocale;
+  systemLocale: SupportedLocale;
   languagePreference: LanguagePreference;
   preferredLanguages: readonly string[];
   setLanguagePreference: (language: LanguagePreference) => void;
@@ -29,6 +30,7 @@ const defaultTranslate = createTranslator(DEFAULT_LOCALE);
 
 const DEFAULT_CONTEXT: I18nContextValue = {
   locale: DEFAULT_LOCALE,
+  systemLocale: DEFAULT_LOCALE,
   languagePreference: "system",
   preferredLanguages: [DEFAULT_LOCALE],
   setLanguagePreference: () => undefined,
@@ -57,6 +59,7 @@ export function I18nProvider({
     () => preferredLanguages ?? readDevicePreferredLanguages(),
     [preferredLanguages]
   );
+  const systemLocale = locale ?? resolvePreferredLocale(effectivePreferred, "system");
   const resolvedLocale = locale ?? resolvePreferredLocale(effectivePreferred, languagePreference);
 
   // Sync synchronously during render so non-React presentation helpers called in render see the resolved locale and device region immediately.
@@ -69,13 +72,14 @@ export function I18nProvider({
 
   const value = useMemo<I18nContextValue>(() => ({
     locale: resolvedLocale,
+    systemLocale,
     languagePreference,
     preferredLanguages: effectivePreferred,
     setLanguagePreference: onLanguagePreferenceChange ?? (() => undefined),
     t: createTranslator(resolvedLocale),
     formatNumber: (num, options) => formatNumberForLocale(num, resolvedLocale, options, effectivePreferred),
     formatDate: (date, options) => formatDateForLocale(date, resolvedLocale, options, effectivePreferred)
-  }), [effectivePreferred, languagePreference, onLanguagePreferenceChange, resolvedLocale]);
+  }), [effectivePreferred, languagePreference, onLanguagePreferenceChange, resolvedLocale, systemLocale]);
 
   return React.createElement(I18nContext.Provider, { value }, children);
 }

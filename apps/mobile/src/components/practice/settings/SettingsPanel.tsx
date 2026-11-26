@@ -252,6 +252,7 @@ export function SettingsPanel({
 }): React.JSX.Element {
   const {
     locale,
+    systemLocale,
     languagePreference: contextLanguagePreference,
     setLanguagePreference: setContextLanguagePreference,
     t
@@ -274,7 +275,7 @@ export function SettingsPanel({
       setContextLanguagePreference(next);
     }
     setLanguagePickerOpen(false);
-    const nextLocale: SupportedLocale = next === "system" ? locale : next;
+    const nextLocale: SupportedLocale = next === "system" ? systemLocale : next;
     const nextLabel = next === "system"
       ? translate(nextLocale, "settings.language.system")
       : LANGUAGE_NATIVE_LABELS[next];
@@ -302,7 +303,7 @@ export function SettingsPanel({
       >
         <SettingsRow
           detail={activeLanguagePreference === "system"
-            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[locale] })
+            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[systemLocale] })
             : undefined}
           expanded={languagePickerOpen}
           label={t("settings.language.label")}
@@ -315,11 +316,11 @@ export function SettingsPanel({
           <View testID="settings-language-options">
             <ListRow
               accessibilityLabel={t("settings.language.optionSystemA11y", {
-                resolved: LANGUAGE_NATIVE_LABELS[locale]
+                resolved: LANGUAGE_NATIVE_LABELS[systemLocale]
               })}
               accessory={activeLanguagePreference === "system" ? "check" : "none"}
               selected={activeLanguagePreference === "system"}
-              subtitle={LANGUAGE_NATIVE_LABELS[locale]}
+              subtitle={LANGUAGE_NATIVE_LABELS[systemLocale]}
               testID="settings-language-option-system"
               title={t("settings.language.system")}
               onPress={() => selectLanguagePreference("system")}
