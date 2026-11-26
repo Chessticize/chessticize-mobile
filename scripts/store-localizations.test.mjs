@@ -55,10 +55,12 @@ test("Google Play localized metadata covers all 9 locales within limits and resp
     assert.ok(charCount(entry.fullDescription) > 0 && charCount(entry.fullDescription) <= data.limits.fullDescriptionCharacters, `${storeLocale} fullDescription exceeds limit`);
     assert.ok(charCount(entry.appIconAltText) > 0 && charCount(entry.appIconAltText) <= data.limits.graphicAltTextCharacters, `${storeLocale} appIconAltText exceeds limit (${charCount(entry.appIconAltText)})`);
     assert.ok(charCount(entry.featureGraphicAltText) > 0 && charCount(entry.featureGraphicAltText) <= data.limits.graphicAltTextCharacters, `${storeLocale} featureGraphicAltText exceeds limit (${charCount(entry.featureGraphicAltText)})`);
+    assert.ok(charCount(entry.currentVersionWhatsNew) > 0 && charCount(entry.currentVersionWhatsNew) <= data.limits.chessticizeWhatsNewCharacters, `${storeLocale} whatsNew exceeds ${data.limits.chessticizeWhatsNewCharacters} chars (${charCount(entry.currentVersionWhatsNew)})`);
+    assert.ok(!/https?:\/\//u.test(entry.currentVersionWhatsNew), `${storeLocale} whatsNew must not contain raw URLs`);
     assert.ok(!("keywords" in entry), `${storeLocale} must not include Apple keywords field`);
     assert.ok(!/https?:\/\//u.test(entry.fullDescription), `${storeLocale} fullDescription must not include URLs`);
 
-    const combined = `${entry.appName}\n${entry.shortDescription}\n${entry.fullDescription}`.toLowerCase();
+    const combined = `${entry.appName}\n${entry.shortDescription}\n${entry.fullDescription}\n${entry.currentVersionWhatsNew}`.toLowerCase();
     for (const prohibited of data.prohibitedClaims) {
       assert.ok(
         !combined.includes(prohibited.toLowerCase()),
