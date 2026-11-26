@@ -1732,6 +1732,7 @@ describe('Detox suite configuration', () => {
       '<rootDir>/e2e/promotion.e2e.js',
       '<rootDir>/e2e/tactical-profile.e2e.js',
       '<rootDir>/e2e/dynamic-type.e2e.js',
+      '<rootDir>/e2e/language-settings.e2e.js',
       '<rootDir>/e2e/flows.e2e.js'
     ]);
   });

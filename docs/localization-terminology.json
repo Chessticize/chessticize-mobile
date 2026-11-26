@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "brandAndUntranslatedTerms": [
+    "Chessticize",
+    "Stockfish",
+    "iCloud",
+    "GitHub",
+    "SAN piece letters (K, Q, R, B, N)"
+  ],
+  "terms": [
+    {
+      "id": "tab-practice",
+      "key": "tabs.practice",
+      "translations": {
+        "en": "Practice",
+        "zh-Hans": "练习",
+        "zh-Hant": "練習",
+        "ja": "練習",
+        "ko": "연습",
+        "es": "Práctica",
+        "de": "Training",
+        "fr": "Pratique",
+        "pt-BR": "Prática"
+      }
+    },
+    {
+      "id": "tab-review",
+      "key": "tabs.review",
+      "translations": {
+        "en": "Review",
+        "zh-Hans": "复习",
+        "zh-Hant": "複習",
+        "ja": "復習",
+        "ko": "복습",
+        "es": "Repaso",
+        "de": "Wiederholen",
+        "fr": "Révision",
+        "pt-BR": "Revisão"
+      }
+    },
+    {
+      "id": "tab-history",
+      "key": "tabs.history",
+      "translations": {
+        "en": "History",
+        "zh-Hans": "历史",
+        "zh-Hant": "歷史",
+        "ja": "履歴",
+        "ko": "기록",
+        "es": "Historial",
+        "de": "Verlauf",
+        "fr": "Historique",
+        "pt-BR": "Histórico"
+      }
+    },
+    {
+      "id": "tab-settings",
+      "key": "tabs.settings",
+      "translations": {
+        "en": "Settings",
+        "zh-Hans": "设置",
+        "zh-Hant": "設定",
+        "ja": "設定",
+        "ko": "설정",
+        "es": "Ajustes",
+        "de": "Optionen",
+        "fr": "Réglages",
+        "pt-BR": "Ajustes"
+      }
+    },
+    {
+      "id": "mode-arrow-duel",
+      "key": "common.arrowDuel",
+      "translations": {
+        "en": "Arrow Duel",
+        "zh-Hans": "箭头对决",
+        "zh-Hant": "箭頭對決",
+        "ja": "アローデュエル",
+        "ko": "화살표 대결",
+        "es": "Duelo de Flechas",
+        "de": "Pfeilduell",
+        "fr": "Duel de Flèches",
+        "pt-BR": "Duelo de Setas"
+      }
+    },
+    {
+      "id": "mode-survival",
+      "key": "common.survival",
+      "translations": {
+        "en": "Survival",
+        "zh-Hans": "生存",
+        "zh-Hant": "生存",
+        "ja": "サバイバル",
+        "ko": "서바이벌",
+        "es": "Supervivencia",
+        "de": "Survival",
+        "fr": "Survie",
+        "pt-BR": "Sobrevivência"
+      }
+    },
+    {
+      "id": "mode-sprint",
+      "key": "common.sprint",
+      "translations": {
+        "en": "Sprint",
+        "zh-Hans": "冲刺",
+        "zh-Hant": "衝刺",
+        "ja": "スプリント",
+        "ko": "스프린트",
+        "es": "Sprint",
+        "de": "Sprint",
+        "fr": "Sprint",
+        "pt-BR": "Sprint"
+      }
+    },
+    {
+      "id": "mode-focused-run",
+      "key": "common.focusedRun",
+      "translations": {
+        "en": "Focused Run",
+        "zh-Hans": "专项训练",
+        "zh-Hant": "專項訓練",
+        "ja": "集中ラン",
+        "ko": "집중 훈련",
+        "es": "Serie Enfocada",
+        "de": "Fokus-Lauf",
+        "fr": "Série Ciblée",
+        "pt-BR": "Série Focada"
+      }
+    },
+    {
+      "id": "term-rating",
+      "key": "common.rating",
+      "translations": {
+        "en": "Rating",
+        "zh-Hans": "等级分",
+        "zh-Hant": "等級分",
+        "ja": "レーティング",
+        "ko": "레이팅",
+        "es": "Rating",
+        "de": "Wertung",
+        "fr": "Elo",
+        "pt-BR": "Rating"
+      }
+    },
+    {
+      "id": "chess-fork",
+      "key": "themes.fork",
+      "translations": {
+        "en": "Fork",
+        "zh-Hans": "捉双",
+        "zh-Hant": "捉雙",
+        "ja": "フォーク",
+        "ko": "포크",
+        "es": "Ataque doble",
+        "de": "Gabel",
+        "fr": "Fourchette",
+        "pt-BR": "Garfo"
+      }
+    },
+    {
+      "id": "chess-pin",
+      "key": "themes.pin",
+      "translations": {
+        "en": "Pin",
+        "zh-Hans": "牵制",
+        "zh-Hant": "牽制",
+        "ja": "ピン",
+        "ko": "핀",
+        "es": "Clavada",
+        "de": "Fesselung",
+        "fr": "Clouage",
+        "pt-BR": "Cravada"
+      }
+    },
+    {
+      "id": "chess-skewer",
+      "key": "themes.skewer",
+      "translations": {
+        "en": "Skewer",
+        "zh-Hans": "串击",
+        "zh-Hant": "串擊",
+        "ja": "スキュワー",
+        "ko": "스큐어",
+        "es": "Enfilada",
+        "de": "Spieß",
+        "fr": "Enfilade",
+        "pt-BR": "Espeto"
+      }
+    },
+    {
+      "id": "chess-back-rank-mate",
+      "key": "themes.backRankMate",
+      "translations": {
+        "en": "Back Rank Mate",
+        "zh-Hans": "底线杀",
+        "zh-Hant": "底線殺",
+        "ja": "バックランクメイト",
+        "ko": "백랭크 메이트",
+        "es": "Mate del pasillo",
+        "de": "Grundreihenmatt",
+        "fr": "Mat du couloir",
+        "pt-BR": "Mate do corredor"
+      }
+    },
+    {
+      "id": "chess-smothered-mate",
+      "key": "themes.smotheredMate",
+      "translations": {
+        "en": "Smothered Mate",
+        "zh-Hans": "闷杀",
+        "zh-Hant": "悶殺",
+        "ja": "スモザードメイト",
+        "ko": "스머더드 메이트",
+        "es": "Mate de la coz",
+        "de": "Ersticktes Matt",
+        "fr": "Mat à l’étouffée",
+        "pt-BR": "Mate sufocado"
+      }
+    },
+    {
+      "id": "chess-zugzwang",
+      "key": "themes.zugzwang",
+      "translations": {
+        "en": "Zugzwang",
+        "zh-Hans": "逼着",
+        "zh-Hant": "逼著",
+        "ja": "ツークツワンク",
+        "ko": "추크츠방",
+        "es": "Zugzwang",
+        "de": "Zugzwang",
+        "fr": "Zugzwang",
+        "pt-BR": "Zugzwang"
+      }
+    }
+  ]
+}

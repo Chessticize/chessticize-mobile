@@ -44,6 +44,7 @@ than maintain copies. Current user instructions take precedence.
 | Issues and PRDs | [Issue tracker](docs/agents/issue-tracker.md) |
 | Feedback triage | [Triage skill](.codex/skills/chessticize-issue-triage/SKILL.md), [rubric](docs/agents/issue-triage.md), [labels](docs/agents/triage-labels.md) |
 | Domain terminology and ADR discovery | [Domain docs](docs/agents/domain.md) |
+| Localization, terminology glossary and native parity | [Localization](docs/LOCALIZATION.md) |
 | Coordinated release, RC freeze and source identity | [Release source policy](docs/RELEASE_SOURCE_POLICY.md), [versioning](docs/RELEASE_VERSIONING.md) |
 | Android release status, build, submission or recovery | [Android release skill](.codex/skills/chessticize-android-release/SKILL.md) |
 | Local iOS environment or selected Detox run | [Local E2E skill](.codex/skills/chessticize-mobile-local-e2e/SKILL.md) |

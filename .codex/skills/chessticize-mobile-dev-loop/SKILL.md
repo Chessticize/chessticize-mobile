@@ -32,7 +32,7 @@ selected by changed boundaries, not a checklist to run in sequence.
 | Pure domain rules | Focused core tests, `pnpm test:unit`, `pnpm typecheck` |
 | Storage/repository contracts | Real SQLite integration tests, `pnpm test:integration`; migration matrix when schema changes |
 | CLI or process protocol | `pnpm test:e2e` against the real CLI process |
-| React Native state, navigation, copy, accessibility or service wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck` |
+| React Native state, navigation, copy, accessibility or service wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`, `pnpm check:localizations` when user-facing copy or locales change ([Localization](../../../docs/LOCALIZATION.md)) |
 | Shared presentation or responsive UI | Relevant component/Interaction Lab coverage, `pnpm mobile:lab:validate` for Lab changes |
 | Agent guidance or process tooling | `pnpm process:validate` and focused tooling tests when executable checks change |
 | Native bridge, platform, dependency or native runner | Select targeted/full scope in Testing Architecture, then the platform runner below |
