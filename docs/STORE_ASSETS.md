@@ -99,6 +99,8 @@ Chessticize is published under GPL-3.0-or-later. The app includes bundled puzzle
 
 ALSO INCLUDED
 
+• 9 languages with in-app language switching
+• Separate Light and Dark board themes plus classic chess piece sets
 • Curated puzzle themes
 • Adjustable pace, duration, and difficulty
 • Optional move sounds and haptic feedback
