@@ -689,6 +689,16 @@ export function SettingsPanel({
             void Linking.openURL(LICHESS_PUZZLE_DATABASE_URL);
           }}
         />
+        <SettingsExternalLinkRow
+          label="Third-Party Notices"
+          value="Open Source"
+          detail="Chess piece sets, audio, icons, and open-source libraries"
+          linkLabel="THIRD_PARTY_NOTICES.md"
+          testID="settings-third-party-notices"
+          onPress={() => {
+            void Linking.openURL(applicationMetadata.thirdPartyNoticesUrl);
+          }}
+        />
       </SettingsSection>
 
       {statusMessage ? (

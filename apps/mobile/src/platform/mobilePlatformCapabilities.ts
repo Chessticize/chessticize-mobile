@@ -74,6 +74,7 @@ export interface MobileApplicationMetadata {
   stockfishSourceUrl: string;
   supportEmail: string;
   supportEmailUrl: string;
+  thirdPartyNoticesUrl: string;
 }
 
 const SOURCE_REPOSITORY_URL =
@@ -91,6 +92,7 @@ export const MOBILE_APPLICATION_METADATA_LINKS: Omit<
   stockfishSourceUrl: `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/native/stockfish`,
   supportEmail: SUPPORT_EMAIL,
   supportEmailUrl: `mailto:${SUPPORT_EMAIL}`,
+  thirdPartyNoticesUrl: `${SOURCE_REPOSITORY_URL}/blob/main/THIRD_PARTY_NOTICES.md`,
 };
 
 export interface MobilePlatformCapabilities {
