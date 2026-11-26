@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Chessticize</string>
+    <string name="review_reminders_channel_name">復習リマインダー</string>
+    <string name="review_reminders_channel_description">Chessticize で復習時期になったパズルをお知らせします</string>
+</resources>

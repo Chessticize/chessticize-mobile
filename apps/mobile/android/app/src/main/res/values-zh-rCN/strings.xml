@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Chessticize</string>
+    <string name="review_reminders_channel_name">复习提醒</string>
+    <string name="review_reminders_channel_description">当 Chessticize 中有待复习题目时提醒你</string>
 </resources>

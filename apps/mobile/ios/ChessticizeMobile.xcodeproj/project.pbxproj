@@ -28,6 +28,7 @@
 		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
 		C41500032E80000100A00001 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C41500042E80000100A00001 /* StoreKit.framework */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		D47430012F10000100A00001 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D47430022F10000100A00001 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,6 +61,15 @@
 		B35300042E70000100A00001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };
 		C41500042E80000100A00001 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		D47430112F10000100A00001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = ChessticizeMobile/en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D47430122F10000100A00001 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "ChessticizeMobile/zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		D47430132F10000100A00001 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "ChessticizeMobile/zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		D47430142F10000100A00001 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ChessticizeMobile/ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D47430152F10000100A00001 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ChessticizeMobile/ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D47430162F10000100A00001 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = ChessticizeMobile/es.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D47430172F10000100A00001 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = ChessticizeMobile/de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D47430182F10000100A00001 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = ChessticizeMobile/fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D47430192F10000100A00001 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "ChessticizeMobile/pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -98,6 +108,7 @@
 				9D2E4F5D2D2C400100A00001 /* ChessticizeMobile.entitlements */,
 				9D2E4F5F2D2C400100A00001 /* ChessticizeMobileDev.entitlements */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
+				D47430022F10000100A00001 /* InfoPlist.strings */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				58A3D47A2D58A00100A00001 /* bundled-core-pack.sqlite */,
@@ -209,6 +220,9 @@
 				en,
 				Base,
 				"zh-Hans",
+				"zh-Hant",
+				ja,
+				ko,
 				es,
 				de,
 				fr,
@@ -235,6 +249,7 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				58A3D47B2D58A00100A00001 /* bundled-core-pack.sqlite in Resources */,
 				D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */,
+				D47430012F10000100A00001 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -352,6 +367,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		D47430022F10000100A00001 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D47430112F10000100A00001 /* en */,
+				D47430122F10000100A00001 /* zh-Hans */,
+				D47430132F10000100A00001 /* zh-Hant */,
+				D47430142F10000100A00001 /* ja */,
+				D47430152F10000100A00001 /* ko */,
+				D47430162F10000100A00001 /* es */,
+				D47430172F10000100A00001 /* de */,
+				D47430182F10000100A00001 /* fr */,
+				D47430192F10000100A00001 /* pt-BR */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {

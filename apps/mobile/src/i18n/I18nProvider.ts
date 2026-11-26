@@ -11,6 +11,7 @@ import {
   formatDateForLocale,
   formatNumberForLocale,
   setActiveLocale,
+  setActivePreferredLanguages,
   type TranslateFn
 } from "./translate.ts";
 
@@ -58,11 +59,13 @@ export function I18nProvider({
   );
   const resolvedLocale = locale ?? resolvePreferredLocale(effectivePreferred, languagePreference);
 
-  // Sync synchronously during render so non-React presentation helpers called in render see the resolved locale immediately.
+  // Sync synchronously during render so non-React presentation helpers called in render see the resolved locale and device region immediately.
   setActiveLocale(resolvedLocale);
+  setActivePreferredLanguages(effectivePreferred);
   useEffect(() => {
     setActiveLocale(resolvedLocale);
-  }, [resolvedLocale]);
+    setActivePreferredLanguages(effectivePreferred);
+  }, [effectivePreferred, resolvedLocale]);
 
   const value = useMemo<I18nContextValue>(() => ({
     locale: resolvedLocale,
@@ -70,8 +73,8 @@ export function I18nProvider({
     preferredLanguages: effectivePreferred,
     setLanguagePreference: onLanguagePreferenceChange ?? (() => undefined),
     t: createTranslator(resolvedLocale),
-    formatNumber: (num, options) => formatNumberForLocale(num, resolvedLocale, options),
-    formatDate: (date, options) => formatDateForLocale(date, resolvedLocale, options)
+    formatNumber: (num, options) => formatNumberForLocale(num, resolvedLocale, options, effectivePreferred),
+    formatDate: (date, options) => formatDateForLocale(date, resolvedLocale, options, effectivePreferred)
   }), [effectivePreferred, languagePreference, onLanguagePreferenceChange, resolvedLocale]);
 
   return React.createElement(I18nContext.Provider, { value }, children);
