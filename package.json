@@ -27,6 +27,8 @@
     "app-store:testflight-evidence": "node scripts/app-store-testflight-evidence.mjs",
     "support:inspect-icloud": "node scripts/inspect-icloud-support-bundle.mjs",
     "process:validate": "node scripts/validate-development-process.mjs",
+    "check:localizations": "node scripts/check-localizations.mjs",
+    "report:localizations": "node scripts/build-localization-report.mjs",
     "generate:offline-puzzles": "node --experimental-strip-types scripts/generate-offline-puzzle-fixture.mjs",
     "benchmark:multi-theme-query": "node --experimental-strip-types scripts/benchmark-multi-theme-query.mjs",
     "simulate:tactical-profile": "node --experimental-strip-types scripts/simulate-tactical-profile.mjs",

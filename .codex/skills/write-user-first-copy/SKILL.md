@@ -89,4 +89,4 @@ If any answer depends on insider knowledge, rewrite.
 
 When asked only for copy, provide the proposed strings grouped by surface and state, followed by only the rationale needed to evaluate a real tradeoff. When asked to implement, change the source and its public-behavior tests, then report the final strings and validation evidence.
 
-Preserve the project's language and localization rules. Do not silently translate, change terminology contracts, or add product behavior while improving tone.
+Preserve the project's language and localization rules ([Localization](../../../docs/LOCALIZATION.md)). Do not silently translate, change terminology contracts, or add product behavior while improving tone.
