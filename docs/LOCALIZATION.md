@@ -52,3 +52,14 @@ Chessticize ships in **9 languages**:
 - **Visual & interactive checks:**
   - Switch locales via the Storybook **Language** toolbar (`apps/mobile-lab/.storybook/preview.tsx`) across phone portrait, compact width, tablet, and largest text size.
   - Native live-switch and cold-launch persistence E2E coverage lives in `apps/mobile/e2e/language-settings.e2e.js`.
+
+## Store Metadata, Marketing Screenshots, and Static Website
+
+- **App Store metadata (`config/app-store-metadata-localizations-v1.json`):** Paste-ready localized listings for all 9 App Store Connect locales (`en-US`, `zh-Hans`, `zh-Hant`, `ja`, `ko`, `es-ES`, `de-DE`, `fr-FR`, `pt-BR`) respecting Apple character and 100-byte UTF-8 keyword limits.
+- **Google Play metadata (`config/google-play-metadata-localizations-v1.json`):** Paste-ready localized listings for all 9 Google Play locales (`en-US`, `zh-CN`, `zh-TW`, `ja-JP`, `ko-KR`, `es-ES`, `de-DE`, `fr-FR`, `pt-BR`) enforcing Google character limits and Android prohibited-claim rules (no `iCloud` claims on Android).
+- **Localized marketing screenshot copy (`config/marketing-screenshots-localizations-v1.json`):** Localized headlines, supporting lines, and Play alt texts for every frame in the `mobile-1.6` and `v1-core` screenshot stories across all 9 locales.
+- **Static localized website (`config/site-localizations-v1.json` → `site/<locale>/`):** Regenerate all zero-JS localized static pages and `hreflang` / footer language switcher links with:
+  ```sh
+  pnpm site:build-locales
+  ```
+- All store limits, prohibited-claim rules, screenshot copy lengths, and static website invariants are validated in CI by `scripts/store-localizations.test.mjs`.

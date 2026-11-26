@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Prise en charge actuelle de l’accessibilité et limites connues de Chessticize." />
+    <meta name="theme-color" content="#f7fbff" />
+    <link rel="canonical" href="https://chessticize.com/fr/accessibility/" />
+    <link rel="alternate" hreflang="en" href="https://chessticize.com/accessibility/" />
+    <link rel="alternate" hreflang="zh-Hans" href="https://chessticize.com/zh-Hans/accessibility/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://chessticize.com/zh-Hant/accessibility/" />
+    <link rel="alternate" hreflang="ja" href="https://chessticize.com/ja/accessibility/" />
+    <link rel="alternate" hreflang="ko" href="https://chessticize.com/ko/accessibility/" />
+    <link rel="alternate" hreflang="es" href="https://chessticize.com/es/accessibility/" />
+    <link rel="alternate" hreflang="de" href="https://chessticize.com/de/accessibility/" />
+    <link rel="alternate" hreflang="fr" href="https://chessticize.com/fr/accessibility/" />
+    <link rel="alternate" hreflang="pt-BR" href="https://chessticize.com/pt-BR/accessibility/" />
+    <link rel="alternate" hreflang="x-default" href="https://chessticize.com/accessibility/" />
+    <link rel="icon" href="../../assets/app-icon-192.png" sizes="192x192" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <title>Accessibilité de Chessticize</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Aller au contenu</a>
+    <header class="site-header">
+      <a class="brand" href="../" aria-label="Accueil Chessticize">
+        <img src="../../assets/app-icon-192.png" width="42" height="42" alt="" />
+        <span>Chessticize</span>
+      </a>
+      <nav aria-label="Navigation principale">
+        <a href="../#puzzle-story">Fonctionnement</a>
+        <a href="../#privacy">Confidentialité</a>
+        <a href="../support/">Assistance</a>
+        <a class="nav-source" href="https://github.com/Chessticize/chessticize-mobile">Code source</a>
+      </nav>
+    </header>
+    <main id="main" class="simple-page section-shell">
+      <div class="simple-page-header">
+        <p class="eyebrow">Accessibilité</p>
+        <h1>Ce que l’application actuelle prend en charge</h1>
+        <p>Chessticize ne déclare actuellement aucune fonctionnalité d’accessibilité sur l’App Store. Certains contrôles disposent de libellés utiles, mais l’échiquier n’offre pas encore de saisie complète accessible et tous les parcours courants n’ont pas été vérifiés.</p>
+        <p>Aucune refonte globale n’est actuellement planifiée. Les tickets associés sont fermés comme non planifiés, sans modifier l’application actuelle.</p>
+      </div>
+      <div class="info-grid">
+        <section class="info-card">
+          <h2>Lecteurs d’écran et contrôle vocal</h2>
+          <p>Les menus, onglets et boutons comportent des libellés utiles, mais l’échiquier ne propose pas encore de saisie complète avec VoiceOver ou le Contrôle vocal.</p>
+        </section>
+        <section class="info-card">
+          <h2>Texte et apparence</h2>
+          <p>Les très grandes tailles de texte système peuvent tronquer ou chevaucher certains contrôles ; ces mentions ne sont donc pas déclarées sur l’App Store.</p>
+        </section>
+        <section class="info-card">
+          <h2>Contrôles visuels et animations</h2>
+          <p>Des limites connues subsistent sur le contraste, les cibles tactiles de 44 pt et Réduire les animations, et le parcours complet en niveaux de gris reste à mener.</p>
+        </section>
+        <section class="info-card">
+          <h2>Orientation et iPad</h2>
+          <p>L’iPhone utilise le portrait. L’iPad prend en charge portrait et paysage, avec le paysage comme mise en page principale.</p>
+        </section>
+      </div>
+      <section class="simple-page-header simple-page-section">
+        <h2>Limites et vérifications actuelles</h2>
+        <p>Des limites vérifiées demeurent sur l’échiquier, la taille du texte, le contraste, les cibles tactiles et les animations. Aucun blocage purement chromatique n’a été constaté en niveaux de gris, mais l’audit complet n’est pas encore archivé.</p>
+      </section>
+      <section class="simple-page-header simple-page-section">
+        <h2>Partager un retour d’accessibilité</h2>
+        <p>Précisez le parcours, l’appareil et les réglages d’assistance utilisés. Les rapports publics sont suivis sur GitHub et les demandes privées par e-mail.</p>
+        <div class="button-row">
+          <a class="button button-primary" href="https://github.com/Chessticize/chessticize-mobile/issues/new?title=Accessibility%3A%20">
+            <strong>Ouvrir un rapport d’accessibilité</strong>
+          </a>
+          <a class="button button-secondary" href="../support/">
+            <strong>Contacter l’assistance</strong>
+          </a>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="section-shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="../">
+            <img src="../../assets/app-icon-192.png" width="36" height="36" alt="" />
+            <span>Chessticize</span>
+          </a>
+          <p>Entraînement privé, hors ligne et sans publicité aux problèmes d’échecs.</p>
+        </div>
+        <nav aria-label="Navigation de pied de page">
+          <a href="https://apps.apple.com/us/app/chessticize/id6788610123">App Store</a>
+          <a href="../android/">Android</a>
+          <a href="../support/">Assistance</a>
+          <a href="https://github.com/Chessticize/chessticize-mobile">Code source</a>
+        </nav>
+      </div>
+      <nav class="section-shell locale-switcher" aria-label="Langue"><a href="../../accessibility/" lang="en">English</a><a href="../../zh-Hans/accessibility/" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/accessibility/" lang="zh-Hant">繁體中文</a><a href="../../ja/accessibility/" lang="ja">日本語</a><a href="../../ko/accessibility/" lang="ko">한국어</a><a href="../../es/accessibility/" lang="es">Español</a><a href="../../de/accessibility/" lang="de">Deutsch</a><a href="../../fr/accessibility/" lang="fr" aria-current="page">Français</a><a href="../../pt-BR/accessibility/" lang="pt-BR">Português (Brasil)</a></nav>
+    </footer>
+  </body>
+</html>

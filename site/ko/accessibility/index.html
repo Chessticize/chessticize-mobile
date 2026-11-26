@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="현재 Chessticize 체스 퍼즐 앱의 접근성 지원 현황과 알려진 제한 사항." />
+    <meta name="theme-color" content="#f7fbff" />
+    <link rel="canonical" href="https://chessticize.com/ko/accessibility/" />
+    <link rel="alternate" hreflang="en" href="https://chessticize.com/accessibility/" />
+    <link rel="alternate" hreflang="zh-Hans" href="https://chessticize.com/zh-Hans/accessibility/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://chessticize.com/zh-Hant/accessibility/" />
+    <link rel="alternate" hreflang="ja" href="https://chessticize.com/ja/accessibility/" />
+    <link rel="alternate" hreflang="ko" href="https://chessticize.com/ko/accessibility/" />
+    <link rel="alternate" hreflang="es" href="https://chessticize.com/es/accessibility/" />
+    <link rel="alternate" hreflang="de" href="https://chessticize.com/de/accessibility/" />
+    <link rel="alternate" hreflang="fr" href="https://chessticize.com/fr/accessibility/" />
+    <link rel="alternate" hreflang="pt-BR" href="https://chessticize.com/pt-BR/accessibility/" />
+    <link rel="alternate" hreflang="x-default" href="https://chessticize.com/accessibility/" />
+    <link rel="icon" href="../../assets/app-icon-192.png" sizes="192x192" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <title>Chessticize 접근성</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+    <header class="site-header">
+      <a class="brand" href="../" aria-label="Chessticize 홈">
+        <img src="../../assets/app-icon-192.png" width="42" height="42" alt="" />
+        <span>Chessticize</span>
+      </a>
+      <nav aria-label="기본 탐색">
+        <a href="../#puzzle-story">사용 방법</a>
+        <a href="../#privacy">개인정보</a>
+        <a href="../support/">지원</a>
+        <a class="nav-source" href="https://github.com/Chessticize/chessticize-mobile">소스 코드</a>
+      </nav>
+    </header>
+    <main id="main" class="simple-page section-shell">
+      <div class="simple-page-header">
+        <p class="eyebrow">접근성</p>
+        <h1>현재 앱의 지원 범위</h1>
+        <p>Chessticize는 현재 App Store에 어떤 접근성 기능 지원도 선언하지 않습니다. 주변 컨트롤에는 유용한 레이블이 있지만, 체스판 자체에는 완전한 접근성 착수 경로가 없으며 모든 일반 퍼즐 흐름이 검증되지 않았습니다.</p>
+        <p>현재 광범위한 접근성 개선 일정은 예정되어 있지 않습니다. 관련 이슈는 계획 없음으로 종료되었으며, 이는 현재 앱 상태나 미완료 검증을 변경하지 않습니다.</p>
+      </div>
+      <div class="info-grid">
+        <section class="info-card">
+          <h2>스크린 리더 및 음성 제어</h2>
+          <p>메뉴, 탭, 버튼에는 레이블이 제공되지만 체스판 자체에 완전한 VoiceOver 또는 음성 제어 착수 경로가 없어 App Store에 선언하지 않습니다.</p>
+        </section>
+        <section class="info-card">
+          <h2>텍스트 및 화면 테마</h2>
+          <p>매우 큰 시스템 글꼴에서 일부 컨트롤이 잘리거나 겹칠 수 있어 큰 텍스트 등의 접근성 항목을 선언하지 않습니다.</p>
+        </section>
+        <section class="info-card">
+          <h2>시각 및 동작 점검</h2>
+          <p>확인된 대비·44pt 터치 영역·동작 줄이기 한계가 남아 있으며 전체 그레이스케일 점검도 완료되지 않아 미선언 상태를 유지합니다.</p>
+        </section>
+        <section class="info-card">
+          <h2>화면 방향 및 iPad</h2>
+          <p>iPhone은 세로 모드를 사용하며 iPad는 세로와 가로를 모두 지원합니다(가로 기본). 두 크기 모두 큰 글꼴 개선이 추가로 필요합니다.</p>
+        </section>
+      </div>
+      <section class="simple-page-header simple-page-section">
+        <h2>현재 제한 사항 및 점검</h2>
+        <p>체스판, 텍스트, 대비, 터치 영역, 동작과 관련한 확인된 제한 사항이 남아 있습니다. 그레이스케일에서는 색상 전용 차단 요소가 확인되지 않았으나 전체 점검 기록은 아직 없습니다.</p>
+      </section>
+      <section class="simple-page-header simple-page-section">
+        <h2>접근성 피드백 공유</h2>
+        <p>사용한 퍼즐 흐름, 기기 및 보조 설정을 함께 알려 주세요. 공개 보고는 GitHub, 비공개 문의는 지원 이메일을 이용해 주세요.</p>
+        <div class="button-row">
+          <a class="button button-primary" href="https://github.com/Chessticize/chessticize-mobile/issues/new?title=Accessibility%3A%20">
+            <strong>접근성 보고 열기</strong>
+          </a>
+          <a class="button button-secondary" href="../support/">
+            <strong>지원 문의</strong>
+          </a>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="section-shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="../">
+            <img src="../../assets/app-icon-192.png" width="36" height="36" alt="" />
+            <span>Chessticize</span>
+          </a>
+          <p>프라이빗하고 오프라인으로 즐기는 광고 없는 체스 퍼즐 연습.</p>
+        </div>
+        <nav aria-label="바닥글 탐색">
+          <a href="https://apps.apple.com/us/app/chessticize/id6788610123">App Store</a>
+          <a href="../android/">Android</a>
+          <a href="../support/">지원</a>
+          <a href="https://github.com/Chessticize/chessticize-mobile">소스 코드</a>
+        </nav>
+      </div>
+      <nav class="section-shell locale-switcher" aria-label="언어"><a href="../../accessibility/" lang="en">English</a><a href="../../zh-Hans/accessibility/" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/accessibility/" lang="zh-Hant">繁體中文</a><a href="../../ja/accessibility/" lang="ja">日本語</a><a href="../../ko/accessibility/" lang="ko" aria-current="page">한국어</a><a href="../../es/accessibility/" lang="es">Español</a><a href="../../de/accessibility/" lang="de">Deutsch</a><a href="../../fr/accessibility/" lang="fr">Français</a><a href="../../pt-BR/accessibility/" lang="pt-BR">Português (Brasil)</a></nav>
+    </footer>
+  </body>
+</html>

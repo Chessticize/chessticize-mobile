@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Chessticize チェスパズルアプリの現在のアクセシビリティ対応状況と既知の制約。" />
+    <meta name="theme-color" content="#f7fbff" />
+    <link rel="canonical" href="https://chessticize.com/ja/accessibility/" />
+    <link rel="alternate" hreflang="en" href="https://chessticize.com/accessibility/" />
+    <link rel="alternate" hreflang="zh-Hans" href="https://chessticize.com/zh-Hans/accessibility/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://chessticize.com/zh-Hant/accessibility/" />
+    <link rel="alternate" hreflang="ja" href="https://chessticize.com/ja/accessibility/" />
+    <link rel="alternate" hreflang="ko" href="https://chessticize.com/ko/accessibility/" />
+    <link rel="alternate" hreflang="es" href="https://chessticize.com/es/accessibility/" />
+    <link rel="alternate" hreflang="de" href="https://chessticize.com/de/accessibility/" />
+    <link rel="alternate" hreflang="fr" href="https://chessticize.com/fr/accessibility/" />
+    <link rel="alternate" hreflang="pt-BR" href="https://chessticize.com/pt-BR/accessibility/" />
+    <link rel="alternate" hreflang="x-default" href="https://chessticize.com/accessibility/" />
+    <link rel="icon" href="../../assets/app-icon-192.png" sizes="192x192" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <title>Chessticize アクセシビリティ</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へスキップ</a>
+    <header class="site-header">
+      <a class="brand" href="../" aria-label="Chessticize ホーム">
+        <img src="../../assets/app-icon-192.png" width="42" height="42" alt="" />
+        <span>Chessticize</span>
+      </a>
+      <nav aria-label="メインナビゲーション">
+        <a href="../#puzzle-story">仕組み</a>
+        <a href="../#privacy">プライバシー</a>
+        <a href="../support/">サポート</a>
+        <a class="nav-source" href="https://github.com/Chessticize/chessticize-mobile">ソースコード</a>
+      </nav>
+    </header>
+    <main id="main" class="simple-page section-shell">
+      <div class="simple-page-header">
+        <p class="eyebrow">アクセシビリティ</p>
+        <h1>現在のアプリの対応状況</h1>
+        <p>Chessticize は現在 App Store でアクセシビリティ機能の対応宣言を行っていません。周囲の操作要素にはラベルを付与していますが、盤面自体には完全なアクセシブル着手経路がなく、一般的なパズル操作の検証も完了していません。</p>
+        <p>現時点で大規模な改修予定はありません。関連 Issue は予定なしとしてクローズされており、現在のアプリ仕様や未検証項目を変更するものではありません。</p>
+      </div>
+      <div class="info-grid">
+        <section class="info-card">
+          <h2>スクリーンリーダーと音声操作</h2>
+          <p>メニュー・タブ・ボタンには有用なラベルがありますが、盤面自体に VoiceOver や音声コントロールでの完全な着手経路がないため、App Store では未宣言としています。</p>
+        </section>
+        <section class="info-card">
+          <h2>文字サイズと外観</h2>
+          <p>極端に大きなシステム文字では一部要素が切れたり重なったりする場合があるため、大きな文字などの対応宣言は行っていません。</p>
+        </section>
+        <section class="info-card">
+          <h2>視覚とモーション確認</h2>
+          <p>コントラストや 44pt タッチ領域、視差効果を減らす設定には既知の課題が残っており、グレースケール全操作確認も未完了のため未宣言のままとしています。</p>
+        </section>
+        <section class="info-card">
+          <h2>画面向きと iPad</h2>
+          <p>iPhone は縦向き、iPad は縦横両対応（横向きが主力）です。両サイズクラスで極大文字のさらなる調整が必要です。</p>
+        </section>
+      </div>
+      <section class="simple-page-header simple-page-section">
+        <h2>現在の制約と確認状況</h2>
+        <p>盤面入力・文字サイズ・コントラスト・タッチ領域・モーションに確認済みの制約が残っています。グレースケールでは色のみに依存する致命的な障壁は未確認ですが、完全な検証記録はありません。</p>
+      </section>
+      <section class="simple-page-header simple-page-section">
+        <h2>アクセシビリティのフィードバック</h2>
+        <p>ご利用の操作手順・端末・支援機能設定を添えてお知らせください。公開報告は GitHub、個別相談はサポートまでお願いします。</p>
+        <div class="button-row">
+          <a class="button button-primary" href="https://github.com/Chessticize/chessticize-mobile/issues/new?title=Accessibility%3A%20">
+            <strong>アクセシビリティ報告を作成</strong>
+          </a>
+          <a class="button button-secondary" href="../support/">
+            <strong>サポートへ連絡</strong>
+          </a>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="section-shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="../">
+            <img src="../../assets/app-icon-192.png" width="36" height="36" alt="" />
+            <span>Chessticize</span>
+          </a>
+          <p>プライバシー重視・オフライン・広告なしのチェスパズル練習。</p>
+        </div>
+        <nav aria-label="フッターナビゲーション">
+          <a href="https://apps.apple.com/us/app/chessticize/id6788610123">App Store</a>
+          <a href="../android/">Android</a>
+          <a href="../support/">サポート</a>
+          <a href="https://github.com/Chessticize/chessticize-mobile">ソースコード</a>
+        </nav>
+      </div>
+      <nav class="section-shell locale-switcher" aria-label="言語"><a href="../../accessibility/" lang="en">English</a><a href="../../zh-Hans/accessibility/" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/accessibility/" lang="zh-Hant">繁體中文</a><a href="../../ja/accessibility/" lang="ja" aria-current="page">日本語</a><a href="../../ko/accessibility/" lang="ko">한국어</a><a href="../../es/accessibility/" lang="es">Español</a><a href="../../de/accessibility/" lang="de">Deutsch</a><a href="../../fr/accessibility/" lang="fr">Français</a><a href="../../pt-BR/accessibility/" lang="pt-BR">Português (Brasil)</a></nav>
+    </footer>
+  </body>
+</html>
