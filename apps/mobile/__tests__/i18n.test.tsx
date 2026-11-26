@@ -1,19 +1,23 @@
 import React, { useState } from "react";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Text } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import {
   DEFAULT_LOCALE,
   enMessages,
+  getRegisteredCatalog,
   I18nProvider,
   LANGUAGE_NATIVE_LABELS,
-  registerLocaleCatalog,
   SUPPORTED_LOCALES,
   translate,
   useI18n,
   type LanguagePreference,
-  type LocaleCatalog,
   type MessageKey
 } from "../src/i18n/index.ts";
+import { customThemeLabel } from "../src/components/practice/shared/themeCatalog.ts";
+import { whatsNewContentFor } from "../src/whatsNew/whatsNewContent.ts";
+import { sessionGuideStepCopy } from "../src/components/sessionGuideSteps.ts";
 import { readDevicePreferredLanguages } from "../src/platform/deviceLocale.ts";
 import { SettingsPanel } from "../src/components/practice/settings/SettingsPanel.tsx";
 import { MOBILE_APPLICATION_METADATA_LINKS } from "../src/platform/mobilePlatformCapabilities.ts";
@@ -32,7 +36,12 @@ const TEST_ADAPTIVE_LAYOUT = buildPracticeAdaptiveLayout({
   width: 390
 });
 
-describe("i18n runtime & English catalog", () => {
+function extractPlaceholders(template: string): string[] {
+  const matches = template.match(/\{\{\w+\}\}/g) ?? [];
+  return [...new Set(matches)].sort();
+}
+
+describe("i18n runtime & locale catalogs", () => {
   it("translates strings, interpolates placeholders, and selects singular/plural forms", () => {
     expect(translate("en", "tabs.practice")).toBe("Practice");
     expect(translate("en", "common.ratingValue", { rating: 1450 })).toBe("Rating 1450");
@@ -44,39 +53,82 @@ describe("i18n runtime & English catalog", () => {
       .toBe("3 due reviews, 2 overdue");
   });
 
-  it("falls back to English when a locale catalog has not been registered yet", () => {
-    expect(translate("de", "tabs.settings")).toBe("Settings");
-    expect(translate("zh-Hans", "common.puzzlesCount", { count: 2 })).toBe("2 puzzles");
+  it("registers real translations and accurate chess terminology for every supported locale", () => {
+    expect(translate("zh-Hans", "tabs.practice")).toBe("练习");
+    expect(translate("zh-Hans", "themes.fork")).toBe("捉双");
+    expect(translate("zh-Hans", "themes.smotheredMate")).toBe("闷杀");
+    expect(translate("zh-Hans", "common.puzzlesCount", { count: 3 })).toBe("3 题");
+
+    expect(translate("es", "tabs.practice")).toBe("Práctica");
+    expect(translate("es", "themes.backRankMate")).toBe("Mate del pasillo");
+    expect(translate("es", "themes.smotheredMate")).toBe("Mate de la coz");
+    expect(translate("es", "common.puzzlesCount", { count: 1 })).toBe("1 ejercicio");
+    expect(translate("es", "common.puzzlesCount", { count: 3 })).toBe("3 ejercicios");
+
+    expect(translate("de", "tabs.practice")).toBe("Training");
+    expect(translate("de", "themes.backRankMate")).toBe("Grundreihenmatt");
+    expect(translate("de", "themes.intermezzo")).toBe("Zwischenzug");
+    expect(translate("de", "common.puzzlesCount", { count: 1 })).toBe("1 Aufgabe");
+    expect(translate("de", "common.puzzlesCount", { count: 3 })).toBe("3 Aufgaben");
+
+    expect(translate("fr", "tabs.practice")).toBe("Pratique");
+    expect(translate("fr", "themes.backRankMate")).toBe("Mat du couloir");
+    expect(translate("fr", "themes.smotheredMate")).toBe("Mat à l’étouffée");
+    expect(translate("fr", "common.puzzlesCount", { count: 0 })).toBe("0 problème");
+    expect(translate("fr", "common.puzzlesCount", { count: 1 })).toBe("1 problème");
+    expect(translate("fr", "common.puzzlesCount", { count: 3 })).toBe("3 problèmes");
+
+    expect(translate("pt-BR", "tabs.practice")).toBe("Prática");
+    expect(translate("pt-BR", "themes.fork")).toBe("Garfo");
+    expect(translate("pt-BR", "themes.smotheredMate")).toBe("Mate sufocado");
+    expect(translate("pt-BR", "common.puzzlesCount", { count: 1 })).toBe("1 problema");
+    expect(translate("pt-BR", "common.puzzlesCount", { count: 3 })).toBe("3 problemas");
+
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(customThemeLabel("fork", locale).length).toBeGreaterThan(0);
+      expect(whatsNewContentFor("ios", locale).title.length).toBeGreaterThan(0);
+      expect(sessionGuideStepCopy("session_progress", { focusedRun: false, mode: "standard" }, locale).title.length)
+        .toBeGreaterThan(0);
+    }
   });
 
   it("locks device locale detection to English under Jest for deterministic tests", () => {
     expect(readDevicePreferredLanguages()).toEqual([DEFAULT_LOCALE]);
   });
 
-  it("has non-empty, well-formed values for every key in the canonical English catalog", () => {
-    const keys = Object.keys(enMessages) as MessageKey[];
-    expect(keys.length).toBeGreaterThan(200);
-    for (const key of keys) {
-      const entry = enMessages[key];
-      if (typeof entry === "string") {
-        expect(entry.trim().length).toBeGreaterThan(0);
-      } else {
-        expect(entry.other.trim().length).toBeGreaterThan(0);
-        if (entry.one !== undefined) {
-          expect(entry.one.trim().length).toBeGreaterThan(0);
+  it("has 100% key parity, non-empty values, and matching placeholders across all 6 locales", () => {
+    const enKeys = Object.keys(enMessages).sort() as MessageKey[];
+    expect(enKeys.length).toBeGreaterThan(200);
+
+    for (const locale of SUPPORTED_LOCALES) {
+      const catalog = getRegisteredCatalog(locale);
+      const localeKeys = Object.keys(catalog).sort() as MessageKey[];
+      expect(localeKeys).toEqual(enKeys);
+
+      for (const key of enKeys) {
+        const enEntry = enMessages[key];
+        const entry = catalog[key];
+        if (typeof enEntry === "string") {
+          expect(typeof entry).toBe("string");
+          const str = entry as string;
+          expect(str.trim().length).toBeGreaterThan(0);
+          expect(extractPlaceholders(str)).toEqual(extractPlaceholders(enEntry));
+        } else {
+          const enPlural = enEntry as { readonly one?: string; readonly other: string };
+          expect(typeof entry).toBe("object");
+          const plural = entry as { readonly one?: string; readonly other: string };
+          expect(plural.other.trim().length).toBeGreaterThan(0);
+          expect(extractPlaceholders(plural.other)).toEqual(extractPlaceholders(enPlural.other));
+          if (plural.one !== undefined) {
+            expect(plural.one.trim().length).toBeGreaterThan(0);
+            expect(extractPlaceholders(plural.one)).toEqual(extractPlaceholders(enPlural.one ?? enPlural.other));
+          }
         }
       }
     }
   });
 
   it("updates consumers live when I18nProvider switches language preference", () => {
-    const testCatalog: LocaleCatalog = {
-      ...enMessages,
-      "tabs.practice": "Üben",
-      "tabs.settings": "Einstellungen"
-    };
-    registerLocaleCatalog("de", testCatalog);
-
     let setPref: ((next: LanguagePreference) => void) | undefined;
 
     function Probe(): React.JSX.Element {
@@ -118,7 +170,14 @@ describe("i18n runtime & English catalog", () => {
 
     expect(textOf(renderer, "probe-locale")).toBe("de");
     expect(textOf(renderer, "probe-pref")).toBe("de");
-    expect(textOf(renderer, "probe-title")).toBe("Üben");
+    expect(textOf(renderer, "probe-title")).toBe("Training");
+
+    act(() => {
+      setPref?.("zh-Hans");
+    });
+
+    expect(textOf(renderer, "probe-locale")).toBe("zh-Hans");
+    expect(textOf(renderer, "probe-title")).toBe("练习");
 
     act(() => {
       setPref?.("system");
@@ -126,6 +185,38 @@ describe("i18n runtime & English catalog", () => {
 
     expect(textOf(renderer, "probe-locale")).toBe("en");
     expect(textOf(renderer, "probe-title")).toBe("Practice");
+  });
+
+  it("declares all supported locales in native iOS and Android configuration", () => {
+    const appRoot = process.cwd();
+    const infoPlist = readFileSync(join(appRoot, "ios", "ChessticizeMobile", "Info.plist"), "utf8");
+    const pbxproj = readFileSync(
+      join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"),
+      "utf8"
+    );
+    const manifest = readFileSync(
+      join(appRoot, "android", "app", "src", "main", "AndroidManifest.xml"),
+      "utf8"
+    );
+    const localesConfig = readFileSync(
+      join(appRoot, "android", "app", "src", "main", "res", "xml", "locales_config.xml"),
+      "utf8"
+    );
+
+    expect(infoPlist).toContain("<key>CFBundleLocalizations</key>");
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(infoPlist).toContain(`<string>${locale}</string>`);
+      expect(localesConfig).toContain(`android:name="${locale}"`);
+    }
+    expect(pbxproj).toContain('"zh-Hans"');
+    expect(pbxproj).toContain('"pt-BR"');
+    expect(manifest).toContain('android:localeConfig="@xml/locales_config"');
+
+    for (const qualifier of ["values", "values-zh-rCN", "values-es", "values-de", "values-fr", "values-pt-rBR"]) {
+      const stringsPath = join(appRoot, "android", "app", "src", "main", "res", qualifier, "strings.xml");
+      expect(existsSync(stringsPath)).toBe(true);
+      expect(readFileSync(stringsPath, "utf8")).toContain('<string name="app_name">Chessticize</string>');
+    }
   });
 });
 

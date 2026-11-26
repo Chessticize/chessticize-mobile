@@ -44,7 +44,11 @@ export function ArrowDuelWhatIfOverlay({
   return (
     <View
       pointerEvents={actionLabel && onAction ? "auto" : "none"}
-      style={styles.arrowDuelWhatIfOverlay}
+      style={[
+        styles.arrowDuelWhatIfOverlay,
+        compactTitle ? styles.arrowDuelWhatIfOverlayCompact : null,
+        veryCompactTitle ? styles.arrowDuelWhatIfOverlayVeryCompact : null
+      ]}
       testID={`${testIDPrefix}-what-if-overlay`}
     >
       <View
@@ -109,14 +113,22 @@ export function ArrowDuelWhatIfOverlay({
           </Text>
         )}
         <Text
-          style={styles.arrowDuelWhatIfDetail}
+          style={[
+            styles.arrowDuelWhatIfDetail,
+            compactTitle ? styles.arrowDuelWhatIfDetailCompact : null,
+            veryCompactTitle ? styles.arrowDuelWhatIfDetailVeryCompact : null
+          ]}
           testID={`${testIDPrefix}-what-if-detail`}
         >
           {detail}
         </Text>
         {optionalSettingsHint ? (
           <Text
-            style={styles.arrowDuelWhatIfSettingsHint}
+            style={[
+              styles.arrowDuelWhatIfSettingsHint,
+              compactTitle ? styles.arrowDuelWhatIfSettingsHintCompact : null,
+              veryCompactTitle ? styles.arrowDuelWhatIfSettingsHintVeryCompact : null
+            ]}
             testID={`${testIDPrefix}-what-if-settings-hint`}
           >
             {optionalSettingsHint}
@@ -472,6 +484,14 @@ const useStyles = makeStyles((theme) => ({
     top: 0,
     zIndex: 60
   },
+  arrowDuelWhatIfOverlayCompact: {
+    paddingHorizontal: 16,
+    paddingVertical: 8
+  },
+  arrowDuelWhatIfOverlayVeryCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 6
+  },
   arrowDuelWhatIfAnnouncement: {
     alignItems: "center",
     width: "100%"
@@ -493,6 +513,7 @@ const useStyles = makeStyles((theme) => ({
   arrowDuelWhatIfTitleLead: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "center"
   },
   arrowDuelWhatIfTitleLine: {
@@ -508,8 +529,8 @@ const useStyles = makeStyles((theme) => ({
     lineHeight: 24
   },
   arrowDuelWhatIfTitleLineVeryCompact: {
-    fontSize: 18,
-    lineHeight: 22
+    fontSize: 16,
+    lineHeight: 20
   },
   arrowDuelWhatIfSideGlyphChip: {
     alignItems: "center",
@@ -542,6 +563,16 @@ const useStyles = makeStyles((theme) => ({
     marginTop: 8,
     textAlign: "center"
   },
+  arrowDuelWhatIfDetailCompact: {
+    fontSize: 13,
+    lineHeight: 17,
+    marginTop: 6
+  },
+  arrowDuelWhatIfDetailVeryCompact: {
+    fontSize: 12,
+    lineHeight: 15,
+    marginTop: 4
+  },
   arrowDuelWhatIfSettingsHint: {
     alignSelf: "center",
     backgroundColor: theme.colors.accent.glassFill,
@@ -557,6 +588,16 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 9,
     paddingVertical: 3,
     textAlign: "center"
+  },
+  arrowDuelWhatIfSettingsHintCompact: {
+    marginTop: 6
+  },
+  arrowDuelWhatIfSettingsHintVeryCompact: {
+    fontSize: 10,
+    lineHeight: 13,
+    marginTop: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2
   },
   arrowDuelWhatIfAction: {
     alignItems: "center",

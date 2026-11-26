@@ -13,6 +13,7 @@
       android:fullBackupContent="@xml/backup_rules"
       android:dataExtractionRules="@xml/data_extraction_rules"
       android:enableOnBackInvokedCallback="true"
+      android:localeConfig="@xml/locales_config"
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">

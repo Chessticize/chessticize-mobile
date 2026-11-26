@@ -11,11 +11,21 @@ import {
   type ReviewQueueState,
   type SupportedLocale
 } from "../../../../packages/core/src/index.ts";
+import { deMessages } from "./locales/de.ts";
 import { enMessages, type EnMessages, type LocaleCatalog, type MessageKey } from "./locales/en.ts";
+import { esMessages } from "./locales/es.ts";
+import { frMessages } from "./locales/fr.ts";
+import { ptBRMessages } from "./locales/pt-BR.ts";
+import { zhHansMessages } from "./locales/zh-Hans.ts";
 import type { MessageValue, TranslateArgs } from "./types.ts";
 
-const REGISTERED_CATALOGS: Partial<Record<SupportedLocale, LocaleCatalog>> = {
-  en: enMessages
+const REGISTERED_CATALOGS: Record<SupportedLocale, LocaleCatalog> = {
+  en: enMessages,
+  "zh-Hans": zhHansMessages,
+  es: esMessages,
+  de: deMessages,
+  fr: frMessages,
+  "pt-BR": ptBRMessages
 };
 
 let activeLocale: SupportedLocale = DEFAULT_LOCALE;

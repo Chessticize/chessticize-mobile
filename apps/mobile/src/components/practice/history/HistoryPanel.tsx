@@ -968,6 +968,7 @@ const useStyles = makeStyles((theme) => ({
   },
   attemptRowIdentity: {
     flexDirection: "row",
+    flexWrap: "wrap",
     minWidth: 0
   },
   attemptRowIdentityId: {

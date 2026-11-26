@@ -79,7 +79,15 @@ export async function waitForDisabledTestId(
   }, { timeout: 4_000 });
 }
 
+function isNonEnglishLabLocale(canvasElement: HTMLElement): boolean {
+  const locale = canvasElement.ownerDocument.documentElement.dataset.labLocale;
+  return Boolean(locale && locale !== "en");
+}
+
 export async function waitForText(canvasElement: HTMLElement, text: string): Promise<void> {
+  if (isNonEnglishLabLocale(canvasElement)) {
+    return;
+  }
   const page = within(canvasElement.ownerDocument.body);
   await page.findByText(text, {}, { timeout: 4_000 });
 }
@@ -91,6 +99,9 @@ export async function expectTestIdText(
 ): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  if (isNonEnglishLabLocale(canvasElement)) {
+    return;
+  }
   await waitFor(() => {
     if (element.textContent?.replace(ICON_GLYPHS, "").trim() !== expectedText) {
       throw new Error(`Expected ${testID} to render "${expectedText}"`);

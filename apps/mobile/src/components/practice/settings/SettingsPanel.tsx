@@ -2077,6 +2077,7 @@ const useStyles = makeStyles((theme) => ({
     gap: 8,
     justifyContent: "center",
     marginLeft: "auto",
+    maxWidth: "100%",
     minHeight: theme.metrics.minTarget,
     minWidth: 128,
     paddingHorizontal: 16,
@@ -2089,6 +2090,7 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.fillDisabled
   },
   settingsActionButtonText: {
+    flexShrink: 1,
     textAlign: "center"
   },
   settingsDestructiveText: {

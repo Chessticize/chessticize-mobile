@@ -97,7 +97,9 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     alignSelf: "flex-start",
     borderRadius: theme.shape.control,
-    justifyContent: "center"
+    flexShrink: 1,
+    justifyContent: "center",
+    maxWidth: "100%"
   },
   regular: {
     minHeight: 50,
@@ -119,8 +121,10 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     alignSelf: "stretch",
     flexDirection: "row",
+    flexShrink: 1,
     gap: 6,
-    justifyContent: "center"
+    justifyContent: "center",
+    minWidth: 0
   },
   label: {
     ...theme.typography.headline,

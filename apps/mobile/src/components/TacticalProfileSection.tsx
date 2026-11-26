@@ -52,12 +52,12 @@ export function TacticalProfileHomeCard({
             {presentation.phase === "building" ? (
               <ActivityIndicator color={theme.colors.accent.s700} size="small" testID="training-focus-building-indicator" />
             ) : null}
-            <Text numberOfLines={1} style={[styles.statusPillText, statusPillTextStyle(styles, content.tone)]}>
+            <Text numberOfLines={2} style={[styles.statusPillText, statusPillTextStyle(styles, content.tone)]}>
               {content.status}
             </Text>
           </View>
           {presentation.assurance === "provisional" ? (
-            <Text numberOfLines={1} style={styles.earlyEstimateLabel} testID="training-focus-early-estimate">
+            <Text numberOfLines={2} style={styles.earlyEstimateLabel} testID="training-focus-early-estimate">
               {t("history.progress.earlyEstimate")}
             </Text>
           ) : null}
@@ -1029,6 +1029,7 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: theme.shape.capsule,
     flexDirection: "row",
     gap: 6,
+    maxWidth: "100%",
     paddingHorizontal: 8,
     paddingVertical: 2
   },
@@ -1046,6 +1047,7 @@ const useStyles = makeStyles((theme) => ({
   },
   statusPillText: {
     ...theme.typography.caption,
+    flexShrink: 1,
     fontWeight: theme.typography.headline.fontWeight
   },
   statusPillTextBlue: {

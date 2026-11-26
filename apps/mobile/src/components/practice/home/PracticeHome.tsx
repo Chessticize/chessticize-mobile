@@ -191,7 +191,7 @@ export function PracticeHome({
               currentRating={currentRating}
               mode={progressMode}
               progress={progress}
-              ratingContextLabel={selectedRun?.name}
+              ratingContextLabel={selectedRun ? localizedRunName(selectedRun, locale) : undefined}
             />
           )}
 
@@ -233,7 +233,7 @@ function PracticeRunHome({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
   const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
@@ -512,7 +512,7 @@ function PracticeRunHome({
         startAccessibilityLabel={presentation.homeEditing
           ? t("practiceHome.doneEditingA11y")
           : selectedRun
-            ? t("practiceHome.startA11y", { name: selectedRun.name })
+            ? t("practiceHome.startA11y", { name: localizedRunName(selectedRun, locale) })
             : t("practiceHome.startGenericRunA11y")}
         startDisabled={!presentation.homeEditing && !selectedRun}
         startTestID={presentation.homeEditing ? "practice-run-home-done" : "practice-run-start"}
@@ -693,24 +693,27 @@ function PracticeRunHome({
           rows
           testID="practice-run-restore-section"
         >
-          {presentation.hiddenRuns.map((run) => (
-            <ListRow
-              key={run.id}
-              icon={runIconName(run)}
-              subtitle={t("common.ratingValue", { rating: run.elo })}
-              title={run.name}
-              trailing={(
-                <Button
-                  accessibilityLabel={t("practiceHome.runRestoreA11y", { name: run.name })}
-                  label={t("common.restore")}
-                  size="compact"
-                  testID={`practice-run-restore-${safeTestId(run.id)}`}
-                  variant="secondary"
-                  onPress={() => presentation.onIntent({ type: "restore-run", runId: run.id })}
-                />
-              )}
-            />
-          ))}
+          {presentation.hiddenRuns.map((run) => {
+            const displayName = localizedRunName(run, locale);
+            return (
+              <ListRow
+                key={run.id}
+                icon={runIconName(run)}
+                subtitle={t("common.ratingValue", { rating: run.elo })}
+                title={displayName}
+                trailing={(
+                  <Button
+                    accessibilityLabel={t("practiceHome.runRestoreA11y", { name: displayName })}
+                    label={t("common.restore")}
+                    size="compact"
+                    testID={`practice-run-restore-${safeTestId(run.id)}`}
+                    variant="secondary"
+                    onPress={() => presentation.onIntent({ type: "restore-run", runId: run.id })}
+                  />
+                )}
+              />
+            );
+          })}
         </Section>
       ) : null}
     </View>
@@ -930,6 +933,7 @@ function PracticeRunCard({
   const styles = useStyles();
   const appTheme = useTheme();
   const { locale, t } = useTranslation();
+  const displayName = localizedRunName(run, locale);
   const details = run.kind === "custom"
     ? `${run.themes.map((theme) => customThemeLabel(theme, locale)).join(" + ")} · ${formatSprintTimingLabel({
         ...defaultSprintConfig(run.mode),
@@ -950,7 +954,7 @@ function PracticeRunCard({
       dropTarget={dropTarget}
       nativeRunReorderScrollController={nativeRunReorderScrollController}
       runId={run.id}
-      runName={run.name}
+      runName={displayName}
       style={[
         styles.homeRow,
         homeRowPositionStyle(styles, dragging ? "only" : position),
@@ -974,9 +978,9 @@ function PracticeRunCard({
         accessibilityState={{ selected: active && !editing }}
         accessibilityLabel={editing
           ? directRunEditing
-            ? t("practiceHome.runEditA11y", { name: run.name })
-            : t("practiceHome.runEditRatingA11y", { name: run.name })
-          : t("practiceHome.runSelectA11y", { name: run.name, elo: run.elo, detail: details })}
+            ? t("practiceHome.runEditA11y", { name: displayName })
+            : t("practiceHome.runEditRatingA11y", { name: displayName })
+          : t("practiceHome.runSelectA11y", { name: displayName, elo: run.elo, detail: details })}
         style={styles.homeRowSelectArea}
         testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
@@ -991,7 +995,7 @@ function PracticeRunCard({
             testID={`practice-run-name-${safeTestId(run.id)}`}
             variant="headline"
           >
-            {run.name}
+            {displayName}
           </AppText>
           <AppText ellipsizeMode="tail" numberOfLines={2} tone="secondary" variant="subheadline">{details}</AppText>
         </View>
@@ -1014,7 +1018,7 @@ function PracticeRunCard({
           <View style={styles.runEditActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("practiceHome.runMoveUpA11y", { name: run.name })}
+              accessibilityLabel={t("practiceHome.runMoveUpA11y", { name: displayName })}
               accessibilityState={{ disabled: !canMoveUp }}
               disabled={!canMoveUp}
               style={[styles.homeRowIconButton, !canMoveUp ? styles.homeRowIconButtonDisabled : null]}
@@ -1025,7 +1029,7 @@ function PracticeRunCard({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("practiceHome.runMoveDownA11y", { name: run.name })}
+              accessibilityLabel={t("practiceHome.runMoveDownA11y", { name: displayName })}
               accessibilityState={{ disabled: !canMoveDown }}
               disabled={!canMoveDown}
               style={[styles.homeRowIconButton, !canMoveDown ? styles.homeRowIconButtonDisabled : null]}
@@ -1036,8 +1040,8 @@ function PracticeRunCard({
             </Pressable>
             <Button
               accessibilityLabel={directRunEditing
-                ? t("practiceHome.runEditA11y", { name: run.name })
-                : t("practiceHome.runEditRatingA11y", { name: run.name })}
+                ? t("practiceHome.runEditA11y", { name: displayName })
+                : t("practiceHome.runEditRatingA11y", { name: displayName })}
               label={directRunEditing ? t("common.edit") : t("settings.ratings.editRowLabel")}
               size="compact"
               testID={`practice-run-edit-${safeTestId(run.id)}`}
@@ -1046,7 +1050,7 @@ function PracticeRunCard({
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("practiceHome.runRemoveA11y", { name: run.name })}
+              accessibilityLabel={t("practiceHome.runRemoveA11y", { name: displayName })}
               style={[styles.homeRowIconButton, styles.homeRowRemoveButton]}
               testID={`practice-run-remove-${safeTestId(run.id)}`}
               onPress={() => onIntent({ type: "remove-run", runId: run.id })}
@@ -2151,6 +2155,19 @@ function runIconName(run: Pick<PracticeRunPresentation, "kind" | "mode">): IconN
   return run.mode === "arrow_duel" ? "arrowDuel" : "standard";
 }
 
+function localizedRunName(
+  run: Pick<PracticeRunPresentation, "kind" | "name">,
+  locale: SupportedLocale
+): string {
+  if (run.kind === "standard" && run.name === "Standard") {
+    return translate(locale, "common.standard");
+  }
+  if (run.kind === "arrow_duel" && run.name === "Arrow Duel") {
+    return translate(locale, "common.arrowDuel");
+  }
+  return run.name;
+}
+
 function HomeStartHeader({
   actionLabel,
   headerTestID,
@@ -2318,9 +2335,10 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.inline
   },
   homeRowEditingMeta: {
+    flexWrap: "wrap",
     justifyContent: "space-between",
     paddingBottom: 2,
-    paddingLeft: theme.metrics.iconTile + theme.spacing.row,
+    rowGap: 6,
     width: "100%"
   },
   // Ratings form one right-aligned, muted column; selection is shown by the
@@ -2497,7 +2515,11 @@ const useStyles = makeStyles((theme) => ({
   runEditActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 6
+    flexShrink: 1,
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "flex-end",
+    marginLeft: "auto"
   },
   practiceModeDetailProbe: {
     height: 0,

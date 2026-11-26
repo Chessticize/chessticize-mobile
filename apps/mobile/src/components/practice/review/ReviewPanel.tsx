@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { GestureType } from "react-native-gesture-handler";
 import {
   type AttemptEvent,
@@ -27,6 +27,7 @@ import {
   type ReviewTodayHistoryPresentation
 } from "../../../../../../packages/storage/src/review-today.ts";
 import { type AdaptiveLayout, PRACTICE_UI_PADDING as UI_PADDING } from "../../adaptivePracticeLayout.ts";
+import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import type { MoveFeedbackClient } from "../../../platform/moveFeedback.ts";
 import type { ReviewQueueDuePromotionResult } from "../../../../../../packages/storage/src/practice-store.ts";
 import type { ReviewEntry } from "../../../backend/reviewEntry.ts";
@@ -280,7 +281,7 @@ export function ReviewPanel({
   const reviewDueSubline = queueSummary.oldestDueSubline;
   const reviewFilterControlActive = filtersExpanded || queueFilter !== "all";
   // Three side-by-side counts break their labels mid-word at large text sizes.
-  const forecastStacked = useWindowDimensions().fontScale >= REVIEW_FORECAST_STACK_FONT_SCALE;
+  const forecastStacked = usePracticeViewport().fontScale >= REVIEW_FORECAST_STACK_FONT_SCALE;
 
   useEffect(() => {
     if (appliedPreferredEntriesKeyRef.current === preferredEntriesKey) {
@@ -470,7 +471,7 @@ export function ReviewPanel({
               total: queueSummary.totalCount,
               filterLabel: reviewDueFilterLabel
             })}
-        style={styles.reviewDueCard}
+        style={[styles.reviewDueCard, forecastStacked ? styles.reviewDueCardStacked : null]}
         testID="review-due-card"
       >
         <View style={styles.editorRowLabel}>
@@ -487,7 +488,7 @@ export function ReviewPanel({
             {reviewDueSubline}
           </AppText>
         </View>
-        <View style={styles.reviewDueCountBlock}>
+        <View style={[styles.reviewDueCountBlock, forecastStacked ? styles.reviewDueCountBlockStacked : null]}>
           <AppText testID="review-due-count" style={styles.reviewDueBigCount} tone="accent" variant="numeralLarge">{dailyReviewProgressLabel}</AppText>
         </View>
       </View>
@@ -904,12 +905,19 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.row,
     padding: 16
   },
+  reviewDueCardStacked: {
+    alignItems: "flex-start",
+    flexDirection: "column"
+  },
   reviewDueBigCount: {
     textAlign: "right"
   },
   reviewDueCountBlock: {
     alignItems: "flex-end",
     flexShrink: 0
+  },
+  reviewDueCountBlockStacked: {
+    alignItems: "flex-start"
   },
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
@@ -1030,7 +1038,9 @@ const useStyles = makeStyles((theme) => ({
     width: StyleSheet.hairlineWidth
   },
   reviewSectionTitle: {
-    flex: 1
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0
   },
   historyChipContent: {
     alignItems: "center",
