@@ -15617,6 +15617,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain("Chessticize presolve metadata");
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain("database.lichess.org/#puzzles");
     press(renderer, "settings-puzzle-data-license");
+    expect(findByTestId(renderer, "settings-third-party-notices")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-third-party-notices"))).toContain("Third-Party Notices");
+    expect(collectText(findByTestId(renderer, "settings-third-party-notices"))).toContain("Chess piece sets, audio, icons, and open-source libraries");
+    expect(collectText(findByTestId(renderer, "settings-third-party-notices"))).toContain("THIRD_PARTY_NOTICES.md");
+    press(renderer, "settings-third-party-notices");
     expect(findByTestId(renderer, "settings-support-email")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-support-email"))).toContain("Support");
     expect(collectText(findByTestId(renderer, "settings-support-email"))).toContain("support@chessticize.com");
@@ -15625,7 +15630,8 @@ describe("PracticePocScreen", () => {
     expect(openURLSpy).toHaveBeenNthCalledWith(2, "https://github.com/Chessticize/chessticize-mobile");
     expect(openURLSpy).toHaveBeenNthCalledWith(3, "https://github.com/Chessticize/chessticize-mobile/tree/main/apps/mobile/native/stockfish");
     expect(openURLSpy).toHaveBeenNthCalledWith(4, "https://database.lichess.org/#puzzles");
-    expect(openURLSpy).toHaveBeenNthCalledWith(5, "mailto:support@chessticize.com");
+    expect(openURLSpy).toHaveBeenNthCalledWith(5, "https://github.com/Chessticize/chessticize-mobile/blob/main/THIRD_PARTY_NOTICES.md");
+    expect(openURLSpy).toHaveBeenNthCalledWith(6, "mailto:support@chessticize.com");
     openURLSpy.mockRestore();
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
