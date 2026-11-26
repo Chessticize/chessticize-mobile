@@ -562,19 +562,23 @@ Play before reporting them complete.
 
 Android 1.6.3 build 25 relaxes in-app review prompt eligibility (including unrated Sprints, high-accuracy Focused Runs, and strong Survival runs, with a 1-second settle delay and 30-day cooldown) and fixes mid-Sprint backgrounding cancelling later review prompts. This is a bounded JS/TS logic delta with no native bridge or schema changes; reuse applicable earlier native evidence and verify the new signed artifact and source identity.
 
+## Android 1.7.0 candidate preparation
+
+Android 1.7.0 build 26 adds full 9-language localization (with localized Android notification channels, `ACTION_LOCALE_CHANGED` refresh, and per-app locale configuration), customizable Light and Dark board color schemes plus classic chess piece sets, reorganized Settings, and a localized Third-Party Notices link in Settings About. Because Android native resources and the notification-channel module changed, verify the Android build, resource packaging, third-party notices, and source identity on this candidate before submission.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.6.3`)
-- Android version code: `apps/mobile/release-version.json` (`25`)
+- Public version: `apps/mobile/release-version.json` (`1.7.0`)
+- Android version code: `apps/mobile/release-version.json` (`26`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Open-development target: `apps/mobile/development-version.json`
   (Debug/E2E only, independent of the Android store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.6.3-build-25`
+- Required source tag before any Play track upload: `android-v1.7.0-build-26`
 
-Android `versionCode` must increase for every later Play upload. This coordinated release also allocates iOS 1.6.3 build 1. Settings reads `versionName`
+Android `versionCode` must increase for every later Play upload. This coordinated release also allocates iOS 1.7.0 build 1. Settings reads `versionName`
 and `versionCode` from the installed Android artifact and the corresponding bundle
 keys on iOS; no user-visible version fallback is hardcoded in JavaScript.
 Prepare candidate identities only on the coordinated release branch and advance
