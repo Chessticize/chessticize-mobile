@@ -335,7 +335,15 @@ describe("Settings language selector", () => {
     const sectionTestIds = renderer.root
       .findAll((node) => typeof node.type === "string" && typeof node.props?.testID === "string" && node.props.testID.endsWith("-section"))
       .map((node) => node.props.testID);
-    expect(sectionTestIds[0]).toBe("settings-language-section");
+    expect(sectionTestIds).toEqual([
+      "settings-language-section",
+      "settings-appearance-section",
+      "settings-move-feedback-section",
+      "settings-notifications-section",
+      "settings-sync-section",
+      "settings-feedback-section",
+      "settings-about-section"
+    ]);
 
     expect(textOf(renderer, "settings-language-row")).toContain("Follow device language (English)");
     const trailing = renderer.root.findByProps({ testID: "settings-language-row-trailing" });
