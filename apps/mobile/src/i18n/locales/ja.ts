@@ -552,6 +552,9 @@ export const jaMessages = {
   "settings.about.stockfishDetail": "アプリで使用している Stockfish 18 のソース",
   "settings.about.stockfishLink": "ソース内の StockfishEngine",
   "settings.about.puzzleData": "パズルデータ",
+  "settings.about.thirdPartyNotices": "サードパーティ通知",
+  "settings.about.thirdPartyNoticesValue": "オープンソース",
+  "settings.about.thirdPartyNoticesDetail": "駒セット、効果音、アイコン、オープンソースライブラリ",
   "settings.dev.diagnostics": "Stockfish 診断",
   "settings.dev.diagnosticsA11y": "Stockfish 診断を開く",
 

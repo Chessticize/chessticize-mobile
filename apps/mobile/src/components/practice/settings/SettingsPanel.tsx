@@ -690,9 +690,9 @@ export function SettingsPanel({
           }}
         />
         <SettingsExternalLinkRow
-          label="Third-Party Notices"
-          value="Open Source"
-          detail="Chess piece sets, audio, icons, and open-source libraries"
+          label={t("settings.about.thirdPartyNotices")}
+          value={t("settings.about.thirdPartyNoticesValue")}
+          detail={t("settings.about.thirdPartyNoticesDetail")}
           linkLabel="THIRD_PARTY_NOTICES.md"
           testID="settings-third-party-notices"
           onPress={() => {

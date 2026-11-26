@@ -564,6 +564,9 @@ export const esMessages = {
   "settings.about.stockfishDetail": "Código fuente del motor Stockfish 18 usado por la app",
   "settings.about.stockfishLink": "StockfishEngine en código",
   "settings.about.puzzleData": "Datos de ejercicios",
+  "settings.about.thirdPartyNotices": "Avisos de terceros",
+  "settings.about.thirdPartyNoticesValue": "Código abierto",
+  "settings.about.thirdPartyNoticesDetail": "Juegos de piezas, audio, iconos y bibliotecas de código abierto",
   "settings.dev.diagnostics": "Diagnóstico Stockfish",
   "settings.dev.diagnosticsA11y": "Abrir diagnóstico de Stockfish",
 

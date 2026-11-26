@@ -564,6 +564,9 @@ export const frMessages = {
   "settings.about.stockfishDetail": "Code source du moteur Stockfish 18 utilisé",
   "settings.about.stockfishLink": "StockfishEngine dans les sources",
   "settings.about.puzzleData": "Données tactiques",
+  "settings.about.thirdPartyNotices": "Mentions tierces",
+  "settings.about.thirdPartyNoticesValue": "Open source",
+  "settings.about.thirdPartyNoticesDetail": "Jeux de pièces, audio, icônes et bibliothèques open source",
   "settings.dev.diagnostics": "Diagnostic Stockfish",
   "settings.dev.diagnosticsA11y": "Ouvrir le diagnostic Stockfish",
 

@@ -564,6 +564,9 @@ export const ptBRMessages = {
   "settings.about.stockfishDetail": "Código-fonte do motor Stockfish 18 usado no app",
   "settings.about.stockfishLink": "StockfishEngine no código",
   "settings.about.puzzleData": "Dados dos problemas",
+  "settings.about.thirdPartyNotices": "Avisos de terceiros",
+  "settings.about.thirdPartyNoticesValue": "Código aberto",
+  "settings.about.thirdPartyNoticesDetail": "Conjuntos de peças, áudio, ícones e bibliotecas de código aberto",
   "settings.dev.diagnostics": "Diagnóstico Stockfish",
   "settings.dev.diagnosticsA11y": "Abrir diagnóstico do Stockfish",
 
