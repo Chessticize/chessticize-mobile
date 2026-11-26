@@ -332,7 +332,15 @@ describe("Settings language selector", () => {
       renderer = TestRenderer.create(<SettingsHarness />);
     });
 
+    const sectionTestIds = renderer.root
+      .findAll((node) => typeof node.type === "string" && typeof node.props?.testID === "string" && node.props.testID.endsWith("-section"))
+      .map((node) => node.props.testID);
+    expect(sectionTestIds[0]).toBe("settings-language-section");
+
     expect(textOf(renderer, "settings-language-row")).toContain("Follow device language (English)");
+    const trailing = renderer.root.findByProps({ testID: "settings-language-row-trailing" });
+    expect(extractText(trailing)).toContain("System");
+    expect(trailing.props.style).toMatchObject({ alignItems: "center", flexDirection: "row" });
 
     act(() => {
       renderer.root.findByProps({ testID: "settings-language-row" }).props.onPress();
@@ -349,6 +357,7 @@ describe("Settings language selector", () => {
 
     expect(onLanguageChange).toHaveBeenCalledWith("zh-Hans");
     expect(textOf(renderer, "settings-language-row")).toContain("简体中文");
+    expect(extractText(renderer.root.findByProps({ testID: "settings-language-row-trailing" }))).toContain("简体中文");
   });
 });
 

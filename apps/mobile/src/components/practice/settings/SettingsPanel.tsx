@@ -295,6 +295,54 @@ export function SettingsPanel({
       ]}
       testID="settings-panel"
     >
+      <SettingsSection
+        title={t("settings.language.sectionTitle")}
+        testID="settings-language-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <SettingsRow
+          detail={activeLanguagePreference === "system"
+            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[locale] })
+            : undefined}
+          expanded={languagePickerOpen}
+          label={t("settings.language.label")}
+          testID="settings-language-row"
+          value={activeLanguageValue}
+          valueAlign="center"
+          onPress={() => setLanguagePickerOpen((open) => !open)}
+        />
+        {languagePickerOpen ? (
+          <View testID="settings-language-options">
+            <ListRow
+              accessibilityLabel={t("settings.language.optionSystemA11y", {
+                resolved: LANGUAGE_NATIVE_LABELS[locale]
+              })}
+              accessory={activeLanguagePreference === "system" ? "check" : "none"}
+              selected={activeLanguagePreference === "system"}
+              subtitle={LANGUAGE_NATIVE_LABELS[locale]}
+              testID="settings-language-option-system"
+              title={t("settings.language.system")}
+              onPress={() => selectLanguagePreference("system")}
+            />
+            {SUPPORTED_LOCALES.map((candidate) => (
+              <React.Fragment key={candidate}>
+                <View style={styles.settingsLanguageOptionDivider} />
+                <ListRow
+                  accessibilityLabel={t("settings.language.optionA11y", {
+                    language: LANGUAGE_NATIVE_LABELS[candidate]
+                  })}
+                  accessory={activeLanguagePreference === candidate ? "check" : "none"}
+                  selected={activeLanguagePreference === candidate}
+                  testID={`settings-language-option-${candidate}`}
+                  title={LANGUAGE_NATIVE_LABELS[candidate]}
+                  onPress={() => selectLanguagePreference(candidate)}
+                />
+              </React.Fragment>
+            ))}
+          </View>
+        ) : null}
+      </SettingsSection>
+
       {progressProtection.kind === "icloud_sync" ? (
         <SettingsSection title={t("settings.sync.section")} testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
@@ -500,48 +548,6 @@ export function SettingsPanel({
           onLightBoardThemeChange={onLightBoardThemeChange}
           onPieceSetChange={onPieceSetChange}
         />
-      </SettingsSection>
-
-      <SettingsSection
-        title={t("settings.language.sectionTitle")}
-        testID="settings-language-section"
-        wide={adaptiveLayout.usesWideContent}
-      >
-        <SettingsRow
-          detail={activeLanguagePreference === "system"
-            ? t("settings.language.systemDetail", { resolved: LANGUAGE_NATIVE_LABELS[locale] })
-            : undefined}
-          label={t("settings.language.label")}
-          testID="settings-language-row"
-          value={activeLanguageValue}
-          onPress={() => setLanguagePickerOpen((open) => !open)}
-        />
-        {languagePickerOpen ? (
-          <View testID="settings-language-options">
-            <ListRow
-              accessibilityLabel={t("settings.language.optionSystemA11y", {
-                resolved: LANGUAGE_NATIVE_LABELS[locale]
-              })}
-              selected={activeLanguagePreference === "system"}
-              subtitle={LANGUAGE_NATIVE_LABELS[locale]}
-              testID="settings-language-option-system"
-              title={t("settings.language.system")}
-              onPress={() => selectLanguagePreference("system")}
-            />
-            {SUPPORTED_LOCALES.map((candidate) => (
-              <ListRow
-                key={candidate}
-                accessibilityLabel={t("settings.language.optionA11y", {
-                  language: LANGUAGE_NATIVE_LABELS[candidate]
-                })}
-                selected={activeLanguagePreference === candidate}
-                testID={`settings-language-option-${candidate}`}
-                title={LANGUAGE_NATIVE_LABELS[candidate]}
-                onPress={() => selectLanguagePreference(candidate)}
-              />
-            ))}
-          </View>
-        ) : null}
       </SettingsSection>
 
       {showRatingControls ? (
@@ -1249,37 +1255,45 @@ function SettingsSection({
 function SettingsRow({
   destructive = false,
   detail,
+  expanded,
   label,
   onPress,
   showDetail = true,
   testID,
   tint,
-  value
+  value,
+  valueAlign = "top"
 }: {
   destructive?: boolean;
   detail?: string;
+  expanded?: boolean;
   label: string;
   onPress?: () => void;
   showDetail?: boolean;
   testID: string;
   tint?: "accent";
   value?: string;
+  valueAlign?: "top" | "center";
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const { fontScale } = usePracticeViewport();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
+  const centerValue = valueAlign === "center" && Boolean(value) && fontScale < STACKED_ACTIONS_FONT_SCALE;
+  const disclosureIcon = expanded ? "chevronDown" : "chevronRight";
   return (
     <Pressable
       accessible
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={expanded !== undefined ? { expanded } : undefined}
       testID={testID}
       style={({ pressed }) => [rowStyle, styles.settingsRow, onPress && pressed ? styles.settingsRowPressed : null]}
       onPress={onPress}
     >
       <View style={styles.settingsRowCopy}>
-        <View style={styles.settingsRowTitleLine}>
+        {centerValue ? (
           <AppText
             tone={tint === "accent" ? "accent" : undefined}
             style={[styles.settingsRowLabel, destructive ? styles.settingsDestructiveText : null]}
@@ -1287,8 +1301,18 @@ function SettingsRow({
           >
             {label}
           </AppText>
-          {value ? <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText> : null}
-        </View>
+        ) : (
+          <View style={styles.settingsRowTitleLine}>
+            <AppText
+              tone={tint === "accent" ? "accent" : undefined}
+              style={[styles.settingsRowLabel, destructive ? styles.settingsDestructiveText : null]}
+              variant="body"
+            >
+              {label}
+            </AppText>
+            {value ? <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText> : null}
+          </View>
+        )}
         {detail && showDetail ? <AppText tone="secondary" variant="footnote">{detail}</AppText> : null}
         {detail && !showDetail ? (
           <View
@@ -1297,8 +1321,15 @@ function SettingsRow({
           />
         ) : null}
       </View>
-      {onPress ? (
-        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
+      {centerValue ? (
+        <View style={styles.settingsRowTrailing} testID={`${testID}-trailing`}>
+          <AppText style={styles.settingsRowValueCentered} tone="secondary" variant="body">{value}</AppText>
+          {onPress ? (
+            <Icon color={appTheme.colors.text.tertiary} name={disclosureIcon} size={15} testID="chevron-right-glyph" weight="semibold" />
+          ) : null}
+        </View>
+      ) : onPress ? (
+        <Icon color={appTheme.colors.text.tertiary} name={disclosureIcon} size={15} testID="chevron-right-glyph" weight="semibold" />
       ) : null}
     </Pressable>
   );
@@ -2055,6 +2086,21 @@ const useStyles = makeStyles((theme) => ({
     marginLeft: "auto",
     maxWidth: "100%",
     textAlign: "right"
+  },
+  settingsRowTrailing: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: 6,
+    maxWidth: "50%"
+  },
+  settingsRowValueCentered: {
+    flexShrink: 1,
+    textAlign: "right"
+  },
+  settingsLanguageOptionDivider: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth
   },
   settingsActionButtonRow: {
     alignItems: "center",
