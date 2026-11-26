@@ -564,6 +564,9 @@ export const deMessages = {
   "settings.about.stockfishDetail": "Von der App genutzter Stockfish-18-Quellcode",
   "settings.about.stockfishLink": "StockfishEngine im Quellcode",
   "settings.about.puzzleData": "Aufgabendaten",
+  "settings.about.thirdPartyNotices": "Drittanbieterhinweise",
+  "settings.about.thirdPartyNoticesValue": "Open Source",
+  "settings.about.thirdPartyNoticesDetail": "Figurensätze, Audio, Symbole und Open-Source-Bibliotheken",
   "settings.dev.diagnostics": "Stockfish-Diagnose",
   "settings.dev.diagnosticsA11y": "Stockfish-Diagnose öffnen",
 

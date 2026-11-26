@@ -551,6 +551,9 @@ export const koMessages = {
   "settings.about.stockfishDetail": "앱에서 사용하는 Stockfish 18 소스",
   "settings.about.stockfishLink": "소스 내 StockfishEngine",
   "settings.about.puzzleData": "퍼즐 데이터",
+  "settings.about.thirdPartyNotices": "제3자 고지",
+  "settings.about.thirdPartyNoticesValue": "오픈소스",
+  "settings.about.thirdPartyNoticesDetail": "기물 세트, 효과음, 아이콘 및 오픈소스 라이브러리",
   "settings.dev.diagnostics": "Stockfish 진단",
   "settings.dev.diagnosticsA11y": "Stockfish 진단 열기",
 

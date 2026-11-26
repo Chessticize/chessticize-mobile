@@ -551,6 +551,9 @@ export const zhHantMessages = {
   "settings.about.stockfishDetail": "應用程式使用的 Stockfish 18 引擎原始碼",
   "settings.about.stockfishLink": "原始碼中的 StockfishEngine",
   "settings.about.puzzleData": "題庫資料",
+  "settings.about.thirdPartyNotices": "第三方聲明",
+  "settings.about.thirdPartyNoticesValue": "開源",
+  "settings.about.thirdPartyNoticesDetail": "棋子素材、音效、圖示與開源元件",
   "settings.dev.diagnostics": "Stockfish 診斷",
   "settings.dev.diagnosticsA11y": "開啟 Stockfish 診斷",
 

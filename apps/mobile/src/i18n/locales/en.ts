@@ -564,6 +564,9 @@ export const enMessages = {
   "settings.about.stockfishDetail": "Stockfish 18 engine source used by the app",
   "settings.about.stockfishLink": "StockfishEngine in source",
   "settings.about.puzzleData": "Puzzle Data",
+  "settings.about.thirdPartyNotices": "Third-Party Notices",
+  "settings.about.thirdPartyNoticesValue": "Open Source",
+  "settings.about.thirdPartyNoticesDetail": "Chess piece sets, audio, icons, and open-source libraries",
   "settings.dev.diagnostics": "Stockfish Diagnostics",
   "settings.dev.diagnosticsA11y": "Open Stockfish diagnostics",
 
