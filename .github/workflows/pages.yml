@@ -50,6 +50,12 @@ jobs:
           node scripts/render-android-download-page.mjs \
             --template site/android/index.template.html \
             --output "$RUNNER_TEMP/pages-site/android/index.html"
+          for template in site/*/android/index.template.html; do
+            locale_dir="$(basename "$(dirname "$(dirname "$template")")")"
+            node scripts/render-android-download-page.mjs \
+              --template "$template" \
+              --output "$RUNNER_TEMP/pages-site/$locale_dir/android/index.html"
+          done
 
       - name: Version the stylesheet by content
         run: node scripts/fingerprint-site-styles.mjs "$RUNNER_TEMP/pages-site"

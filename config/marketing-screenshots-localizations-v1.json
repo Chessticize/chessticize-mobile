@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 1,
+  "contractId": "marketing-screenshots-localizations-v1",
+  "storyReference": "config/app-store-marketing-story-v1.json",
+  "limits": {
+    "headlineCharacters": 36,
+    "supportingCharacters": 90,
+    "altTextCharacters": 140
+  },
+  "campaigns": {
+    "mobile-1.6": {
+      "frameOrder": [
+        "practice-home",
+        "dark-arrow-duel",
+        "tactical-profile",
+        "focused-run",
+        "survival",
+        "review"
+      ],
+      "locales": {
+        "en": {
+          "appStoreLocale": "en-US",
+          "googlePlayLocale": "en-US",
+          "frames": {
+            "practice-home": {
+              "headline": "Find Your Next Puzzle",
+              "altText": "Practice Home with a fresh puzzle ready to start, a Training Focus card, and bottom navigation."
+            },
+            "dark-arrow-duel": {
+              "headline": "Choose the Best Move",
+              "altText": "Dark Arrow Duel board asking for the opponent's reply, with session progress and a reply challenge prompt."
+            },
+            "tactical-profile": {
+              "headline": "Find Your Training Focus",
+              "altText": "Training Focus profile with a ranked recommendation and early estimate disclosure for the next practice run."
+            },
+            "focused-run": {
+              "headline": "Practice What You Need",
+              "altText": "Focused Run preview with the selected rating anchor and allocation bar for the planned practice session."
+            },
+            "survival": {
+              "headline": "Beat Your Best",
+              "altText": "Dark personal best hub with a Survival challenge type selected and a visible start control."
+            },
+            "review": {
+              "headline": "Make Every Mistake Count",
+              "altText": "Scheduled Review queue with due puzzles, a start button, and a forecast of upcoming reviews."
+            }
+          }
+        },
+        "zh-Hans": {
+          "appStoreLocale": "zh-Hans",
+          "googlePlayLocale": "zh-CN",
+          "frames": {
+            "practice-home": {
+              "headline": "开启下一轮战术题",
+              "altText": "练习主页展示可立即开始的训练方案、训练重点卡片与底部导航栏。"
+            },
+            "dark-arrow-duel": {
+              "headline": "选出更强一步",
+              "altText": "深色模式下的箭头对决棋盘，提示找出对手最佳应对并显示当前进度。"
+            },
+            "tactical-profile": {
+              "headline": "发现你的训练重点",
+              "altText": "战术画像界面展示按优先级排序的训练建议及初步估计说明。"
+            },
+            "focused-run": {
+              "headline": "专攻薄弱环节",
+              "altText": "专项训练预览页，展示当前等级分基准与题型配比条。"
+            },
+            "survival": {
+              "headline": "突破个人最佳",
+              "altText": "深色生存挑战设置页，已选定挑战模式并显示开始按钮。"
+            },
+            "review": {
+              "headline": "让每次失误都有收获",
+              "altText": "定时复习队列展示今日待复习题目、开始按钮与未来复习预告。"
+            }
+          }
+        },
+        "zh-Hant": {
+          "appStoreLocale": "zh-Hant",
+          "googlePlayLocale": "zh-TW",
+          "frames": {
+            "practice-home": {
+              "headline": "展開下一輪戰術題",
+              "altText": "練習主頁展示可立即開始的訓練方案、訓練重點卡片與底部導覽列。"
+            },
+            "dark-arrow-duel": {
+              "headline": "選出更強一步",
+              "altText": "深色模式下的箭頭對決棋盤，提示找出對手最佳應對並顯示目前進度。"
+            },
+            "tactical-profile": {
+              "headline": "找出你的訓練重點",
+              "altText": "戰術畫像畫面展示排序推薦重點與初步估計說明。"
+            },
+            "focused-run": {
+              "headline": "專攻最需要的題型",
+              "altText": "專項訓練預覽頁，顯示目前等級分基準與題型配比條。"
+            },
+            "survival": {
+              "headline": "刷新個人紀錄",
+              "altText": "深色生存挑戰設定頁，已選定挑戰類型並顯示開始按鈕。"
+            },
+            "review": {
+              "headline": "讓每次失誤都有收穫",
+              "altText": "定時複習佇列顯示今日待複習題目、開始按鈕與後續複習預告。"
+            }
+          }
+        },
+        "ja": {
+          "appStoreLocale": "ja",
+          "googlePlayLocale": "ja-JP",
+          "frames": {
+            "practice-home": {
+              "headline": "次のパズルへ",
+              "altText": "すぐ開始できる練習ホーム、重点テーマカード、下部ナビゲーションの表示。"
+            },
+            "dark-arrow-duel": {
+              "headline": "最善の一手を選ぶ",
+              "altText": "ダークモードのアローデュエル盤面。相手の応手を求める表示と進捗バー。"
+            },
+            "tactical-profile": {
+              "headline": "重点テーマを発見",
+              "altText": "優先度付きのおすすめ重点と暫定推定の注記を示す戦術プロフィール画面。"
+            },
+            "focused-run": {
+              "headline": "必要なテーマを集中練習",
+              "altText": "基準レートと出題配分バーを表示した集中ランのプレビュー画面。"
+            },
+            "survival": {
+              "headline": "自己ベストに挑む",
+              "altText": "ダークモードのサバイバル設定画面。種目選択と開始ボタンを表示。"
+            },
+            "review": {
+              "headline": "ミスを確実に力に変える",
+              "altText": "今日の復習キュー、開始ボタン、今後の復習予定を表示した復習画面。"
+            }
+          }
+        },
+        "ko": {
+          "appStoreLocale": "ko",
+          "googlePlayLocale": "ko-KR",
+          "frames": {
+            "practice-home": {
+              "headline": "다음 퍼즐을 바로 시작",
+              "altText": "바로 시작할 수 있는 연습 홈, 집중 영역 카드 및 하단 내비게이션 화면."
+            },
+            "dark-arrow-duel": {
+              "headline": "최선의 수를 선택하세요",
+              "altText": "다크 모드의 화살표 대결 체스판과 상대 응수 안내 및 진행 표시."
+            },
+            "tactical-profile": {
+              "headline": "집중할 전술을 찾으세요",
+              "altText": "우선순위 추천과 초기 추정 안내가 표시된 전술 프로필 화면."
+            },
+            "focused-run": {
+              "headline": "필요한 약점만 집중 훈련",
+              "altText": "선택된 레이팅 기준과 출제 비율 막대가 보이는 집중 훈련 미리보기."
+            },
+            "survival": {
+              "headline": "최고 기록에 도전하세요",
+              "altText": "다크 모드의 서바이벌 허브 화면과 도전 유형 선택 및 시작 버튼."
+            },
+            "review": {
+              "headline": "모든 실수를 실력으로",
+              "altText": "오늘의 복습 대기열, 시작 버튼 및 향후 복습 예보가 담긴 복습 화면."
+            }
+          }
+        },
+        "es": {
+          "appStoreLocale": "es-ES",
+          "googlePlayLocale": "es-ES",
+          "frames": {
+            "practice-home": {
+              "headline": "Tu próximo ejercicio",
+              "altText": "Inicio de Práctica con serie lista para comenzar, tarjeta de Enfoque y navegación inferior."
+            },
+            "dark-arrow-duel": {
+              "headline": "Elige la mejor jugada",
+              "altText": "Tablero de Duelo de Flechas en modo oscuro pidiendo la respuesta rival y mostrando progreso."
+            },
+            "tactical-profile": {
+              "headline": "Descubre tu enfoque",
+              "altText": "Perfil táctico con recomendación priorizada y aviso de estimación inicial."
+            },
+            "focused-run": {
+              "headline": "Entrena lo que necesitas",
+              "altText": "Vista previa de Serie Enfocada con Rating base y barra de reparto de ejercicios."
+            },
+            "survival": {
+              "headline": "Supera tu récord",
+              "altText": "Pantalla oscura de Supervivencia con modo seleccionado y botón de inicio visible."
+            },
+            "review": {
+              "headline": "Aprovecha cada error",
+              "altText": "Cola de Repaso programado con ejercicios pendientes, botón de inicio y previsión."
+            }
+          }
+        },
+        "de": {
+          "appStoreLocale": "de-DE",
+          "googlePlayLocale": "de-DE",
+          "frames": {
+            "practice-home": {
+              "headline": "Starte die nächste Aufgabe",
+              "altText": "Trainingsstart mit bereiter Aufgabe, Fokus-Karte und unterer Navigation."
+            },
+            "dark-arrow-duel": {
+              "headline": "Wähle den besten Zug",
+              "altText": "Dunkles Pfeilduell-Brett mit Aufforderung zur gegnerischen Antwort und Fortschritt."
+            },
+            "tactical-profile": {
+              "headline": "Finde deinen Fokus",
+              "altText": "Taktikprofil mit priorisierter Empfehlung und Hinweis auf frühe Schätzung."
+            },
+            "focused-run": {
+              "headline": "Trainiere gezielt",
+              "altText": "Fokus-Lauf-Vorschau mit Wertungsanker und Verteilungsbalken für die Einheit."
+            },
+            "survival": {
+              "headline": "Schlage deine Bestmarke",
+              "altText": "Dunkler Survival-Hub mit gewähltem Modus und sichtbarem Start-Button."
+            },
+            "review": {
+              "headline": "Lerne aus jedem Fehler",
+              "altText": "Geplante Wiederholung mit fälligen Aufgaben, Start-Button und Vorschau."
+            }
+          }
+        },
+        "fr": {
+          "appStoreLocale": "fr-FR",
+          "googlePlayLocale": "fr-FR",
+          "frames": {
+            "practice-home": {
+              "headline": "Votre prochain problème",
+              "altText": "Accueil Pratique avec une série prête, une carte Focus et la barre de navigation."
+            },
+            "dark-arrow-duel": {
+              "headline": "Choisissez le meilleur coup",
+              "altText": "Échiquier sombre du Duel de Flèches demandant la réplique adverse avec la progression."
+            },
+            "tactical-profile": {
+              "headline": "Trouvez votre axe d’effort",
+              "altText": "Profil tactique affichant la recommandation classée et la mention d’estimation initiale."
+            },
+            "focused-run": {
+              "headline": "Travaillez l’essentiel",
+              "altText": "Aperçu de Série Ciblée avec le repère Elo et la répartition des problèmes."
+            },
+            "survival": {
+              "headline": "Battez votre record",
+              "altText": "Écran sombre Survie avec le mode sélectionné et le bouton de démarrage."
+            },
+            "review": {
+              "headline": "Tirez parti de chaque erreur",
+              "altText": "File de Révision programmée avec problèmes dus, bouton démarrer et prévisions."
+            }
+          }
+        },
+        "pt-BR": {
+          "appStoreLocale": "pt-BR",
+          "googlePlayLocale": "pt-BR",
+          "frames": {
+            "practice-home": {
+              "headline": "Seu próximo problema",
+              "altText": "Início de Prática com série pronta, cartão de Foco de Treino e navegação inferior."
+            },
+            "dark-arrow-duel": {
+              "headline": "Escolha o melhor lance",
+              "altText": "Tabuleiro escuro do Duelo de Setas pedindo a resposta do adversário e exibindo progresso."
+            },
+            "tactical-profile": {
+              "headline": "Descubra seu foco",
+              "altText": "Perfil Tático com recomendação ordenada e aviso de estimativa inicial."
+            },
+            "focused-run": {
+              "headline": "Treine o que importa",
+              "altText": "Prévia de Série Focada com Rating de referência e barra de distribuição."
+            },
+            "survival": {
+              "headline": "Supere seu recorde",
+              "altText": "Tela escura de Sobrevivência com desafio selecionado e botão de início."
+            },
+            "review": {
+              "headline": "Faça cada erro valer",
+              "altText": "Fila de Revisão programada com problemas pendentes, botão iniciar e previsão."
+            }
+          }
+        }
+      }
+    },
+    "v1-core": {
+      "frameOrder": [
+        "build-tactical-intuition",
+        "choose-the-best-move",
+        "focus-your-practice",
+        "make-every-mistake-count",
+        "see-your-progress",
+        "private-offline-open-source"
+      ],
+      "locales": {
+        "en": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "Build Tactical Intuition",
+              "supporting": "Short, rating-matched Sprints build fast pattern recognition."
+            },
+            "choose-the-best-move": {
+              "headline": "Choose the Best Move",
+              "supporting": "Arrow Duel trains you to reject a tempting blunder before you play it."
+            },
+            "focus-your-practice": {
+              "headline": "Focus Your Practice",
+              "supporting": "Choose themes, pace, and difficulty for the skill you want to train."
+            },
+            "make-every-mistake-count": {
+              "headline": "Make Every Mistake Count",
+              "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due."
+            },
+            "see-your-progress": {
+              "headline": "See Your Progress",
+              "supporting": "Follow your Ratings and recent Runs over time."
+            },
+            "private-offline-open-source": {
+              "headline": "Private. Offline. Open Source.",
+              "supporting": "No ads. No Chessticize account. No developer data collection."
+            }
+          }
+        },
+        "zh-Hans": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "培养战术直觉",
+              "supporting": "短时、按等级分匹配的冲刺，快速提升局面模式识别。"
+            },
+            "choose-the-best-move": {
+              "headline": "选出最佳着法",
+              "supporting": "箭头对决帮你在落子前识破诱人的漏着。"
+            },
+            "focus-your-practice": {
+              "headline": "专注目标练习",
+              "supporting": "自由选择主题、节奏与难度，定向打磨薄弱环节。"
+            },
+            "make-every-mistake-count": {
+              "headline": "让每次失误都有价值",
+              "supporting": "定时复习会在合适时机把错题与存疑题重新带回。"
+            },
+            "see-your-progress": {
+              "headline": "清晰看见进步",
+              "supporting": "持续追踪等级分变化与近期训练记录。"
+            },
+            "private-offline-open-source": {
+              "headline": "私密 · 离线 · 开源",
+              "supporting": "无广告、无需账号、不收集个人数据。"
+            }
+          }
+        },
+        "zh-Hant": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "培養戰術直覺",
+              "supporting": "短時、依等級分匹配的衝刺，快速提升局面模式識別。"
+            },
+            "choose-the-best-move": {
+              "headline": "選出最佳著法",
+              "supporting": "箭頭對決幫你在落子前識破誘人的漏著。"
+            },
+            "focus-your-practice": {
+              "headline": "專注目標練習",
+              "supporting": "自由選擇主題、節奏與難度，定向磨練想加強的技巧。"
+            },
+            "make-every-mistake-count": {
+              "headline": "讓每次失誤都有價值",
+              "supporting": "定時複習會在合適時機將錯題與存疑題重新帶回。"
+            },
+            "see-your-progress": {
+              "headline": "清楚看見進步",
+              "supporting": "持續追蹤等級分走勢與近期訓練紀錄。"
+            },
+            "private-offline-open-source": {
+              "headline": "私密 · 離線 · 開源",
+              "supporting": "無廣告、免帳號、不蒐集個人資料。"
+            }
+          }
+        },
+        "ja": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "戦術の直感を磨く",
+              "supporting": "レートに合った短時間スプリントでパターン認識を高速化。"
+            },
+            "choose-the-best-move": {
+              "headline": "最善の一手を選ぶ",
+              "supporting": "アローデュエルで誘いの悪手を指す前に見抜く練習。"
+            },
+            "focus-your-practice": {
+              "headline": "狙いを絞って練習",
+              "supporting": "テーマ・ペース・難易度を自由に選んで集中トレーニング。"
+            },
+            "make-every-mistake-count": {
+              "headline": "ミスを確実に力に変える",
+              "supporting": "間違えた問題や不明な問題を適切な時期に復習出題。"
+            },
+            "see-your-progress": {
+              "headline": "上達をひと目で",
+              "supporting": "レーティング推移と最近のランを時系列で確認。"
+            },
+            "private-offline-open-source": {
+              "headline": "安全・オフライン・オープン",
+              "supporting": "広告なし。アカウント不要。データ収集なし。"
+            }
+          }
+        },
+        "ko": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "전술 직관을 키우세요",
+              "supporting": "레이팅에 맞춘 짧은 스프린트로 빠른 패턴 인식을 기릅니다."
+            },
+            "choose-the-best-move": {
+              "headline": "최선의 수를 선택하세요",
+              "supporting": "화살표 대결로 유혹적인 블런더를 두기 전에 걸러내세요."
+            },
+            "focus-your-practice": {
+              "headline": "원하는 주제에 집중",
+              "supporting": "테마, 페이스, 난이도를 직접 골라 필요한 실력을 훈련하세요."
+            },
+            "make-every-mistake-count": {
+              "headline": "모든 실수를 실력으로",
+              "supporting": "예약 복습이 틀리거나 불확실한 문제를 제때 다시 가져옵니다."
+            },
+            "see-your-progress": {
+              "headline": "성장을 한눈에",
+              "supporting": "레이팅 변화와 최근 훈련 기록을 꾸준히 확인하세요."
+            },
+            "private-offline-open-source": {
+              "headline": "프라이빗 · 오프라인 · 오픈소스",
+              "supporting": "광고 없음. 계정 불필요. 개발자 데이터 수집 없음."
+            }
+          }
+        },
+        "es": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "Mejora tu intuición táctica",
+              "supporting": "Sprints cortos ajustados a tu nivel para reconocer patrones rápido."
+            },
+            "choose-the-best-move": {
+              "headline": "Elige la mejor jugada",
+              "supporting": "Duelo de Flechas te entrena para descartar errores tentadores."
+            },
+            "focus-your-practice": {
+              "headline": "Enfoca tu práctica",
+              "supporting": "Elige temas, ritmo y dificultad según lo que quieras entrenar."
+            },
+            "make-every-mistake-count": {
+              "headline": "Aprovecha cada error",
+              "supporting": "El Repaso programado trae de vuelta los ejercicios fallados o dudosos."
+            },
+            "see-your-progress": {
+              "headline": "Observa tu progreso",
+              "supporting": "Sigue tus Ratings y tus series recientes a lo largo del tiempo."
+            },
+            "private-offline-open-source": {
+              "headline": "Privado. Offline. Open Source.",
+              "supporting": "Sin anuncios. Sin cuenta. Sin recopilación de datos."
+            }
+          }
+        },
+        "de": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "Schult dein Taktik-Gespür",
+              "supporting": "Kurze, wertungsangepasste Sprints stärken die Mustererkennung."
+            },
+            "choose-the-best-move": {
+              "headline": "Wähle den besten Zug",
+              "supporting": "Im Pfeilduell erkennst und verwirfst du verlockende Patzer."
+            },
+            "focus-your-practice": {
+              "headline": "Trainiere gezielt",
+              "supporting": "Wähle Motive, Tempo und Schwierigkeit für dein Ziel."
+            },
+            "make-every-mistake-count": {
+              "headline": "Lerne aus jedem Fehler",
+              "supporting": "Geplante Wiederholung bringt verfehlte Aufgaben rechtzeitig zurück."
+            },
+            "see-your-progress": {
+              "headline": "Sieh deinen Fortschritt",
+              "supporting": "Verfolge Wertungen und letzte Läufe im Zeitverlauf."
+            },
+            "private-offline-open-source": {
+              "headline": "Privat. Offline. Open Source.",
+              "supporting": "Keine Werbung. Kein Konto. Keine Datenerhebung."
+            }
+          }
+        },
+        "fr": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "Affûtez votre sens tactique",
+              "supporting": "Des Sprints courts adaptés à votre Elo pour reconnaître vite les motifs."
+            },
+            "choose-the-best-move": {
+              "headline": "Choisissez le meilleur coup",
+              "supporting": "Le Duel de Flèches vous aide à éviter la gaffe tentante."
+            },
+            "focus-your-practice": {
+              "headline": "Ciblez votre entraînement",
+              "supporting": "Choisissez thèmes, rythme et niveau selon vos objectifs."
+            },
+            "make-every-mistake-count": {
+              "headline": "Tirez parti de chaque erreur",
+              "supporting": "La Révision ramène les problèmes manqués ou peu clairs au bon moment."
+            },
+            "see-your-progress": {
+              "headline": "Suivez vos progrès",
+              "supporting": "Consultez votre Elo et vos dernières séries au fil du temps."
+            },
+            "private-offline-open-source": {
+              "headline": "Privé. Hors ligne. Open source.",
+              "supporting": "Sans pub. Sans compte. Sans collecte de données."
+            }
+          }
+        },
+        "pt-BR": {
+          "frames": {
+            "build-tactical-intuition": {
+              "headline": "Desenvolva intuição tática",
+              "supporting": "Sprints curtos no seu Rating aceleram o reconhecimento de padrões."
+            },
+            "choose-the-best-move": {
+              "headline": "Escolha o melhor lance",
+              "supporting": "O Duelo de Setas treina você a rejeitar erros tentadores."
+            },
+            "focus-your-practice": {
+              "headline": "Foque sua prática",
+              "supporting": "Escolha temas, ritmo e dificuldade para o que deseja treinar."
+            },
+            "make-every-mistake-count": {
+              "headline": "Faça cada erro valer",
+              "supporting": "A Revisão programada traz de volta os problemas errados na hora certa."
+            },
+            "see-your-progress": {
+              "headline": "Veja sua evolução",
+              "supporting": "Acompanhe seus Ratings e séries recentes ao longo do tempo."
+            },
+            "private-offline-open-source": {
+              "headline": "Privado. Offline. Open Source.",
+              "supporting": "Sem anúncios. Sem conta. Sem coleta de dados."
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -48,6 +48,7 @@
     "mobile:storybook": "pnpm --filter ChessticizeMobileLab storybook",
     "landing-page:assets": "node scripts/prepare-landing-page-assets.mjs",
     "landing-page:android:render": "node scripts/render-android-download-page.mjs",
+    "site:build-locales": "node scripts/build-localized-site.mjs",
     "mobile:version:status": "node scripts/mobile-version.mjs status",
     "mobile:version:check": "node scripts/mobile-version.mjs check",
     "mobile:version:prepare-release": "node scripts/mobile-version.mjs prepare-release",

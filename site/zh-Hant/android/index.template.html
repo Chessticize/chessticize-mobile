@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="從 Google Play 安裝 Chessticize，或自公開 GitHub Release 下載經過驗證的 Play 簽章 APK。" />
+    <meta name="theme-color" content="#f7fbff" />
+    <link rel="canonical" href="https://chessticize.com/zh-Hant/android/" />
+    <link rel="alternate" hreflang="en" href="https://chessticize.com/android/" />
+    <link rel="alternate" hreflang="zh-Hans" href="https://chessticize.com/zh-Hans/android/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://chessticize.com/zh-Hant/android/" />
+    <link rel="alternate" hreflang="ja" href="https://chessticize.com/ja/android/" />
+    <link rel="alternate" hreflang="ko" href="https://chessticize.com/ko/android/" />
+    <link rel="alternate" hreflang="es" href="https://chessticize.com/es/android/" />
+    <link rel="alternate" hreflang="de" href="https://chessticize.com/de/android/" />
+    <link rel="alternate" hreflang="fr" href="https://chessticize.com/fr/android/" />
+    <link rel="alternate" hreflang="pt-BR" href="https://chessticize.com/pt-BR/android/" />
+    <link rel="alternate" hreflang="x-default" href="https://chessticize.com/android/" />
+    <link rel="icon" href="../../assets/app-icon-192.png" sizes="192x192" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <title>安裝 Android 版 Chessticize</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳至主要內容</a>
+    <header class="site-header">
+      <a class="brand" href="../" aria-label="Chessticize 首頁">
+        <img src="../../assets/app-icon-192.png" width="42" height="42" alt="" />
+        <span>Chessticize</span>
+      </a>
+      <nav aria-label="主導覽">
+        <a href="../#puzzle-story">功能介紹</a>
+        <a href="../#privacy">隱私</a>
+        <a href="../support/">支援</a>
+        <a class="nav-source" href="https://github.com/Chessticize/chessticize-mobile">原始碼</a>
+      </nav>
+    </header>
+    <main id="main" class="simple-page section-shell">
+      <div class="simple-page-header">
+        <p class="eyebrow">Android · 版本 {{ANDROID_PUBLIC_VERSION}} · 建置 {{ANDROID_VERSION_CODE}}</p>
+        <h1>透過 Google Play 安裝 Chessticize。</h1>
+        <p>建議透過 Google Play 安裝以取得自動更新。同一份 Play 簽章發布檔也鏡像於 GitHub 供手動安裝。</p>
+      </div>
+      <div class="info-grid">
+        <section class="info-card">
+          <h2>Google Play</h2>
+          <p>透過 Google Play 安裝 Chessticize 並接收未來更新。</p>
+          <a class="store-badge-link" href="https://play.google.com/store/apps/details?id=com.chessticize.mobile" aria-label="在 Google Play 取得 Chessticize">
+            <img class="store-badge store-badge-google" src="../../assets/get-it-on-google-play.png" width="155" height="60" alt="" />
+          </a>
+        </section>
+        <section class="info-card">
+          <h2>手動安裝 APK</h2>
+          <p>通用 APK · {{ANDROID_APK_SIZE_MIB}} MiB · 套件名稱 <code>com.chessticize.mobile</code></p>
+          <a class="button button-primary" href="{{ANDROID_APK_URL}}">
+            <span class="button-kicker">下載</span>
+            <strong>Chessticize {{ANDROID_PUBLIC_VERSION}} APK</strong>
+          </a>
+          <p>在允許手動安裝的相容 Android 裝置上，即使沒有 Google Play 或 Google Play 服務也能使用此 APK。</p>
+          <p>Android 可能會要求你允許此瀏覽器安裝來自 Play 商店以外的應用程式，安裝完成後即可立即關閉該權限。</p>
+        </section>
+        <section class="info-card">
+          <h2>驗證下載檔案</h2>
+          <p>APK SHA-256</p>
+          <p class="checksum">{{ANDROID_APK_SHA256}}</p>
+          <p>
+            <a href="{{ANDROID_CHECKSUM_URL}}">下載校驗碼檔案</a>或檢視<a href="{{ANDROID_RELEASE_URL}}">完整發布紀錄</a>。
+          </p>
+        </section>
+        <section class="info-card">
+          <h2>手動安裝步驟</h2>
+          <ol class="numbered-steps">
+            <li>點擊上方按鈕下載 APK。</li>
+            <li>開啟下載檔案並核准 Android 安裝提示。</li>
+            <li>啟動 Chessticize，立即離線解開內建戰術題。</li>
+          </ol>
+        </section>
+        <section class="info-card">
+          <h2>更新方式</h2>
+          <p>透過 Google Play 安裝的版本會經由 Google Play 更新。GitHub APK 不會自動更新；未來請回到此穩定頁面或追蹤公開存放庫。</p>
+          <p>覆蓋安裝相容的較新 Play 簽章 APK 時，你的本機進度資料庫會完整保留。</p>
+        </section>
+      </div>
+    </main>
+    <footer>
+      <div class="section-shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="../">
+            <img src="../../assets/app-icon-192.png" width="36" height="36" alt="" />
+            <span>Chessticize</span>
+          </a>
+          <p>私密、離線、無廣告的西洋棋戰術題練習。</p>
+        </div>
+        <nav aria-label="頁尾導覽">
+          <a href="https://apps.apple.com/us/app/chessticize/id6788610123">App Store</a>
+          <a href="https://play.google.com/store/apps/details?id=com.chessticize.mobile">Google Play</a>
+          <a href="../support/">支援</a>
+          <a href="../accessibility/">無障礙</a>
+          <a href="https://github.com/Chessticize/chessticize-mobile">原始碼</a>
+        </nav>
+      </div>
+      <nav class="section-shell locale-switcher" aria-label="語言"><a href="../../android/" lang="en">English</a><a href="../../zh-Hans/android/" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/android/" lang="zh-Hant" aria-current="page">繁體中文</a><a href="../../ja/android/" lang="ja">日本語</a><a href="../../ko/android/" lang="ko">한국어</a><a href="../../es/android/" lang="es">Español</a><a href="../../de/android/" lang="de">Deutsch</a><a href="../../fr/android/" lang="fr">Français</a><a href="../../pt-BR/android/" lang="pt-BR">Português (Brasil)</a></nav>
+    </footer>
+  </body>
+</html>
