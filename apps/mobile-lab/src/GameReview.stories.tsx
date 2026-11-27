@@ -8,12 +8,12 @@ import {
   type ExtractedGamePuzzle,
   type GameHighlightMoment
 } from "../../../packages/core/src/index.ts";
-import {
-  MemoryStore,
-  PracticeService,
-  type StoredGamePlyEval,
-  type StoredImportedGame
-} from "../../../packages/storage/src/index.ts";
+import type {
+  StoredGamePlyEval,
+  StoredImportedGame
+} from "../../../packages/storage/src/game-review-store.ts";
+import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
+import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
 import {
   GameReviewScreen,
   type GameReviewBoardComponent,

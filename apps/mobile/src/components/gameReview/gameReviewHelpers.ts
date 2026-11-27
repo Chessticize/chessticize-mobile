@@ -18,7 +18,7 @@ import {
   USER_GAME_RATING_KEY_PREFIX,
   type StoredImportedGame,
   type StoredUserPuzzle
-} from "../../../../../packages/storage/src/index.ts";
+} from "../../../../../packages/storage/src/game-review-store.ts";
 import type {
   GameReviewEvalGraphPoint,
   GameReviewSummaryData,

@@ -17,10 +17,10 @@ import type {
 import type {
   GameAnalysisStatus,
   GameReviewStore,
-  PracticeService,
   StoredImportedGame,
   StoredUserPuzzle
-} from "../../../../../packages/storage/src/index.ts";
+} from "../../../../../packages/storage/src/game-review-store.ts";
+import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 
 export interface GameReviewLiveEngine extends GameReviewEngine, PuzzleExtractionEngine {
   analyze(request: EngineSearchRequest): Promise<EngineAnalysisLine[]>;

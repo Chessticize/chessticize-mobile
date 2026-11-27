@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, View } from "react-native";
 import { curatedPuzzleThemes } from "../../../../../packages/core/src/index.ts";
-import type { StoredUserPuzzle } from "../../../../../packages/storage/src/index.ts";
+import type { StoredUserPuzzle } from "../../../../../packages/storage/src/game-review-store.ts";
 import { makeStyles } from "../../theme/index.ts";
 import { customThemeLabel } from "../practice/shared/themeCatalog.ts";
 import { AppText, Badge, Button } from "../ui/index.tsx";

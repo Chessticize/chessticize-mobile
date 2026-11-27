@@ -17,7 +17,7 @@ import {
   storedGamePlyEvalFromEvaluation,
   type GameAnalysisStatus,
   type StoredUserPuzzle
-} from "../../../../../packages/storage/src/index.ts";
+} from "../../../../../packages/storage/src/game-review-store.ts";
 import {
   buildEvalGraphPoints,
   buildGameReviewSummary,

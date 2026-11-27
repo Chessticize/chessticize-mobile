@@ -4,9 +4,9 @@ import Chessboard, { type MoveResult } from "react-native-chessboard";
 import type { GameHighlightMoment } from "../../../../../packages/core/src/index.ts";
 import type {
   GameReviewStore,
-  PracticeService,
   StoredImportedGame
-} from "../../../../../packages/storage/src/index.ts";
+} from "../../../../../packages/storage/src/game-review-store.ts";
+import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import { makeStyles, useBoardAppearance, useTheme } from "../../theme/index.ts";
 import { buildPracticeAdaptiveLayout, PRACTICE_UI_PADDING } from "../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../PracticeViewport.tsx";
