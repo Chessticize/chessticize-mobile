@@ -134,6 +134,35 @@ upstream commit `47948db658a1678d14e97d41c1bcf82958e70ded` using
 - Notes: Chessticize Mobile uses this package for board rendering and applies a
   local patch from `patches/react-native-chessboard@0.2.0.patch`.
 
+## Puzzle extraction, win-chances, and tactical motif tagger
+
+The on-device game-puzzle extractor, Arrow Duel caliber verifier, and tactical
+motif tagger under `packages/core/src/game-puzzles/` are ported and adapted from
+MIT-licensed chess puzzle analysis and tagging projects, plus Lichess's
+published win-chances curve:
+
+- **lichess-org/puzzler**
+  - Copyright: Original work Copyright 2020 lichess.org
+  - License: MIT License
+  - Source: https://github.com/lichess-org/puzzler
+  - Notes: Original puzzle generator (`cook_mate`, `cook_advantage`, `is_valid_attack`) and tactical motif tagger (`cook`, `util`, `zugzwang`).
+
+- **lychee-org/retagger**
+  - Copyright: Forked work Copyright 2023 lychee-org
+  - License: MIT License
+  - Source: https://github.com/lychee-org/retagger
+  - Notes: Forked puzzle tagging pipeline upon which `chessticize-worker`'s tagger was built.
+
+- **lichess-org/lila**
+  - Source: https://github.com/lichess-org/lila/pull/11148
+  - Notes: Win-chances sigmoid formula (`2 / (1 + exp(-0.00368208 * cp)) - 1`) used for outcome-changing swing and Arrow Duel caliber thresholds.
+
+- **Chessticize/chessticize-worker**
+  - Copyright: Modified work Copyright 2024-2026 chessticize.com
+  - License: MIT License
+  - Source: https://github.com/Chessticize/chessticize-worker
+  - Notes: Adapted puzzle extraction, 8-case game-moment classification, Arrow Duel verification, clock-metric parsing, and PR #26/#27 tagger fixes ported to pure TypeScript in `packages/core/src/game-puzzles/`.
+
 ## React Native and mobile runtime package inventory
 
 The app is built with React Native and related open-source packages. The
