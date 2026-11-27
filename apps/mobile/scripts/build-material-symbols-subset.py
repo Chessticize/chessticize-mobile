@@ -35,6 +35,7 @@ DRAWABLE_DIR = ROOT / "android/app/src/main/res/drawable"
 TAB_DRAWABLES = {
     "ic_tab_practice": "target",
     "ic_tab_review": "replay",
+    "ic_tab_games": "bar_chart",
     "ic_tab_history": "history",
     "ic_tab_settings": "settings",
 }

@@ -329,6 +329,7 @@ import {
   withAttemptClarity
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
+import { GamesHubScreen } from "./games/GamesHubScreen.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
 interface Props {
@@ -357,6 +358,7 @@ interface Props {
   runEloEditingMovedToHome?: boolean;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
+  onOpenGameReview?: (gameId: string) => void;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
@@ -610,6 +612,7 @@ export function PracticePocScreen({
   runEloEditingMovedToHome = false,
   settingsCaptureBottomInset,
   initialTab = "practice",
+  onOpenGameReview,
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
@@ -977,6 +980,8 @@ export function PracticePocScreen({
     left: number; top: number; width: number; maxHeight: number;
   } | null>(null);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
+  const [gamesImportModalOpen, setGamesImportModalOpen] = useState(false);
+  const [activeGameReviewId, setActiveGameReviewId] = useState<string | null>(null);
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
@@ -1038,6 +1043,7 @@ export function PracticePocScreen({
     || historyUnavailableAttempt !== null;
   const topLevelChromeVisible = isTopLevelChromeVisible({
     feedbackSnapshotVisible: feedbackSnapshot !== null,
+    gameReviewOpen: activeGameReviewId !== null,
     openSession: state?.status === "active" || state?.status === "paused",
     personalBestGuideVisible,
     personalBestHubVisible,
@@ -1482,6 +1488,10 @@ export function PracticePocScreen({
     }
     if (nextTab !== "review") {
       setReviewFiltersExpanded(false);
+    }
+    if (nextTab !== "games") {
+      setGamesImportModalOpen(false);
+      setActiveGameReviewId(null);
     }
     if (nextTab !== "settings") {
       setSettingsAdvancedRatingsOpen(false);
@@ -3896,7 +3906,7 @@ export function PracticePocScreen({
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
   const visibleHistoryPage = historyView?.page;
-  const contentOwnsHeader = tab === "review" || tab === "history";
+  const contentOwnsHeader = tab === "review" || tab === "history" || tab === "games";
   const survivalBackTransient: MobileBackTransient | null = personalBestRecordsVisible
     ? "survival-records"
     : personalBestGuideVisible
@@ -3924,7 +3934,9 @@ export function PracticePocScreen({
               ? "history-filters"
               : tab === "review" && !reviewSurfaceOpen && reviewFiltersExpanded
                 ? "review-filters"
-                : tab === "settings" && settingsAdvancedRatingsOpen
+                : tab === "games" && gamesImportModalOpen
+                  ? "games-import"
+                  : tab === "settings" && settingsAdvancedRatingsOpen
                   ? "settings-advanced-ratings"
                   : tab === "practice" && mode === "custom" && customRatingEditorOpen
                     ? "custom-rating-editor"
@@ -3938,7 +3950,9 @@ export function PracticePocScreen({
             kind: "review-session",
             owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
           }
-        : tab === "history" && historyProgressOpen
+        : tab === "games" && activeGameReviewId !== null
+          ? { kind: "game-review", owner: "games" }
+          : tab === "history" && historyProgressOpen
           ? { kind: "history-progress", owner: "history" }
           : tab === "analysis"
             ? { kind: "stockfish-diagnostics", owner: "settings" }
@@ -3955,6 +3969,7 @@ export function PracticePocScreen({
                 ? { kind: "custom-practice", owner: "practice" }
                 : null,
     [
+      activeGameReviewId,
       activeRunManagementScreen,
       historyProgressOpen,
       isFinished,
@@ -4122,6 +4137,8 @@ export function PracticePocScreen({
           setHistoryFiltersExpanded(false);
         } else if (intent.transient === "review-filters") {
           setReviewFiltersExpanded(false);
+        } else if (intent.transient === "games-import") {
+          setGamesImportModalOpen(false);
         } else if (intent.transient === "settings-advanced-ratings") {
           setSettingsAdvancedRatingsOpen(false);
         } else if (intent.transient === "custom-rating-editor") {
@@ -4159,6 +4176,8 @@ export function PracticePocScreen({
           }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "game-review") {
+          setActiveGameReviewId(null);
         } else if (resolvedState.detail?.kind === "history-progress") {
           setHistoryProgressOpen(false);
         } else if (resolvedState.detail?.kind === "practice-run-editor") {
@@ -5512,6 +5531,31 @@ export function PracticePocScreen({
                 systemBackCommand={reviewBackCommand}
               />
             ) : null}
+            {tab === "games" ? (
+              <GamesHubScreen
+                adaptiveLayout={adaptiveLayout}
+                importModalVisible={gamesImportModalOpen}
+                nowMs={nowMs}
+                service={service}
+                stockfish={stockfish}
+                onImportModalVisibleChange={setGamesImportModalOpen}
+                onOpenGameReview={(gameId) => {
+                  if (onOpenGameReview) {
+                    onOpenGameReview(gameId);
+                  } else {
+                    setActiveGameReviewId(gameId);
+                  }
+                }}
+                onPracticeMyGamePuzzles={() => {
+                  setError(null);
+                  try {
+                    adoptStartedSprint(service.startMyGamePuzzlesSession({}, captureLiveNowIso()));
+                  } catch (caught) {
+                    setError(errorMessage(caught));
+                  }
+                }}
+              />
+            ) : null}
             {tab === "settings" ? (
               <SettingsPanel
                 adaptiveLayout={adaptiveLayout}
@@ -6054,6 +6098,9 @@ function screenTitleFor(tab: Tab, locale: SupportedLocale): string {
   if (tab === "review") {
     return translate(locale, "tabs.review");
   }
+  if (tab === "games") {
+    return translate(locale, "tabs.games");
+  }
   if (tab === "history") {
     return translate(locale, "tabs.history");
   }
@@ -6066,6 +6113,9 @@ function screenTitleFor(tab: Tab, locale: SupportedLocale): string {
 function screenSubtitleFor(tab: Tab, locale: SupportedLocale): string | null {
   if (tab === "review") {
     return translate(locale, "screen.subtitle.review");
+  }
+  if (tab === "games") {
+    return translate(locale, "screen.subtitle.games");
   }
   if (tab === "history") {
     return translate(locale, "screen.subtitle.history");

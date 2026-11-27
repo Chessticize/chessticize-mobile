@@ -23,15 +23,17 @@ describe("top-level tabs", () => {
     expect(TOP_LEVEL_TABS.map((item) => [item.icon, item.sfSymbol, ICONS[item.icon].material, item.androidDrawable])).toEqual([
       ["tabPractice", "target", "target", "ic_tab_practice"],
       ["tabReview", "arrow.counterclockwise", "replay", "ic_tab_review"],
+      ["tabGames", "checkerboard.rectangle", "bar_chart", "ic_tab_games"],
       ["tabHistory", "clock.arrow.circlepath", "history", "ic_tab_history"],
       ["tabSettings", "gearshape", "settings", "ic_tab_settings"]
     ]);
   });
 
-  it("keeps the four product tabs, their order and their Detox test IDs", () => {
+  it("keeps the five product tabs, their order and their Detox test IDs", () => {
     expect(TOP_LEVEL_TABS.map((item) => [item.tab, item.label, item.testID])).toEqual([
       ["practice", "Practice", "practice-tab"],
       ["review", "Review", "review-tab"],
+      ["games", "Games", "games-tab"],
       ["history", "History", "history-tab"],
       ["settings", "Settings", "settings-tab"]
     ]);
@@ -39,6 +41,7 @@ describe("top-level tabs", () => {
 
   it("routes Review to the due queue and other tabs to their root", () => {
     expect(topLevelTabIntent("review")).toEqual({ kind: "open-review-queue" });
+    expect(topLevelTabIntent("games")).toEqual({ kind: "show-tab", tab: "games" });
     expect(topLevelTabIntent("history")).toEqual({ kind: "show-tab", tab: "history" });
   });
 });

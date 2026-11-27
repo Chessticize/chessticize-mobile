@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated for Material Symbols Rounded "bar_chart" (Apache License 2.0,
+     Copyright Google LLC; see THIRD_PARTY_NOTICES.md). The tab bar tints it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group
+        android:scaleY="-1"
+        android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M200 160Q183 160 171.5 171.5Q160 183 160 200V480Q160 497 171.5 508.5Q183 520 200 520H280Q297 520 308.5 508.5Q320 497 320 480V200Q320 183 308.5 171.5Q297 160 280 160ZM440 160Q423 160 411.5 171.5Q400 183 400 200V760Q400 777 411.5 788.5Q423 800 440 800H520Q537 800 548.5 788.5Q560 777 560 760V200Q560 183 548.5 171.5Q537 160 520 160ZM680 160Q663 160 651.5 171.5Q640 183 640 200V600Q640 617 651.5 628.5Q663 640 680 640H760Q777 640 788.5 628.5Q800 617 800 600V200Q800 183 788.5 171.5Q777 160 760 160Z" />
+    </group>
+</vector>

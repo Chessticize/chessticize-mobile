@@ -52,8 +52,10 @@ import type {
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
+  ExtractedGamePuzzle,
   HistoryQuery,
   HistoryView,
+  ImportedGameDraft,
   OpponentReplyConfig,
   Puzzle,
   PracticeRunRecord,
@@ -76,7 +78,20 @@ import type {
   SurvivalLevel,
   SurvivalPreferences
 } from "../../core/src/index.ts";
-import { USER_GAME_RATING_KEY_PREFIX } from "./game-review-store.ts";
+import {
+  USER_GAME_RATING_KEY_PREFIX,
+  type GameListFilter,
+  type GameReviewStore,
+  type LinkedGameAccount,
+  type LinkedGameAccountPlatform,
+  type ReplaceGameUserPuzzlesMeta,
+  type SaveGamePlyEvaluationsStatusUpdate,
+  type StoredGamePlyEval,
+  type StoredImportedGame,
+  type StoredUserPuzzle,
+  type UpsertImportedGamesResult,
+  type UserPuzzleFilter
+} from "./game-review-store.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
 import type {
   ClearSyncedHistoryResult,
@@ -287,6 +302,83 @@ export class PracticeService {
       throw new Error("Progress V2 persistence is unavailable for this store");
     }
     return this.store.progressV2;
+  }
+
+  get gameReviewStore(): GameReviewStore {
+    return this.store;
+  }
+
+  listLinkedAccounts(): LinkedGameAccount[] {
+    return this.store.listLinkedAccounts();
+  }
+
+  upsertLinkedAccount(
+    account: Omit<LinkedGameAccount, "createdAt"> & { createdAt?: string }
+  ): LinkedGameAccount {
+    return this.store.upsertLinkedAccount(account);
+  }
+
+  removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    this.store.removeLinkedAccount(platform, username);
+  }
+
+  upsertImportedGames(
+    games: readonly ImportedGameDraft[],
+    nowIso?: string
+  ): UpsertImportedGamesResult {
+    return this.store.upsertImportedGames(games, nowIso);
+  }
+
+  listImportedGames(filter?: GameListFilter): StoredImportedGame[] {
+    return this.store.listImportedGames(filter);
+  }
+
+  countImportedGames(filter?: Omit<GameListFilter, "limit" | "offset">): number {
+    return this.store.countImportedGames(filter);
+  }
+
+  getImportedGame(gameId: string): StoredImportedGame | undefined {
+    return this.store.getImportedGame(gameId);
+  }
+
+  deleteImportedGame(gameId: string): void {
+    this.store.deleteImportedGame(gameId);
+  }
+
+  saveGamePlyEvaluations(
+    gameId: string,
+    evals: readonly StoredGamePlyEval[],
+    statusUpdate: SaveGamePlyEvaluationsStatusUpdate
+  ): void {
+    this.store.saveGamePlyEvaluations(gameId, evals, statusUpdate);
+  }
+
+  listGamePlyEvaluations(gameId: string): StoredGamePlyEval[] {
+    return this.store.listGamePlyEvaluations(gameId);
+  }
+
+  replaceGameUserPuzzles(
+    gameId: string,
+    puzzles: readonly ExtractedGamePuzzle[],
+    gameMeta: ReplaceGameUserPuzzlesMeta
+  ): StoredUserPuzzle[] {
+    return this.store.replaceGameUserPuzzles(gameId, puzzles, gameMeta);
+  }
+
+  listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
+    return this.store.listUserPuzzles(filter);
+  }
+
+  countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
+    return this.store.countUserPuzzles(filter);
+  }
+
+  getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
+    return this.store.getUserPuzzle(puzzleId);
+  }
+
+  archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
+    this.store.archiveUserPuzzle(puzzleId, archived);
   }
 
   getProgressV2Diagnostics(): ProgressV2Diagnostics {
