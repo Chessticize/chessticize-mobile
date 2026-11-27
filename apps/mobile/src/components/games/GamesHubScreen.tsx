@@ -492,14 +492,47 @@ export function GamesHubScreen({
           {t("tabs.games")}
         </AppText>
         {!isEmpty ? (
-          <Button
-            icon="add"
-            label={t("games.action.import")}
-            size="compact"
-            testID="games-header-import"
-            variant="secondary"
-            onPress={() => openModal("chess_com")}
-          />
+          <View style={styles.headerActions}>
+            {snapshot.linkedAccounts.length > 0 ? (
+              <Pressable
+                accessibilityLabel={syncing ? t("games.action.syncing") : t("games.action.sync")}
+                accessibilityRole="button"
+                accessibilityState={{ busy: syncing, disabled: syncing }}
+                disabled={syncing}
+                onPress={() => {
+                  void handleSyncAllLinked();
+                }}
+                style={({ pressed }) => [
+                  styles.syncIconButton,
+                  pressed && !syncing ? styles.pressed : null
+                ]}
+                testID="games-sync-button"
+              >
+                {syncing ? (
+                  <ActivityIndicator
+                    color={theme.colors.accent.s600}
+                    size="small"
+                    testID="games-sync-spinner"
+                  />
+                ) : (
+                  <Icon
+                    color={theme.colors.text.primary}
+                    name="reset"
+                    size={16}
+                    weight="semibold"
+                  />
+                )}
+              </Pressable>
+            ) : null}
+            <Button
+              icon="add"
+              label={t("games.action.import")}
+              size="compact"
+              testID="games-header-import"
+              variant="secondary"
+              onPress={() => openModal("chess_com")}
+            />
+          </View>
         ) : null}
       </View>
 
@@ -590,37 +623,6 @@ export function GamesHubScreen({
                     onPress={() => openModal(account.platform)}
                   />
                 ))}
-                {snapshot.linkedAccounts.length > 0 ? (
-                  <Pressable
-                    accessibilityLabel={syncing ? t("games.action.syncing") : t("games.action.sync")}
-                    accessibilityRole="button"
-                    accessibilityState={{ busy: syncing, disabled: syncing }}
-                    disabled={syncing}
-                    onPress={() => {
-                      void handleSyncAllLinked();
-                    }}
-                    style={({ pressed }) => [
-                      styles.syncIconButton,
-                      pressed && !syncing ? styles.pressed : null
-                    ]}
-                    testID="games-sync-button"
-                  >
-                    {syncing ? (
-                      <ActivityIndicator
-                        color={theme.colors.accent.s600}
-                        size="small"
-                        testID="games-sync-spinner"
-                      />
-                    ) : (
-                      <Icon
-                        color={theme.colors.text.primary}
-                        name="reset"
-                        size={16}
-                        weight="semibold"
-                      />
-                    )}
-                  </Pressable>
-                ) : null}
                 {syncSummary ? (
                   <Badge
                     label={syncSummary}
@@ -675,8 +677,8 @@ export function GamesHubScreen({
                   ) : null}
                 </>
               ) : null}
-              <View style={styles.secondaryActionRow}>
-                {unanalyzedGames.length > 0 && !batchBusy ? (
+              {unanalyzedGames.length > 0 && !batchBusy ? (
+                <View style={styles.secondaryActionRow}>
                   <Button
                     label={`Analyze all (${unanalyzedGames.length})`}
                     size="compact"
@@ -684,15 +686,8 @@ export function GamesHubScreen({
                     variant="secondary"
                     onPress={handleAnalyzeAll}
                   />
-                ) : null}
-                <Button
-                  label={t("games.action.importPgn")}
-                  size="compact"
-                  testID="games-import-pgn-button"
-                  variant="secondary"
-                  onPress={() => openModal("pgn")}
-                />
-              </View>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -1180,9 +1175,14 @@ const useStyles = makeStyles((theme) => ({
     borderColor: theme.colors.border.default,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    height: 34,
+    height: 36,
     justifyContent: "center",
-    width: 34
+    width: 36
+  },
+  headerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
   },
   puzzlesTabSection: {
     gap: 10
