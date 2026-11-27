@@ -1,0 +1,1007 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, type AppStateStatus } from "react-native";
+import {
+  evaluateGamePass1,
+  extractGamePuzzles,
+  gameReviewReportToPlyEvalInputs,
+  parsePgnGame,
+  submitArrowDuelChoice,
+  submitLineMove,
+  type EngineAnalysisLine,
+  type GameHighlightMoment,
+  type GamePlyEvaluation,
+  type ParsedGame
+} from "../../../../../packages/core/src/index.ts";
+import {
+  gamePlyEvaluationFromStored,
+  storedGamePlyEvalFromEvaluation,
+  type GameAnalysisStatus,
+  type StoredUserPuzzle
+} from "../../../../../packages/storage/src/index.ts";
+import {
+  buildEvalGraphPoints,
+  buildGameReviewSummary,
+  buildKeyMoments,
+  createInitialRetryState,
+  EVEN_ANALYSIS_SCORE,
+  fenForRetryState,
+  normalizeUciMove,
+  reviewContextForUserPuzzle,
+  STANDARD_STARTING_FEN,
+  tryApplyUciMove,
+  whiteWinPercentForScore
+} from "./gameReviewHelpers.ts";
+import type {
+  GameReviewBoardArrow,
+  GameReviewController,
+  GameReviewMode,
+  GameReviewScanPhase,
+  KeyMomentRetryState,
+  UseGameReviewControllerParams
+} from "./gameReviewTypes.ts";
+
+const DEFAULT_CHECKPOINT_INTERVAL_PLIES = 4;
+const DEFAULT_FREE_ANALYSIS_DEPTH = 18;
+const DEFAULT_FREE_ANALYSIS_MULTIPV = 3;
+
+export function useGameReviewController({
+  game,
+  store,
+  practiceService,
+  engine = null,
+  initialHighlights = [],
+  initialMode,
+  initialFreeAnalysisOpen = false,
+  pass1Depth,
+  pass1Nodes,
+  freeAnalysisDepth = DEFAULT_FREE_ANALYSIS_DEPTH,
+  checkpointIntervalPlies = DEFAULT_CHECKPOINT_INTERVAL_PLIES
+}: UseGameReviewControllerParams): GameReviewController {
+  // Parse PGN synchronously so the board & move list render immediately.
+  const { parsedGame, parseError } = useMemo<{
+    parsedGame: ParsedGame | null;
+    parseError: string | null;
+  }>(() => {
+    try {
+      return { parsedGame: parsePgnGame(game.pgn), parseError: null };
+    } catch (error) {
+      return {
+        parsedGame: null,
+        parseError: error instanceof Error ? error.message : "Invalid PGN"
+      };
+    }
+  }, [game.pgn]);
+
+  const totalPlies = parsedGame?.plies.length ?? 0;
+
+  // Hydrate any cached ply evaluations and puzzles immediately from the store.
+  const initialStoredEvals = useMemo(
+    () => store.listGamePlyEvaluations(game.id).map(gamePlyEvaluationFromStored),
+    [game.id, store]
+  );
+  const initialStoredPuzzles = useMemo(
+    () => store.listUserPuzzles({ gameId: game.id }),
+    [game.id, store]
+  );
+
+  const [analysisStatus, setAnalysisStatus] = useState<GameAnalysisStatus>(game.analysisStatus);
+  const [scanPhase, setScanPhase] = useState<GameReviewScanPhase>(() => {
+    if (game.analysisStatus === "complete") {
+      return "complete";
+    }
+    if (!engine || parseError) {
+      return "idle";
+    }
+    return game.analysisStatus === "pass1_done" ? "extracting_pass2" : "scanning_pass1";
+  });
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [plyEvaluations, setPlyEvaluations] = useState<GamePlyEvaluation[]>(initialStoredEvals);
+  const [userPuzzles, setUserPuzzles] = useState<StoredUserPuzzle[]>(initialStoredPuzzles);
+  const [highlights, setHighlights] = useState<GameHighlightMoment[]>(() => [...initialHighlights]);
+  const [scanTrigger, setScanTrigger] = useState(0);
+
+  const [flipped, setFlipped] = useState<boolean>(game.userColor === "b");
+  const [mode, setModeState] = useState<GameReviewMode>(() => {
+    if (initialMode) {
+      return initialMode;
+    }
+    return initialStoredPuzzles.length > 0 || initialHighlights.length > 0
+      ? "moments"
+      : "moves";
+  });
+  const [currentPly, setCurrentPly] = useState<number>(() =>
+    totalPlies > 0 ? Math.min(1, totalPlies) : 0
+  );
+  const [activeMomentIndex, setActiveMomentIndex] = useState<number>(0);
+  const [retryStatesByMomentId, setRetryStatesByMomentId] = useState<
+    Record<string, KeyMomentRetryState>
+  >({});
+
+  // Free exploration off the main game line
+  const [explorationStartFen, setExplorationStartFen] = useState<string | null>(null);
+  const [explorationMoves, setExplorationMoves] = useState<string[]>([]);
+  const [explorationFen, setExplorationFen] = useState<string | null>(null);
+
+  // Live Stockfish MultiPV=3 free analysis
+  const [freeAnalysisOpen, setFreeAnalysisOpen] = useState<boolean>(initialFreeAnalysisOpen);
+  const [freeAnalysisLoading, setFreeAnalysisLoading] = useState<boolean>(false);
+  const [freeAnalysisLines, setFreeAnalysisLines] = useState<EngineAnalysisLine[]>([]);
+  const [freeAnalysisError, setFreeAnalysisError] = useState<string | null>(null);
+
+  // Review queue enrollment state synced with PracticeService
+  const [enrolledPuzzleIds, setEnrolledPuzzleIds] = useState<Set<string>>(() => {
+    const enrolled = new Set<string>();
+    for (const puzzle of initialStoredPuzzles) {
+      const ctx = reviewContextForUserPuzzle(puzzle);
+      if (practiceService.getReviewQueueState(ctx)) {
+        enrolled.add(puzzle.id);
+      }
+    }
+    return enrolled;
+  });
+
+  // Track latest streamed evaluations for checkpoint flushing on pause/background/unmount.
+  const latestEvalsRef = useRef<GamePlyEvaluation[]>(plyEvaluations);
+  latestEvalsRef.current = plyEvaluations;
+  const latestStatusRef = useRef<GameAnalysisStatus>(analysisStatus);
+  latestStatusRef.current = analysisStatus;
+  const scanAbortRef = useRef<AbortController | null>(null);
+  const freeAnalysisAbortRef = useRef<AbortController | null>(null);
+
+  const syncEnrolledIds = useCallback(
+    (puzzles: readonly StoredUserPuzzle[]) => {
+      const next = new Set<string>();
+      for (const puzzle of puzzles) {
+        if (practiceService.getReviewQueueState(reviewContextForUserPuzzle(puzzle))) {
+          next.add(puzzle.id);
+        }
+      }
+      setEnrolledPuzzleIds(next);
+    },
+    [practiceService]
+  );
+
+  const persistCheckpoint = useCallback(
+    (
+      evals: readonly GamePlyEvaluation[],
+      status: GameAnalysisStatus,
+      accuracies?: { whiteAccuracy?: number; blackAccuracy?: number }
+    ) => {
+      if (evals.length === 0 && status === "none") {
+        return;
+      }
+      const checkpointPly = evals[evals.length - 1]?.ply ?? 0;
+      const storedEvals = evals.map((item) => storedGamePlyEvalFromEvaluation(game.id, item));
+      try {
+        store.saveGamePlyEvaluations(game.id, storedEvals, {
+          analysisStatus: status,
+          analysisCheckpointPly: checkpointPly,
+          ...(accuracies?.whiteAccuracy === undefined
+            ? {}
+            : { whiteAccuracy: accuracies.whiteAccuracy }),
+          ...(accuracies?.blackAccuracy === undefined
+            ? {}
+            : { blackAccuracy: accuracies.blackAccuracy })
+        });
+      } catch {
+        // Ignore if game was deleted externally during unmount/backgrounding.
+      }
+    },
+    [game.id, store]
+  );
+
+  // Foreground streaming Pass-1 -> Pass-2 analysis pipeline.
+  useEffect(() => {
+    if (analysisStatus === "complete") {
+      setScanPhase("complete");
+      return;
+    }
+    if (!engine || !parsedGame || parseError) {
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setScanError(null);
+
+    const runPipeline = async () => {
+      try {
+        const cachedEvals = store
+          .listGamePlyEvaluations(game.id)
+          .map(gamePlyEvaluationFromStored);
+        const streamedEvals = [...cachedEvals];
+        let unsavedCount = 0;
+
+        setScanPhase("scanning_pass1");
+        const report = await evaluateGamePass1({
+          pgn: parsedGame,
+          engine,
+          userColor: game.userColor,
+          options: {
+            ...(pass1Depth === undefined ? {} : { depth: pass1Depth }),
+            ...(pass1Nodes === undefined ? {} : { nodes: pass1Nodes }),
+            priority: "batch",
+            initialEvaluations: cachedEvals,
+            signal: controller.signal,
+            onPlyEvaluated: (plyEval) => {
+              if (cancelled || controller.signal.aborted) {
+                return;
+              }
+              streamedEvals.push(plyEval);
+              latestEvalsRef.current = [...streamedEvals];
+              setPlyEvaluations([...streamedEvals]);
+              unsavedCount += 1;
+              if (unsavedCount >= checkpointIntervalPlies) {
+                unsavedCount = 0;
+                persistCheckpoint(streamedEvals, "partial");
+                setAnalysisStatus("partial");
+              }
+            }
+          }
+        });
+
+        if (cancelled || controller.signal.aborted || !report.isComplete) {
+          if (report.plies.length > 0 && latestStatusRef.current !== "complete") {
+            persistCheckpoint(report.plies, "partial", {
+              whiteAccuracy: report.whiteAccuracy,
+              blackAccuracy: report.blackAccuracy
+            });
+            if (!cancelled) {
+              setAnalysisStatus("partial");
+              setScanPhase("paused");
+            }
+          }
+          return;
+        }
+
+        // Persist completed Pass-1 report before entering Pass-2 extraction.
+        latestEvalsRef.current = [...report.plies];
+        setPlyEvaluations([...report.plies]);
+        persistCheckpoint(report.plies, "pass1_done", {
+          whiteAccuracy: report.whiteAccuracy,
+          blackAccuracy: report.blackAccuracy
+        });
+        setAnalysisStatus("pass1_done");
+        setScanPhase("extracting_pass2");
+
+        const extraction = await extractGamePuzzles(
+          {
+            gameId: game.id,
+            userColor: game.userColor,
+            plies: gameReviewReportToPlyEvalInputs(report),
+            ...(game.timeControl ? { timeControl: game.timeControl } : {})
+          },
+          engine,
+          { signal: controller.signal }
+        );
+
+        if (cancelled || controller.signal.aborted) {
+          return;
+        }
+
+        const savedPuzzles = store.replaceGameUserPuzzles(game.id, extraction.puzzles, {
+          ...(game.playedAt ? { playedAt: game.playedAt } : {}),
+          ...(game.timeClass ? { timeClass: game.timeClass } : {})
+        });
+        persistCheckpoint(report.plies, "complete", {
+          whiteAccuracy: report.whiteAccuracy,
+          blackAccuracy: report.blackAccuracy
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setUserPuzzles(savedPuzzles);
+        syncEnrolledIds(savedPuzzles);
+        setHighlights(extraction.highlights);
+        setAnalysisStatus("complete");
+        setScanPhase("complete");
+        if (savedPuzzles.length > 0 || extraction.highlights.length > 0) {
+          setModeState((prev) => (prev === "moves" && initialMode === undefined ? "moments" : prev));
+        }
+      } catch (error) {
+        if (cancelled || controller.signal.aborted) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : "Engine analysis failed";
+        setScanError(message);
+        setScanPhase("error");
+        if (latestEvalsRef.current.length > 0) {
+          persistCheckpoint(latestEvalsRef.current, "partial");
+        }
+      }
+    };
+
+    void runPipeline();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (scanAbortRef.current === controller) {
+        scanAbortRef.current = null;
+      }
+      if (latestStatusRef.current !== "complete" && latestEvalsRef.current.length > 0) {
+        persistCheckpoint(latestEvalsRef.current, "partial");
+      }
+    };
+    // Intentionally keyed on scanTrigger and game.id so partial checkpoint status updates do not restart the loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id, engine, parsedGame, parseError, scanTrigger]);
+
+  // Cancel active scan cleanly and persist partial checkpoint when app backgrounds.
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "background" || nextState === "inactive") {
+        if (scanAbortRef.current && !scanAbortRef.current.signal.aborted) {
+          scanAbortRef.current.abort();
+          if (latestStatusRef.current !== "complete" && latestEvalsRef.current.length > 0) {
+            persistCheckpoint(latestEvalsRef.current, "partial");
+            setAnalysisStatus("partial");
+          }
+          setScanPhase("paused");
+        }
+        if (freeAnalysisAbortRef.current && !freeAnalysisAbortRef.current.signal.aborted) {
+          freeAnalysisAbortRef.current.abort();
+          setFreeAnalysisLoading(false);
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [persistCheckpoint]);
+
+  const evalByPly = useMemo(() => {
+    const map = new Map<number, GamePlyEvaluation>();
+    for (const item of plyEvaluations) {
+      map.set(item.ply, item);
+    }
+    return map;
+  }, [plyEvaluations]);
+
+  const keyMoments = useMemo(
+    () => buildKeyMoments(parsedGame, plyEvaluations, userPuzzles, highlights),
+    [highlights, parsedGame, plyEvaluations, userPuzzles]
+  );
+
+  // Keep activeMomentIndex in bounds when keyMoments change.
+  const clampedMomentIndex =
+    keyMoments.length === 0 ? 0 : Math.min(activeMomentIndex, keyMoments.length - 1);
+  const activeMoment = keyMoments[clampedMomentIndex] ?? null;
+
+  // Ensure every key moment has an initialized retry state.
+  useEffect(() => {
+    if (keyMoments.length === 0) {
+      return;
+    }
+    setRetryStatesByMomentId((previous) => {
+      let changed = false;
+      const next = { ...previous };
+      for (const moment of keyMoments) {
+        if (!next[moment.id]) {
+          next[moment.id] = createInitialRetryState(moment);
+          changed = true;
+        }
+      }
+      return changed ? next : previous;
+    });
+  }, [keyMoments]);
+
+  const activeRetryState = useMemo<KeyMomentRetryState | null>(() => {
+    if (!activeMoment) {
+      return null;
+    }
+    return retryStatesByMomentId[activeMoment.id] ?? createInitialRetryState(activeMoment);
+  }, [activeMoment, retryStatesByMomentId]);
+
+  const clearExploration = useCallback(() => {
+    setExplorationStartFen(null);
+    setExplorationMoves([]);
+    setExplorationFen(null);
+  }, []);
+
+  const isExploringOffLine = explorationFen !== null && explorationMoves.length > 0;
+
+  // Compute the current board position, last move highlight, and evaluation score.
+  const { currentFen, currentLastMoveUci, currentScore, currentWhiteWinPercent } = useMemo(() => {
+    if (isExploringOffLine && explorationFen) {
+      const liveTop = freeAnalysisLines[0];
+      const liveScore = liveTop?.score ?? EVEN_ANALYSIS_SCORE;
+      return {
+        currentFen: explorationFen,
+        currentLastMoveUci: explorationMoves[explorationMoves.length - 1] ?? null,
+        currentScore: liveScore,
+        currentWhiteWinPercent: whiteWinPercentForScore(liveScore)
+      };
+    }
+
+    if (mode === "moments" && activeMoment && activeRetryState) {
+      const momentBoard = fenForRetryState(activeMoment, activeRetryState);
+      const momentEval = evalByPly.get(activeMoment.ply);
+      const score = momentEval?.scoreAfter ?? EVEN_ANALYSIS_SCORE;
+      return {
+        currentFen: momentBoard.fen,
+        currentLastMoveUci: momentBoard.lastMoveUci,
+        currentScore: score,
+        currentWhiteWinPercent: momentEval
+          ? momentEval.whiteWinPercent
+          : whiteWinPercentForScore(score)
+      };
+    }
+
+    // Moves browsing mode
+    if (!parsedGame || currentPly <= 0) {
+      const firstEval = plyEvaluations[0];
+      const initWin = firstEval
+        ? firstEval.color === "w"
+          ? firstEval.moverWinPercentBefore
+          : 100 - firstEval.moverWinPercentBefore
+        : 50;
+      return {
+        currentFen: parsedGame?.initialFen ?? STANDARD_STARTING_FEN,
+        currentLastMoveUci: null,
+        currentScore: EVEN_ANALYSIS_SCORE,
+        currentWhiteWinPercent: initWin
+      };
+    }
+
+    const clampedPly = Math.min(currentPly, parsedGame.plies.length);
+    const parsedPly = parsedGame.plies[clampedPly - 1];
+    const plyEval = evalByPly.get(clampedPly);
+    const score = plyEval?.scoreAfter ?? EVEN_ANALYSIS_SCORE;
+    return {
+      currentFen: parsedPly?.fenAfter ?? parsedGame.initialFen ?? STANDARD_STARTING_FEN,
+      currentLastMoveUci: parsedPly?.uci ?? null,
+      currentScore: score,
+      currentWhiteWinPercent: plyEval ? plyEval.whiteWinPercent : whiteWinPercentForScore(score)
+    };
+  }, [
+    activeMoment,
+    activeRetryState,
+    currentPly,
+    evalByPly,
+    explorationFen,
+    explorationMoves,
+    freeAnalysisLines,
+    isExploringOffLine,
+    mode,
+    parsedGame,
+    plyEvaluations
+  ]);
+
+  const isPromptHidingAnswer =
+    mode === "moments" &&
+    activeMoment?.kind === "puzzle" &&
+    activeRetryState?.status === "prompt";
+
+  // Live Free Stockfish Analysis (MultiPV=3, priority="interactive" preempts Pass-2 batch work!)
+  useEffect(() => {
+    if (!freeAnalysisOpen || !engine || isPromptHidingAnswer) {
+      freeAnalysisAbortRef.current?.abort();
+      freeAnalysisAbortRef.current = null;
+      setFreeAnalysisLoading(false);
+      if (!freeAnalysisOpen) {
+        setFreeAnalysisLines([]);
+        setFreeAnalysisError(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    freeAnalysisAbortRef.current = controller;
+    setFreeAnalysisLoading(true);
+    setFreeAnalysisError(null);
+
+    engine
+      .analyze({
+        fen: currentFen,
+        multiPv: DEFAULT_FREE_ANALYSIS_MULTIPV,
+        depth: freeAnalysisDepth,
+        priority: "interactive",
+        signal: controller.signal,
+        onUpdate: (lines) => {
+          if (!cancelled && !controller.signal.aborted) {
+            setFreeAnalysisLines(lines);
+          }
+        }
+      })
+      .then((lines) => {
+        if (!cancelled && !controller.signal.aborted) {
+          setFreeAnalysisLines(lines);
+          setFreeAnalysisLoading(false);
+        }
+      })
+      .catch((error) => {
+        if (cancelled || controller.signal.aborted) {
+          return;
+        }
+        setFreeAnalysisLoading(false);
+        setFreeAnalysisError(
+          error instanceof Error ? error.message : "Engine analysis unavailable"
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (freeAnalysisAbortRef.current === controller) {
+        freeAnalysisAbortRef.current = null;
+      }
+    };
+  }, [currentFen, engine, freeAnalysisDepth, freeAnalysisOpen, isPromptHidingAnswer]);
+
+  // Compute board overlay arrows & Arrow Duel candidates.
+  const { boardArrows, arrowDuelCandidates } = useMemo<{
+    boardArrows: GameReviewBoardArrow[];
+    arrowDuelCandidates: string[] | null;
+  }>(() => {
+    const arrows: GameReviewBoardArrow[] = [];
+    let candidates: string[] | null = null;
+
+    if (!isExploringOffLine && mode === "moments" && activeMoment && activeRetryState) {
+      if (activeMoment.kind === "highlight") {
+        arrows.push({ move: activeMoment.highlight.uci, role: "highlight", selected: true });
+      } else if (activeRetryState.status === "prompt") {
+        if (activeMoment.puzzle.puzzleKind === "arrow_duel" && activeRetryState.candidates) {
+          candidates = activeRetryState.candidates;
+        }
+        // In Line prompt mode, answer is strictly hidden (zero answer arrows).
+      } else if (!activeRetryState.showingRefutation) {
+        if (activeMoment.bestMoveUci) {
+          arrows.push({
+            move: activeMoment.bestMoveUci,
+            role: "best",
+            selected: true
+          });
+        }
+        if (
+          activeMoment.playedMoveUci &&
+          normalizeUciMove(activeMoment.playedMoveUci) !==
+            normalizeUciMove(activeMoment.bestMoveUci ?? "")
+        ) {
+          arrows.push({
+            move: activeMoment.playedMoveUci,
+            role: "blunder",
+            selected: false
+          });
+        }
+      }
+    } else if (freeAnalysisOpen && freeAnalysisLines[0]?.move) {
+      arrows.push({
+        move: freeAnalysisLines[0].move,
+        role: "engine",
+        selected: true
+      });
+    }
+
+    return { boardArrows: arrows, arrowDuelCandidates: candidates };
+  }, [
+    activeMoment,
+    activeRetryState,
+    freeAnalysisLines,
+    freeAnalysisOpen,
+    isExploringOffLine,
+    mode
+  ]);
+
+  const setMode = useCallback(
+    (nextMode: GameReviewMode) => {
+      clearExploration();
+      setModeState(nextMode);
+      if (nextMode === "moments" && keyMoments[clampedMomentIndex]) {
+        setCurrentPly(keyMoments[clampedMomentIndex]!.ply);
+      }
+    },
+    [clampedMomentIndex, clearExploration, keyMoments]
+  );
+
+  const selectPly = useCallback(
+    (ply: number) => {
+      clearExploration();
+      const clamped = Math.max(0, Math.min(ply, totalPlies));
+      setCurrentPly(clamped);
+      setModeState("moves");
+    },
+    [clearExploration, totalPlies]
+  );
+
+  const stepFirst = useCallback(() => selectPly(0), [selectPly]);
+  const stepPrev = useCallback(() => selectPly(currentPly - 1), [currentPly, selectPly]);
+  const stepNext = useCallback(() => selectPly(currentPly + 1), [currentPly, selectPly]);
+  const stepLast = useCallback(() => selectPly(totalPlies), [selectPly, totalPlies]);
+
+  const toggleFlip = useCallback(() => {
+    setFlipped((value) => !value);
+  }, []);
+
+  const selectKeyMoment = useCallback(
+    (index: number) => {
+      if (keyMoments.length === 0) {
+        return;
+      }
+      clearExploration();
+      const bounded = Math.max(0, Math.min(index, keyMoments.length - 1));
+      setActiveMomentIndex(bounded);
+      const target = keyMoments[bounded];
+      if (target) {
+        setCurrentPly(target.ply);
+      }
+      setModeState("moments");
+    },
+    [clearExploration, keyMoments]
+  );
+
+  const prevKeyMoment = useCallback(() => {
+    selectKeyMoment(clampedMomentIndex - 1);
+  }, [clampedMomentIndex, selectKeyMoment]);
+
+  const nextKeyMoment = useCallback(() => {
+    selectKeyMoment(clampedMomentIndex + 1);
+  }, [clampedMomentIndex, selectKeyMoment]);
+
+  const skipActiveKeyMoment = useCallback(() => {
+    if (!activeMoment || activeMoment.kind !== "puzzle") {
+      return;
+    }
+    setRetryStatesByMomentId((previous) => {
+      const current = previous[activeMoment.id] ?? createInitialRetryState(activeMoment);
+      return {
+        ...previous,
+        [activeMoment.id]: {
+          ...current,
+          status: "skipped",
+          showingRefutation: false,
+          refutationStep: 0
+        }
+      };
+    });
+  }, [activeMoment]);
+
+  const retryActiveKeyMoment = useCallback(() => {
+    if (!activeMoment || activeMoment.kind !== "puzzle") {
+      return;
+    }
+    clearExploration();
+    setRetryStatesByMomentId((previous) => ({
+      ...previous,
+      [activeMoment.id]: createInitialRetryState(activeMoment)
+    }));
+  }, [activeMoment, clearExploration]);
+
+  const recordRetryOutcome = useCallback(
+    (puzzle: StoredUserPuzzle, result: "correct" | "wrong"): boolean => {
+      const ctx = reviewContextForUserPuzzle(puzzle);
+      const outcome = practiceService.recordGameReviewRetryOutcome({
+        puzzleId: ctx.puzzleId,
+        mode: ctx.mode,
+        ratingKey: ctx.ratingKey,
+        result
+      });
+      if (outcome.enrolled) {
+        setEnrolledPuzzleIds((previous) => {
+          const next = new Set(previous);
+          next.add(puzzle.id);
+          return next;
+        });
+      }
+      return outcome.enrolled;
+    },
+    [practiceService]
+  );
+
+  const handleExplorationMove = useCallback(
+    (uci: string) => {
+      const baseFen = explorationFen ?? currentFen;
+      const applied = tryApplyUciMove(baseFen, uci);
+      if (!applied) {
+        return;
+      }
+      if (!explorationStartFen) {
+        setExplorationStartFen(currentFen);
+      }
+      setExplorationMoves((previous) => [...previous, applied.uci]);
+      setExplorationFen(applied.fen);
+    },
+    [currentFen, explorationFen, explorationStartFen]
+  );
+
+  const submitBoardMove = useCallback(
+    (rawUci: string) => {
+      const uci = normalizeUciMove(rawUci);
+      if (!uci) {
+        return;
+      }
+
+      // Interactive Retry mode (Key Moments prompt)
+      if (
+        !isExploringOffLine &&
+        mode === "moments" &&
+        activeMoment?.kind === "puzzle" &&
+        activeRetryState?.status === "prompt"
+      ) {
+        const puzzle = activeMoment.puzzle;
+
+        if (puzzle.puzzleKind === "arrow_duel" && activeRetryState.duelState) {
+          const isCandidate = activeRetryState.duelState.candidates.some(
+            (candidate) => normalizeUciMove(candidate) === uci
+          );
+          if (!isCandidate) {
+            return;
+          }
+          const { state: nextDuel, feedback } = submitArrowDuelChoice(
+            activeRetryState.duelState,
+            uci,
+            { opponentReply: false }
+          );
+          const solved = feedback.result === "correct";
+          const enrolled = recordRetryOutcome(puzzle, solved ? "correct" : "wrong");
+
+          setRetryStatesByMomentId((previous) => ({
+            ...previous,
+            [activeMoment.id]: {
+              ...activeRetryState,
+              duelState: nextDuel,
+              selectedMove: uci,
+              status: solved ? "solved" : "failed",
+              showingRefutation: !solved && activeRetryState.punishmentLine.length > 0,
+              refutationStep: !solved && activeRetryState.punishmentLine.length > 0 ? 1 : 0,
+              autoEnrolledInReview: enrolled
+            }
+          }));
+          return;
+        }
+
+        if (puzzle.puzzleKind === "line" && activeRetryState.lineState) {
+          let result;
+          try {
+            result = submitLineMove(activeRetryState.lineState, uci);
+          } catch {
+            return;
+          }
+          if (result.feedback.result === "wrong") {
+            const enrolled = recordRetryOutcome(puzzle, "wrong");
+            setRetryStatesByMomentId((previous) => ({
+              ...previous,
+              [activeMoment.id]: {
+                ...activeRetryState,
+                selectedMove: uci,
+                expectedMove: result.feedback.expectedMove,
+                status: "failed",
+                showingRefutation: false,
+                refutationStep: 0,
+                autoEnrolledInReview: enrolled
+              }
+            }));
+            return;
+          }
+
+          if (result.feedback.puzzleSolved) {
+            const enrolled = recordRetryOutcome(puzzle, "correct");
+            setRetryStatesByMomentId((previous) => ({
+              ...previous,
+              [activeMoment.id]: {
+                ...activeRetryState,
+                lineState: result.state,
+                selectedMove: uci,
+                status: "solved",
+                showingRefutation: false,
+                refutationStep: 0,
+                autoEnrolledInReview: enrolled
+              }
+            }));
+            return;
+          }
+
+          // Multi-move line: advance cursor and stay in prompt for the next move.
+          setRetryStatesByMomentId((previous) => ({
+            ...previous,
+            [activeMoment.id]: {
+              ...activeRetryState,
+              lineState: result.state,
+              selectedMove: uci
+            }
+          }));
+          return;
+        }
+      }
+
+      // Free exploration move on the board (Moves mode, solved/failed review, or Engine open)
+      handleExplorationMove(uci);
+    },
+    [
+      activeMoment,
+      activeRetryState,
+      handleExplorationMove,
+      isExploringOffLine,
+      mode,
+      recordRetryOutcome
+    ]
+  );
+
+  const selectArrowDuelCandidate = useCallback(
+    (uci: string) => {
+      submitBoardMove(uci);
+    },
+    [submitBoardMove]
+  );
+
+  const toggleRefutationPlayback = useCallback(() => {
+    if (!activeMoment || !activeRetryState || activeRetryState.punishmentLine.length === 0) {
+      return;
+    }
+    clearExploration();
+    setRetryStatesByMomentId((previous) => {
+      const current = previous[activeMoment.id] ?? activeRetryState;
+      const nextShowing = !current.showingRefutation;
+      return {
+        ...previous,
+        [activeMoment.id]: {
+          ...current,
+          showingRefutation: nextShowing,
+          refutationStep: nextShowing ? 1 : 0
+        }
+      };
+    });
+  }, [activeMoment, activeRetryState, clearExploration]);
+
+  const stepRefutationForward = useCallback(() => {
+    if (!activeMoment || !activeRetryState) {
+      return;
+    }
+    setRetryStatesByMomentId((previous) => {
+      const current = previous[activeMoment.id] ?? activeRetryState;
+      const nextStep = Math.min(current.punishmentLine.length, current.refutationStep + 1);
+      return {
+        ...previous,
+        [activeMoment.id]: {
+          ...current,
+          showingRefutation: true,
+          refutationStep: nextStep
+        }
+      };
+    });
+  }, [activeMoment, activeRetryState]);
+
+  const stepRefutationBackward = useCallback(() => {
+    if (!activeMoment || !activeRetryState) {
+      return;
+    }
+    setRetryStatesByMomentId((previous) => {
+      const current = previous[activeMoment.id] ?? activeRetryState;
+      const nextStep = Math.max(0, current.refutationStep - 1);
+      return {
+        ...previous,
+        [activeMoment.id]: {
+          ...current,
+          showingRefutation: nextStep > 0,
+          refutationStep: nextStep
+        }
+      };
+    });
+  }, [activeMoment, activeRetryState]);
+
+  const togglePuzzleReviewEnrollment = useCallback(
+    (puzzle: StoredUserPuzzle) => {
+      const ctx = reviewContextForUserPuzzle(puzzle);
+      const currentlyEnrolled = Boolean(practiceService.getReviewQueueState(ctx));
+      if (currentlyEnrolled) {
+        practiceService.removeReview(ctx);
+        setEnrolledPuzzleIds((previous) => {
+          const next = new Set(previous);
+          next.delete(puzzle.id);
+          return next;
+        });
+      } else {
+        practiceService.enrollReview(ctx);
+        setEnrolledPuzzleIds((previous) => {
+          const next = new Set(previous);
+          next.add(puzzle.id);
+          return next;
+        });
+      }
+    },
+    [practiceService]
+  );
+
+  const toggleFreeAnalysis = useCallback(() => {
+    setFreeAnalysisOpen((value) => !value);
+  }, []);
+
+  const playEngineLineMove = useCallback(
+    (uci: string) => {
+      if (isPromptHidingAnswer) {
+        return;
+      }
+      handleExplorationMove(uci);
+    },
+    [handleExplorationMove, isPromptHidingAnswer]
+  );
+
+  const returnToGameLine = useCallback(() => {
+    clearExploration();
+  }, [clearExploration]);
+
+  const resumeAnalysis = useCallback(() => {
+    if (analysisStatus === "complete") {
+      return;
+    }
+    setScanTrigger((value) => value + 1);
+  }, [analysisStatus]);
+
+  const evalGraphPoints = useMemo(
+    () => buildEvalGraphPoints(parsedGame, plyEvaluations, keyMoments),
+    [keyMoments, parsedGame, plyEvaluations]
+  );
+
+  const summary = useMemo(
+    () => buildGameReviewSummary(game, plyEvaluations, userPuzzles),
+    [game, plyEvaluations, userPuzzles]
+  );
+
+  return {
+    game,
+    parsedGame,
+    parseError,
+    analysisStatus,
+    scanPhase,
+    scanProgress: {
+      completedPlies: plyEvaluations.length,
+      totalPlies
+    },
+    scanError,
+    plyEvaluations,
+    evalByPly,
+    evalGraphPoints,
+    currentPly,
+    currentFen,
+    currentScore,
+    currentWhiteWinPercent,
+    currentLastMoveUci,
+    flipped,
+    mode,
+    keyMoments,
+    activeMomentIndex: clampedMomentIndex,
+    activeMoment,
+    activeRetryState,
+    retryStatesByMomentId,
+    boardArrows,
+    arrowDuelCandidates,
+    isPromptHidingAnswer,
+    userPuzzles,
+    enrolledPuzzleIds,
+    summary,
+    freeAnalysisOpen,
+    freeAnalysisLoading,
+    freeAnalysisLines,
+    freeAnalysisError,
+    isExploringOffLine,
+    explorationPliesCount: explorationMoves.length,
+    setMode,
+    selectPly,
+    stepFirst,
+    stepPrev,
+    stepNext,
+    stepLast,
+    toggleFlip,
+    selectKeyMoment,
+    prevKeyMoment,
+    nextKeyMoment,
+    skipActiveKeyMoment,
+    retryActiveKeyMoment,
+    submitBoardMove,
+    selectArrowDuelCandidate,
+    toggleRefutationPlayback,
+    stepRefutationForward,
+    stepRefutationBackward,
+    togglePuzzleReviewEnrollment,
+    toggleFreeAnalysis,
+    playEngineLineMove,
+    returnToGameLine,
+    resumeAnalysis
+  };
+}

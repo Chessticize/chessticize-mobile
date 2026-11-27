@@ -1,0 +1,309 @@
+import React from "react";
+import { Pressable, View } from "react-native";
+import { curatedPuzzleThemes } from "../../../../../packages/core/src/index.ts";
+import type { StoredUserPuzzle } from "../../../../../packages/storage/src/index.ts";
+import { makeStyles } from "../../theme/index.ts";
+import { customThemeLabel } from "../practice/shared/themeCatalog.ts";
+import { AppText, Badge, Button } from "../ui/index.tsx";
+import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
+import type { GameReviewSummaryData, SideClassificationCounts } from "./gameReviewTypes.ts";
+
+export interface GameReviewSummaryCardProps {
+  summary: GameReviewSummaryData;
+  whitePlayerName: string;
+  blackPlayerName: string;
+  enrolledPuzzleIds: ReadonlySet<string>;
+  onSelectPuzzle?: (puzzle: StoredUserPuzzle) => void;
+  onToggleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
+  onPracticeGamePuzzles?: () => void;
+  testID?: string;
+}
+
+export function GameReviewSummaryCard({
+  summary,
+  whitePlayerName,
+  blackPlayerName,
+  enrolledPuzzleIds,
+  onSelectPuzzle,
+  onToggleReviewEnrollment,
+  onPracticeGamePuzzles,
+  testID = "game-review-summary-card"
+}: GameReviewSummaryCardProps): React.JSX.Element {
+  const styles = useStyles();
+  const { puzzles } = summary;
+
+  return (
+    <View style={styles.container} testID={testID}>
+      <AppText variant="headline">{GAME_REVIEW_COPY.summary.title}</AppText>
+
+      <View style={styles.accuracyRow} testID="game-review-accuracy-strip">
+        <AccuracyColumn
+          counts={summary.white}
+          highlight={summary.userColor === "w"}
+          name={whitePlayerName || GAME_REVIEW_COPY.summary.whiteLabel}
+          sideLabel={GAME_REVIEW_COPY.summary.whiteLabel}
+          testID="game-review-accuracy-white"
+        />
+        <AccuracyColumn
+          counts={summary.black}
+          highlight={summary.userColor === "b"}
+          name={blackPlayerName || GAME_REVIEW_COPY.summary.blackLabel}
+          sideLabel={GAME_REVIEW_COPY.summary.blackLabel}
+          testID="game-review-accuracy-black"
+        />
+      </View>
+
+      <View style={styles.countsTable} testID="game-review-classification-counts">
+        <ClassificationCountRow
+          blackCount={summary.black.best}
+          label={GAME_REVIEW_COPY.classifications.best}
+          tone="positive"
+          whiteCount={summary.white.best}
+        />
+        <ClassificationCountRow
+          blackCount={summary.black.inaccuracy}
+          label={GAME_REVIEW_COPY.classifications.inaccuracy}
+          tone="warning"
+          whiteCount={summary.white.inaccuracy}
+        />
+        <ClassificationCountRow
+          blackCount={summary.black.mistake}
+          label={GAME_REVIEW_COPY.classifications.mistake}
+          tone="warning"
+          whiteCount={summary.white.mistake}
+        />
+        <ClassificationCountRow
+          blackCount={summary.black.blunder}
+          label={GAME_REVIEW_COPY.classifications.blunder}
+          tone="negative"
+          whiteCount={summary.white.blunder}
+        />
+        <ClassificationCountRow
+          blackCount={summary.black.missedWin}
+          label={GAME_REVIEW_COPY.classifications.missed_win}
+          tone="warning"
+          whiteCount={summary.white.missedWin}
+        />
+      </View>
+
+      <View style={styles.puzzlesSection} testID="game-review-summary-puzzles">
+        <AppText variant="subheadline">
+          {GAME_REVIEW_COPY.summary.puzzlesTitle(puzzles.length)}
+        </AppText>
+
+        {puzzles.length === 0 ? (
+          <AppText tone="secondary" variant="footnote">
+            {GAME_REVIEW_COPY.summary.noPuzzles}
+          </AppText>
+        ) : (
+          <View style={styles.puzzlesList}>
+            {puzzles.map((puzzle) => {
+              const inReview = enrolledPuzzleIds.has(puzzle.id);
+              const curatedThemes = curatedPuzzleThemes(puzzle.themes);
+              const kindLabel =
+                puzzle.puzzleKind === "arrow_duel"
+                  ? GAME_REVIEW_COPY.summary.kindArrowDuel
+                  : GAME_REVIEW_COPY.summary.kindLine;
+
+              return (
+                <View
+                  key={puzzle.id}
+                  style={styles.puzzleRow}
+                  testID={`summary-puzzle-row-${puzzle.id}`}
+                >
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={!onSelectPuzzle}
+                    onPress={() => onSelectPuzzle?.(puzzle)}
+                    style={styles.puzzleMeta}
+                    testID={`summary-puzzle-open-${puzzle.id}`}
+                  >
+                    <View style={styles.puzzleBadges}>
+                      <Badge label={kindLabel} tone="accent" />
+                      <Badge
+                        label={GAME_REVIEW_COPY.summary.moveNumberLabel(puzzle.gameMoveNumber)}
+                        tone="neutral"
+                      />
+                    </View>
+                    {curatedThemes.length > 0 ? (
+                      <View style={styles.themeTagsRow}>
+                        {curatedThemes.slice(0, 3).map((themeId) => (
+                          <Badge
+                            key={themeId}
+                            label={customThemeLabel(themeId)}
+                            tone="neutral"
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                  </Pressable>
+                  <Button
+                    label={
+                      inReview
+                        ? GAME_REVIEW_COPY.summary.inReview
+                        : GAME_REVIEW_COPY.summary.addToReview
+                    }
+                    onPress={() => onToggleReviewEnrollment(puzzle)}
+                    size="compact"
+                    testID={`summary-puzzle-review-toggle-${puzzle.id}`}
+                    variant={inReview ? "plain" : "secondary"}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {puzzles.length > 0 && onPracticeGamePuzzles ? (
+          <Button
+            label={GAME_REVIEW_COPY.summary.practiceGamePuzzles}
+            onPress={onPracticeGamePuzzles}
+            stretch
+            testID="game-review-practice-puzzles-cta"
+            variant="primary"
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function AccuracyColumn({
+  sideLabel,
+  name,
+  counts,
+  highlight,
+  testID
+}: {
+  sideLabel: string;
+  name: string;
+  counts: SideClassificationCounts;
+  highlight: boolean;
+  testID: string;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View
+      style={[styles.accuracyCard, highlight ? styles.accuracyCardActive : null]}
+      testID={testID}
+    >
+      <AppText numberOfLines={1} tone="secondary" variant="caption">
+        {sideLabel}
+      </AppText>
+      <AppText numberOfLines={1} variant="footnote">
+        {name}
+      </AppText>
+      <AppText testID={`${testID}-value`} variant="numeralLarge">
+        {GAME_REVIEW_COPY.summary.accuracyLabel(counts.accuracy)}
+      </AppText>
+    </View>
+  );
+}
+
+function ClassificationCountRow({
+  label,
+  whiteCount,
+  blackCount,
+  tone
+}: {
+  label: string;
+  whiteCount: number;
+  blackCount: number;
+  tone: "positive" | "warning" | "negative";
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View style={styles.countRow}>
+      <AppText style={styles.countNumeral} variant="numeralRow">
+        {String(whiteCount)}
+      </AppText>
+      <AppText style={styles.countLabel} tone={tone} variant="footnote">
+        {label}
+      </AppText>
+      <AppText style={styles.countNumeral} variant="numeralRow">
+        {String(blackCount)}
+      </AppText>
+    </View>
+  );
+}
+
+const useStyles = makeStyles((theme) => ({
+  container: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.card,
+    borderWidth: 1,
+    gap: 12,
+    padding: 12
+  },
+  accuracyRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  accuracyCard: {
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  accuracyCardActive: {
+    borderColor: theme.colors.accent.s400
+  },
+  countsTable: {
+    gap: 4
+  },
+  countRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 2
+  },
+  countNumeral: {
+    minWidth: 32,
+    textAlign: "center"
+  },
+  countLabel: {
+    flex: 1,
+    textAlign: "center"
+  },
+  puzzlesSection: {
+    borderTopColor: theme.colors.border.default,
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 10
+  },
+  puzzlesList: {
+    gap: 8
+  },
+  puzzleRow: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSunken,
+    borderRadius: theme.shape.control,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "space-between",
+    padding: 10
+  },
+  puzzleMeta: {
+    flex: 1,
+    gap: 6,
+    minWidth: 150
+  },
+  puzzleBadges: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  themeTagsRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4
+  }
+}));
