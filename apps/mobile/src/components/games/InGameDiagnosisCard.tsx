@@ -82,11 +82,13 @@ export function InGameDiagnosisCard({
         <AppText style={styles.heading} variant="headline">
           {t("games.insights.title")}
         </AppText>
-        <Badge
-          label={headline.title}
-          testID="games-diagnosis-headline"
-          tone={headline.tone}
-        />
+        <View>
+          <Badge
+            label={headline.title}
+            testID="games-diagnosis-headline"
+            tone={headline.tone}
+          />
+        </View>
       </View>
 
       {showClock ? (

@@ -278,9 +278,9 @@ describe("GamesHubScreen", () => {
     expect(hasTestID(renderer, "games-list")).toBe(true);
     expect(hasTestID(renderer, "game-row-https://www.chess.com/game/live/1001")).toBe(true);
     expect(service.listImportedGames()).toHaveLength(1);
-    expect(textContent(findByTestID(renderer, "games-sync-summary"))).toContain("+1 game");
+    expect(hasTestID(renderer, "games-sync-summary")).toBe(false);
 
-    // Re-syncing the same game keeps no duplicates and omits a redundant "Up to date" badge.
+    // Re-syncing the same game keeps no duplicates and omits any persistent sync summary badge.
     await pressAsync(renderer, "games-sync-button");
     expect(service.listImportedGames()).toHaveLength(1);
     expect(hasTestID(renderer, "games-sync-summary")).toBe(false);
@@ -447,7 +447,8 @@ describe("GamesHubScreen", () => {
     expect(requests.length).toBe(1);
     expect(requests[0]).toContain("since=");
     expect(service.listImportedGames()).toHaveLength(1);
-    expect(textContent(findByTestID(renderer, "games-sync-summary"))).toContain("1");
+    expect(hasTestID(renderer, "game-row-https://lichess.org/autoSync1")).toBe(true);
+    expect(hasTestID(renderer, "games-sync-summary")).toBe(false);
   });
 
   it("displays all user puzzles ordered by game recency with Add All to Review, Replay launch, and Game link", () => {

@@ -122,7 +122,6 @@ export function GamesHubScreen({
   const [modalInitialTab, setModalInitialTab] = useState<GamesImportTab>(initialImportTab);
   const [syncing, setSyncing] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [syncSummary, setSyncSummary] = useState<string | null>(null);
   const [hubError, setHubError] = useState<string | null>(initialError);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalStatus, setModalStatus] = useState<string | null>(null);
@@ -428,9 +427,6 @@ export function GamesHubScreen({
       setHubError(null);
       try {
         const result = await syncAccount({ platform, username }, maxGames);
-        setSyncSummary(
-          result.inserted > 0 ? t("games.sync.added", { count: result.inserted }) : null
-        );
         setModalStatus(
           result.skipped > 0
             ? t("games.import.summaryWithSkipped", {
@@ -456,11 +452,9 @@ export function GamesHubScreen({
     }
     setSyncing(true);
     setHubError(null);
-    setSyncSummary(null);
     try {
-      let totalInserted = 0;
       for (const account of snapshot.linkedAccounts) {
-        const result = await syncAccount(
+        await syncAccount(
           {
             platform: account.platform,
             username: account.username,
@@ -468,17 +462,13 @@ export function GamesHubScreen({
           },
           50
         );
-        totalInserted += result.inserted;
       }
-      setSyncSummary(
-        totalInserted > 0 ? t("games.sync.added", { count: totalInserted }) : null
-      );
     } catch (error) {
       setHubError(gameImportErrorMessage(error, locale));
     } finally {
       setSyncing(false);
     }
-  }, [loadingOlder, locale, snapshot.linkedAccounts, syncAccount, syncing, t]);
+  }, [loadingOlder, locale, snapshot.linkedAccounts, syncAccount, syncing]);
 
   const handleImportOlderGames = useCallback(
     async (targetAccount?: LinkedGameAccount): Promise<void> => {
@@ -535,13 +525,12 @@ export function GamesHubScreen({
           totalInserted += upsert.inserted;
         }
         refreshHub();
-        const summary =
-          totalInserted > 0
-            ? t("games.sync.added", { count: totalInserted })
-            : t("games.sync.noOlderGames");
-        setSyncSummary(summary);
         if (targetAccount) {
-          setModalStatus(summary);
+          setModalStatus(
+            totalInserted > 0
+              ? t("games.sync.added", { count: totalInserted })
+              : t("games.sync.noOlderGames")
+          );
         }
       } catch (error) {
         const message = gameImportErrorMessage(error, locale);
@@ -610,7 +599,6 @@ export function GamesHubScreen({
               skipped: totalSkipped
             })
           : t("games.import.summary", { count: upsert.inserted });
-      setSyncSummary(summary);
       setModalStatus(summary);
       refreshHub();
     },
@@ -900,29 +888,17 @@ export function GamesHubScreen({
             ) : null}
           </CollapsibleRegion>
 
-          {syncSummary || (unanalyzedGames.length > 0 && !batchBusy) ? (
+          {unanalyzedGames.length > 0 && !batchBusy ? (
             <View style={styles.controlsStrip} testID="games-top-bar">
-              {syncSummary ? (
-                <View style={styles.accountRow}>
-                  <Badge
-                    label={syncSummary}
-                    testID="games-sync-summary"
-                    tone="positive"
-                  />
-                </View>
-              ) : null}
-
-              {unanalyzedGames.length > 0 && !batchBusy ? (
-                <View style={styles.secondaryActionRow}>
-                  <Button
-                    label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
-                    size="compact"
-                    testID="games-analyze-recent"
-                    variant="secondary"
-                    onPress={handleAnalyzeAll}
-                  />
-                </View>
-              ) : null}
+              <View style={styles.secondaryActionRow}>
+                <Button
+                  label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
+                  size="compact"
+                  testID="games-analyze-recent"
+                  variant="secondary"
+                  onPress={handleAnalyzeAll}
+                />
+              </View>
             </View>
           ) : null}
 
@@ -1382,11 +1358,13 @@ function GameRow({
       testID={`game-row-${game.id}`}
       onPress={onPress}
     >
-      <Badge
-        label={gameResultShortLabel(outcome, locale)}
-        testID={`game-row-result-${game.id}`}
-        tone={badgeTone}
-      />
+      <View style={styles.gameRowLeading}>
+        <Badge
+          label={gameResultShortLabel(outcome, locale)}
+          testID={`game-row-result-${game.id}`}
+          tone={badgeTone}
+        />
+      </View>
       <View style={styles.gameRowCopy}>
         <AppText ellipsizeMode="tail" numberOfLines={1} variant="headline">
           {opponentLine}
@@ -1586,6 +1564,11 @@ const useStyles = makeStyles((theme) => ({
   },
   gameRowPressed: {
     backgroundColor: theme.colors.surfaceStrong
+  },
+  gameRowLeading: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center"
   },
   gameRowCopy: {
     flex: 1,
