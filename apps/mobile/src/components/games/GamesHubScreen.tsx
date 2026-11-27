@@ -34,8 +34,11 @@ import {
   Section,
   SegmentedControl
 } from "../ui/index.tsx";
+import { CollapsibleRegion } from "../practice/shared/CollapsibleRegion.tsx";
 import { FilterButton } from "../practice/shared/FilterButton.tsx";
+import { FilterGlyph } from "../practice/shared/Glyphs.tsx";
 import { customThemeLabel } from "../practice/shared/themeCatalog.ts";
+import { ToolbarIconButton } from "../practice/shared/ToolbarIconButton.tsx";
 import { BatchAnalysisBanner } from "./BatchAnalysisBanner.tsx";
 import { GamesImportModal, type GamesImportTab } from "./GamesImportModal.tsx";
 import { InGameDiagnosisCard } from "./InGameDiagnosisCard.tsx";
@@ -112,6 +115,8 @@ export function GamesHubScreen({
 
   const [revision, setRevision] = useState(0);
   const [hubView, setHubView] = useState<"games" | "puzzles">("games");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [accountFilter, setAccountFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
   const [timeClassFilter, setTimeClassFilter] = useState<GamesTimeClassFilter>("all");
   const [internalModalOpen, setInternalModalOpen] = useState(false);
@@ -230,6 +235,40 @@ export function GamesHubScreen({
     };
   }, [revision, service]);
 
+  const availableAccountFilters = useMemo(() => {
+    const byKey = new Map<string, { key: string; label: string }>();
+    for (const account of snapshot.linkedAccounts) {
+      const key = `${account.platform}:${account.username.toLowerCase()}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          key,
+          label: `${gamePlatformLabel(account.platform, locale)} · ${account.username}`
+        });
+      }
+    }
+    for (const game of snapshot.allGames) {
+      if (game.platform === "pgn") {
+        if (!byKey.has("pgn")) {
+          byKey.set("pgn", { key: "pgn", label: "PGN" });
+        }
+      } else if (game.username) {
+        const key = `${game.platform}:${game.username.toLowerCase()}`;
+        if (!byKey.has(key)) {
+          byKey.set(key, {
+            key,
+            label: `${gamePlatformLabel(game.platform, locale)} · ${game.username}`
+          });
+        }
+      }
+    }
+    return [...byKey.values()];
+  }, [locale, snapshot.allGames, snapshot.linkedAccounts]);
+
+  const effectiveAccountFilter =
+    accountFilter === "all" || availableAccountFilters.some((item) => item.key === accountFilter)
+      ? accountFilter
+      : "all";
+
   const availableTimeClassFilters = useMemo(() => {
     const present = new Set<string>();
     for (const game of snapshot.allGames) {
@@ -248,15 +287,74 @@ export function GamesHubScreen({
     ? timeClassFilter
     : "all";
 
+  const matchesAccountFilter = useCallback(
+    (game: StoredImportedGame | undefined): boolean => {
+      if (effectiveAccountFilter === "all") {
+        return true;
+      }
+      if (!game) {
+        return false;
+      }
+      if (effectiveAccountFilter === "pgn") {
+        return game.platform === "pgn";
+      }
+      const key = `${game.platform}:${(game.username ?? "").toLowerCase()}`;
+      return key === effectiveAccountFilter;
+    },
+    [effectiveAccountFilter]
+  );
+
   const filteredGames = useMemo(
     () =>
       snapshot.allGames.filter(
         (game) =>
+          matchesAccountFilter(game) &&
           matchesGamesStatusFilter(game.analysisStatus, statusFilter) &&
           matchesGamesTimeClassFilter(game.timeClass, effectiveTimeClassFilter)
       ),
-    [effectiveTimeClassFilter, snapshot.allGames, statusFilter]
+    [effectiveTimeClassFilter, matchesAccountFilter, snapshot.allGames, statusFilter]
   );
+
+  const filteredOrderedUserPuzzles = useMemo(
+    () =>
+      snapshot.orderedUserPuzzles.filter((puzzle) => {
+        const sourceGame = snapshot.gameById.get(puzzle.gameId);
+        if (!matchesAccountFilter(sourceGame)) {
+          return false;
+        }
+        const puzzleTimeClass = puzzle.timeClass ?? sourceGame?.timeClass ?? "other";
+        return matchesGamesTimeClassFilter(puzzleTimeClass, effectiveTimeClassFilter);
+      }),
+    [effectiveTimeClassFilter, matchesAccountFilter, snapshot.gameById, snapshot.orderedUserPuzzles]
+  );
+
+  const filteredDiagnosis = useMemo(() => {
+    const gamesInScope = snapshot.allGames.filter(
+      (game) =>
+        matchesAccountFilter(game) &&
+        matchesGamesTimeClassFilter(game.timeClass, effectiveTimeClassFilter)
+    );
+    return diagnoseInGameWeaknesses({
+      games: gamesInScope,
+      puzzles: filteredOrderedUserPuzzles
+    });
+  }, [
+    effectiveTimeClassFilter,
+    filteredOrderedUserPuzzles,
+    matchesAccountFilter,
+    snapshot.allGames
+  ]);
+
+  const hasActiveFilters =
+    effectiveAccountFilter !== "all" ||
+    statusFilter !== "all" ||
+    effectiveTimeClassFilter !== "all";
+
+  const resetAllFilters = useCallback((): void => {
+    setAccountFilter("all");
+    setStatusFilter("all");
+    setTimeClassFilter("all");
+  }, []);
 
   const unanalyzedGames = useMemo(
     () => snapshot.allGames.filter((game) => game.analysisStatus !== "complete"),
@@ -476,8 +574,8 @@ export function GamesHubScreen({
   const effectiveHubView: "games" | "puzzles" =
     snapshot.userPuzzleCount > 0 ? hubView : "games";
   const allVisiblePuzzlesEnrolled =
-    snapshot.orderedUserPuzzles.length > 0 &&
-    snapshot.orderedUserPuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
+    filteredOrderedUserPuzzles.length > 0 &&
+    filteredOrderedUserPuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
 
   return (
     <View
@@ -524,6 +622,15 @@ export function GamesHubScreen({
                 )}
               </Pressable>
             ) : null}
+            <ToolbarIconButton
+              accessibilityLabel={filtersExpanded ? t("history.hideFiltersA11y") : t("history.showFiltersA11y")}
+              accessibilityState={{ expanded: filtersExpanded }}
+              active={filtersExpanded || hasActiveFilters}
+              testID="games-filter-toggle"
+              onPress={() => setFiltersExpanded((current) => !current)}
+            >
+              <FilterGlyph active={filtersExpanded || hasActiveFilters} />
+            </ToolbarIconButton>
             <Button
               icon="add"
               label={t("games.action.import")}
@@ -613,23 +720,99 @@ export function GamesHubScreen({
         </Section>
       ) : (
         <>
-          <View style={styles.controlsStrip} testID="games-top-bar">
-            {snapshot.linkedAccounts.length > 0 || syncSummary ? (
-              <View style={styles.accountRow}>
-                {snapshot.linkedAccounts.map((account) => (
-                  <LinkedAccountPill
-                    key={`${account.platform}:${account.username}`}
-                    account={account}
-                    onPress={() => openModal(account.platform)}
+          <CollapsibleRegion
+            contentStyle={styles.filtersDrawer}
+            contentTestID="games-filters"
+            expanded={filtersExpanded}
+          >
+            {availableAccountFilters.length > 1 ? (
+              <ScrollView
+                accessibilityLabel="Filter by account"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                testID="games-account-filters"
+              >
+                <View style={styles.filterRow}>
+                  <FilterButton
+                    active={effectiveAccountFilter === "all"}
+                    label={t("games.filter.all")}
+                    testID="games-filter-account-all"
+                    onPress={() => setAccountFilter("all")}
+                  />
+                  {availableAccountFilters.map((account) => (
+                    <FilterButton
+                      key={account.key}
+                      active={effectiveAccountFilter === account.key}
+                      label={account.label}
+                      testID={`games-filter-account-${account.key}`}
+                      onPress={() => setAccountFilter(account.key)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : null}
+            {effectiveHubView === "games" ? (
+              <View
+                accessibilityLabel={t("games.filter.statusA11y")}
+                style={styles.filterRow}
+                testID="games-status-filters"
+              >
+                {GAMES_STATUS_FILTERS.map((filter) => (
+                  <FilterButton
+                    key={filter}
+                    active={statusFilter === filter}
+                    label={t(`games.filter.${filter}`)}
+                    testID={`games-filter-status-${filter}`}
+                    onPress={() => setStatusFilter(filter)}
                   />
                 ))}
-                {syncSummary ? (
-                  <Badge
-                    label={syncSummary}
-                    testID="games-sync-summary"
-                    tone="positive"
-                  />
-                ) : null}
+              </View>
+            ) : null}
+            {availableTimeClassFilters.length > 2 ? (
+              <ScrollView
+                accessibilityLabel={t("games.filter.timeClassA11y")}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                testID="games-time-class-filters"
+              >
+                <View style={styles.filterRow}>
+                  {availableTimeClassFilters.map((filter) => (
+                    <FilterButton
+                      key={filter}
+                      active={effectiveTimeClassFilter === filter}
+                      label={
+                        filter === "all"
+                          ? t("games.filter.all")
+                          : gameTimeClassLabel(filter, locale)
+                      }
+                      testID={`games-filter-time-${filter}`}
+                      onPress={() => setTimeClassFilter(filter)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : null}
+            {hasActiveFilters ? (
+              <View style={styles.filterResetRow}>
+                <Button
+                  label={t("games.action.resetFilters")}
+                  size="compact"
+                  testID="games-filter-drawer-reset"
+                  variant="plain"
+                  onPress={resetAllFilters}
+                />
+              </View>
+            ) : null}
+          </CollapsibleRegion>
+
+          <View style={styles.controlsStrip} testID="games-top-bar">
+            {syncSummary ? (
+              <View style={styles.accountRow}>
+                <Badge
+                  label={syncSummary}
+                  testID="games-sync-summary"
+                  tone="positive"
+                />
               </View>
             ) : null}
 
@@ -723,176 +906,167 @@ export function GamesHubScreen({
           {effectiveHubView === "puzzles" ? (
             <View style={styles.puzzlesTabSection} testID="games-puzzles-view">
               <View style={styles.puzzlesTabActions}>
-                {onPracticeMyGamePuzzles ? (
+                {onPracticeMyGamePuzzles && filteredOrderedUserPuzzles.length > 0 ? (
                   <Button
                     icon="play"
-                    label={`Replay all (${snapshot.orderedUserPuzzles.length})`}
+                    label={`Replay all (${filteredOrderedUserPuzzles.length})`}
                     size="compact"
                     testID="games-puzzles-practice-all"
                     variant="primary"
                     onPress={() =>
                       onPracticeMyGamePuzzles({
-                        puzzleIds: snapshot.orderedUserPuzzles.map((p) => p.id),
+                        puzzleIds: filteredOrderedUserPuzzles.map((p) => p.id),
                         initialIndex: 0
                       })
                     }
                   />
                 ) : null}
-                <Button
-                  disabled={allVisiblePuzzlesEnrolled}
-                  label={allVisiblePuzzlesEnrolled ? "All in Review" : "Add All to Review"}
-                  size="compact"
-                  testID="games-puzzles-add-all-review"
-                  variant={allVisiblePuzzlesEnrolled ? "plain" : "secondary"}
-                  onPress={() => handleAddAllUserPuzzlesToReview(snapshot.orderedUserPuzzles)}
-                />
+                {filteredOrderedUserPuzzles.length > 0 ? (
+                  <Button
+                    disabled={allVisiblePuzzlesEnrolled}
+                    label={allVisiblePuzzlesEnrolled ? "All in Review" : "Add All to Review"}
+                    size="compact"
+                    testID="games-puzzles-add-all-review"
+                    variant={allVisiblePuzzlesEnrolled ? "plain" : "secondary"}
+                    onPress={() => handleAddAllUserPuzzlesToReview(filteredOrderedUserPuzzles)}
+                  />
+                ) : null}
               </View>
 
-              <Section rows testID="games-puzzles-list">
-                {snapshot.orderedUserPuzzles.map((puzzle, index) => {
-                  const sourceGame = snapshot.gameById.get(puzzle.gameId);
-                  const opponentName =
-                    puzzle.opponentName ??
-                    (sourceGame ? gameOpponentForUser(sourceGame).username : undefined);
-                  const timeClass = puzzle.timeClass
-                    ? gameTimeClassLabel(puzzle.timeClass, locale)
-                    : sourceGame?.timeClass
-                      ? gameTimeClassLabel(sourceGame.timeClass, locale)
-                      : "";
-                  const dateLabel = puzzle.playedAt
-                    ? gameRelativeDateLabel(puzzle.playedAt, nowMs, locale)
-                    : sourceGame?.playedAt
-                      ? gameRelativeDateLabel(sourceGame.playedAt, nowMs, locale)
-                      : "";
-                  const headerLine = opponentName
-                    ? `vs ${opponentName} · Move ${puzzle.gameMoveNumber}`
-                    : `Move ${puzzle.gameMoveNumber}`;
-                  const metaLine = [timeClass, dateLabel].filter(Boolean).join(" · ");
-                  const inReview = snapshot.enrolledPuzzleIds.has(puzzle.id);
-                  const curatedThemes = curatedPuzzleThemes(puzzle.themes);
-                  const kindLabel =
-                    puzzle.puzzleKind === "arrow_duel"
-                      ? t("common.arrowDuel")
-                      : t("common.standard");
+              {filteredOrderedUserPuzzles.length === 0 ? (
+                <Section testID="games-filtered-empty">
+                  <View style={styles.filteredEmptyContent}>
+                    <AppText tone="secondary" variant="body">
+                      {t("games.filter.filteredEmpty")}
+                    </AppText>
+                    <Button
+                      label={t("games.action.resetFilters")}
+                      size="compact"
+                      testID="games-reset-filters"
+                      variant="secondary"
+                      onPress={resetAllFilters}
+                    />
+                  </View>
+                </Section>
+              ) : (
+                <Section rows testID="games-puzzles-list">
+                  {filteredOrderedUserPuzzles.map((puzzle, index) => {
+                    const sourceGame = snapshot.gameById.get(puzzle.gameId);
+                    const opponentName =
+                      puzzle.opponentName ??
+                      (sourceGame ? gameOpponentForUser(sourceGame).username : undefined);
+                    const timeClass = puzzle.timeClass
+                      ? gameTimeClassLabel(puzzle.timeClass, locale)
+                      : sourceGame?.timeClass
+                        ? gameTimeClassLabel(sourceGame.timeClass, locale)
+                        : "";
+                    const dateLabel = puzzle.playedAt
+                      ? gameRelativeDateLabel(puzzle.playedAt, nowMs, locale)
+                      : sourceGame?.playedAt
+                        ? gameRelativeDateLabel(sourceGame.playedAt, nowMs, locale)
+                        : "";
+                    const headerLine = opponentName
+                      ? `vs ${opponentName} · Move ${puzzle.gameMoveNumber}`
+                      : `Move ${puzzle.gameMoveNumber}`;
+                    const metaLine = [timeClass, dateLabel].filter(Boolean).join(" · ");
+                    const inReview = snapshot.enrolledPuzzleIds.has(puzzle.id);
+                    const curatedThemes = curatedPuzzleThemes(puzzle.themes);
+                    const kindLabel =
+                      puzzle.puzzleKind === "arrow_duel"
+                        ? t("common.arrowDuel")
+                        : t("common.standard");
 
-                  return (
-                    <View
-                      key={puzzle.id}
-                      style={styles.puzzleListRow}
-                      testID={`games-puzzle-row-${puzzle.id}`}
-                    >
-                      <Pressable
-                        accessibilityRole="button"
-                        disabled={!onPracticeMyGamePuzzles}
-                        onPress={() =>
-                          onPracticeMyGamePuzzles?.({
-                            puzzleIds: snapshot.orderedUserPuzzles.map((p) => p.id),
-                            initialIndex: index
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.puzzleListMain,
-                          pressed && onPracticeMyGamePuzzles ? styles.pressed : null
-                        ]}
-                        testID={`games-puzzle-play-${puzzle.id}`}
+                    return (
+                      <View
+                        key={puzzle.id}
+                        style={styles.puzzleListRow}
+                        testID={`games-puzzle-row-${puzzle.id}`}
                       >
-                        <AppText numberOfLines={1} variant="subheadline">
-                          {headerLine}
-                        </AppText>
-                        {metaLine ? (
-                          <AppText numberOfLines={1} tone="secondary" variant="caption">
-                            {metaLine}
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={!onPracticeMyGamePuzzles}
+                          onPress={() =>
+                            onPracticeMyGamePuzzles?.({
+                              puzzleIds: filteredOrderedUserPuzzles.map((p) => p.id),
+                              initialIndex: index
+                            })
+                          }
+                          style={({ pressed }) => [
+                            styles.puzzleListMain,
+                            pressed && onPracticeMyGamePuzzles ? styles.pressed : null
+                          ]}
+                          testID={`games-puzzle-play-${puzzle.id}`}
+                        >
+                          <AppText numberOfLines={1} variant="subheadline">
+                            {headerLine}
                           </AppText>
-                        ) : null}
-                        <View style={styles.puzzleListBadges}>
-                          <Badge label={kindLabel} tone="accent" />
-                          {curatedThemes.slice(0, 2).map((themeId) => (
-                            <Badge
-                              key={themeId}
-                              label={customThemeLabel(themeId)}
-                              tone="neutral"
-                            />
-                          ))}
-                        </View>
-                      </Pressable>
+                          {metaLine ? (
+                            <AppText numberOfLines={1} tone="secondary" variant="caption">
+                              {metaLine}
+                            </AppText>
+                          ) : null}
+                          <View style={styles.puzzleListBadges}>
+                            <Badge label={kindLabel} tone="accent" />
+                            {curatedThemes.slice(0, 2).map((themeId) => (
+                              <Badge
+                                key={themeId}
+                                label={customThemeLabel(themeId)}
+                                tone="neutral"
+                              />
+                            ))}
+                          </View>
+                        </Pressable>
 
-                      <View style={styles.puzzleListTrailing}>
-                        <Button
-                          label={inReview ? "In Review" : "Add to Review"}
-                          size="compact"
-                          testID={`games-puzzle-review-toggle-${puzzle.id}`}
-                          variant={inReview ? "plain" : "secondary"}
-                          onPress={() => handleToggleUserPuzzleReview(puzzle)}
-                        />
-                        <Button
-                          label="Game ›"
-                          size="compact"
-                          testID={`games-puzzle-open-game-${puzzle.id}`}
-                          variant="plain"
-                          onPress={() => onOpenGameReview(puzzle.gameId)}
-                        />
+                        <View style={styles.puzzleListTrailing}>
+                          <Button
+                            label={inReview ? "In Review" : "Add to Review"}
+                            size="compact"
+                            testID={`games-puzzle-review-toggle-${puzzle.id}`}
+                            variant={inReview ? "plain" : "secondary"}
+                            onPress={() => handleToggleUserPuzzleReview(puzzle)}
+                          />
+                          <Button
+                            label="Game ›"
+                            size="compact"
+                            testID={`games-puzzle-open-game-${puzzle.id}`}
+                            variant="plain"
+                            onPress={() => onOpenGameReview(puzzle.gameId)}
+                          />
+                        </View>
                       </View>
-                    </View>
-                  );
-                })}
-              </Section>
+                    );
+                  })}
+                </Section>
+              )}
             </View>
           ) : (
             <>
               <InGameDiagnosisCard
-                diagnosis={snapshot.diagnosis}
+                diagnosis={filteredDiagnosis}
                 onPracticeBlindspotTheme={
                   onPracticeMyGamePuzzles
-                    ? (theme) =>
-                        onPracticeMyGamePuzzles({
-                          themes: [theme],
-                          ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
-                        })
+                    ? (theme) => {
+                        const matchingIds = filteredOrderedUserPuzzles
+                          .filter((puzzle) =>
+                            puzzle.themes.some(
+                              (item) => item.toLowerCase() === theme.toLowerCase()
+                            )
+                          )
+                          .map((puzzle) => puzzle.id);
+                        if (effectiveAccountFilter !== "all" && matchingIds.length > 0) {
+                          onPracticeMyGamePuzzles({ puzzleIds: matchingIds, initialIndex: 0 });
+                        } else {
+                          onPracticeMyGamePuzzles({
+                            themes: [theme],
+                            ...(effectiveTimeClassFilter !== "all"
+                              ? { timeClass: effectiveTimeClassFilter }
+                              : {})
+                          });
+                        }
+                      }
                     : undefined
                 }
               />
-
-              <View style={styles.filtersBlock} testID="games-filters">
-                <View
-                  accessibilityLabel={t("games.filter.statusA11y")}
-                  style={styles.filterRow}
-                  testID="games-status-filters"
-                >
-                  {GAMES_STATUS_FILTERS.map((filter) => (
-                    <FilterButton
-                      key={filter}
-                      active={statusFilter === filter}
-                      label={t(`games.filter.${filter}`)}
-                      testID={`games-filter-status-${filter}`}
-                      onPress={() => setStatusFilter(filter)}
-                    />
-                  ))}
-                </View>
-                {availableTimeClassFilters.length > 2 ? (
-                  <ScrollView
-                    accessibilityLabel={t("games.filter.timeClassA11y")}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    testID="games-time-class-filters"
-                  >
-                    <View style={styles.filterRow}>
-                      {availableTimeClassFilters.map((filter) => (
-                        <FilterButton
-                          key={filter}
-                          active={effectiveTimeClassFilter === filter}
-                          label={
-                            filter === "all"
-                              ? t("games.filter.all")
-                              : gameTimeClassLabel(filter, locale)
-                          }
-                          testID={`games-filter-time-${filter}`}
-                          onPress={() => setTimeClassFilter(filter)}
-                        />
-                      ))}
-                    </View>
-                  </ScrollView>
-                ) : null}
-              </View>
 
               {filteredGames.length === 0 ? (
                 <Section testID="games-filtered-empty">
@@ -905,10 +1079,7 @@ export function GamesHubScreen({
                       size="compact"
                       testID="games-reset-filters"
                       variant="secondary"
-                      onPress={() => {
-                        setStatusFilter("all");
-                        setTimeClassFilter("all");
-                      }}
+                      onPress={resetAllFilters}
                     />
                   </View>
                 </Section>
@@ -1183,6 +1354,13 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     gap: 8
+  },
+  filtersDrawer: {
+    gap: 8,
+    paddingBottom: 4
+  },
+  filterResetRow: {
+    alignItems: "flex-start"
   },
   puzzlesTabSection: {
     gap: 10

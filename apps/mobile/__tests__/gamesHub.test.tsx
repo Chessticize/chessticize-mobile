@@ -320,16 +320,22 @@ describe("GamesHubScreen", () => {
     service.upsertImportedGames([
       makeDraft({
         id: "g-blitz-unanalyzed",
+        platform: "chess_com",
+        username: "alice",
         timeClass: "blitz",
         black: { username: "BlitzFoe", rating: 1550, isAi: false }
       }),
       makeDraft({
         id: "g-rapid-analyzed",
+        platform: "lichess",
+        username: "alice_li",
         timeClass: "rapid",
         black: { username: "RapidFoe", rating: 1700, isAi: false }
       }),
       makeDraft({
         id: "g-bullet-partial",
+        platform: "chess_com",
+        username: "alice",
         timeClass: "bullet",
         black: { username: "BulletFoe", rating: 1480, isAi: false }
       })
@@ -359,6 +365,15 @@ describe("GamesHubScreen", () => {
     expect(textContent(findByTestID(renderer, "game-row-status-g-rapid-analyzed"))).toContain("84%");
     expect(textContent(findByTestID(renderer, "game-row-status-g-bullet-partial"))).toContain("Resume");
     expect(textContent(findByTestID(renderer, "game-row-status-g-blitz-unanalyzed"))).toContain("Review");
+
+    // Expand collapsible filter drawer (matches History pattern)
+    press(renderer, "games-filter-toggle");
+
+    // Account filter inside drawer narrows games to the selected account.
+    press(renderer, "games-filter-account-lichess:alice_li");
+    expect(hasTestID(renderer, "game-row-g-rapid-analyzed")).toBe(true);
+    expect(hasTestID(renderer, "game-row-g-blitz-unanalyzed")).toBe(false);
+    press(renderer, "games-filter-account-all");
 
     press(renderer, "games-filter-status-analyzed");
     expect(hasTestID(renderer, "game-row-g-rapid-analyzed")).toBe(true);

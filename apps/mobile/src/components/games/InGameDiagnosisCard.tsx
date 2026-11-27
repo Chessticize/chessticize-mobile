@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import type {
   DiagnosisHeadlineKind,
   InGameWeaknessDiagnosis
@@ -136,8 +136,13 @@ export function InGameDiagnosisCard({
       ) : null}
 
       {diagnosis.topBlindspots.length > 0 ? (
-        <View style={styles.blindspotsRow} testID="games-diagnosis-blindspots">
-          {diagnosis.topBlindspots.slice(0, 4).map((spot) => (
+        <ScrollView
+          contentContainerStyle={styles.blindspotsRow}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          testID="games-diagnosis-blindspots"
+        >
+          {diagnosis.topBlindspots.slice(0, 6).map((spot) => (
             <Pressable
               key={spot.theme}
               accessibilityRole={onPracticeBlindspotTheme ? "button" : "text"}
@@ -154,7 +159,7 @@ export function InGameDiagnosisCard({
               </AppText>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       ) : null}
     </Section>
   );
@@ -207,8 +212,8 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: "700"
   },
   blindspotsRow: {
+    alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 6
   },
   blindspotChip: {
