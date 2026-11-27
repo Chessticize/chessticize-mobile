@@ -150,6 +150,41 @@ describe("mobile Back contract", () => {
       label: "History",
       testID: "tab-history"
     });
+
+    const gameReviewState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "game-review", owner: "games" },
+      tab: "games"
+    };
+    const gameReviewIntent = resolveMobileBackIntent(gameReviewState, "button");
+    expect(gameReviewIntent).toEqual({
+      kind: "return-to-owner",
+      owner: "games"
+    });
+    expect(mobileBackDestination(gameReviewIntent, gameReviewState)).toEqual({
+      label: "Games",
+      testID: "tab-games"
+    });
+
+    const gamesImportState: MobileBackState = {
+      ...rootState,
+      tab: "games",
+      topTransient: "games-import"
+    };
+    const gamesImportIntent = resolveMobileBackIntent(gamesImportState, "button");
+    expect(gamesImportIntent).toEqual({
+      kind: "dismiss-transient",
+      transient: "games-import"
+    });
+    expect(mobileBackDestination(gamesImportIntent, gamesImportState)).toEqual({
+      label: "Games",
+      testID: "tab-games"
+    });
+
+    expect(resolveMobileBackIntent({
+      ...rootState,
+      tab: "games"
+    }, "button")).toEqual({ kind: "return-to-practice" });
   });
 
   it("guards active practice, returns non-root tabs to Practice, and delegates only at root", () => {

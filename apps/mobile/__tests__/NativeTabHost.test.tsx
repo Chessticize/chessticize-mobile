@@ -224,6 +224,7 @@ describe("NativeTabHost", () => {
     expect(screens.map((screen) => [screen.props.screenKey, screen.props.tabBarItemTestID])).toEqual([
       ["practice", "practice-tab"],
       ["review", "review-tab"],
+      ["games", "games-tab"],
       ["history", "history-tab"],
       ["settings", "settings-tab"]
     ]);

@@ -1,7 +1,7 @@
 import { getActiveLocale, translate } from "../i18n/translate.ts";
 import type { SupportedLocale } from "../../../../packages/core/src/index.ts";
 
-export type MobileBackPrimaryTab = "practice" | "review" | "history" | "settings";
+export type MobileBackPrimaryTab = "practice" | "review" | "games" | "history" | "settings";
 export type MobileBackTab = MobileBackPrimaryTab | "analysis";
 
 export type MobileBackTransient =
@@ -9,6 +9,7 @@ export type MobileBackTransient =
   | "review-reminder-prompt"
   | "history-filters"
   | "review-filters"
+  | "games-import"
   | "settings-advanced-ratings"
   | "custom-rating-editor"
   | "sprint-session-guide"
@@ -25,6 +26,7 @@ export type MobileBackOwner = MobileBackPrimaryTab;
 export type MobileBackDetail =
   | { kind: "review-analysis"; owner: "history" | "review" }
   | { kind: "review-session"; owner: MobileBackOwner }
+  | { kind: "game-review"; owner: "games" }
   | { kind: "history-progress"; owner: "history" }
   | { kind: "tactical-profile"; owner: "practice" }
   | { kind: "practice-run-editor"; owner: "practice" }
@@ -159,6 +161,8 @@ function destinationLabelForTab(tab: MobileBackTab, locale: SupportedLocale): st
       return translate(locale, "tabs.practice");
     case "review":
       return translate(locale, "tabs.review");
+    case "games":
+      return translate(locale, "back.games");
     case "history":
       return translate(locale, "tabs.history");
     case "settings":
