@@ -26,6 +26,7 @@ import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./
 import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
 import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
+import type { GameReviewStore } from "./game-review-store.ts";
 
 export interface ClearSyncedHistoryResult {
   attempts: number;
@@ -179,7 +180,7 @@ export interface PracticeRatingActivity {
   lastPlayedAt: string;
 }
 
-export interface PracticeStore extends ProgressV2PersistenceHost {
+export interface PracticeStore extends ProgressV2PersistenceHost, GameReviewStore {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;
@@ -235,7 +236,7 @@ export interface PracticeStore extends ProgressV2PersistenceHost {
   clearSyncedHistory(now: string): ClearSyncedHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
-  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState;
+  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string, timeZone?: string): ReviewQueueState;
   removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval;
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;

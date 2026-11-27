@@ -1,3 +1,5 @@
+import type { GamePuzzleMomentKind } from "./game-puzzles/types.ts";
+
 export type SprintMode = "standard" | "blitz" | "arrow_duel" | "custom";
 
 export type SprintStatus = "active" | "paused" | "won" | "failed" | "abandoned";
@@ -70,6 +72,27 @@ export interface SurvivalPreferences {
   guideSeen: boolean;
 }
 
+export const USER_GAME_PUZZLE_ID_PREFIX = "ug_";
+
+export function isUserGamePuzzleId(id: string): boolean {
+  return id.startsWith(USER_GAME_PUZZLE_ID_PREFIX);
+}
+
+export interface UserGamePuzzleMeta {
+  gameId: string;
+  gamePly: number;
+  gameMoveNumber: number;
+  puzzleKind: "line" | "arrow_duel";
+  momentKind: GamePuzzleMomentKind;
+  opponentName?: string;
+  playedAt?: string;
+  timeClass?: string;
+  clockRemainingSec?: number;
+  timeSpentSec?: number;
+  punishmentLine?: string[];
+  caliberScore?: number;
+}
+
 export interface Puzzle {
   id: string;
   initialFen: string;
@@ -81,10 +104,11 @@ export interface Puzzle {
   themes: string[];
   gameUrl?: string;
   openingTags?: string[];
-  source: "lichess" | "synthetic";
+  source: "lichess" | "synthetic" | "user_game";
   stockfishEval?: number;
   stockfishBestMove?: string;
   stockfishEvalAfterFirstMove?: number;
+  userGameMeta?: UserGamePuzzleMeta;
 }
 
 export interface SprintConfig {
@@ -114,6 +138,11 @@ export interface SprintConfig {
   };
   /** Fixed-level, locally resumable Survival challenge identity. */
   survival?: SurvivalSprintConfig;
+  /** Personal "My Game Puzzles" session identity (local-only, unrated by default). */
+  userGamePuzzles?: {
+    timeClass?: string;
+    gameId?: string;
+  };
   /**
    * How the overall Run clock behaves. Absent means "countdown": the Run
    * fails with time_expired at `durationSeconds`. "untimed" (Focused Runs

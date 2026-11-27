@@ -32,6 +32,9 @@ const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 const SNAPSHOT_TABLES = [
   "app_review_request_state",
   "app_settings",
+  "game_ply_evals",
+  "imported_games",
+  "linked_accounts",
   "puzzles",
   "ratings",
   "sprint_sessions",
@@ -46,7 +49,8 @@ const SNAPSHOT_TABLES = [
   "review_events",
   "survival_bests",
   "survival_preferences",
-  "tactical_profile_source_state"
+  "tactical_profile_source_state",
+  "user_puzzles"
 ] as const;
 
 test("SQLite migrates an empty database to the current schema version", async () => {

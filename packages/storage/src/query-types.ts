@@ -5,6 +5,8 @@ import type {
   SprintMode
 } from "../../core/src/index.ts";
 
+export type PuzzleSelectionSource = "pack" | "user_game" | "all";
+
 export interface PuzzleSelectionFilter {
   mode: SprintMode;
   limit: number;
@@ -16,6 +18,9 @@ export interface PuzzleSelectionFilter {
   includeIds?: string[];
   excludeIds?: string[];
   randomSeed?: string | number;
+  source?: PuzzleSelectionSource;
+  timeClass?: string;
+  gameId?: string;
 }
 
 export interface HistoryFilter {
