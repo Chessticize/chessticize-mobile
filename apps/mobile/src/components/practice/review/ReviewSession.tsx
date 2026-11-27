@@ -1384,11 +1384,23 @@ export function ReviewSession({
             testID="review-open-source-game"
           >
             <AppText tone="accent" variant="caption">
-              {`${
-                currentEntry.puzzle.userGameMeta.opponentName
-                  ? `vs ${currentEntry.puzzle.userGameMeta.opponentName} · `
-                  : ""
-              }Move ${currentEntry.puzzle.userGameMeta.gameMoveNumber}${onOpenSourceGame ? " · View Game ›" : ""}`}
+              {currentEntry.puzzle.userGameMeta.opponentName
+                ? onOpenSourceGame
+                  ? t("games.puzzles.provenanceWithOpponent", {
+                      opponent: currentEntry.puzzle.userGameMeta.opponentName,
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })
+                  : t("games.puzzles.vsMove", {
+                      opponent: currentEntry.puzzle.userGameMeta.opponentName,
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })
+                : onOpenSourceGame
+                  ? t("games.puzzles.provenanceMoveOnly", {
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })
+                  : t("games.puzzles.moveOnly", {
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })}
             </AppText>
           </Pressable>
         ) : null}

@@ -2,8 +2,8 @@ import React from "react";
 import { Pressable, View } from "react-native";
 import type { EngineAnalysisLine } from "../../../../../packages/core/src/index.ts";
 import { makeStyles } from "../../theme/index.ts";
+import { useTranslation } from "../../i18n/index.ts";
 import { AppText, Badge, Button } from "../ui/index.tsx";
-import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
 import { formatEvalLabel, formatPvSanLine, uciToSan } from "./gameReviewHelpers.ts";
 
 export interface LiveEngineLinesPanelProps {
@@ -36,23 +36,24 @@ export function LiveEngineLinesPanel({
   testID = "game-review-engine-panel"
 }: LiveEngineLinesPanelProps): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   const topDepth = lines[0]?.depth;
 
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.headerRow}>
         <View style={styles.headerTitleGroup}>
-          <AppText variant="headline">{GAME_REVIEW_COPY.enginePanel.title}</AppText>
+          <AppText variant="headline">{t("gameReview.engine.title")}</AppText>
           {topDepth !== undefined ? (
             <Badge
-              label={GAME_REVIEW_COPY.enginePanel.depthLabel(topDepth)}
+              label={t("gameReview.engine.depth", { depth: topDepth })}
               testID={`${testID}-depth`}
               tone="neutral"
             />
           ) : null}
           {isExploringOffLine ? (
             <Badge
-              label={GAME_REVIEW_COPY.enginePanel.exploringOffset(explorationPliesCount)}
+              label={t("gameReview.engine.exploringOffset", { count: explorationPliesCount })}
               testID={`${testID}-exploring-badge`}
               tone="accent"
             />
@@ -60,7 +61,7 @@ export function LiveEngineLinesPanel({
         </View>
         <View style={styles.headerActions}>
           <Button
-            label={GAME_REVIEW_COPY.enginePanel.showArrows}
+            label={t("gameReview.engine.showArrows")}
             onPress={onToggleShowArrows}
             size="compact"
             testID="game-review-show-arrows-toggle"
@@ -68,7 +69,7 @@ export function LiveEngineLinesPanel({
           />
           {isExploringOffLine ? (
             <Button
-              label={GAME_REVIEW_COPY.enginePanel.backToGame}
+              label={t("gameReview.engine.backToGame")}
               onPress={onReturnToGame}
               size="compact"
               testID="game-review-back-to-game"
@@ -84,7 +85,7 @@ export function LiveEngineLinesPanel({
         </AppText>
       ) : lines.length === 0 ? (
         <AppText testID={`${testID}-status`} tone="secondary" variant="footnote">
-          {loading ? GAME_REVIEW_COPY.enginePanel.thinking : GAME_REVIEW_COPY.enginePanel.unavailable}
+          {loading ? t("gameReview.engine.thinking") : t("gameReview.engine.unavailable")}
         </AppText>
       ) : (
         <View style={styles.linesList}>
@@ -96,7 +97,10 @@ export function LiveEngineLinesPanel({
             return (
               <Pressable
                 key={`pv-${line.multipv}-${line.move}`}
-                accessibilityLabel={GAME_REVIEW_COPY.enginePanel.playLineA11y(firstSan, evalLabel)}
+                accessibilityLabel={t("gameReview.engine.playLineA11y", {
+                  san: firstSan,
+                  eval: evalLabel
+                })}
                 accessibilityRole="button"
                 accessibilityState={{ disabled }}
                 disabled={disabled}

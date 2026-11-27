@@ -538,7 +538,7 @@ export function GamesHubScreen({
         const summary =
           totalInserted > 0
             ? t("games.sync.added", { count: totalInserted })
-            : "No older games found";
+            : t("games.sync.noOlderGames");
         setSyncSummary(summary);
         if (targetAccount) {
           setModalStatus(summary);
@@ -822,7 +822,7 @@ export function GamesHubScreen({
           >
             {availableAccountFilters.length > 1 ? (
               <ScrollView
-                accessibilityLabel="Filter by account"
+                accessibilityLabel={t("games.filter.accountA11y")}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 testID="games-account-filters"
@@ -915,7 +915,7 @@ export function GamesHubScreen({
               {unanalyzedGames.length > 0 && !batchBusy ? (
                 <View style={styles.secondaryActionRow}>
                   <Button
-                    label={`Analyze all (${unanalyzedGames.length})`}
+                    label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
                     size="compact"
                     testID="games-analyze-recent"
                     variant="secondary"
@@ -936,7 +936,7 @@ export function GamesHubScreen({
 
           {snapshot.userPuzzleCount > 0 ? (
             <SegmentedControl
-              accessibilityLabel="Games or Puzzles view"
+              accessibilityLabel={t("games.view.a11y")}
               onChange={setHubView}
               options={[
                 {
@@ -945,7 +945,7 @@ export function GamesHubScreen({
                   value: "games"
                 },
                 {
-                  label: `Puzzles (${snapshot.userPuzzleCount})`,
+                  label: t("games.view.puzzlesTab", { count: snapshot.userPuzzleCount }),
                   testID: "games-hub-view-puzzles",
                   value: "puzzles"
                 }
@@ -1034,7 +1034,11 @@ export function GamesHubScreen({
                     ) : null}
                     <Button
                       disabled={allVisiblePuzzlesEnrolled}
-                      label={allVisiblePuzzlesEnrolled ? "All in Review" : "Add All to Review"}
+                      label={
+                        allVisiblePuzzlesEnrolled
+                          ? t("games.puzzles.allInReview")
+                          : t("games.puzzles.addAllToReview")
+                      }
                       size="compact"
                       testID="games-puzzles-add-all-review"
                       variant={allVisiblePuzzlesEnrolled ? "plain" : "secondary"}
@@ -1077,8 +1081,11 @@ export function GamesHubScreen({
                         ? gameRelativeDateLabel(sourceGame.playedAt, nowMs, locale)
                         : "";
                     const headerLine = opponentName
-                      ? `vs ${opponentName} · Move ${puzzle.gameMoveNumber}`
-                      : `Move ${puzzle.gameMoveNumber}`;
+                      ? t("games.puzzles.vsMove", {
+                          opponent: opponentName,
+                          move: puzzle.gameMoveNumber
+                        })
+                      : t("games.puzzles.moveOnly", { move: puzzle.gameMoveNumber });
                     const metaLine = [timeClass, dateLabel].filter(Boolean).join(" · ");
                     const inReview = snapshot.enrolledPuzzleIds.has(puzzle.id);
                     const curatedThemes = curatedPuzzleThemes(puzzle.themes);
@@ -1121,7 +1128,7 @@ export function GamesHubScreen({
                             {curatedThemes.slice(0, 2).map((themeId) => (
                               <Badge
                                 key={themeId}
-                                label={customThemeLabel(themeId)}
+                                label={customThemeLabel(themeId, locale)}
                                 tone="neutral"
                               />
                             ))}
@@ -1130,14 +1137,18 @@ export function GamesHubScreen({
 
                         <View style={styles.puzzleListTrailing}>
                           <Button
-                            label={inReview ? "In Review" : "Add to Review"}
+                            label={
+                              inReview
+                                ? t("games.puzzles.inReview")
+                                : t("games.puzzles.addToReview")
+                            }
                             size="compact"
                             testID={`games-puzzle-review-toggle-${puzzle.id}`}
                             variant={inReview ? "plain" : "secondary"}
                             onPress={() => handleToggleUserPuzzleReview(puzzle)}
                           />
                           <Button
-                            label="Game ›"
+                            label={t("games.puzzles.openGame")}
                             size="compact"
                             testID={`games-puzzle-open-game-${puzzle.id}`}
                             variant="plain"
@@ -1211,7 +1222,11 @@ export function GamesHubScreen({
                 <View style={styles.loadOlderFooter}>
                   <Button
                     disabled={syncing || loadingOlder}
-                    label={loadingOlder ? "Importing older games…" : "Import older games (+50)"}
+                    label={
+                      loadingOlder
+                        ? t("games.action.importingOlder")
+                        : t("games.action.importOlder")
+                    }
                     size="compact"
                     testID="games-load-older"
                     variant="secondary"
@@ -1292,9 +1307,20 @@ function GameRow({
   const colorLabel = game.userColor === "w" ? t("common.white") : t("common.black");
   const dateLabel = gameRelativeDateLabel(game.playedAt, nowMs, locale);
 
+  const isUnnamedPgn =
+    game.platform === "pgn" &&
+    game.white.username === "White" &&
+    game.black.username === "Black";
+  const opponentDisplayName = isUnnamedPgn
+    ? t("games.row.pgnFallbackTitle")
+    : game.platform === "pgn" && opponent.username === "White"
+      ? t("common.white")
+      : game.platform === "pgn" && opponent.username === "Black"
+        ? t("common.black")
+        : opponent.username;
   const opponentLine = opponent.rating !== undefined
-    ? `${opponent.username} (${opponent.rating})`
-    : opponent.username;
+    ? `${opponentDisplayName} (${opponent.rating})`
+    : opponentDisplayName;
   const metaLine = [colorLabel, timeClass, dateLabel].filter(Boolean).join(" · ");
 
   const badgeTone =

@@ -11,6 +11,7 @@ import type {
 } from "../../../../../packages/storage/src/game-review-store.ts";
 import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import { makeStyles, useBoardAppearance, useTheme } from "../../theme/index.ts";
+import { useTranslation, type TranslateFn } from "../../i18n/index.ts";
 import { buildPracticeAdaptiveLayout, PRACTICE_UI_PADDING } from "../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../PracticeViewport.tsx";
 import {
@@ -24,7 +25,6 @@ import { chessPieceSpriteFor } from "../practice/shared/chessPieceSprite.ts";
 import { AppText, Badge, Button, Icon } from "../ui/index.tsx";
 import { EvalBar } from "./EvalBar.tsx";
 import { EvalGraph } from "./EvalGraph.tsx";
-import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
 import {
   classificationBadgeMeta,
   formatEvalLabel,
@@ -90,6 +90,7 @@ export function GameReviewScreen({
 }: GameReviewScreenProps): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { t } = useTranslation();
   const { pieceSet } = useBoardAppearance();
   const viewport = usePracticeViewport();
   const [measuredStageWidth, setMeasuredStageWidth] = useState<number | null>(null);
@@ -166,7 +167,8 @@ export function GameReviewScreen({
     totalPlies: controller.scanProgress.totalPlies,
     scanError: controller.scanError,
     onResume: controller.resumeAnalysis,
-    styles
+    styles,
+    t
   });
 
   const activeSelectedPly = controller.currentPly;
@@ -333,7 +335,18 @@ export function GameReviewScreen({
     </View>
   );
 
-  const headerTitle = `${game.white.username} vs ${game.black.username}`;
+  const resolvedWhiteName =
+    game.platform === "pgn" && game.white.username === "White"
+      ? t("common.white")
+      : game.white.username || t("common.white");
+  const resolvedBlackName =
+    game.platform === "pgn" && game.black.username === "Black"
+      ? t("common.black")
+      : game.black.username || t("common.black");
+  const headerTitle = t("gameReview.header.vsTitle", {
+    white: resolvedWhiteName,
+    black: resolvedBlackName
+  });
 
   return (
     <View style={styles.screen} testID="game-review-screen">
@@ -342,7 +355,7 @@ export function GameReviewScreen({
           {onBack ? (
             <Button
               icon="chevronLeft"
-              label={GAME_REVIEW_COPY.header.backLabel}
+              label={t("gameReview.header.back")}
               onPress={onBack}
               size="compact"
               testID="game-review-back"
@@ -355,8 +368,8 @@ export function GameReviewScreen({
           <Pressable
             accessibilityLabel={
               controller.freeAnalysisOpen
-                ? GAME_REVIEW_COPY.header.engineActiveLabel
-                : GAME_REVIEW_COPY.header.engineToggle
+                ? t("gameReview.header.engineActive")
+                : t("gameReview.header.engineToggle")
             }
             accessibilityRole="button"
             accessibilityState={{ selected: controller.freeAnalysisOpen }}
@@ -420,7 +433,8 @@ function renderScanBanner({
   totalPlies,
   scanError,
   onResume,
-  styles
+  styles,
+  t
 }: {
   scanPhase: ReturnType<typeof useGameReviewController>["scanPhase"];
   completedPlies: number;
@@ -428,10 +442,17 @@ function renderScanBanner({
   scanError: string | null;
   onResume: () => void;
   styles: ReturnType<typeof useStyles>;
+  t: TranslateFn;
 }): React.JSX.Element | null {
   if (scanPhase === "scanning_pass1") {
     const progressPct =
       totalPlies > 0 ? Math.max(4, Math.min(100, Math.round((completedPlies / totalPlies) * 100))) : 15;
+    const statusText =
+      totalPlies <= 0
+        ? t("gameReview.status.analyzing")
+        : t("gameReview.status.analyzingPercent", {
+            percent: Math.min(99, Math.round((completedPlies / totalPlies) * 100))
+          });
     return (
       <View style={styles.scanProgressWrap} testID="game-review-scan-banner">
         <View style={styles.scanProgressTrack}>
@@ -439,7 +460,7 @@ function renderScanBanner({
         </View>
         <View style={styles.scanProgressRow}>
           <AppText tone="secondary" variant="caption">
-            {GAME_REVIEW_COPY.status.scanningPass1(completedPlies, totalPlies)}
+            {statusText}
           </AppText>
         </View>
       </View>
@@ -453,21 +474,24 @@ function renderScanBanner({
         </View>
         <View style={styles.scanProgressRow}>
           <AppText tone="secondary" variant="caption">
-            {GAME_REVIEW_COPY.status.extractingPass2}
+            {t("gameReview.status.extractingPuzzles")}
           </AppText>
         </View>
       </View>
     );
   }
   if (scanPhase === "paused") {
+    const pausedLabel =
+      totalPlies <= 0
+        ? t("gameReview.status.paused")
+        : t("gameReview.status.pausedPercent", {
+            percent: Math.min(99, Math.round((completedPlies / totalPlies) * 100))
+          });
     return (
       <View style={styles.scanBanner} testID="game-review-scan-paused">
-        <Badge
-          label={GAME_REVIEW_COPY.status.pausedAtCheckpoint(completedPlies, totalPlies)}
-          tone="warning"
-        />
+        <Badge label={pausedLabel} tone="warning" />
         <Button
-          label={GAME_REVIEW_COPY.status.resumeScan}
+          label={t("gameReview.status.resume")}
           onPress={onResume}
           size="compact"
           testID="game-review-resume-scan"
@@ -480,10 +504,10 @@ function renderScanBanner({
     return (
       <View style={styles.scanBanner} testID="game-review-scan-error">
         <AppText style={styles.scanErrorText} tone="negative" variant="footnote">
-          {scanError ?? GAME_REVIEW_COPY.status.analysisError}
+          {scanError ?? t("gameReview.status.error")}
         </AppText>
         <Button
-          label={GAME_REVIEW_COPY.status.retryScan}
+          label={t("gameReview.status.retry")}
           onPress={onResume}
           size="compact"
           testID="game-review-retry-scan"
@@ -625,6 +649,7 @@ function MoveVerdictStrip({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { t } = useTranslation();
   const canExplainWhy = Boolean(
     !isHidingAnswer && currentPlyEval && isSuboptimalClassification(currentPlyEval.classification)
   );
@@ -633,23 +658,24 @@ function MoveVerdictStrip({
   if (isHidingAnswer) {
     leftContent = (
       <AppText numberOfLines={1} tone="secondary" variant="footnote">
-        {GAME_REVIEW_COPY.header.modeKeyMoments}
+        {t("gameReview.header.modeKeyMoments")}
       </AppText>
     );
   } else if (currentPly <= 0) {
     leftContent = (
       <AppText numberOfLines={1} tone="secondary" variant="footnote">
-        {GAME_REVIEW_COPY.verdict.startPosition}
+        {t("gameReview.verdict.startPosition")}
       </AppText>
     );
   } else if (!currentPlyEval) {
     leftContent = (
       <AppText numberOfLines={1} tone="secondary" variant="footnote">
-        {isScanning ? GAME_REVIEW_COPY.verdict.evaluating : "—"}
+        {isScanning ? t("gameReview.verdict.evaluating") : "—"}
       </AppText>
     );
   } else {
     const meta = classificationBadgeMeta(currentPlyEval.classification, theme.colors);
+    const classificationLabel = t(`gameReview.classification.${currentPlyEval.classification}`);
     const moveTag = `${formatMoveNumberTag(currentPlyEval.moveNumber, currentPlyEval.color)} ${currentPlyEval.san}`;
     const evalLabel = formatEvalLabel(currentPlyEval.scoreAfter);
 
@@ -668,7 +694,7 @@ function MoveVerdictStrip({
           </AppText>
         </View>
         <AppText numberOfLines={1} style={styles.verdictText} variant="footnote">
-          {`${moveTag} · ${meta.label} (${evalLabel})`}
+          {`${moveTag} · ${classificationLabel} (${evalLabel})`}
         </AppText>
       </View>
     );
@@ -680,7 +706,7 @@ function MoveVerdictStrip({
       <View style={styles.criticalNavRow}>
         {canExplainWhy ? (
           <Pressable
-            accessibilityLabel={GAME_REVIEW_COPY.verdict.why}
+            accessibilityLabel={t("gameReview.verdict.why")}
             accessibilityRole="button"
             accessibilityState={{ selected: whyOpen }}
             onPress={onToggleWhy}
@@ -696,32 +722,32 @@ function MoveVerdictStrip({
               style={whyOpen ? styles.whyButtonTextActive : styles.whyButtonText}
               variant="caption"
             >
-              {GAME_REVIEW_COPY.verdict.why}
+              {t("gameReview.verdict.why")}
             </AppText>
           </Pressable>
         ) : null}
         {criticalCount > 0 ? (
           <>
             <Pressable
-              accessibilityLabel={GAME_REVIEW_COPY.verdict.prevKey}
+              accessibilityLabel={t("gameReview.verdict.prevKeyA11y")}
               accessibilityRole="button"
               onPress={onPrevCritical}
               style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
               testID="game-review-prev-critical"
             >
               <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
-                ‹ Key
+                {t("gameReview.verdict.prevKey")}
               </AppText>
             </Pressable>
             <Pressable
-              accessibilityLabel={GAME_REVIEW_COPY.verdict.nextKey}
+              accessibilityLabel={t("gameReview.verdict.nextKeyA11y")}
               accessibilityRole="button"
               onPress={onNextCritical}
               style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
               testID="game-review-next-critical"
             >
               <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
-                Key ›
+                {t("gameReview.verdict.nextKey")}
               </AppText>
             </Pressable>
           </>
@@ -757,6 +783,7 @@ function WhyRefutationPanel({
   step: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { t } = useTranslation();
   const scrollRef = useRef<ScrollView | null>(null);
   const chipOffsetsRef = useRef<Map<number, { x: number; width: number }>>(new Map());
   const scrollViewportWidthRef = useRef<number>(0);
@@ -777,18 +804,18 @@ function WhyRefutationPanel({
   }, [step]);
 
   const autoPlayLabel = autoPlaying
-    ? GAME_REVIEW_COPY.whyPanel.pause
+    ? t("gameReview.why.pause")
     : step >= tokens.length && tokens.length > 0
-      ? GAME_REVIEW_COPY.whyPanel.replay
-      : GAME_REVIEW_COPY.whyPanel.play;
+      ? t("gameReview.why.replay")
+      : t("gameReview.why.play");
 
   return (
     <View style={styles.whyPanel} testID="game-review-why-panel">
       <View style={styles.whyPanelHeader}>
         <AppText numberOfLines={1} style={styles.whyPanelTitle} tone="secondary" variant="caption">
           {tokens.length > 0
-            ? `${GAME_REVIEW_COPY.whyPanel.title} · ${step}/${tokens.length}`
-            : GAME_REVIEW_COPY.whyPanel.title}
+            ? t("gameReview.why.titleWithProgress", { step, total: tokens.length })
+            : t("gameReview.why.title")}
         </AppText>
         <View style={styles.whyPanelActions}>
           {tokens.length > 0 ? (
@@ -815,7 +842,7 @@ function WhyRefutationPanel({
                 </Pressable>
               ) : null}
               <Pressable
-                accessibilityLabel={GAME_REVIEW_COPY.whyPanel.prevA11y}
+                accessibilityLabel={t("gameReview.why.prevA11y")}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: step <= 0 }}
                 disabled={step <= 0}
@@ -828,11 +855,11 @@ function WhyRefutationPanel({
                 testID="game-review-why-prev"
               >
                 <AppText maxFontSizeMultiplier={1.2} style={styles.whyControlText} variant="caption">
-                  {GAME_REVIEW_COPY.whyPanel.prev}
+                  ‹
                 </AppText>
               </Pressable>
               <Pressable
-                accessibilityLabel={GAME_REVIEW_COPY.whyPanel.nextA11y}
+                accessibilityLabel={t("gameReview.why.nextA11y")}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: step >= tokens.length }}
                 disabled={step >= tokens.length}
@@ -845,20 +872,20 @@ function WhyRefutationPanel({
                 testID="game-review-why-next"
               >
                 <AppText maxFontSizeMultiplier={1.2} style={styles.whyControlText} variant="caption">
-                  {GAME_REVIEW_COPY.whyPanel.next}
+                  ›
                 </AppText>
               </Pressable>
             </>
           ) : null}
           <Pressable
-            accessibilityLabel={GAME_REVIEW_COPY.whyPanel.closeA11y}
+            accessibilityLabel={t("gameReview.why.closeA11y")}
             accessibilityRole="button"
             onPress={onClose}
             style={({ pressed }) => [styles.whyControlChip, pressed ? styles.pressed : null]}
             testID="game-review-why-close"
           >
             <AppText maxFontSizeMultiplier={1.2} style={styles.whyControlText} variant="caption">
-              {GAME_REVIEW_COPY.whyPanel.close}
+              ×
             </AppText>
           </Pressable>
         </View>
@@ -869,7 +896,7 @@ function WhyRefutationPanel({
         </AppText>
       ) : loading ? (
         <AppText testID="game-review-why-loading" tone="secondary" variant="footnote">
-          {GAME_REVIEW_COPY.whyPanel.loading}
+          {t("gameReview.why.loading")}
         </AppText>
       ) : tokens.length > 0 ? (
         <ScrollView
@@ -884,7 +911,7 @@ function WhyRefutationPanel({
           testID="game-review-why-san"
         >
           <Pressable
-            accessibilityLabel={GAME_REVIEW_COPY.moveStrip.startLabel}
+            accessibilityLabel={t("gameReview.moveStrip.start")}
             accessibilityRole="button"
             accessibilityState={{ selected: step === 0 }}
             onLayout={(event) => {
@@ -902,7 +929,7 @@ function WhyRefutationPanel({
               style={step === 0 ? styles.whyMoveChipTextSelected : styles.whyMoveChipText}
               variant="footnote"
             >
-              {GAME_REVIEW_COPY.moveStrip.startLabel}
+              {t("gameReview.moveStrip.start")}
             </AppText>
           </Pressable>
           {tokens.map((token) => {
@@ -936,7 +963,7 @@ function WhyRefutationPanel({
         </ScrollView>
       ) : (
         <AppText tone="secondary" variant="footnote">
-          {GAME_REVIEW_COPY.whyPanel.unavailable}
+          {t("gameReview.why.unavailable")}
         </AppText>
       )}
     </View>

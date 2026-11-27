@@ -4810,8 +4810,13 @@ export function PracticePocScreen({
         >
           <Text style={{ color: appTheme.colors.text.secondary, fontSize: 12, fontWeight: "600" }}>
             {displayedPuzzle.puzzle.userGameMeta.opponentName
-              ? `vs ${displayedPuzzle.puzzle.userGameMeta.opponentName} · Move ${displayedPuzzle.puzzle.userGameMeta.gameMoveNumber}`
-              : `From game · Move ${displayedPuzzle.puzzle.userGameMeta.gameMoveNumber}`}
+              ? t("games.puzzles.vsMove", {
+                  opponent: displayedPuzzle.puzzle.userGameMeta.opponentName,
+                  move: displayedPuzzle.puzzle.userGameMeta.gameMoveNumber
+                })
+              : t("games.puzzles.fromGameMove", {
+                  move: displayedPuzzle.puzzle.userGameMeta.gameMoveNumber
+                })}
           </Text>
         </Pressable>
       ) : null}

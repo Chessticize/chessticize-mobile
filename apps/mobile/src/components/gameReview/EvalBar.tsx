@@ -2,8 +2,8 @@ import React from "react";
 import { View } from "react-native";
 import type { AnalysisScore } from "../../../../../packages/core/src/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
+import { useTranslation } from "../../i18n/index.ts";
 import { AppText } from "../ui/index.tsx";
-import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
 import { formatEvalLabel } from "./gameReviewHelpers.ts";
 
 export interface EvalBarProps {
@@ -27,8 +27,13 @@ export function EvalBar({
 }: EvalBarProps): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { t } = useTranslation();
   const clampedWin = Math.max(4, Math.min(96, hidden ? 50 : whiteWinPercent));
   const evalLabel = hidden ? "—" : formatEvalLabel(score);
+  const evalA11yLabel = t("gameReview.evalBar.a11y", {
+    eval: evalLabel,
+    percent: Math.round(clampedWin)
+  });
   const whiteFillColor =
     theme.name === "dark" ? theme.colors.surfaceInverse : theme.colors.surface;
   const blackFillColor =
@@ -42,7 +47,7 @@ export function EvalBar({
     return (
       <View
         accessible
-        accessibilityLabel={GAME_REVIEW_COPY.evalBar.accessibilityLabel(evalLabel, clampedWin)}
+        accessibilityLabel={evalA11yLabel}
         style={styles.horizontalWrap}
         testID={testID}
       >
@@ -85,7 +90,7 @@ export function EvalBar({
   return (
     <View
       accessible
-      accessibilityLabel={GAME_REVIEW_COPY.evalBar.accessibilityLabel(evalLabel, clampedWin)}
+      accessibilityLabel={evalA11yLabel}
       style={[styles.verticalWrap, { height: length }]}
       testID={testID}
     >

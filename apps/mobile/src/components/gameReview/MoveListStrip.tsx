@@ -5,8 +5,8 @@ import type {
   ParsedGamePly
 } from "../../../../../packages/core/src/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
+import { useTranslation } from "../../i18n/index.ts";
 import { AppText, Icon } from "../ui/index.tsx";
-import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
 import { classificationBadgeMeta, formatMoveNumberTag } from "./gameReviewHelpers.ts";
 
 export interface MoveListStripProps {
@@ -38,6 +38,7 @@ export function MoveListStrip({
 }: MoveListStripProps): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { t } = useTranslation();
   const scrollRef = useRef<ScrollView | null>(null);
   const chipOffsetsRef = useRef<Map<number, { x: number; width: number }>>(new Map());
   const scrollViewportWidthRef = useRef<number>(0);
@@ -72,7 +73,7 @@ export function MoveListStrip({
         testID={`${testID}-scroll`}
       >
         <Pressable
-          accessibilityLabel={GAME_REVIEW_COPY.moveStrip.startLabel}
+          accessibilityLabel={t("gameReview.moveStrip.start")}
           accessibilityRole="button"
           accessibilityState={{ selected: currentPly === 0 }}
           onLayout={(event) => {
@@ -90,7 +91,7 @@ export function MoveListStrip({
             style={currentPly === 0 ? styles.moveChipTextSelected : styles.moveChipText}
             variant="footnote"
           >
-            {GAME_REVIEW_COPY.moveStrip.startLabel}
+            {t("gameReview.moveStrip.start")}
           </AppText>
         </Pressable>
         {plies.map((ply) => {
@@ -145,35 +146,35 @@ export function MoveListStrip({
 
       <View style={styles.controlsRow}>
         <StepButton
-          accessibilityLabel={GAME_REVIEW_COPY.moveStrip.firstMoveA11y}
+          accessibilityLabel={t("gameReview.moveStrip.firstMoveA11y")}
           disabled={atStart}
           label="<<"
           onPress={onStepFirst}
           testID="game-review-step-first"
         />
         <StepButton
-          accessibilityLabel={GAME_REVIEW_COPY.moveStrip.prevMoveA11y}
+          accessibilityLabel={t("gameReview.moveStrip.prevMoveA11y")}
           disabled={atStart}
           label="<"
           onPress={onStepPrev}
           testID="game-review-step-prev"
         />
         <StepButton
-          accessibilityLabel={GAME_REVIEW_COPY.moveStrip.nextMoveA11y}
+          accessibilityLabel={t("gameReview.moveStrip.nextMoveA11y")}
           disabled={atEnd}
           label=">"
           onPress={onStepNext}
           testID="game-review-step-next"
         />
         <StepButton
-          accessibilityLabel={GAME_REVIEW_COPY.moveStrip.lastMoveA11y}
+          accessibilityLabel={t("gameReview.moveStrip.lastMoveA11y")}
           disabled={atEnd}
           label=">>"
           onPress={onStepLast}
           testID="game-review-step-last"
         />
         <Pressable
-          accessibilityLabel={GAME_REVIEW_COPY.moveStrip.flipBoardA11y}
+          accessibilityLabel={t("gameReview.moveStrip.flipBoardA11y")}
           accessibilityRole="button"
           onPress={onToggleFlip}
           style={({ pressed }) => [styles.controlButton, pressed ? styles.pressed : null]}

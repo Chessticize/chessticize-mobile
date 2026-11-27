@@ -268,7 +268,7 @@ export function GamesImportModal({
                               {onImportOlderForAccount ? (
                                 <Button
                                   disabled={busy}
-                                  label="+50 older"
+                                  label={t("games.action.importOlderShort")}
                                   size="compact"
                                   testID={`games-import-older-${account.platform}-${account.username}`}
                                   variant="secondary"

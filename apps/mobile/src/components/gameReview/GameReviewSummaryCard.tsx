@@ -3,9 +3,9 @@ import { Pressable, View } from "react-native";
 import { curatedPuzzleThemes } from "../../../../../packages/core/src/index.ts";
 import type { StoredUserPuzzle } from "../../../../../packages/storage/src/game-review-store.ts";
 import { makeStyles } from "../../theme/index.ts";
+import { useTranslation } from "../../i18n/index.ts";
 import { customThemeLabel } from "../practice/shared/themeCatalog.ts";
 import { AppText, Badge, Button } from "../ui/index.tsx";
-import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
 import type { GameReviewSummaryData, SideClassificationCounts } from "./gameReviewTypes.ts";
 
 export interface GameReviewSummaryCardProps {
@@ -32,27 +32,34 @@ export function GameReviewSummaryCard({
   testID = "game-review-summary-card"
 }: GameReviewSummaryCardProps): React.JSX.Element {
   const styles = useStyles();
+  const { locale, t } = useTranslation();
   const { puzzles } = summary;
   const allPuzzlesInReview =
     puzzles.length > 0 && puzzles.every((puzzle) => enrolledPuzzleIds.has(puzzle.id));
+  const whiteLabel = t("common.white");
+  const blackLabel = t("common.black");
+  const resolvedWhiteName =
+    !whitePlayerName || whitePlayerName === "White" ? whiteLabel : whitePlayerName;
+  const resolvedBlackName =
+    !blackPlayerName || blackPlayerName === "Black" ? blackLabel : blackPlayerName;
 
   return (
     <View style={styles.container} testID={testID}>
-      <AppText variant="headline">{GAME_REVIEW_COPY.summary.title}</AppText>
+      <AppText variant="headline">{t("gameReview.summary.title")}</AppText>
 
       <View style={styles.accuracyRow} testID="game-review-accuracy-strip">
         <AccuracyColumn
           counts={summary.white}
           highlight={summary.userColor === "w"}
-          name={whitePlayerName || GAME_REVIEW_COPY.summary.whiteLabel}
-          sideLabel={GAME_REVIEW_COPY.summary.whiteLabel}
+          name={resolvedWhiteName}
+          sideLabel={whiteLabel}
           testID="game-review-accuracy-white"
         />
         <AccuracyColumn
           counts={summary.black}
           highlight={summary.userColor === "b"}
-          name={blackPlayerName || GAME_REVIEW_COPY.summary.blackLabel}
-          sideLabel={GAME_REVIEW_COPY.summary.blackLabel}
+          name={resolvedBlackName}
+          sideLabel={blackLabel}
           testID="game-review-accuracy-black"
         />
       </View>
@@ -60,31 +67,31 @@ export function GameReviewSummaryCard({
       <View style={styles.countsTable} testID="game-review-classification-counts">
         <ClassificationCountRow
           blackCount={summary.black.best}
-          label={GAME_REVIEW_COPY.classifications.best}
+          label={t("gameReview.classification.best")}
           tone="positive"
           whiteCount={summary.white.best}
         />
         <ClassificationCountRow
           blackCount={summary.black.inaccuracy}
-          label={GAME_REVIEW_COPY.classifications.inaccuracy}
+          label={t("gameReview.classification.inaccuracy")}
           tone="warning"
           whiteCount={summary.white.inaccuracy}
         />
         <ClassificationCountRow
           blackCount={summary.black.mistake}
-          label={GAME_REVIEW_COPY.classifications.mistake}
+          label={t("gameReview.classification.mistake")}
           tone="warning"
           whiteCount={summary.white.mistake}
         />
         <ClassificationCountRow
           blackCount={summary.black.blunder}
-          label={GAME_REVIEW_COPY.classifications.blunder}
+          label={t("gameReview.classification.blunder")}
           tone="negative"
           whiteCount={summary.white.blunder}
         />
         <ClassificationCountRow
           blackCount={summary.black.missedWin}
-          label={GAME_REVIEW_COPY.classifications.missed_win}
+          label={t("gameReview.classification.missed_win")}
           tone="warning"
           whiteCount={summary.white.missedWin}
         />
@@ -93,15 +100,15 @@ export function GameReviewSummaryCard({
       <View style={styles.puzzlesSection} testID="game-review-summary-puzzles">
         <View style={styles.puzzlesHeaderRow}>
           <AppText style={styles.puzzlesTitleText} variant="subheadline">
-            {GAME_REVIEW_COPY.summary.puzzlesTitle(puzzles.length)}
+            {t("gameReview.summary.puzzlesCount", { count: puzzles.length })}
           </AppText>
           {puzzles.length > 1 && onEnrollAllPuzzles ? (
             <Button
               disabled={allPuzzlesInReview}
               label={
                 allPuzzlesInReview
-                  ? GAME_REVIEW_COPY.summary.allInReview
-                  : GAME_REVIEW_COPY.summary.addAllToReview
+                  ? t("games.puzzles.allInReview")
+                  : t("games.puzzles.addAllToReview")
               }
               onPress={onEnrollAllPuzzles}
               size="compact"
@@ -113,7 +120,7 @@ export function GameReviewSummaryCard({
 
         {puzzles.length === 0 ? (
           <AppText tone="secondary" variant="footnote">
-            {GAME_REVIEW_COPY.summary.noPuzzles}
+            {t("gameReview.summary.noPuzzles")}
           </AppText>
         ) : (
           <View style={styles.puzzlesList}>
@@ -122,8 +129,8 @@ export function GameReviewSummaryCard({
               const curatedThemes = curatedPuzzleThemes(puzzle.themes);
               const kindLabel =
                 puzzle.puzzleKind === "arrow_duel"
-                  ? GAME_REVIEW_COPY.summary.kindArrowDuel
-                  : GAME_REVIEW_COPY.summary.kindLine;
+                  ? t("common.arrowDuel")
+                  : t("gameReview.summary.kindLine");
 
               return (
                 <View
@@ -141,7 +148,7 @@ export function GameReviewSummaryCard({
                     <View style={styles.puzzleBadges}>
                       <Badge label={kindLabel} tone="accent" />
                       <Badge
-                        label={GAME_REVIEW_COPY.summary.moveNumberLabel(puzzle.gameMoveNumber)}
+                        label={t("games.puzzles.moveOnly", { move: puzzle.gameMoveNumber })}
                         tone="neutral"
                       />
                     </View>
@@ -150,7 +157,7 @@ export function GameReviewSummaryCard({
                         {curatedThemes.slice(0, 3).map((themeId) => (
                           <Badge
                             key={themeId}
-                            label={customThemeLabel(themeId)}
+                            label={customThemeLabel(themeId, locale)}
                             tone="neutral"
                           />
                         ))}
@@ -160,8 +167,8 @@ export function GameReviewSummaryCard({
                   <Button
                     label={
                       inReview
-                        ? GAME_REVIEW_COPY.summary.inReview
-                        : GAME_REVIEW_COPY.summary.addToReview
+                        ? t("games.puzzles.inReview")
+                        : t("games.puzzles.addToReview")
                     }
                     onPress={() => onToggleReviewEnrollment(puzzle)}
                     size="compact"
@@ -176,7 +183,7 @@ export function GameReviewSummaryCard({
 
         {puzzles.length > 0 && onPracticeGamePuzzles ? (
           <Button
-            label={GAME_REVIEW_COPY.summary.practiceGamePuzzles}
+            label={t("gameReview.summary.practiceGamePuzzles")}
             onPress={onPracticeGamePuzzles}
             stretch
             testID="game-review-practice-puzzles-cta"
@@ -214,7 +221,7 @@ function AccuracyColumn({
         {name}
       </AppText>
       <AppText testID={`${testID}-value`} variant="numeralLarge">
-        {GAME_REVIEW_COPY.summary.accuracyLabel(counts.accuracy)}
+        {`${Math.round(counts.accuracy)}%`}
       </AppText>
     </View>
   );

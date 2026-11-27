@@ -2,8 +2,8 @@ import React from "react";
 import { Pressable, View } from "react-native";
 import type { MoveClassification } from "../../../../../packages/core/src/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
+import { useTranslation } from "../../i18n/index.ts";
 import { AppText } from "../ui/index.tsx";
-import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
 import { formatEvalLabel, formatMoveNumberTag } from "./gameReviewHelpers.ts";
 import type { GameReviewEvalGraphPoint } from "./gameReviewTypes.ts";
 
@@ -28,6 +28,7 @@ export function EvalGraph({
 }: EvalGraphProps): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const { t } = useTranslation();
   const whiteAreaColor =
     theme.name === "dark" ? theme.colors.surfaceInverse : theme.colors.surface;
   const blackAreaColor =
@@ -39,13 +40,13 @@ export function EvalGraph({
   if (points.length <= 1 && pendingCount === 0) {
     return (
       <View
-        accessibilityLabel={GAME_REVIEW_COPY.evalGraph.accessibilityLabel}
+        accessibilityLabel={t("gameReview.evalGraph.a11y")}
         style={[styles.container, { minHeight: height }]}
         testID={testID}
       >
         <View style={styles.emptyWrap}>
           <AppText tone="secondary" variant="footnote">
-            {GAME_REVIEW_COPY.evalGraph.emptyLabel}
+            {t("gameReview.evalGraph.empty")}
           </AppText>
         </View>
       </View>
@@ -54,7 +55,7 @@ export function EvalGraph({
 
   return (
     <View
-      accessibilityLabel={GAME_REVIEW_COPY.evalGraph.accessibilityLabel}
+      accessibilityLabel={t("gameReview.evalGraph.a11y")}
       style={styles.container}
       testID={testID}
     >
@@ -67,20 +68,20 @@ export function EvalGraph({
             const markerColor = markerColorForPoint(point, theme);
             const moveLabel =
               point.ply === 0
-                ? GAME_REVIEW_COPY.moveStrip.startLabel
+                ? t("gameReview.moveStrip.start")
                 : `${formatMoveNumberTag(point.moveNumber, point.color ?? "w")} ${point.san ?? ""}`.trim();
             const classificationLabel = point.classification
-              ? GAME_REVIEW_COPY.classifications[point.classification]
-              : GAME_REVIEW_COPY.classifications.book;
+              ? t(`gameReview.classification.${point.classification}`)
+              : t("gameReview.classification.book");
 
             return (
               <Pressable
                 key={`ply-${point.ply}`}
-                accessibilityLabel={GAME_REVIEW_COPY.evalGraph.pointAccessibilityLabel(
-                  moveLabel,
-                  formatEvalLabel(point.score),
-                  classificationLabel
-                )}
+                accessibilityLabel={t("gameReview.evalGraph.pointA11y", {
+                  move: moveLabel,
+                  eval: formatEvalLabel(point.score),
+                  classification: classificationLabel
+                })}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isSelected }}
                 onPress={() => onSelectPly(point.ply)}

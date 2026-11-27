@@ -5,7 +5,7 @@ import type {
   InGameWeaknessDiagnosis
 } from "../../../../../packages/core/src/index.ts";
 import { customThemeLabel } from "../practice/shared/themeCatalog.ts";
-import { useTranslation } from "../../i18n/index.ts";
+import { useTranslation, type TranslateFn } from "../../i18n/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
 import { AppText, Badge, Section } from "../ui/index.tsx";
 import { gameTimeClassLabel } from "./gamesPresentation.ts";
@@ -17,38 +17,43 @@ export interface InGameDiagnosisCardProps {
 
 function headlinePresentation(
   diagnosis: InGameWeaknessDiagnosis,
-  locale: Parameters<typeof customThemeLabel>[1]
+  locale: Parameters<typeof customThemeLabel>[1],
+  t: TranslateFn
 ): { title: string; tone: "accent" | "warning" | "positive" | "neutral" } {
   const { headlineKind, headlineStats } = diagnosis;
   switch (headlineKind as DiagnosisHeadlineKind) {
     case "time_trouble": {
-      const pct = Math.round((headlineStats.dominantClockShare ?? 0) * 100);
-      return { title: `Time trouble (${pct}% of mistakes)`, tone: "warning" };
+      const percent = Math.round((headlineStats.dominantClockShare ?? 0) * 100);
+      return { title: t("games.insights.headline.timeTrouble", { percent }), tone: "warning" };
     }
     case "impulsive": {
-      const pct = Math.round((headlineStats.dominantClockShare ?? 0) * 100);
-      return { title: `Impulsive moves (${pct}% of mistakes)`, tone: "warning" };
+      const percent = Math.round((headlineStats.dominantClockShare ?? 0) * 100);
+      return { title: t("games.insights.headline.impulsive", { percent }), tone: "warning" };
     }
     case "tactical_blindspot": {
       const themeName = headlineStats.primaryBlindspotTheme
         ? customThemeLabel(headlineStats.primaryBlindspotTheme, locale)
-        : "Tactics";
-      return { title: `Blindspot: ${themeName}`, tone: "accent" };
+        : t("games.insights.tacticsFallback");
+      return { title: t("games.insights.headline.blindspot", { theme: themeName }), tone: "accent" };
     }
     case "escaped_blunders": {
-      const pct = Math.round(headlineStats.escapedPercent ?? 0);
-      return { title: `${pct}% of blunders went unpunished`, tone: "warning" };
+      const percent = Math.round(headlineStats.escapedPercent ?? 0);
+      return { title: t("games.insights.headline.escaped", { percent }), tone: "warning" };
     }
     case "balanced": {
-      const acc =
-        headlineStats.overallAccuracy !== undefined
-          ? ` · ${Math.round(headlineStats.overallAccuracy)}%`
-          : "";
-      return { title: `Balanced play${acc}`, tone: "positive" };
+      if (headlineStats.overallAccuracy !== undefined) {
+        return {
+          title: t("games.insights.headline.balancedWithAccuracy", {
+            percent: Math.round(headlineStats.overallAccuracy)
+          }),
+          tone: "positive"
+        };
+      }
+      return { title: t("games.insights.headline.balanced"), tone: "positive" };
     }
     case "insufficient_data":
     default:
-      return { title: "Analyze more games", tone: "neutral" };
+      return { title: t("games.insights.headline.insufficient"), tone: "neutral" };
   }
 }
 
@@ -58,13 +63,13 @@ export function InGameDiagnosisCard({
 }: InGameDiagnosisCardProps): React.JSX.Element | null {
   const styles = useStyles();
   const theme = useTheme();
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
 
   if (!diagnosis.sufficientData) {
     return null;
   }
 
-  const headline = headlinePresentation(diagnosis, locale);
+  const headline = headlinePresentation(diagnosis, locale, t);
   const clock = diagnosis.clockTimingBreakdown;
   const showClock = clock.knownClockOwnMistakes > 0;
   const timeTroublePct = Math.round(clock.knownShares.time_trouble * 100);
@@ -75,7 +80,7 @@ export function InGameDiagnosisCard({
     <Section surfaceStyle={styles.card} testID="games-diagnosis-card">
       <View style={styles.headerRow}>
         <AppText style={styles.heading} variant="headline">
-          In-Game Insights
+          {t("games.insights.title")}
         </AppText>
         <Badge
           label={headline.title}
@@ -113,7 +118,11 @@ export function InGameDiagnosisCard({
             ) : null}
           </View>
           <AppText tone="secondary" variant="caption">
-            {`Time trouble ${timeTroublePct}% · Impulsive ${impulsivePct}% · Deliberate ${deliberatePct}%`}
+            {t("games.insights.clockSummary", {
+              timeTrouble: timeTroublePct,
+              impulsive: impulsivePct,
+              deliberate: deliberatePct
+            })}
           </AppText>
         </View>
       ) : null}
