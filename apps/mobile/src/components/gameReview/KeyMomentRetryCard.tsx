@@ -1,9 +1,14 @@
 import React from "react";
 import { Pressable, View } from "react-native";
-import { makeStyles } from "../../theme/index.ts";
+import { makeStyles, useTheme } from "../../theme/index.ts";
 import { AppText, Badge, Button } from "../ui/index.tsx";
 import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
-import { formatMoveNumberTag, formatPvSanLine, uciToSan } from "./gameReviewHelpers.ts";
+import {
+  classificationBadgeMeta,
+  formatMoveNumberTag,
+  formatPvSanLine,
+  uciToSan
+} from "./gameReviewHelpers.ts";
 import type { KeyMomentItem, KeyMomentRetryState } from "./gameReviewTypes.ts";
 
 export interface KeyMomentRetryCardProps {
@@ -44,6 +49,7 @@ export function KeyMomentRetryCard({
   testID = "game-review-key-moment-card"
 }: KeyMomentRetryCardProps): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
 
   if (!moment || !retryState) {
     return (
@@ -84,6 +90,43 @@ export function KeyMomentRetryCard({
         <AppText testID="key-moment-highlight-detail" variant="subheadline">
           {GAME_REVIEW_COPY.keyMoments.highlightDetail(moveLabel, moment.highlight.san)}
         </AppText>
+      </View>
+    );
+  }
+
+  if (moment.kind === "swing") {
+    const moveLabel = formatMoveNumberTag(moment.moveNumber, moment.color);
+    const meta = classificationBadgeMeta(moment.classification, theme.colors);
+    const tone =
+      moment.classification === "blunder" || moment.classification === "missed_win"
+        ? "negative"
+        : "warning";
+
+    return (
+      <View style={[styles.card, styles.cardDanger]} testID={testID}>
+        <HeaderBar
+          current={momentIndex + 1}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          onNext={onNext}
+          onPrev={onPrev}
+          total={totalMoments}
+        />
+        <View style={styles.statusRow}>
+          <Badge
+            label={`${meta.glyph} ${meta.label}`}
+            testID="key-moment-swing-badge"
+            tone={tone}
+          />
+          <AppText tone="secondary" variant="footnote">
+            {`${moveLabel} ${moment.playedMoveSan} (${moment.evalAfterLabel})`}
+          </AppText>
+        </View>
+        {moment.bestMoveSan ? (
+          <AppText testID="key-moment-swing-best" variant="subheadline">
+            {GAME_REVIEW_COPY.verdict.bestWas(moment.bestMoveSan)}
+          </AppText>
+        ) : null}
       </View>
     );
   }

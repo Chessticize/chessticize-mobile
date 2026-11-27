@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import type { ThemeColors } from "../../theme/index.ts";
 import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
@@ -9,6 +10,7 @@ import {
   type AnalysisScore,
   type GameHighlightMoment,
   type GamePlyEvaluation,
+  type MoveClassification,
   type MoveWinPercentTransition,
   type ParsedGame,
   type ReviewContext
@@ -165,6 +167,55 @@ export function isEscapedMomentKind(momentKind: StoredUserPuzzle["momentKind"]):
   return momentKind === "own_mistake_escaped" || momentKind === "own_blunder_escaped";
 }
 
+export interface ClassificationBadgeMeta {
+  glyph: string;
+  label: string;
+  bgColor: string;
+  textColor: string;
+}
+
+export function classificationBadgeMeta(
+  classification: MoveClassification,
+  colors: ThemeColors
+): ClassificationBadgeMeta {
+  switch (classification) {
+    case "best":
+      return { glyph: "★", label: "Best", bgColor: colors.positive.s600, textColor: colors.text.onTone };
+    case "great":
+      return { glyph: "!", label: "Great", bgColor: colors.accent.fill, textColor: colors.text.onAccent };
+    case "good":
+      return { glyph: "✓", label: "Good", bgColor: colors.success.s700, textColor: colors.text.onTone };
+    case "book":
+      return { glyph: "B", label: "Book", bgColor: colors.fillStrong, textColor: colors.text.onAccent };
+    case "inaccuracy":
+      return { glyph: "?!", label: "Inaccuracy", bgColor: colors.warning.s500, textColor: colors.text.onTone };
+    case "mistake":
+      return { glyph: "?", label: "Mistake", bgColor: colors.caution.s700, textColor: colors.text.onTone };
+    case "blunder":
+      return { glyph: "??", label: "Blunder", bgColor: colors.danger.s600, textColor: colors.text.onTone };
+    case "missed_win":
+      return { glyph: "✕", label: "Missed Win", bgColor: colors.danger.s700, textColor: colors.text.onTone };
+  }
+}
+
+export function isCriticalClassification(classification: MoveClassification | undefined): boolean {
+  return (
+    classification === "blunder" ||
+    classification === "mistake" ||
+    classification === "missed_win" ||
+    classification === "great"
+  );
+}
+
+export function isSuboptimalClassification(classification: MoveClassification | undefined): boolean {
+  return (
+    classification === "inaccuracy" ||
+    classification === "mistake" ||
+    classification === "blunder" ||
+    classification === "missed_win"
+  );
+}
+
 export function buildKeyMoments(
   parsedGame: ParsedGame | null,
   plyEvaluations: readonly GamePlyEvaluation[],
@@ -181,8 +232,13 @@ export function buildKeyMoments(
   }
 
   const items: KeyMomentItem[] = [];
+  const coveredPlies = new Set<number>();
 
   for (const puzzle of userPuzzles) {
+    coveredPlies.add(puzzle.gamePly);
+    if (puzzle.momentKind.startsWith("opponent_")) {
+      coveredPlies.add(puzzle.gamePly + 1);
+    }
     const plyEval = evalByPly.get(puzzle.gamePly);
     const parsedPly = parsedPlyByNumber.get(puzzle.gamePly);
     const corePuzzle = storedUserPuzzleToPuzzle(puzzle);
@@ -236,6 +292,7 @@ export function buildKeyMoments(
   }
 
   for (const highlight of highlights) {
+    coveredPlies.add(highlight.ply);
     const parsedPly = parsedPlyByNumber.get(highlight.ply);
     const plyEval = evalByPly.get(highlight.ply);
     const fenBefore = plyEval?.fenBefore ?? parsedPly?.fenBefore ?? parsedGame?.initialFen ?? STANDARD_STARTING_FEN;
@@ -251,6 +308,43 @@ export function buildKeyMoments(
     });
   }
 
+  // When Pass-2 has not yet produced puzzles or highlights (e.g. while scanning or for games
+  // with zero extracted puzzles), fall back to Pass-1 critical swings so Key Moments stays useful.
+  if (items.length === 0) {
+    for (const plyEval of plyEvaluations) {
+      if (coveredPlies.has(plyEval.ply)) {
+        continue;
+      }
+      if (
+        plyEval.classification !== "blunder" &&
+        plyEval.classification !== "mistake" &&
+        plyEval.classification !== "missed_win"
+      ) {
+        continue;
+      }
+      const bestMoveUci =
+        plyEval.bestMove && normalizeUciMove(plyEval.bestMove) !== normalizeUciMove(plyEval.uci)
+          ? plyEval.bestMove
+          : undefined;
+      const bestMoveSan = bestMoveUci ? uciToSan(plyEval.fenBefore, bestMoveUci) : undefined;
+      items.push({
+        id: `swing:${plyEval.ply}:${plyEval.uci}`,
+        kind: "swing",
+        ply: plyEval.ply,
+        moveNumber: plyEval.moveNumber,
+        color: plyEval.color,
+        classification: plyEval.classification,
+        playedMoveUci: plyEval.uci,
+        playedMoveSan: plyEval.san,
+        ...(bestMoveUci !== undefined ? { bestMoveUci } : {}),
+        ...(bestMoveSan !== undefined ? { bestMoveSan } : {}),
+        evalAfterLabel: formatEvalLabel(plyEval.scoreAfter),
+        fenBefore: plyEval.fenBefore,
+        fenAfter: plyEval.fenAfter
+      });
+    }
+  }
+
   return items.sort((left, right) => left.ply - right.ply || left.id.localeCompare(right.id));
 }
 
@@ -259,6 +353,16 @@ export function createInitialRetryState(moment: KeyMomentItem): KeyMomentRetrySt
     return {
       momentId: moment.id,
       status: "highlight",
+      punishmentLine: [],
+      showingRefutation: false,
+      refutationStep: 0,
+      autoEnrolledInReview: false
+    };
+  }
+  if (moment.kind === "swing") {
+    return {
+      momentId: moment.id,
+      status: "swing",
       punishmentLine: [],
       showingRefutation: false,
       refutationStep: 0,
@@ -321,6 +425,12 @@ export function fenForRetryState(
     return {
       fen: moment.fenAfter,
       lastMoveUci: moment.highlight.uci
+    };
+  }
+  if (moment.kind === "swing") {
+    return {
+      fen: moment.fenAfter,
+      lastMoveUci: moment.playedMoveUci
     };
   }
 

@@ -673,7 +673,7 @@ describe("GameReviewScreen (#767)", () => {
       expect.objectContaining({
         fen: ply2Fen,
         multiPv: 3,
-        depth: 18,
+        depth: 16,
         priority: "interactive"
       })
     );
@@ -812,6 +812,176 @@ describe("GameReviewScreen (#767)", () => {
 
     // Ensure Pressable buttons exist cleanly
     expect(renderer.root.findAllByType(Pressable).length).toBeGreaterThan(4);
+    act(() => renderer.unmount());
+  });
+
+  it("renders move classification square badge, verdict strip, best-move arrow in Moves mode, and jumps across critical plies", () => {
+    const { store, service, game } = setupAnalyzedStore();
+    // Attach a bestMove to ply 7 (4. Qf3 missed_win -> h5f7#) to verify best-move arrow & verdict text.
+    const existingEvals = store.listGamePlyEvaluations(game.id);
+    const updatedEvals = existingEvals.map((item) =>
+      item.ply === 7 ? { ...item, bestMove: "h5f7" } : item
+    );
+    store.saveGamePlyEvaluations(game.id, updatedEvals, {
+      analysisStatus: "complete",
+      analysisCheckpointPly: PARSED_SAMPLE.plies.length
+    });
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+            <GameReviewScreen
+              BoardComponent={MockReviewBoard}
+              game={store.getImportedGame(game.id)!}
+              initialMode="moves"
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    // Starting at ply 0: verdict bar shows Start position, Key › jumps to first critical ply (ply 6 blunder).
+    expect(findByTestId(renderer, "game-review-verdict-bar")).toBeTruthy();
+    act(() => {
+      findByTestId(renderer, "game-review-next-critical").props.onPress();
+    });
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+      PARSED_SAMPLE.plies[5]!.fenAfter
+    );
+    expect(findByTestId(renderer, "game-review-square-badge-blunder")).toBeTruthy();
+
+    // Key › again jumps to ply 7 (missed_win) and shows best-move green arrow + verdict "Best: Qxf7#".
+    act(() => {
+      findByTestId(renderer, "game-review-next-critical").props.onPress();
+    });
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+      PARSED_SAMPLE.plies[6]!.fenAfter
+    );
+    expect(findByTestId(renderer, "game-review-square-badge-missed_win")).toBeTruthy();
+    expect(findByTestId(renderer, "game-review-arrow-best-h5f7")).toBeTruthy();
+    expect(textContent(findByTestId(renderer, "game-review-verdict-bar"))).toContain("Missed Win");
+    expect(textContent(findByTestId(renderer, "game-review-verdict-bar"))).toContain("Qxf7#");
+
+    // ‹ Key jumps back to ply 6
+    act(() => {
+      findByTestId(renderer, "game-review-prev-critical").props.onPress();
+    });
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+      PARSED_SAMPLE.plies[5]!.fenAfter
+    );
+
+    act(() => renderer.unmount());
+  });
+
+  it("ignores transient AppState inactive transitions and auto-resumes when returning active from background", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    const shortPgn = [
+      '[Event "Blitz"]',
+      '[White "Alice"]',
+      '[Black "Bob"]',
+      '[Result "*"]',
+      '[TimeControl "300+0"]',
+      "",
+      "1. e4 e5 2. Nf3 Nc6 *"
+    ].join("\n");
+    const draft = createSampleGame({
+      id: "game-inactive-resume-1",
+      pgn: shortPgn,
+      analysisStatus: "none",
+      analysisCheckpointPly: 0,
+      whiteAccuracy: undefined,
+      blackAccuracy: undefined,
+      puzzleCount: 0
+    });
+    store.upsertImportedGames([draft], draft.createdAt);
+    const unanalyzed = store.getImportedGame(draft.id)!;
+
+    let callCount = 0;
+    let blockedResolve: (() => void) | null = null;
+    const engine: GameReviewLiveEngine = {
+      analyze: (req) => {
+        callCount += 1;
+        if (callCount === 2) {
+          return new Promise<EngineAnalysisLine[]>((resolve, reject) => {
+            blockedResolve = () =>
+              resolve([
+                {
+                  move: "e7e5",
+                  pv: ["e7e5"],
+                  multipv: 1,
+                  depth: 10,
+                  score: { kind: "cp", sideToMoveCentipawns: 15, whiteCentipawns: 15 }
+                }
+              ]);
+            req.signal?.addEventListener("abort", () => {
+              const err = new Error("Aborted");
+              err.name = "AbortError";
+              reject(err);
+            });
+          });
+        }
+        return Promise.resolve([
+          {
+            move: "e2e4",
+            pv: ["e2e4"],
+            multipv: 1,
+            depth: 10,
+            score: { kind: "cp", sideToMoveCentipawns: 15, whiteCentipawns: 15 }
+          }
+        ]);
+      }
+    };
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+            <GameReviewScreen
+              BoardComponent={MockReviewBoard}
+              checkpointIntervalPlies={10}
+              engine={engine}
+              game={unanalyzed}
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    await flushAsync(8);
+    expect(callCount).toBe(2);
+
+    // Transient iOS "inactive" (e.g. screenshot / Notification Center) must NOT pause the scan.
+    act(() => {
+      (AppState as unknown as { __emit: (state: string) => void }).__emit("inactive");
+    });
+    await flushAsync(6);
+    expect(queryByTestId(renderer, "game-review-scan-paused")).toBeNull();
+
+    // Real "background" pauses cleanly.
+    act(() => {
+      (AppState as unknown as { __emit: (state: string) => void }).__emit("background");
+    });
+    await flushAsync(8);
+    expect(findByTestId(renderer, "game-review-scan-paused")).toBeTruthy();
+
+    // Returning "active" auto-resumes and finishes the scan.
+    act(() => {
+      (AppState as unknown as { __emit: (state: string) => void }).__emit("active");
+    });
+    await flushAsync(20);
+    expect(store.getImportedGame(draft.id)?.analysisStatus).toBe("complete");
+    expect(queryByTestId(renderer, "game-review-scan-paused")).toBeNull();
+
+    const release = blockedResolve as (() => void) | null;
+    release?.();
     act(() => renderer.unmount());
   });
 });

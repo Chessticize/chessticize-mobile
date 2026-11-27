@@ -29,9 +29,9 @@ export function EvalGraph({
   const styles = useStyles();
   const theme = useTheme();
   const whiteAreaColor =
-    theme.name === "dark" ? theme.colors.fillMuted : theme.colors.surface;
+    theme.name === "dark" ? theme.colors.surfaceInverse : theme.colors.surface;
   const blackAreaColor =
-    theme.name === "dark" ? theme.colors.surfaceRaised : theme.colors.surfaceStrong;
+    theme.name === "dark" ? theme.colors.surfaceSunken : theme.colors.text.strong;
 
   const expectedTotal = Math.max(points.length, (totalPlies ?? 0) + 1);
   const pendingCount = Math.max(0, expectedTotal - points.length);

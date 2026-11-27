@@ -1,14 +1,13 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import type {
   GamePlyEvaluation,
-  MoveClassification,
   ParsedGamePly
 } from "../../../../../packages/core/src/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
 import { AppText, Icon } from "../ui/index.tsx";
 import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
-import { formatMoveNumberTag } from "./gameReviewHelpers.ts";
+import { classificationBadgeMeta, formatMoveNumberTag } from "./gameReviewHelpers.ts";
 
 export interface MoveListStripProps {
   plies: readonly ParsedGamePly[];
@@ -37,15 +36,32 @@ export function MoveListStrip({
 }: MoveListStripProps): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const scrollRef = useRef<ScrollView | null>(null);
+  const chipOffsetsRef = useRef<Map<number, { x: number; width: number }>>(new Map());
+  const scrollViewportWidthRef = useRef<number>(0);
   const totalPlies = plies.length;
   const atStart = currentPly <= 0;
   const atEnd = currentPly >= totalPlies;
 
+  useEffect(() => {
+    const layout = chipOffsetsRef.current.get(currentPly);
+    if (!layout || !scrollRef.current?.scrollTo) {
+      return;
+    }
+    const viewportWidth = scrollViewportWidthRef.current;
+    const targetX = Math.max(0, layout.x - Math.max(0, (viewportWidth - layout.width) / 2));
+    scrollRef.current.scrollTo({ x: targetX, animated: true });
+  }, [currentPly]);
+
   return (
     <View style={styles.container} testID={testID}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.movesContent}
         horizontal
+        onLayout={(event) => {
+          scrollViewportWidthRef.current = event.nativeEvent.layout.width;
+        }}
         showsHorizontalScrollIndicator={false}
         style={styles.movesScroll}
         testID={`${testID}-scroll`}
@@ -54,6 +70,12 @@ export function MoveListStrip({
           accessibilityLabel={GAME_REVIEW_COPY.moveStrip.startLabel}
           accessibilityRole="button"
           accessibilityState={{ selected: currentPly === 0 }}
+          onLayout={(event) => {
+            chipOffsetsRef.current.set(0, {
+              x: event.nativeEvent.layout.x,
+              width: event.nativeEvent.layout.width
+            });
+          }}
           onPress={() => onSelectPly(0)}
           style={[styles.moveChip, currentPly === 0 ? styles.moveChipSelected : null]}
           testID="move-strip-ply-0"
@@ -69,7 +91,11 @@ export function MoveListStrip({
         {plies.map((ply) => {
           const selected = ply.ply === currentPly;
           const plyEval = evalByPly.get(ply.ply);
-          const dotColor = classificationDotColor(plyEval?.classification, theme);
+          const badgeMeta = plyEval ? classificationBadgeMeta(plyEval.classification, theme.colors) : null;
+          const showGlyph =
+            plyEval &&
+            plyEval.classification !== "good" &&
+            plyEval.classification !== "book";
           const prefix = ply.color === "w" ? `${ply.moveNumber}. ` : "";
           const label = `${prefix}${ply.san}`;
 
@@ -79,12 +105,26 @@ export function MoveListStrip({
               accessibilityLabel={`${formatMoveNumberTag(ply.moveNumber, ply.color)} ${ply.san}`}
               accessibilityRole="button"
               accessibilityState={{ selected }}
+              onLayout={(event) => {
+                chipOffsetsRef.current.set(ply.ply, {
+                  x: event.nativeEvent.layout.x,
+                  width: event.nativeEvent.layout.width
+                });
+              }}
               onPress={() => onSelectPly(ply.ply)}
               style={[styles.moveChip, selected ? styles.moveChipSelected : null]}
               testID={`move-strip-ply-${ply.ply}`}
             >
-              {dotColor ? (
-                <View style={[styles.classificationDot, { backgroundColor: dotColor }]} />
+              {showGlyph && badgeMeta ? (
+                <View style={[styles.glyphPill, { backgroundColor: badgeMeta.bgColor }]}>
+                  <AppText
+                    maxFontSizeMultiplier={1.1}
+                    style={[styles.glyphText, { color: badgeMeta.textColor }]}
+                    variant="caption"
+                  >
+                    {badgeMeta.glyph}
+                  </AppText>
+                </View>
               ) : null}
               <AppText
                 maxFontSizeMultiplier={1.4}
@@ -180,26 +220,6 @@ function StepButton({
   );
 }
 
-function classificationDotColor(
-  classification: MoveClassification | undefined,
-  theme: ReturnType<typeof useTheme>
-): string | null {
-  switch (classification) {
-    case "blunder":
-      return theme.colors.danger.s600;
-    case "mistake":
-      return theme.colors.caution.s700;
-    case "missed_win":
-      return theme.colors.warning.s500;
-    case "inaccuracy":
-      return theme.colors.warning.s400;
-    case "great":
-      return theme.colors.positive.s600;
-    default:
-      return null;
-  }
-}
-
 const useStyles = makeStyles((theme) => ({
   container: {
     backgroundColor: theme.colors.surface,
@@ -240,10 +260,18 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.onAccent,
     fontWeight: theme.fontWeight.bold
   },
-  classificationDot: {
+  glyphPill: {
+    alignItems: "center",
     borderRadius: theme.radius.pill,
-    height: 7,
-    width: 7
+    height: 16,
+    justifyContent: "center",
+    minWidth: 16,
+    paddingHorizontal: 3
+  },
+  glyphText: {
+    fontSize: 9.5,
+    fontWeight: theme.fontWeight.bold,
+    lineHeight: 12
   },
   controlsRow: {
     flexDirection: "row",

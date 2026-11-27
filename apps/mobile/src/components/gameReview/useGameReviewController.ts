@@ -25,6 +25,8 @@ import {
   createInitialRetryState,
   EVEN_ANALYSIS_SCORE,
   fenForRetryState,
+  isCriticalClassification,
+  isSuboptimalClassification,
   normalizeUciMove,
   reviewContextForUserPuzzle,
   STANDARD_STARTING_FEN,
@@ -40,8 +42,11 @@ import type {
   UseGameReviewControllerParams
 } from "./gameReviewTypes.ts";
 
-const DEFAULT_CHECKPOINT_INTERVAL_PLIES = 4;
-const DEFAULT_FREE_ANALYSIS_DEPTH = 18;
+const DEFAULT_CHECKPOINT_INTERVAL_PLIES = 6;
+const DEFAULT_MOBILE_PASS1_DEPTH = 10;
+const DEFAULT_MOBILE_PASS1_NODES = 40_000;
+const DEFAULT_MOBILE_PASS2_DEEP_LIMIT = { depth: 16, nodes: 250_000 } as const;
+const DEFAULT_FREE_ANALYSIS_DEPTH = 16;
 const DEFAULT_FREE_ANALYSIS_MULTIPV = 3;
 
 export function useGameReviewController({
@@ -146,6 +151,7 @@ export function useGameReviewController({
   const latestStatusRef = useRef<GameAnalysisStatus>(analysisStatus);
   latestStatusRef.current = analysisStatus;
   const scanAbortRef = useRef<AbortController | null>(null);
+  const pausedByBackgroundRef = useRef(false);
   const freeAnalysisAbortRef = useRef<AbortController | null>(null);
 
   const syncEnrolledIds = useCallback(
@@ -219,8 +225,8 @@ export function useGameReviewController({
           engine,
           userColor: game.userColor,
           options: {
-            ...(pass1Depth === undefined ? {} : { depth: pass1Depth }),
-            ...(pass1Nodes === undefined ? {} : { nodes: pass1Nodes }),
+            depth: pass1Depth ?? DEFAULT_MOBILE_PASS1_DEPTH,
+            nodes: pass1Nodes ?? DEFAULT_MOBILE_PASS1_NODES,
             priority: "batch",
             initialEvaluations: cachedEvals,
             signal: controller.signal,
@@ -273,7 +279,10 @@ export function useGameReviewController({
             ...(game.timeControl ? { timeControl: game.timeControl } : {})
           },
           engine,
-          { signal: controller.signal }
+          {
+            deepLimit: DEFAULT_MOBILE_PASS2_DEEP_LIMIT,
+            signal: controller.signal
+          }
         );
 
         if (cancelled || controller.signal.aborted) {
@@ -330,11 +339,13 @@ export function useGameReviewController({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id, engine, parsedGame, parseError, scanTrigger]);
 
-  // Cancel active scan cleanly and persist partial checkpoint when app backgrounds.
+  // Cancel active scan cleanly and persist partial checkpoint only on true backgrounding,
+  // and auto-resume smoothly when the user returns to the app.
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === "background" || nextState === "inactive") {
+      if (nextState === "background") {
         if (scanAbortRef.current && !scanAbortRef.current.signal.aborted) {
+          pausedByBackgroundRef.current = true;
           scanAbortRef.current.abort();
           if (latestStatusRef.current !== "complete" && latestEvalsRef.current.length > 0) {
             persistCheckpoint(latestEvalsRef.current, "partial");
@@ -345,6 +356,11 @@ export function useGameReviewController({
         if (freeAnalysisAbortRef.current && !freeAnalysisAbortRef.current.signal.aborted) {
           freeAnalysisAbortRef.current.abort();
           setFreeAnalysisLoading(false);
+        }
+      } else if (nextState === "active" && pausedByBackgroundRef.current) {
+        pausedByBackgroundRef.current = false;
+        if (latestStatusRef.current !== "complete") {
+          setScanTrigger((value) => value + 1);
         }
       }
     };
@@ -535,6 +551,32 @@ export function useGameReviewController({
     };
   }, [currentFen, engine, freeAnalysisDepth, freeAnalysisOpen, isPromptHidingAnswer]);
 
+  const currentPlyEval = useMemo<GamePlyEvaluation | null>(() => {
+    if (isExploringOffLine) {
+      return null;
+    }
+    if (mode === "moments" && activeMoment) {
+      return evalByPly.get(activeMoment.ply) ?? null;
+    }
+    if (currentPly <= 0) {
+      return null;
+    }
+    return evalByPly.get(currentPly) ?? null;
+  }, [activeMoment, currentPly, evalByPly, isExploringOffLine, mode]);
+
+  const criticalPlies = useMemo<number[]>(() => {
+    const plySet = new Set<number>();
+    for (const moment of keyMoments) {
+      plySet.add(moment.ply);
+    }
+    for (const plyEval of plyEvaluations) {
+      if (isCriticalClassification(plyEval.classification)) {
+        plySet.add(plyEval.ply);
+      }
+    }
+    return [...plySet].sort((a, b) => a - b);
+  }, [keyMoments, plyEvaluations]);
+
   // Compute board overlay arrows & Arrow Duel candidates.
   const { boardArrows, arrowDuelCandidates } = useMemo<{
     boardArrows: GameReviewBoardArrow[];
@@ -546,6 +588,11 @@ export function useGameReviewController({
     if (!isExploringOffLine && mode === "moments" && activeMoment && activeRetryState) {
       if (activeMoment.kind === "highlight") {
         arrows.push({ move: activeMoment.highlight.uci, role: "highlight", selected: true });
+      } else if (activeMoment.kind === "swing") {
+        if (activeMoment.bestMoveUci) {
+          arrows.push({ move: activeMoment.bestMoveUci, role: "best", selected: true });
+        }
+        arrows.push({ move: activeMoment.playedMoveUci, role: "blunder", selected: false });
       } else if (activeRetryState.status === "prompt") {
         if (activeMoment.puzzle.puzzleKind === "arrow_duel" && activeRetryState.candidates) {
           candidates = activeRetryState.candidates;
@@ -577,12 +624,26 @@ export function useGameReviewController({
         role: "engine",
         selected: true
       });
+    } else if (
+      !isExploringOffLine &&
+      mode === "moves" &&
+      currentPlyEval &&
+      isSuboptimalClassification(currentPlyEval.classification) &&
+      currentPlyEval.bestMove &&
+      normalizeUciMove(currentPlyEval.bestMove) !== normalizeUciMove(currentPlyEval.uci)
+    ) {
+      arrows.push({
+        move: currentPlyEval.bestMove,
+        role: "best",
+        selected: true
+      });
     }
 
     return { boardArrows: arrows, arrowDuelCandidates: candidates };
   }, [
     activeMoment,
     activeRetryState,
+    currentPlyEval,
     freeAnalysisLines,
     freeAnalysisOpen,
     isExploringOffLine,
@@ -927,11 +988,45 @@ export function useGameReviewController({
   }, [clearExploration]);
 
   const resumeAnalysis = useCallback(() => {
+    pausedByBackgroundRef.current = false;
     if (analysisStatus === "complete") {
       return;
     }
     setScanTrigger((value) => value + 1);
   }, [analysisStatus]);
+
+  const jumpToNextCriticalPly = useCallback(() => {
+    if (criticalPlies.length === 0) {
+      return;
+    }
+    clearExploration();
+    const nextPly = criticalPlies.find((ply) => ply > currentPly) ?? criticalPlies[0]!;
+    setCurrentPly(nextPly);
+    const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === nextPly);
+    if (matchingMomentIndex >= 0) {
+      setActiveMomentIndex(matchingMomentIndex);
+    }
+  }, [clearExploration, criticalPlies, currentPly, keyMoments]);
+
+  const jumpToPrevCriticalPly = useCallback(() => {
+    if (criticalPlies.length === 0) {
+      return;
+    }
+    clearExploration();
+    let prevPly: number | undefined;
+    for (let index = criticalPlies.length - 1; index >= 0; index -= 1) {
+      if (criticalPlies[index]! < currentPly) {
+        prevPly = criticalPlies[index];
+        break;
+      }
+    }
+    const targetPly = prevPly ?? criticalPlies[criticalPlies.length - 1]!;
+    setCurrentPly(targetPly);
+    const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === targetPly);
+    if (matchingMomentIndex >= 0) {
+      setActiveMomentIndex(matchingMomentIndex);
+    }
+  }, [clearExploration, criticalPlies, currentPly, keyMoments]);
 
   const evalGraphPoints = useMemo(
     () => buildEvalGraphPoints(parsedGame, plyEvaluations, keyMoments),
@@ -958,10 +1053,12 @@ export function useGameReviewController({
     evalByPly,
     evalGraphPoints,
     currentPly,
+    currentPlyEval,
     currentFen,
     currentScore,
     currentWhiteWinPercent,
     currentLastMoveUci,
+    criticalPlies,
     flipped,
     mode,
     keyMoments,
@@ -987,6 +1084,8 @@ export function useGameReviewController({
     stepPrev,
     stepNext,
     stepLast,
+    jumpToPrevCriticalPly,
+    jumpToNextCriticalPly,
     toggleFlip,
     selectKeyMoment,
     prevKeyMoment,

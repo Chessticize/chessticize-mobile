@@ -10,16 +10,33 @@ export const GAME_REVIEW_COPY = {
     summaryToggle: "Summary"
   },
   status: {
-    scanningPass1: (completed: number, total: number) =>
-      `Analyzing game · ${completed}/${total}`,
+    scanningPass1: (completed: number, total: number) => {
+      if (total <= 0) {
+        return "Analyzing game…";
+      }
+      const pct = Math.min(99, Math.round((completed / total) * 100));
+      return `Analyzing… ${pct}%`;
+    },
     extractingPass2: "Finding key moments…",
-    pausedAtCheckpoint: (checkpointPly: number, total: number) =>
-      `Paused at ply ${checkpointPly}/${total}`,
+    pausedAtCheckpoint: (checkpointPly: number, total: number) => {
+      if (total <= 0) {
+        return "Analysis paused";
+      }
+      const pct = Math.min(99, Math.round((checkpointPly / total) * 100));
+      return `Analysis paused · ${pct}%`;
+    },
     resumeScan: "Resume",
     analysisError: "Analysis paused due to an engine error",
     retryScan: "Retry",
     offlineReady: "Offline review ready",
     noMoves: "This game has no moves to review."
+  },
+  verdict: {
+    startPosition: "Starting position",
+    evaluating: "Evaluating…",
+    bestWas: (san: string) => `Best: ${san}`,
+    prevKey: "Prev Key",
+    nextKey: "Next Key"
   },
   evalBar: {
     accessibilityLabel: (evalLabel: string, whiteWinPercent: number) =>

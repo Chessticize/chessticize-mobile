@@ -1,7 +1,10 @@
 import React, { useMemo } from "react";
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Chessboard, { type MoveResult } from "react-native-chessboard";
-import type { GameHighlightMoment } from "../../../../../packages/core/src/index.ts";
+import type {
+  GameHighlightMoment,
+  GamePlyEvaluation
+} from "../../../../../packages/core/src/index.ts";
 import type {
   GameReviewStore,
   StoredImportedGame
@@ -23,6 +26,14 @@ import { AppText, Badge, Button, SegmentedControl } from "../ui/index.tsx";
 import { EvalBar } from "./EvalBar.tsx";
 import { EvalGraph } from "./EvalGraph.tsx";
 import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
+import {
+  classificationBadgeMeta,
+  formatEvalLabel,
+  formatMoveNumberTag,
+  isSuboptimalClassification,
+  normalizeUciMove,
+  uciToSan
+} from "./gameReviewHelpers.ts";
 import { GameReviewSummaryCard } from "./GameReviewSummaryCard.tsx";
 import type {
   GameReviewBoardArrow,
@@ -52,7 +63,7 @@ export interface GameReviewScreenProps {
   onPracticeGamePuzzles?: (gameId: string) => void;
 }
 
-const EVAL_BAR_SIDE_WIDTH = 42;
+const EVAL_BAR_SIDE_WIDTH = 52;
 const BOARD_MIN_SIZE = 220;
 const BOARD_MAX_PORTRAIT_SIZE = 500;
 const BOARD_MAX_LANDSCAPE_SIZE = 540;
@@ -227,6 +238,16 @@ export function GameReviewScreen({
               flipped={controller.flipped}
             />
           ) : null}
+          {!controller.isPromptHidingAnswer &&
+          controller.currentPlyEval &&
+          controller.currentLastMoveUci ? (
+            <MoveClassificationBadgeOverlay
+              boardSize={boardSize}
+              classification={controller.currentPlyEval.classification}
+              flipped={controller.flipped}
+              moveUci={controller.currentLastMoveUci}
+            />
+          ) : null}
         </View>
       </View>
     </View>
@@ -234,6 +255,16 @@ export function GameReviewScreen({
 
   const panelsContent = (
     <View style={styles.panelsStack}>
+      <MoveVerdictStrip
+        criticalCount={controller.criticalPlies.length}
+        currentPly={controller.currentPly}
+        currentPlyEval={controller.currentPlyEval}
+        isHidingAnswer={controller.isPromptHidingAnswer}
+        isScanning={isScanning}
+        onNextCritical={controller.jumpToNextCriticalPly}
+        onPrevCritical={controller.jumpToPrevCriticalPly}
+      />
+
       <EvalGraph
         onSelectPly={controller.selectPly}
         points={controller.evalGraphPoints}
@@ -403,19 +434,32 @@ function renderScanBanner({
   styles: ReturnType<typeof useStyles>;
 }): React.JSX.Element | null {
   if (scanPhase === "scanning_pass1") {
+    const progressPct =
+      totalPlies > 0 ? Math.max(4, Math.min(100, Math.round((completedPlies / totalPlies) * 100))) : 15;
     return (
-      <View style={styles.scanBanner} testID="game-review-scan-banner">
-        <Badge
-          label={GAME_REVIEW_COPY.status.scanningPass1(completedPlies, totalPlies)}
-          tone="accent"
-        />
+      <View style={styles.scanProgressWrap} testID="game-review-scan-banner">
+        <View style={styles.scanProgressTrack}>
+          <View style={[styles.scanProgressFill, { width: `${progressPct}%` }]} />
+        </View>
+        <View style={styles.scanProgressRow}>
+          <AppText tone="secondary" variant="caption">
+            {GAME_REVIEW_COPY.status.scanningPass1(completedPlies, totalPlies)}
+          </AppText>
+        </View>
       </View>
     );
   }
   if (scanPhase === "extracting_pass2") {
     return (
-      <View style={styles.scanBanner} testID="game-review-scan-banner">
-        <Badge label={GAME_REVIEW_COPY.status.extractingPass2} tone="accent" />
+      <View style={styles.scanProgressWrap} testID="game-review-scan-banner">
+        <View style={styles.scanProgressTrack}>
+          <View style={[styles.scanProgressFill, { width: "100%" }]} />
+        </View>
+        <View style={styles.scanProgressRow}>
+          <AppText tone="secondary" variant="caption">
+            {GAME_REVIEW_COPY.status.extractingPass2}
+          </AppText>
+        </View>
       </View>
     );
   }
@@ -505,6 +549,169 @@ function GameReviewArrowOverlay({
   );
 }
 
+function MoveClassificationBadgeOverlay({
+  boardSize,
+  classification,
+  flipped,
+  moveUci
+}: {
+  boardSize: number;
+  classification: GamePlyEvaluation["classification"];
+  flipped: boolean;
+  moveUci: string;
+}): React.JSX.Element | null {
+  const styles = useStyles();
+  const theme = useTheme();
+  const normalized = normalizeUciMove(moveUci);
+  if (normalized.length < 4) {
+    return null;
+  }
+  const destSquare = normalized.slice(2, 4);
+  const fileIndex = destSquare.charCodeAt(0) - 97;
+  const rankNumber = Number(destSquare[1]);
+  if (fileIndex < 0 || fileIndex > 7 || !Number.isInteger(rankNumber) || rankNumber < 1 || rankNumber > 8) {
+    return null;
+  }
+  const col = flipped ? 7 - fileIndex : fileIndex;
+  const row = flipped ? rankNumber - 1 : 8 - rankNumber;
+  const squareSize = boardSize / 8;
+  const badgeSize = Math.max(18, Math.min(24, Math.round(squareSize * 0.44)));
+  const left = Math.min(boardSize - badgeSize - 1, Math.max(1, (col + 1) * squareSize - badgeSize * 0.72));
+  const top = Math.min(boardSize - badgeSize - 1, Math.max(1, row * squareSize - badgeSize * 0.22));
+  const meta = classificationBadgeMeta(classification, theme.colors);
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.squareBadge,
+        {
+          backgroundColor: meta.bgColor,
+          height: badgeSize,
+          left,
+          minWidth: badgeSize,
+          top
+        }
+      ]}
+      testID={`game-review-square-badge-${classification}`}
+    >
+      <AppText
+        maxFontSizeMultiplier={1.0}
+        style={[styles.squareBadgeText, { color: meta.textColor }]}
+        variant="caption"
+      >
+        {meta.glyph}
+      </AppText>
+    </View>
+  );
+}
+
+function MoveVerdictStrip({
+  criticalCount,
+  currentPly,
+  currentPlyEval,
+  isHidingAnswer,
+  isScanning,
+  onNextCritical,
+  onPrevCritical
+}: {
+  criticalCount: number;
+  currentPly: number;
+  currentPlyEval: GamePlyEvaluation | null;
+  isHidingAnswer: boolean;
+  isScanning: boolean;
+  onNextCritical: () => void;
+  onPrevCritical: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  const theme = useTheme();
+
+  let leftContent: React.JSX.Element;
+  if (isHidingAnswer) {
+    leftContent = (
+      <AppText numberOfLines={1} tone="secondary" variant="footnote">
+        {GAME_REVIEW_COPY.header.modeKeyMoments}
+      </AppText>
+    );
+  } else if (currentPly <= 0) {
+    leftContent = (
+      <AppText numberOfLines={1} tone="secondary" variant="footnote">
+        {GAME_REVIEW_COPY.verdict.startPosition}
+      </AppText>
+    );
+  } else if (!currentPlyEval) {
+    leftContent = (
+      <AppText numberOfLines={1} tone="secondary" variant="footnote">
+        {isScanning ? GAME_REVIEW_COPY.verdict.evaluating : "—"}
+      </AppText>
+    );
+  } else {
+    const meta = classificationBadgeMeta(currentPlyEval.classification, theme.colors);
+    const moveTag = `${formatMoveNumberTag(currentPlyEval.moveNumber, currentPlyEval.color)} ${currentPlyEval.san}`;
+    const evalLabel = formatEvalLabel(currentPlyEval.scoreAfter);
+    const bestSan =
+      isSuboptimalClassification(currentPlyEval.classification) &&
+      currentPlyEval.bestMove &&
+      normalizeUciMove(currentPlyEval.bestMove) !== normalizeUciMove(currentPlyEval.uci)
+        ? uciToSan(currentPlyEval.fenBefore, currentPlyEval.bestMove)
+        : null;
+
+    leftContent = (
+      <View style={styles.verdictLeft}>
+        <View
+          style={[styles.verdictGlyph, { backgroundColor: meta.bgColor }]}
+          testID="game-review-verdict-badge"
+        >
+          <AppText
+            maxFontSizeMultiplier={1.1}
+            style={[styles.verdictGlyphText, { color: meta.textColor }]}
+            variant="caption"
+          >
+            {meta.glyph}
+          </AppText>
+        </View>
+        <AppText numberOfLines={1} style={styles.verdictText} variant="footnote">
+          {bestSan
+            ? `${moveTag} · ${meta.label} (${evalLabel}) · ${GAME_REVIEW_COPY.verdict.bestWas(bestSan)}`
+            : `${moveTag} · ${meta.label} (${evalLabel})`}
+        </AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.verdictBar} testID="game-review-verdict-bar">
+      <View style={styles.verdictMain}>{leftContent}</View>
+      {criticalCount > 0 ? (
+        <View style={styles.criticalNavRow}>
+          <Pressable
+            accessibilityLabel={GAME_REVIEW_COPY.verdict.prevKey}
+            accessibilityRole="button"
+            onPress={onPrevCritical}
+            style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
+            testID="game-review-prev-critical"
+          >
+            <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
+              ‹ Key
+            </AppText>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={GAME_REVIEW_COPY.verdict.nextKey}
+            accessibilityRole="button"
+            onPress={onNextCritical}
+            style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
+            testID="game-review-next-critical"
+          >
+            <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
+              Key ›
+            </AppText>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const useStyles = makeStyles((theme) => ({
   screen: {
     backgroundColor: theme.colors.surfaceRaised,
@@ -514,9 +721,9 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.surface,
     borderBottomColor: theme.colors.border.default,
     borderBottomWidth: 1,
-    gap: 8,
+    gap: 6,
     paddingHorizontal: PRACTICE_UI_PADDING,
-    paddingVertical: 10
+    paddingVertical: 6
   },
   headerTopRow: {
     alignItems: "center",
@@ -526,6 +733,28 @@ const useStyles = makeStyles((theme) => ({
   },
   headerTitle: {
     flex: 1
+  },
+  scanProgressWrap: {
+    backgroundColor: theme.colors.surface,
+    borderBottomColor: theme.colors.border.default,
+    borderBottomWidth: 1
+  },
+  scanProgressTrack: {
+    backgroundColor: theme.colors.surfaceStrong,
+    height: 3,
+    overflow: "hidden",
+    width: "100%"
+  },
+  scanProgressFill: {
+    backgroundColor: theme.colors.accent.fill,
+    height: "100%"
+  },
+  scanProgressRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingHorizontal: PRACTICE_UI_PADDING,
+    paddingVertical: 3
   },
   scanBanner: {
     alignItems: "center",
@@ -537,7 +766,7 @@ const useStyles = makeStyles((theme) => ({
     gap: 8,
     justifyContent: "space-between",
     paddingHorizontal: PRACTICE_UI_PADDING,
-    paddingVertical: 8
+    paddingVertical: 6
   },
   scanErrorText: {
     flex: 1
@@ -549,7 +778,7 @@ const useStyles = makeStyles((theme) => ({
     flex: 1
   },
   portraitContent: {
-    gap: 12,
+    gap: 10,
     padding: PRACTICE_UI_PADDING
   },
   railLayout: {
@@ -567,12 +796,12 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 0
   },
   railPanelsContent: {
-    gap: 12,
+    gap: 10,
     paddingBottom: 16
   },
   boardSection: {
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     width: "100%"
   },
   boardRow: {
@@ -594,8 +823,87 @@ const useStyles = makeStyles((theme) => ({
     top: 0,
     zIndex: 12
   },
+  squareBadge: {
+    alignItems: "center",
+    borderColor: theme.colors.surface,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    position: "absolute",
+    zIndex: 14
+  },
+  squareBadgeText: {
+    fontSize: 10,
+    fontWeight: theme.fontWeight.bold,
+    lineHeight: 12,
+    textAlign: "center"
+  },
+  verdictBar: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    minHeight: 38,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  verdictMain: {
+    flex: 1,
+    minWidth: 0
+  },
+  verdictLeft: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  verdictGlyph: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 20,
+    justifyContent: "center",
+    minWidth: 20,
+    paddingHorizontal: 4
+  },
+  verdictGlyphText: {
+    fontSize: 10.5,
+    fontWeight: theme.fontWeight.bold,
+    lineHeight: 13
+  },
+  verdictText: {
+    color: theme.colors.text.primary,
+    flex: 1,
+    fontWeight: theme.fontWeight.semibold
+  },
+  criticalNavRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  criticalNavButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 3
+  },
+  criticalNavText: {
+    color: theme.colors.text.primary,
+    fontWeight: theme.fontWeight.bold
+  },
+  pressed: {
+    opacity: 0.72
+  },
   panelsStack: {
-    gap: 12,
+    gap: 10,
     width: "100%"
   }
 }));

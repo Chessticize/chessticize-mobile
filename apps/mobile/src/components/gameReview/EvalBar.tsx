@@ -32,7 +32,7 @@ export function EvalBar({
   const whiteFillColor =
     theme.name === "dark" ? theme.colors.surfaceInverse : theme.colors.surface;
   const blackFillColor =
-    theme.name === "dark" ? theme.colors.surfaceRaised : theme.colors.surfaceInverse;
+    theme.name === "dark" ? theme.colors.surfaceSunken : theme.colors.surfaceInverse;
 
   if (orientation === "horizontal") {
     const leftPercent = flipped ? 100 - clampedWin : clampedWin;
@@ -106,7 +106,9 @@ export function EvalBar({
       </View>
       <View style={styles.verticalLabelWrap}>
         <AppText
-          maxFontSizeMultiplier={1.3}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.15}
+          minimumFontScale={0.72}
           numberOfLines={1}
           style={styles.verticalLabelText}
           testID={`${testID}-label`}
@@ -123,7 +125,7 @@ const useStyles = makeStyles((theme) => ({
   verticalWrap: {
     alignItems: "center",
     justifyContent: "space-between",
-    width: 34
+    width: 44
   },
   verticalTrack: {
     borderColor: theme.colors.border.strong,
@@ -132,7 +134,7 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     overflow: "hidden",
     position: "relative",
-    width: 14
+    width: 18
   },
   verticalSegment: {
     width: "100%"
@@ -146,19 +148,24 @@ const useStyles = makeStyles((theme) => ({
     top: "50%"
   },
   verticalLabelWrap: {
+    alignItems: "center",
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border.default,
     borderRadius: theme.radius[6],
     borderWidth: 1,
+    justifyContent: "center",
     marginTop: 4,
-    paddingHorizontal: 3,
+    minWidth: 44,
+    paddingHorizontal: 2,
     paddingVertical: 2
   },
   verticalLabelText: {
     backgroundColor: theme.colors.surface,
     color: theme.colors.text.primary,
+    fontSize: 10.5,
     fontVariant: ["tabular-nums"],
     fontWeight: theme.fontWeight.bold,
+    lineHeight: 13,
     textAlign: "center"
   },
   horizontalWrap: {

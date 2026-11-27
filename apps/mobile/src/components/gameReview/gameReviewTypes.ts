@@ -75,9 +75,25 @@ export type KeyMomentHighlightItem = {
   fenAfter: string;
 };
 
-export type KeyMomentItem = KeyMomentPuzzleItem | KeyMomentHighlightItem;
+export type KeyMomentSwingItem = {
+  id: string;
+  kind: "swing";
+  ply: number;
+  moveNumber: number;
+  color: "w" | "b";
+  classification: MoveClassification;
+  playedMoveUci: string;
+  playedMoveSan: string;
+  bestMoveUci?: string;
+  bestMoveSan?: string;
+  evalAfterLabel: string;
+  fenBefore: string;
+  fenAfter: string;
+};
 
-export type KeyMomentRetryStatus = "prompt" | "solved" | "failed" | "skipped" | "highlight";
+export type KeyMomentItem = KeyMomentPuzzleItem | KeyMomentHighlightItem | KeyMomentSwingItem;
+
+export type KeyMomentRetryStatus = "prompt" | "solved" | "failed" | "skipped" | "highlight" | "swing";
 
 export type KeyMomentRetryState = {
   momentId: string;
@@ -155,10 +171,12 @@ export interface GameReviewController {
   evalByPly: ReadonlyMap<number, GamePlyEvaluation>;
   evalGraphPoints: GameReviewEvalGraphPoint[];
   currentPly: number;
+  currentPlyEval: GamePlyEvaluation | null;
   currentFen: string;
   currentScore: AnalysisScore;
   currentWhiteWinPercent: number;
   currentLastMoveUci: string | null;
+  criticalPlies: number[];
   flipped: boolean;
   mode: GameReviewMode;
   keyMoments: KeyMomentItem[];
@@ -184,6 +202,8 @@ export interface GameReviewController {
   stepPrev: () => void;
   stepNext: () => void;
   stepLast: () => void;
+  jumpToPrevCriticalPly: () => void;
+  jumpToNextCriticalPly: () => void;
   toggleFlip: () => void;
   selectKeyMoment: (index: number) => void;
   prevKeyMoment: () => void;

@@ -63,6 +63,16 @@ export interface GamesBatchAnalysisController {
   dismiss: () => void;
 }
 
+const DEFAULT_MOBILE_BATCH_PASS1_LIMIT = {
+  depth: 10,
+  nodes: 40_000
+} as const;
+
+const DEFAULT_MOBILE_BATCH_PASS2_DEEP_LIMIT = {
+  depth: 16,
+  nodes: 250_000
+} as const;
+
 type PauseReason = "none" | "user" | "background" | "cancel";
 
 export function useGamesBatchAnalysis({
@@ -177,6 +187,8 @@ export function useGamesBatchAnalysis({
           timeControl: latestGame.timeControl,
           pass1Options: {
             priority: "batch",
+            depth: DEFAULT_MOBILE_BATCH_PASS1_LIMIT.depth,
+            nodes: DEFAULT_MOBILE_BATCH_PASS1_LIMIT.nodes,
             ...pass1OptionsRef.current,
             initialEvaluations,
             signal: controller.signal,
@@ -192,6 +204,7 @@ export function useGamesBatchAnalysis({
             }
           },
           extractionOptions: {
+            deepLimit: DEFAULT_MOBILE_BATCH_PASS2_DEEP_LIMIT,
             ...extractionOptionsRef.current,
             signal: controller.signal
           },
@@ -395,7 +408,7 @@ export function useGamesBatchAnalysis({
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus): void => {
-      if (nextAppState !== "active" && runningRef.current) {
+      if (nextAppState === "background" && runningRef.current) {
         requestPause("background");
       }
     };
