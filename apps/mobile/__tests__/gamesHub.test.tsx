@@ -770,11 +770,78 @@ describe("GamesHubScreen", () => {
       />
     );
 
+    // Practice My Game Puzzles CTA lives in the Puzzles tab to avoid duplicating Games view
+    expect(hasTestID(renderer, "games-practice-puzzles-cta")).toBe(false);
+    press(renderer, "games-hub-view-puzzles");
     expect(textContent(findByTestID(renderer, "games-practice-puzzles-cta"))).toContain(
       "Practice My Game Puzzles (1)"
     );
     press(renderer, "games-practice-puzzles-cta");
     expect(onPractice).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports importing up to 100 games and loading older games on demand via until cursor", async () => {
+    const service = new PracticeService(new MemoryStore());
+    const oldestPlayedAt = "2026-03-05T12:00:00.000Z";
+    const oldestMs = Date.parse(oldestPlayedAt);
+    service.upsertLinkedAccount({
+      platform: "lichess",
+      username: "alice",
+      lastSyncedAt: "2026-03-10T12:00:00.000Z"
+    });
+    service.upsertImportedGames([
+      makeDraft({
+        id: "https://lichess.org/existing1",
+        platform: "lichess",
+        username: "alice",
+        playedAt: oldestPlayedAt
+      })
+    ]);
+
+    const requestedUrls: string[] = [];
+    const client: GameImportHttpClient = {
+      async getText(url) {
+        requestedUrls.push(url);
+        return {
+          status: 200,
+          text: JSON.stringify({
+            id: "OlderGame1",
+            variant: "standard",
+            speed: "blitz",
+            rated: true,
+            lastMoveAt: oldestMs - 86_400_000,
+            status: "mate",
+            winner: "white",
+            players: {
+              white: { user: { name: "alice", id: "alice" }, rating: 1500 },
+              black: { user: { name: "bob", id: "bob" }, rating: 1490 }
+            },
+            pgn: SAMPLE_PGN_1
+          })
+        };
+      }
+    };
+
+    const renderer = render(
+      <GamesHubScreen
+        httpClient={client}
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+
+    // Import modal exposes 100 recent games option
+    press(renderer, "games-header-import");
+    expect(hasTestID(renderer, "games-import-max-100")).toBe(true);
+    press(renderer, "games-import-close");
+
+    // Pressing Import older games (+50) passes until=<oldestMs> and inserts the older game
+    await pressAsync(renderer, "games-load-older");
+    expect(requestedUrls[0]).toContain(`until=${oldestMs}`);
+    expect(service.listImportedGames().some((g) => g.id === "https://lichess.org/OlderGame1")).toBe(true);
+    // Preserves forward sync cursor
+    expect(service.listLinkedAccounts()[0]?.lastSyncedAt).toBe("2026-03-10T12:00:00.000Z");
   });
 
   it("renders Games as the 5th tab in PracticePocScreen and wires back intent cleanly", () => {

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Chessboard, { type MoveResult } from "react-native-chessboard";
 import type {
   GameHighlightMoment,
@@ -63,8 +63,9 @@ export interface GameReviewScreenProps {
   onPracticeGamePuzzles?: (gameId: string) => void;
 }
 
-const EVAL_BAR_SIDE_WIDTH = 52;
+const EVAL_BAR_SIDE_WIDTH = 44;
 const BOARD_FRAME_BORDER = 2;
+const REVIEW_CONTENT_HORIZONTAL_PADDING = 12;
 const BOARD_MIN_SIZE = 220;
 const BOARD_MAX_PORTRAIT_SIZE = 500;
 const BOARD_MAX_LANDSCAPE_SIZE = 540;
@@ -135,7 +136,7 @@ export function GameReviewScreen({
       const raw = Math.min(availableWidth, availableHeight, BOARD_MAX_LANDSCAPE_SIZE);
       return Math.max(BOARD_MIN_SIZE, Math.floor(raw));
     }
-    const stageWidth = measuredStageWidth ?? layout.contentWidth - PRACTICE_UI_PADDING * 2;
+    const stageWidth = measuredStageWidth ?? layout.contentWidth - REVIEW_CONTENT_HORIZONTAL_PADDING * 2;
     const availableWidth = stageWidth - evalReserve - BOARD_FRAME_BORDER;
     const raw = Math.min(availableWidth, BOARD_MAX_PORTRAIT_SIZE);
     return Math.max(BOARD_MIN_SIZE, Math.floor(raw));
@@ -814,11 +815,11 @@ const useStyles = makeStyles((theme) => ({
     flex: 1
   },
   header: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceRaised,
     borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 6,
-    paddingHorizontal: PRACTICE_UI_PADDING,
+    paddingHorizontal: REVIEW_CONTENT_HORIZONTAL_PADDING,
     paddingVertical: 6
   },
   headerTopRow: {
@@ -828,7 +829,8 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "space-between"
   },
   headerTitle: {
-    flex: 1
+    flex: 1,
+    textAlign: "center"
   },
   scanProgressWrap: {
     backgroundColor: theme.colors.surface,
@@ -875,7 +877,9 @@ const useStyles = makeStyles((theme) => ({
   },
   portraitContent: {
     gap: 10,
-    padding: PRACTICE_UI_PADDING
+    paddingBottom: 20,
+    paddingHorizontal: REVIEW_CONTENT_HORIZONTAL_PADDING,
+    paddingTop: 10
   },
   railLayout: {
     flex: 1,
@@ -903,7 +907,7 @@ const useStyles = makeStyles((theme) => ({
   boardRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     justifyContent: "center"
   },
   boardFrame: {

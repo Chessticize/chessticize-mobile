@@ -103,6 +103,7 @@ export interface GameImportHttpClient {
 export interface RemoteGameImportOptions {
   username: string;
   since?: Date | number | string;
+  until?: Date | number | string;
   maxGames?: number;
   signal?: AbortSignal;
 }

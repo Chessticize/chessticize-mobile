@@ -606,3 +606,100 @@ test("PGN batch importer handles 60-game batches and deduplicates repeated entri
   });
   assert.equal(result.games[0]?.id, hash1);
 });
+
+test("Chess.com and Lichess importers support until cursor for importing older games", async () => {
+  const archivesUrl = `${CHESSCOM_API_BASE}/player/older_user/games/archives`;
+  const marArchive = `${CHESSCOM_API_BASE}/player/older_user/games/2026/03`;
+  const febArchive = `${CHESSCOM_API_BASE}/player/older_user/games/2026/02`;
+
+  const { client: chessComClient, requests: chessComRequests } = createFakeHttpClient((url) => {
+    if (url === archivesUrl) {
+      return {
+        status: 200,
+        text: JSON.stringify({ archives: [febArchive, marArchive] })
+      };
+    }
+    if (url === febArchive) {
+      return {
+        status: 200,
+        text: JSON.stringify({
+          games: [
+            {
+              url: "https://www.chess.com/game/live/202",
+              rules: "chess",
+              end_time: 1771500000,
+              white: { username: "older_user", result: "win" },
+              black: { username: "opp2", result: "resigned" },
+              pgn: "1. e4 e5 1-0"
+            },
+            {
+              url: "https://www.chess.com/game/live/201",
+              rules: "chess",
+              end_time: 1771000000,
+              white: { username: "older_user", result: "win" },
+              black: { username: "opp1", result: "resigned" },
+              pgn: "1. d4 d5 1-0"
+            }
+          ]
+        })
+      };
+    }
+    throw new Error(`Should not fetch newer archive: ${url}`);
+  });
+
+  // March 2026 starts at 1772323200000 ms, so until in mid-Feb skips March archive completely.
+  const olderChessCom = await importChessComGames(chessComClient, {
+    username: "older_user",
+    until: 1771500000 * 1000,
+    maxGames: 50
+  });
+  assert.deepEqual(
+    chessComRequests.map((entry) => entry.url),
+    [archivesUrl, febArchive]
+  );
+  assert.equal(olderChessCom.length, 1);
+  assert.equal(olderChessCom[0]?.id, "https://www.chess.com/game/live/201");
+
+  const { client: lichessClient, requests: lichessRequests } = createFakeHttpClient(() => ({
+    status: 200,
+    text: [
+      JSON.stringify({
+        id: "SameTime1",
+        variant: "standard",
+        speed: "blitz",
+        rated: true,
+        lastMoveAt: 1771500000000,
+        status: "mate",
+        winner: "white",
+        players: {
+          white: { user: { name: "older_li", id: "older_li" } },
+          black: { user: { name: "opp", id: "opp" } }
+        },
+        pgn: "1. e4 e5 1-0"
+      }),
+      JSON.stringify({
+        id: "OlderLi01",
+        variant: "standard",
+        speed: "blitz",
+        rated: true,
+        lastMoveAt: 1771000000000,
+        status: "mate",
+        winner: "white",
+        players: {
+          white: { user: { name: "older_li", id: "older_li" } },
+          black: { user: { name: "opp", id: "opp" } }
+        },
+        pgn: "1. d4 d5 1-0"
+      })
+    ].join("\n")
+  }));
+
+  const olderLichess = await importLichessGames(lichessClient, {
+    username: "older_li",
+    until: 1771500000000,
+    maxGames: 50
+  });
+  assert.ok(lichessRequests[0]?.url.includes("until=1771500000000"));
+  assert.equal(olderLichess.length, 1);
+  assert.equal(olderLichess[0]?.id, "https://lichess.org/OlderLi01");
+});

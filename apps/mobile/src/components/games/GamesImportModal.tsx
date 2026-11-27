@@ -43,12 +43,13 @@ export interface GamesImportModalProps {
     username: string;
     maxGames: number;
   }) => Promise<void>;
+  onImportOlderForAccount?: (account: LinkedGameAccount) => Promise<void>;
   onRemoveAccount: (platform: LinkedGameAccountPlatform, username: string) => void;
   onImportPgn: (input: { pgnText: string; defaultUserColor: GameColor }) => void;
   onClearFeedback?: () => void;
 }
 
-const MAX_GAME_OPTIONS = [25, 50] as const;
+const MAX_GAME_OPTIONS = [25, 50, 100] as const;
 
 export function GamesImportModal({
   visible,
@@ -59,6 +60,7 @@ export function GamesImportModal({
   statusMessage,
   onClose,
   onLinkAndSync,
+  onImportOlderForAccount,
   onRemoveAccount,
   onImportPgn,
   onClearFeedback
@@ -262,18 +264,32 @@ export function GamesImportModal({
                                 {platformLabel}
                               </AppText>
                             </View>
-                            <Button
-                              accessibilityLabel={t("games.modal.removeAccountA11y", {
-                                platform: platformLabel,
-                                username: account.username
-                              })}
-                              disabled={busy}
-                              label={t("common.remove")}
-                              size="compact"
-                              testID={`games-remove-account-${account.platform}-${account.username}`}
-                              variant="destructive"
-                              onPress={() => onRemoveAccount(account.platform, account.username)}
-                            />
+                            <View style={styles.linkedRowActions}>
+                              {onImportOlderForAccount ? (
+                                <Button
+                                  disabled={busy}
+                                  label="+50 older"
+                                  size="compact"
+                                  testID={`games-import-older-${account.platform}-${account.username}`}
+                                  variant="secondary"
+                                  onPress={() => {
+                                    void onImportOlderForAccount(account);
+                                  }}
+                                />
+                              ) : null}
+                              <Button
+                                accessibilityLabel={t("games.modal.removeAccountA11y", {
+                                  platform: platformLabel,
+                                  username: account.username
+                                })}
+                                disabled={busy}
+                                label={t("common.remove")}
+                                size="compact"
+                                testID={`games-remove-account-${account.platform}-${account.username}`}
+                                variant="destructive"
+                                onPress={() => onRemoveAccount(account.platform, account.username)}
+                              />
+                            </View>
                           </View>
                         );
                       })}
@@ -431,5 +447,10 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     gap: 2,
     minWidth: 0
+  },
+  linkedRowActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
   }
 }));

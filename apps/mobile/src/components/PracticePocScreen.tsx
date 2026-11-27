@@ -5097,6 +5097,21 @@ export function PracticePocScreen({
               onReplay={() => showSessionReplay()}
               onReplayMistakes={() => showSessionReplay("mistakes")}
             />
+          ) : tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null ? (
+            <GameReviewScreen
+              engine={getSharedGameReviewArbiter()}
+              game={activeReviewGame}
+              initialPly={activeGameReviewInitialPly ?? undefined}
+              practiceService={service}
+              store={service.gameReviewStore}
+              onBack={() => {
+                setActiveGameReviewId(null);
+                setActiveGameReviewInitialPly(null);
+              }}
+              onPracticeGamePuzzles={(gameId) => {
+                startMyGamePuzzlesSessionForOptions({ gameId });
+              }}
+            />
           ) : (
           <>
           {!appHeaderScrolls ? appShellHeader : null}
@@ -5723,21 +5738,6 @@ export function PracticePocScreen({
                   replayTerminology
                   reviewScheduleControlVisible
                   stockfish={stockfish}
-                />
-              ) : activeReviewGame !== null ? (
-                <GameReviewScreen
-                  engine={getSharedGameReviewArbiter()}
-                  game={activeReviewGame}
-                  initialPly={activeGameReviewInitialPly ?? undefined}
-                  practiceService={service}
-                  store={service.gameReviewStore}
-                  onBack={() => {
-                    setActiveGameReviewId(null);
-                    setActiveGameReviewInitialPly(null);
-                  }}
-                  onPracticeGamePuzzles={(gameId) => {
-                    startMyGamePuzzlesSessionForOptions({ gameId });
-                  }}
                 />
               ) : (
                 <GamesHubScreen

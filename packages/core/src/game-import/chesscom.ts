@@ -65,6 +65,10 @@ export async function importChessComGames(
   const sinceDate = sinceMs !== undefined ? new Date(sinceMs) : undefined;
   const sinceYear = sinceDate?.getUTCFullYear();
   const sinceMonth = sinceDate !== undefined ? sinceDate.getUTCMonth() + 1 : undefined;
+  const untilMs = normalizeSinceMs(options.until);
+  const untilDate = untilMs !== undefined ? new Date(untilMs) : undefined;
+  const untilYear = untilDate?.getUTCFullYear();
+  const untilMonth = untilDate !== undefined ? untilDate.getUTCMonth() + 1 : undefined;
 
   const archivesUrl = `${CHESSCOM_API_BASE}/player/${encodeURIComponent(
     normalizedUsername
@@ -90,6 +94,14 @@ export async function importChessComGames(
   const results: ImportedGameDraft[] = [];
 
   for (const archive of archives) {
+    if (
+      untilYear !== undefined &&
+      untilMonth !== undefined &&
+      (archive.year > untilYear ||
+        (archive.year === untilYear && archive.month > untilMonth))
+    ) {
+      continue;
+    }
     if (
       sinceYear !== undefined &&
       sinceMonth !== undefined &&
@@ -122,6 +134,9 @@ export async function importChessComGames(
     for (const rawGame of classicalGames) {
       const endTimeSeconds = rawGame.end_time as number;
       const playedAtMs = Math.floor(endTimeSeconds * 1000);
+      if (untilMs !== undefined && playedAtMs >= untilMs) {
+        continue;
+      }
       if (sinceMs !== undefined && playedAtMs <= sinceMs) {
         break;
       }

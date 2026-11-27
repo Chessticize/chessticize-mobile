@@ -125,7 +125,7 @@ const useStyles = makeStyles((theme) => ({
   verticalWrap: {
     alignItems: "center",
     justifyContent: "space-between",
-    width: 44
+    width: 38
   },
   verticalTrack: {
     borderColor: theme.colors.border.strong,
@@ -155,7 +155,7 @@ const useStyles = makeStyles((theme) => ({
     borderWidth: 1,
     justifyContent: "center",
     marginTop: 4,
-    minWidth: 44,
+    minWidth: 38,
     paddingHorizontal: 2,
     paddingVertical: 2
   },

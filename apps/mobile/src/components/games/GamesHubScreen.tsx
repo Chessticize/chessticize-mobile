@@ -121,6 +121,7 @@ export function GamesHubScreen({
   const [internalModalOpen, setInternalModalOpen] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState<GamesImportTab>(initialImportTab);
   const [syncing, setSyncing] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [syncSummary, setSyncSummary] = useState<string | null>(null);
   const [hubError, setHubError] = useState<string | null>(initialError);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -327,6 +328,16 @@ export function GamesHubScreen({
     [effectiveTimeClassFilter, matchesAccountFilter, snapshot.gameById, snapshot.orderedUserPuzzles]
   );
 
+  const filteredArrowDuelPuzzles = useMemo(
+    () => filteredOrderedUserPuzzles.filter((puzzle) => puzzle.puzzleKind === "arrow_duel"),
+    [filteredOrderedUserPuzzles]
+  );
+
+  const filteredStandardPuzzles = useMemo(
+    () => filteredOrderedUserPuzzles.filter((puzzle) => puzzle.puzzleKind === "line"),
+    [filteredOrderedUserPuzzles]
+  );
+
   const filteredDiagnosis = useMemo(() => {
     const gamesInScope = snapshot.allGames.filter(
       (game) =>
@@ -442,7 +453,7 @@ export function GamesHubScreen({
   );
 
   const handleSyncAllLinked = useCallback(async (): Promise<void> => {
-    if (syncing || snapshot.linkedAccounts.length === 0) {
+    if (syncing || loadingOlder || snapshot.linkedAccounts.length === 0) {
       return;
     }
     setSyncing(true);
@@ -471,7 +482,96 @@ export function GamesHubScreen({
     } finally {
       setSyncing(false);
     }
-  }, [locale, snapshot.linkedAccounts, syncAccount, syncing, t]);
+  }, [loadingOlder, locale, snapshot.linkedAccounts, syncAccount, syncing, t]);
+
+  const handleImportOlderGames = useCallback(
+    async (targetAccount?: LinkedGameAccount): Promise<void> => {
+      if (syncing || loadingOlder) {
+        return;
+      }
+      const accountsToLoad: LinkedGameAccount[] = targetAccount
+        ? [targetAccount]
+        : effectiveAccountFilter !== "all" && effectiveAccountFilter !== "pgn"
+          ? snapshot.linkedAccounts.filter(
+              (account) =>
+                `${account.platform}:${account.username.toLowerCase()}` === effectiveAccountFilter
+            )
+          : snapshot.linkedAccounts;
+      if (accountsToLoad.length === 0) {
+        return;
+      }
+      setLoadingOlder(true);
+      setHubError(null);
+      if (targetAccount) {
+        setModalError(null);
+        setModalStatus(null);
+      }
+      try {
+        const client = resolveHttpClient();
+        const syncedAt = new Date(nowMs).toISOString();
+        let totalInserted = 0;
+        for (const account of accountsToLoad) {
+          let oldestMs: number | undefined;
+          for (const game of snapshot.allGames) {
+            if (
+              game.platform === account.platform &&
+              (game.username ?? "").toLowerCase() === account.username.toLowerCase()
+            ) {
+              const playedAtMs = Date.parse(game.playedAt);
+              if (Number.isFinite(playedAtMs) && (oldestMs === undefined || playedAtMs < oldestMs)) {
+                oldestMs = playedAtMs;
+              }
+            }
+          }
+          const drafts =
+            account.platform === "chess_com"
+              ? await importChessComGames(client, {
+                  username: account.username,
+                  maxGames: 50,
+                  ...(oldestMs !== undefined ? { until: oldestMs } : {})
+                })
+              : await importLichessGames(client, {
+                  username: account.username,
+                  maxGames: 50,
+                  ...(oldestMs !== undefined ? { until: oldestMs } : {})
+                });
+          const upsert = service.upsertImportedGames(drafts, syncedAt);
+          totalInserted += upsert.inserted;
+        }
+        refreshHub();
+        const summary =
+          totalInserted > 0
+            ? t("games.sync.added", { count: totalInserted })
+            : "No older games found";
+        setSyncSummary(summary);
+        if (targetAccount) {
+          setModalStatus(summary);
+        }
+      } catch (error) {
+        const message = gameImportErrorMessage(error, locale);
+        if (targetAccount) {
+          setModalError(message);
+        } else {
+          setHubError(message);
+        }
+      } finally {
+        setLoadingOlder(false);
+      }
+    },
+    [
+      effectiveAccountFilter,
+      loadingOlder,
+      locale,
+      nowMs,
+      refreshHub,
+      resolveHttpClient,
+      service,
+      snapshot.allGames,
+      snapshot.linkedAccounts,
+      syncing,
+      t
+    ]
+  );
 
   const autoSyncedOnMountRef = useRef(false);
   useEffect(() => {
@@ -594,14 +694,14 @@ export function GamesHubScreen({
               <Pressable
                 accessibilityLabel={syncing ? t("games.action.syncing") : t("games.action.sync")}
                 accessibilityRole="button"
-                accessibilityState={{ busy: syncing, disabled: syncing }}
-                disabled={syncing}
+                accessibilityState={{ busy: syncing || loadingOlder, disabled: syncing || loadingOlder }}
+                disabled={syncing || loadingOlder}
                 onPress={() => {
                   void handleSyncAllLinked();
                 }}
                 style={({ pressed }) => [
                   styles.syncIconButton,
-                  pressed && !syncing ? styles.pressed : null
+                  pressed && !syncing && !loadingOlder ? styles.pressed : null
                 ]}
                 testID="games-sync-button"
               >
@@ -804,61 +904,18 @@ export function GamesHubScreen({
             ) : null}
           </CollapsibleRegion>
 
-          <View style={styles.controlsStrip} testID="games-top-bar">
-            {syncSummary ? (
-              <View style={styles.accountRow}>
-                <Badge
-                  label={syncSummary}
-                  testID="games-sync-summary"
-                  tone="positive"
-                />
-              </View>
-            ) : null}
-
-            <View style={styles.quickActionRow}>
-              {snapshot.userPuzzleCount > 0 && onPracticeMyGamePuzzles ? (
-                <>
-                  <Button
-                    icon="play"
-                    label={t("games.action.practicePuzzles", { count: snapshot.userPuzzleCount })}
-                    stretch
-                    testID="games-practice-puzzles-cta"
-                    onPress={() =>
-                      onPracticeMyGamePuzzles({
-                        ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
-                      })
-                    }
+          {syncSummary || (unanalyzedGames.length > 0 && !batchBusy) ? (
+            <View style={styles.controlsStrip} testID="games-top-bar">
+              {syncSummary ? (
+                <View style={styles.accountRow}>
+                  <Badge
+                    label={syncSummary}
+                    testID="games-sync-summary"
+                    tone="positive"
                   />
-                  {snapshot.arrowDuelCount > 0 && snapshot.lineCount > 0 ? (
-                    <View style={styles.secondaryActionRow}>
-                      <Button
-                        label={`${t("common.arrowDuel")} (${snapshot.arrowDuelCount})`}
-                        size="compact"
-                        testID="games-practice-arrow-duel"
-                        variant="secondary"
-                        onPress={() =>
-                          onPracticeMyGamePuzzles({
-                            mode: "arrow_duel",
-                            ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
-                          })
-                        }
-                      />
-                      <Button
-                        label={`${t("common.standard")} (${snapshot.lineCount})`}
-                        size="compact"
-                        testID="games-practice-lines"
-                        variant="secondary"
-                        onPress={() =>
-                          onPracticeMyGamePuzzles({
-                            mode: "standard",
-                            ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
-                          })
-                        }
-                      />
-                    </View>
-                  ) : null}
-                </>
+                </View>
               ) : null}
+
               {unanalyzedGames.length > 0 && !batchBusy ? (
                 <View style={styles.secondaryActionRow}>
                   <Button
@@ -871,7 +928,7 @@ export function GamesHubScreen({
                 </View>
               ) : null}
             </View>
-          </View>
+          ) : null}
 
           <BatchAnalysisBanner
             state={batch.state}
@@ -904,33 +961,92 @@ export function GamesHubScreen({
 
           {effectiveHubView === "puzzles" ? (
             <View style={styles.puzzlesTabSection} testID="games-puzzles-view">
-              <View style={styles.puzzlesTabActions}>
-                {onPracticeMyGamePuzzles && filteredOrderedUserPuzzles.length > 0 ? (
-                  <Button
-                    icon="play"
-                    label={`Replay all (${filteredOrderedUserPuzzles.length})`}
-                    size="compact"
-                    testID="games-puzzles-practice-all"
-                    variant="primary"
-                    onPress={() =>
-                      onPracticeMyGamePuzzles({
-                        puzzleIds: filteredOrderedUserPuzzles.map((p) => p.id),
-                        initialIndex: 0
-                      })
-                    }
-                  />
-                ) : null}
-                {filteredOrderedUserPuzzles.length > 0 ? (
-                  <Button
-                    disabled={allVisiblePuzzlesEnrolled}
-                    label={allVisiblePuzzlesEnrolled ? "All in Review" : "Add All to Review"}
-                    size="compact"
-                    testID="games-puzzles-add-all-review"
-                    variant={allVisiblePuzzlesEnrolled ? "plain" : "secondary"}
-                    onPress={() => handleAddAllUserPuzzlesToReview(filteredOrderedUserPuzzles)}
-                  />
-                ) : null}
-              </View>
+              {filteredOrderedUserPuzzles.length > 0 ? (
+                <View style={styles.quickActionRow}>
+                  {onPracticeMyGamePuzzles ? (
+                    <Button
+                      icon="play"
+                      label={t("games.action.practicePuzzles", {
+                        count: filteredOrderedUserPuzzles.length
+                      })}
+                      stretch
+                      testID="games-practice-puzzles-cta"
+                      onPress={() => {
+                        if (effectiveAccountFilter !== "all") {
+                          onPracticeMyGamePuzzles({
+                            puzzleIds: filteredOrderedUserPuzzles.map((p) => p.id),
+                            initialIndex: 0
+                          });
+                        } else {
+                          onPracticeMyGamePuzzles({
+                            ...(effectiveTimeClassFilter !== "all"
+                              ? { timeClass: effectiveTimeClassFilter }
+                              : {})
+                          });
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <View style={styles.puzzlesTabActions}>
+                    {onPracticeMyGamePuzzles &&
+                    filteredArrowDuelPuzzles.length > 0 &&
+                    filteredStandardPuzzles.length > 0 ? (
+                      <>
+                        <Button
+                          label={`${t("common.arrowDuel")} (${filteredArrowDuelPuzzles.length})`}
+                          size="compact"
+                          testID="games-practice-arrow-duel"
+                          variant="secondary"
+                          onPress={() => {
+                            if (effectiveAccountFilter !== "all") {
+                              onPracticeMyGamePuzzles({
+                                puzzleIds: filteredArrowDuelPuzzles.map((p) => p.id),
+                                initialIndex: 0
+                              });
+                            } else {
+                              onPracticeMyGamePuzzles({
+                                mode: "arrow_duel",
+                                ...(effectiveTimeClassFilter !== "all"
+                                  ? { timeClass: effectiveTimeClassFilter }
+                                  : {})
+                              });
+                            }
+                          }}
+                        />
+                        <Button
+                          label={`${t("common.standard")} (${filteredStandardPuzzles.length})`}
+                          size="compact"
+                          testID="games-practice-lines"
+                          variant="secondary"
+                          onPress={() => {
+                            if (effectiveAccountFilter !== "all") {
+                              onPracticeMyGamePuzzles({
+                                puzzleIds: filteredStandardPuzzles.map((p) => p.id),
+                                initialIndex: 0
+                              });
+                            } else {
+                              onPracticeMyGamePuzzles({
+                                mode: "standard",
+                                ...(effectiveTimeClassFilter !== "all"
+                                  ? { timeClass: effectiveTimeClassFilter }
+                                  : {})
+                              });
+                            }
+                          }}
+                        />
+                      </>
+                    ) : null}
+                    <Button
+                      disabled={allVisiblePuzzlesEnrolled}
+                      label={allVisiblePuzzlesEnrolled ? "All in Review" : "Add All to Review"}
+                      size="compact"
+                      testID="games-puzzles-add-all-review"
+                      variant={allVisiblePuzzlesEnrolled ? "plain" : "secondary"}
+                      onPress={() => handleAddAllUserPuzzlesToReview(filteredOrderedUserPuzzles)}
+                    />
+                  </View>
+                </View>
+              ) : null}
 
               {filteredOrderedUserPuzzles.length === 0 ? (
                 <Section testID="games-filtered-empty">
@@ -1094,13 +1210,28 @@ export function GamesHubScreen({
                   ))}
                 </Section>
               )}
+
+              {snapshot.linkedAccounts.length > 0 && effectiveAccountFilter !== "pgn" ? (
+                <View style={styles.loadOlderFooter}>
+                  <Button
+                    disabled={syncing || loadingOlder}
+                    label={loadingOlder ? "Importing older games…" : "Import older games (+50)"}
+                    size="compact"
+                    testID="games-load-older"
+                    variant="secondary"
+                    onPress={() => {
+                      void handleImportOlderGames();
+                    }}
+                  />
+                </View>
+              ) : null}
             </>
           )}
         </>
       )}
 
       <GamesImportModal
-        busy={syncing}
+        busy={syncing || loadingOlder}
         errorMessage={modalError}
         initialTab={modalInitialTab}
         linkedAccounts={snapshot.linkedAccounts}
@@ -1111,6 +1242,7 @@ export function GamesHubScreen({
           setModalStatus(null);
         }}
         onClose={() => setModalOpen(false)}
+        onImportOlderForAccount={handleImportOlderGames}
         onImportPgn={handleImportPgn}
         onLinkAndSync={handleLinkAndSync}
         onRemoveAccount={handleRemoveAccount}
@@ -1168,13 +1300,6 @@ function GameRow({
     ? `${opponent.username} (${opponent.rating})`
     : opponent.username;
   const metaLine = [colorLabel, timeClass, dateLabel].filter(Boolean).join(" · ");
-
-  const accentStyle =
-    outcome === "win"
-      ? styles.resultBarWin
-      : outcome === "loss"
-        ? styles.resultBarLoss
-        : styles.resultBarDraw;
 
   const badgeTone =
     outcome === "win"
@@ -1235,7 +1360,6 @@ function GameRow({
       testID={`game-row-${game.id}`}
       onPress={onPress}
     >
-      <View style={[styles.resultBar, accentStyle]} />
       <Badge
         label={gameResultShortLabel(outcome, locale)}
         testID={`game-row-result-${game.id}`}
@@ -1376,8 +1500,11 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "space-between"
+    gap: 8
+  },
+  loadOlderFooter: {
+    alignItems: "center",
+    paddingTop: 2
   },
   puzzleListRow: {
     alignItems: "center",
@@ -1437,20 +1564,6 @@ const useStyles = makeStyles((theme) => ({
   },
   gameRowPressed: {
     backgroundColor: theme.colors.surfaceStrong
-  },
-  resultBar: {
-    alignSelf: "stretch",
-    borderRadius: 2,
-    width: 4
-  },
-  resultBarWin: {
-    backgroundColor: theme.colors.positive.s600
-  },
-  resultBarLoss: {
-    backgroundColor: theme.colors.danger.s600
-  },
-  resultBarDraw: {
-    backgroundColor: theme.colors.border.strong
   },
   gameRowCopy: {
     flex: 1,

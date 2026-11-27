@@ -166,13 +166,28 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
     expect(findByTestID(rendererFull.root, "games-diagnosis-clock")).not.toBeNull();
     expect(findByTestID(rendererFull.root, "games-diagnosis-time-classes")).not.toBeNull();
 
+    // Tapping a blindspot motif chip on Games view launches theme-filtered My Game Puzzles
+    const forkChip = findByTestID(rendererFull.root, "games-diagnosis-blindspot-fork");
+    expect(forkChip).not.toBeNull();
+    act(() => {
+      forkChip!.props.onPress();
+    });
+    expect(launches[0]).toEqual({ themes: ["fork"] });
+
+    // Switch to the Puzzles view for mode-specific puzzle launch buttons
+    const puzzlesTabBtn = findByTestID(rendererFull.root, "games-hub-view-puzzles");
+    expect(puzzlesTabBtn).not.toBeNull();
+    act(() => {
+      puzzlesTabBtn!.props.onPress();
+    });
+
     // Tapping Arrow Duel quick launch passes mode: "arrow_duel"
     const arrowDuelBtn = findByTestID(rendererFull.root, "games-practice-arrow-duel");
     expect(arrowDuelBtn).not.toBeNull();
     act(() => {
       arrowDuelBtn!.props.onPress();
     });
-    expect(launches[0]).toEqual({ mode: "arrow_duel" });
+    expect(launches[1]).toEqual({ mode: "arrow_duel" });
 
     // Tapping Tactical Lines quick launch passes mode: "standard"
     const linesBtn = findByTestID(rendererFull.root, "games-practice-lines");
@@ -180,15 +195,7 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
     act(() => {
       linesBtn!.props.onPress();
     });
-    expect(launches[1]).toEqual({ mode: "standard" });
-
-    // Tapping a blindspot motif chip launches theme-filtered My Game Puzzles
-    const forkChip = findByTestID(rendererFull.root, "games-diagnosis-blindspot-fork");
-    expect(forkChip).not.toBeNull();
-    act(() => {
-      forkChip!.props.onPress();
-    });
-    expect(launches[2]).toEqual({ themes: ["fork"] });
+    expect(launches[2]).toEqual({ mode: "standard" });
 
     act(() => rendererFull.unmount());
   });

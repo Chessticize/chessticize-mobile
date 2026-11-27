@@ -74,6 +74,7 @@ export async function importLichessGames(
   }
 
   const sinceMs = normalizeSinceMs(options.since);
+  const untilMs = normalizeSinceMs(options.until);
   const queryParts = [
     "pgnInJson=true",
     "clocks=true",
@@ -84,6 +85,10 @@ export async function importLichessGames(
     const clampedSinceMs = Math.max(sinceMs, LICHESS_MIN_SINCE_MS);
     queryParts.push(`since=${clampedSinceMs}`);
   }
+  if (untilMs !== undefined) {
+    const clampedUntilMs = Math.max(untilMs, LICHESS_MIN_SINCE_MS);
+    queryParts.push(`until=${clampedUntilMs}`);
+  }
 
   const url = `${LICHESS_API_BASE}/games/user/${encodeURIComponent(
     trimmedUsername
@@ -93,13 +98,14 @@ export async function importLichessGames(
   return parseLichessNdjson(response.text, {
     username: trimmedUsername,
     ...(sinceMs !== undefined ? { sinceMs } : {}),
+    ...(untilMs !== undefined ? { untilMs } : {}),
     maxGames
   });
 }
 
 export function parseLichessNdjson(
   ndjson: string,
-  options: { username: string; sinceMs?: number; maxGames?: number }
+  options: { username: string; sinceMs?: number; untilMs?: number; maxGames?: number }
 ): ImportedGameDraft[] {
   const normalizedUsername = options.username.trim().toLowerCase();
   const maxGames = options.maxGames ?? DEFAULT_LICHESS_MAX_GAMES;
@@ -154,6 +160,13 @@ export function parseLichessNdjson(
       playedAtMs !== undefined &&
       options.sinceMs !== undefined &&
       playedAtMs <= options.sinceMs
+    ) {
+      continue;
+    }
+    if (
+      playedAtMs !== undefined &&
+      options.untilMs !== undefined &&
+      playedAtMs >= options.untilMs
     ) {
       continue;
     }
