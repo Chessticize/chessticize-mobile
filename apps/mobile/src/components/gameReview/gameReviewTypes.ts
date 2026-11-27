@@ -157,6 +157,7 @@ export interface UseGameReviewControllerParams {
   pass1Nodes?: number;
   freeAnalysisDepth?: number;
   checkpointIntervalPlies?: number;
+  animateKeyMomentJump?: boolean;
 }
 
 export interface GameReviewController {
@@ -196,6 +197,7 @@ export interface GameReviewController {
   freeAnalysisError: string | null;
   isExploringOffLine: boolean;
   explorationPliesCount: number;
+  isFastForwarding: boolean;
   setMode: (mode: GameReviewMode) => void;
   selectPly: (ply: number) => void;
   stepFirst: () => void;

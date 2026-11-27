@@ -517,6 +517,7 @@ describe("GameReviewScreen (#767)", () => {
         <ThemeProvider appearance="light">
           <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
             <GameReviewScreen
+              animateKeyMomentJump={false}
               BoardComponent={MockReviewBoard}
               game={game}
               practiceService={service}
@@ -833,6 +834,7 @@ describe("GameReviewScreen (#767)", () => {
         <ThemeProvider appearance="light">
           <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
             <GameReviewScreen
+              animateKeyMomentJump={false}
               BoardComponent={MockReviewBoard}
               game={store.getImportedGame(game.id)!}
               initialMode="moves"
@@ -844,7 +846,10 @@ describe("GameReviewScreen (#767)", () => {
       );
     });
 
-    // Starting at ply 0: verdict bar shows Start position, Key › jumps to first critical ply (ply 6 blunder).
+    // Top Key Moments | Moves segmented control is removed in unified flow.
+    expect(queryByTestId(renderer, "game-review-mode-toggle")).toBeNull();
+
+    // Starting at ply 1: verdict bar shows move verdict, Key › jumps to first critical ply (ply 6 blunder / Line puzzle).
     expect(findByTestId(renderer, "game-review-verdict-bar")).toBeTruthy();
     act(() => {
       findByTestId(renderer, "game-review-next-critical").props.onPress();
@@ -852,9 +857,9 @@ describe("GameReviewScreen (#767)", () => {
     expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
       PARSED_SAMPLE.plies[5]!.fenAfter
     );
-    expect(findByTestId(renderer, "game-review-square-badge-blunder")).toBeTruthy();
+    expect(findByTestId(renderer, "key-moment-counter")).toBeTruthy();
 
-    // Key › again jumps to ply 7 (missed_win) and shows best-move green arrow + verdict "Best: Qxf7#".
+    // Key › again jumps to ply 7 (missed_win) and shows square badge, best-move green arrow & verdict "Best: Qxf7#".
     act(() => {
       findByTestId(renderer, "game-review-next-critical").props.onPress();
     });
@@ -873,6 +878,146 @@ describe("GameReviewScreen (#767)", () => {
     expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
       PARSED_SAMPLE.plies[5]!.fenAfter
     );
+
+    act(() => renderer.unmount());
+  });
+
+  it("fast-forwards step-by-step through intermediate moves on Key › and cancels immediately on manual step", () => {
+    jest.useFakeTimers();
+    try {
+      const { store, service, game } = setupAnalyzedStore();
+      let renderer!: TestRenderer.ReactTestRenderer;
+      act(() => {
+        renderer = TestRenderer.create(
+          <ThemeProvider appearance="light">
+            <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+              <GameReviewScreen
+                animateKeyMomentJump={true}
+                BoardComponent={MockReviewBoard}
+                game={game}
+                initialMode="moves"
+                practiceService={service}
+                store={store}
+              />
+            </PracticeViewportProvider>
+          </ThemeProvider>
+        );
+      });
+
+      // Starts at ply 1; tapping Key › begins fast-forwarding to ply 6 (first critical ply).
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[0]!.fenAfter
+      );
+
+      act(() => {
+        findByTestId(renderer, "game-review-next-critical").props.onPress();
+      });
+      // Immediately steps 1 ply forward (ply 2) for instant visual feedback.
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[1]!.fenAfter
+      );
+
+      // Advance one tick -> ply 3
+      act(() => {
+        jest.advanceTimersByTime(110);
+      });
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[2]!.fenAfter
+      );
+
+      // Advance remaining ticks -> arrives at ply 6 and opens Key Moment 1 retry card!
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[5]!.fenAfter
+      );
+      expect(findByTestId(renderer, "key-moment-counter")).toBeTruthy();
+
+      // Now jump backwards from ply 6 to ply 1 via step-first after starting a jump to ply 9:
+      // verify manual step cancels fast-forward immediately.
+      act(() => {
+        findByTestId(renderer, "game-review-next-critical").props.onPress();
+      });
+      act(() => {
+        findByTestId(renderer, "game-review-step-first").props.onPress();
+      });
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[0]!.fenBefore
+      );
+
+      act(() => renderer.unmount());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not show Analysis paused · 99% when backgrounding after analysis has already completed", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    const shortPgn = [
+      '[Event "Blitz"]',
+      '[White "Alice"]',
+      '[Black "Bob"]',
+      '[Result "*"]',
+      '[TimeControl "300+0"]',
+      "",
+      "1. e4 e5 2. Nf3 Nc6 *"
+    ].join("\n");
+    const draft = createSampleGame({
+      id: "game-complete-then-bg-1",
+      pgn: shortPgn,
+      analysisStatus: "none",
+      analysisCheckpointPly: 0,
+      whiteAccuracy: undefined,
+      blackAccuracy: undefined,
+      puzzleCount: 0
+    });
+    store.upsertImportedGames([draft], draft.createdAt);
+
+    const engine: GameReviewLiveEngine = {
+      analyze: async () => [
+        {
+          move: "e2e4",
+          pv: ["e2e4"],
+          multipv: 1,
+          depth: 10,
+          score: { kind: "cp", sideToMoveCentipawns: 15, whiteCentipawns: 15 }
+        }
+      ]
+    };
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+            <GameReviewScreen
+              BoardComponent={MockReviewBoard}
+              engine={engine}
+              game={store.getImportedGame(draft.id)!}
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    await flushAsync(20);
+    expect(store.getImportedGame(draft.id)?.analysisStatus).toBe("complete");
+    expect(queryByTestId(renderer, "game-review-scan-banner")).toBeNull();
+    expect(queryByTestId(renderer, "game-review-scan-paused")).toBeNull();
+
+    // Locking screen / backgrounding AFTER analysis finished must NOT flip to paused 99%.
+    act(() => {
+      (AppState as unknown as { __emit: (state: string) => void }).__emit("background");
+    });
+    await flushAsync(6);
+    expect(queryByTestId(renderer, "game-review-scan-paused")).toBeNull();
 
     act(() => renderer.unmount());
   });

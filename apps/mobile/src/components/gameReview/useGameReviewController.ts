@@ -60,7 +60,8 @@ export function useGameReviewController({
   pass1Depth,
   pass1Nodes,
   freeAnalysisDepth = DEFAULT_FREE_ANALYSIS_DEPTH,
-  checkpointIntervalPlies = DEFAULT_CHECKPOINT_INTERVAL_PLIES
+  checkpointIntervalPlies = DEFAULT_CHECKPOINT_INTERVAL_PLIES,
+  animateKeyMomentJump = true
 }: UseGameReviewControllerParams): GameReviewController {
   // Parse PGN synchronously so the board & move list render immediately.
   const { parsedGame, parseError } = useMemo<{
@@ -153,6 +154,30 @@ export function useGameReviewController({
   const scanAbortRef = useRef<AbortController | null>(null);
   const pausedByBackgroundRef = useRef(false);
   const freeAnalysisAbortRef = useRef<AbortController | null>(null);
+  const [isFastForwarding, setIsFastForwarding] = useState(false);
+  const fastForwardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fastForwardTargetPlyRef = useRef<number | null>(null);
+  const currentPlyRef = useRef<number>(currentPly);
+  currentPlyRef.current = currentPly;
+
+  const cancelFastForward = useCallback(() => {
+    if (fastForwardTimerRef.current !== null) {
+      clearTimeout(fastForwardTimerRef.current);
+      fastForwardTimerRef.current = null;
+    }
+    fastForwardTargetPlyRef.current = null;
+    setIsFastForwarding(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (fastForwardTimerRef.current !== null) {
+        clearTimeout(fastForwardTimerRef.current);
+        fastForwardTimerRef.current = null;
+      }
+      fastForwardTargetPlyRef.current = null;
+    };
+  }, []);
 
   const syncEnrolledIds = useCallback(
     (puzzles: readonly StoredUserPuzzle[]) => {
@@ -305,6 +330,10 @@ export function useGameReviewController({
         setUserPuzzles(savedPuzzles);
         syncEnrolledIds(savedPuzzles);
         setHighlights(extraction.highlights);
+        latestStatusRef.current = "complete";
+        if (scanAbortRef.current === controller) {
+          scanAbortRef.current = null;
+        }
         setAnalysisStatus("complete");
         setScanPhase("complete");
         if (savedPuzzles.length > 0 || extraction.highlights.length > 0) {
@@ -319,6 +348,10 @@ export function useGameReviewController({
         setScanPhase("error");
         if (latestEvalsRef.current.length > 0) {
           persistCheckpoint(latestEvalsRef.current, "partial");
+        }
+      } finally {
+        if (scanAbortRef.current === controller) {
+          scanAbortRef.current = null;
         }
       }
     };
@@ -344,10 +377,14 @@ export function useGameReviewController({
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === "background") {
-        if (scanAbortRef.current && !scanAbortRef.current.signal.aborted) {
+        if (
+          latestStatusRef.current !== "complete" &&
+          scanAbortRef.current &&
+          !scanAbortRef.current.signal.aborted
+        ) {
           pausedByBackgroundRef.current = true;
           scanAbortRef.current.abort();
-          if (latestStatusRef.current !== "complete" && latestEvalsRef.current.length > 0) {
+          if (latestEvalsRef.current.length > 0) {
             persistCheckpoint(latestEvalsRef.current, "partial");
             setAnalysisStatus("partial");
           }
@@ -359,7 +396,9 @@ export function useGameReviewController({
         }
       } else if (nextState === "active" && pausedByBackgroundRef.current) {
         pausedByBackgroundRef.current = false;
-        if (latestStatusRef.current !== "complete") {
+        if (latestStatusRef.current === "complete") {
+          setScanPhase("complete");
+        } else {
           setScanTrigger((value) => value + 1);
         }
       }
@@ -496,7 +535,7 @@ export function useGameReviewController({
 
   // Live Free Stockfish Analysis (MultiPV=3, priority="interactive" preempts Pass-2 batch work!)
   useEffect(() => {
-    if (!freeAnalysisOpen || !engine || isPromptHidingAnswer) {
+    if (!freeAnalysisOpen || !engine || isPromptHidingAnswer || isFastForwarding) {
       freeAnalysisAbortRef.current?.abort();
       freeAnalysisAbortRef.current = null;
       setFreeAnalysisLoading(false);
@@ -549,7 +588,7 @@ export function useGameReviewController({
         freeAnalysisAbortRef.current = null;
       }
     };
-  }, [currentFen, engine, freeAnalysisDepth, freeAnalysisOpen, isPromptHidingAnswer]);
+  }, [currentFen, engine, freeAnalysisDepth, freeAnalysisOpen, isFastForwarding, isPromptHidingAnswer]);
 
   const currentPlyEval = useMemo<GamePlyEvaluation | null>(() => {
     if (isExploringOffLine) {
@@ -650,30 +689,89 @@ export function useGameReviewController({
     mode
   ]);
 
+  const animateToPly = useCallback(
+    (targetPly: number, onArrive?: () => void) => {
+      cancelFastForward();
+      clearExploration();
+      const clampedTarget = Math.max(0, Math.min(targetPly, totalPlies));
+      const startPly =
+        mode === "moments" && activeMoment ? activeMoment.ply : currentPlyRef.current;
+      const distance = Math.abs(clampedTarget - startPly);
+
+      if (!animateKeyMomentJump || distance <= 1) {
+        currentPlyRef.current = clampedTarget;
+        setCurrentPly(clampedTarget);
+        onArrive?.();
+        return;
+      }
+
+      const delta = clampedTarget > startPly ? 1 : -1;
+      // Adaptive cadence: ~560ms total for medium jumps, brisk 20ms floor for 30+ ply jumps,
+      // 110ms ceiling for 2-5 ply hops so every move in between is clearly readable.
+      const stepMs = Math.max(20, Math.min(110, Math.round(560 / distance)));
+
+      setModeState("moves");
+      setIsFastForwarding(true);
+      fastForwardTargetPlyRef.current = clampedTarget;
+
+      let cursor = startPly + delta;
+      currentPlyRef.current = cursor;
+      setCurrentPly(cursor);
+
+      const tick = () => {
+        cursor += delta;
+        currentPlyRef.current = cursor;
+        setCurrentPly(cursor);
+        if (cursor === clampedTarget) {
+          fastForwardTimerRef.current = null;
+          fastForwardTargetPlyRef.current = null;
+          setIsFastForwarding(false);
+          onArrive?.();
+          return;
+        }
+        fastForwardTimerRef.current = setTimeout(tick, stepMs);
+      };
+
+      fastForwardTimerRef.current = setTimeout(tick, stepMs);
+    },
+    [activeMoment, animateKeyMomentJump, cancelFastForward, clearExploration, mode, totalPlies]
+  );
+
   const setMode = useCallback(
     (nextMode: GameReviewMode) => {
+      cancelFastForward();
       clearExploration();
       setModeState(nextMode);
       if (nextMode === "moments" && keyMoments[clampedMomentIndex]) {
-        setCurrentPly(keyMoments[clampedMomentIndex]!.ply);
+        const ply = keyMoments[clampedMomentIndex]!.ply;
+        currentPlyRef.current = ply;
+        setCurrentPly(ply);
       }
     },
-    [clampedMomentIndex, clearExploration, keyMoments]
+    [cancelFastForward, clampedMomentIndex, clearExploration, keyMoments]
   );
 
   const selectPly = useCallback(
     (ply: number) => {
+      cancelFastForward();
       clearExploration();
       const clamped = Math.max(0, Math.min(ply, totalPlies));
+      currentPlyRef.current = clamped;
       setCurrentPly(clamped);
       setModeState("moves");
     },
-    [clearExploration, totalPlies]
+    [cancelFastForward, clearExploration, totalPlies]
   );
 
   const stepFirst = useCallback(() => selectPly(0), [selectPly]);
-  const stepPrev = useCallback(() => selectPly(currentPly - 1), [currentPly, selectPly]);
-  const stepNext = useCallback(() => selectPly(currentPly + 1), [currentPly, selectPly]);
+  const stepPrev = useCallback(() => {
+    const anchor = mode === "moments" && activeMoment ? activeMoment.ply : currentPly;
+    selectPly(anchor - 1);
+  }, [activeMoment, currentPly, mode, selectPly]);
+  const stepNext = useCallback(() => {
+    const anchor = mode === "moments" && activeMoment ? activeMoment.ply : currentPly;
+    selectPly(anchor + 1);
+  }, [activeMoment, currentPly, mode, selectPly]);
   const stepLast = useCallback(() => selectPly(totalPlies), [selectPly, totalPlies]);
 
   const toggleFlip = useCallback(() => {
@@ -685,16 +783,17 @@ export function useGameReviewController({
       if (keyMoments.length === 0) {
         return;
       }
-      clearExploration();
       const bounded = Math.max(0, Math.min(index, keyMoments.length - 1));
-      setActiveMomentIndex(bounded);
       const target = keyMoments[bounded];
-      if (target) {
-        setCurrentPly(target.ply);
+      if (!target) {
+        return;
       }
-      setModeState("moments");
+      animateToPly(target.ply, () => {
+        setActiveMomentIndex(bounded);
+        setModeState("moments");
+      });
     },
-    [clearExploration, keyMoments]
+    [animateToPly, keyMoments]
   );
 
   const prevKeyMoment = useCallback(() => {
@@ -990,6 +1089,7 @@ export function useGameReviewController({
   const resumeAnalysis = useCallback(() => {
     pausedByBackgroundRef.current = false;
     if (analysisStatus === "complete") {
+      setScanPhase("complete");
       return;
     }
     setScanTrigger((value) => value + 1);
@@ -999,34 +1099,50 @@ export function useGameReviewController({
     if (criticalPlies.length === 0) {
       return;
     }
-    clearExploration();
-    const nextPly = criticalPlies.find((ply) => ply > currentPly) ?? criticalPlies[0]!;
-    setCurrentPly(nextPly);
-    const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === nextPly);
-    if (matchingMomentIndex >= 0) {
-      setActiveMomentIndex(matchingMomentIndex);
-    }
-  }, [clearExploration, criticalPlies, currentPly, keyMoments]);
+    const anchorPly =
+      fastForwardTargetPlyRef.current ??
+      (mode === "moments" && activeMoment ? activeMoment.ply : currentPly);
+    const nextPly = criticalPlies.find((ply) => ply > anchorPly) ?? criticalPlies[0]!;
+    const matchingMomentIndex = keyMoments.findIndex(
+      (item) => item.ply === nextPly && (item.kind === "puzzle" || item.kind === "highlight")
+    );
+    animateToPly(nextPly, () => {
+      if (matchingMomentIndex >= 0) {
+        setActiveMomentIndex(matchingMomentIndex);
+        setModeState("moments");
+      } else {
+        setModeState("moves");
+      }
+    });
+  }, [activeMoment, animateToPly, criticalPlies, currentPly, keyMoments, mode]);
 
   const jumpToPrevCriticalPly = useCallback(() => {
     if (criticalPlies.length === 0) {
       return;
     }
-    clearExploration();
+    const anchorPly =
+      fastForwardTargetPlyRef.current ??
+      (mode === "moments" && activeMoment ? activeMoment.ply : currentPly);
     let prevPly: number | undefined;
     for (let index = criticalPlies.length - 1; index >= 0; index -= 1) {
-      if (criticalPlies[index]! < currentPly) {
+      if (criticalPlies[index]! < anchorPly) {
         prevPly = criticalPlies[index];
         break;
       }
     }
     const targetPly = prevPly ?? criticalPlies[criticalPlies.length - 1]!;
-    setCurrentPly(targetPly);
-    const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === targetPly);
-    if (matchingMomentIndex >= 0) {
-      setActiveMomentIndex(matchingMomentIndex);
-    }
-  }, [clearExploration, criticalPlies, currentPly, keyMoments]);
+    const matchingMomentIndex = keyMoments.findIndex(
+      (item) => item.ply === targetPly && (item.kind === "puzzle" || item.kind === "highlight")
+    );
+    animateToPly(targetPly, () => {
+      if (matchingMomentIndex >= 0) {
+        setActiveMomentIndex(matchingMomentIndex);
+        setModeState("moments");
+      } else {
+        setModeState("moves");
+      }
+    });
+  }, [activeMoment, animateToPly, criticalPlies, currentPly, keyMoments, mode]);
 
   const evalGraphPoints = useMemo(
     () => buildEvalGraphPoints(parsedGame, plyEvaluations, keyMoments),
@@ -1078,6 +1194,7 @@ export function useGameReviewController({
     freeAnalysisError,
     isExploringOffLine,
     explorationPliesCount: explorationMoves.length,
+    isFastForwarding,
     setMode,
     selectPly,
     stepFirst,

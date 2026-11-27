@@ -19,6 +19,7 @@ export interface MoveListStripProps {
   onStepNext: () => void;
   onStepLast: () => void;
   onToggleFlip: () => void;
+  suppressAutoScroll?: boolean;
   testID?: string;
 }
 
@@ -32,6 +33,7 @@ export function MoveListStrip({
   onStepNext,
   onStepLast,
   onToggleFlip,
+  suppressAutoScroll = false,
   testID = "game-review-move-strip"
 }: MoveListStripProps): React.JSX.Element {
   const styles = useStyles();
@@ -44,6 +46,9 @@ export function MoveListStrip({
   const atEnd = currentPly >= totalPlies;
 
   useEffect(() => {
+    if (suppressAutoScroll) {
+      return;
+    }
     const layout = chipOffsetsRef.current.get(currentPly);
     if (!layout || !scrollRef.current?.scrollTo) {
       return;
@@ -51,7 +56,7 @@ export function MoveListStrip({
     const viewportWidth = scrollViewportWidthRef.current;
     const targetX = Math.max(0, layout.x - Math.max(0, (viewportWidth - layout.width) / 2));
     scrollRef.current.scrollTo({ x: targetX, animated: true });
-  }, [currentPly]);
+  }, [currentPly, suppressAutoScroll]);
 
   return (
     <View style={styles.container} testID={testID}>

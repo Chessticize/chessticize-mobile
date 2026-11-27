@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import Chessboard, { type MoveResult } from "react-native-chessboard";
 import type {
@@ -22,7 +22,7 @@ import {
 import { arrowFromTo, formatUci } from "../practice/shared/boardMove.ts";
 import { chessboardColorsFor } from "../practice/shared/chessboardColors.ts";
 import { chessPieceSpriteFor } from "../practice/shared/chessPieceSprite.ts";
-import { AppText, Badge, Button, SegmentedControl } from "../ui/index.tsx";
+import { AppText, Badge, Button } from "../ui/index.tsx";
 import { EvalBar } from "./EvalBar.tsx";
 import { EvalGraph } from "./EvalGraph.tsx";
 import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
@@ -58,12 +58,14 @@ export interface GameReviewScreenProps {
   pass1Nodes?: number;
   freeAnalysisDepth?: number;
   checkpointIntervalPlies?: number;
+  animateKeyMomentJump?: boolean;
   BoardComponent?: GameReviewBoardComponent;
   onBack?: () => void;
   onPracticeGamePuzzles?: (gameId: string) => void;
 }
 
 const EVAL_BAR_SIDE_WIDTH = 52;
+const BOARD_FRAME_BORDER = 2;
 const BOARD_MIN_SIZE = 220;
 const BOARD_MAX_PORTRAIT_SIZE = 500;
 const BOARD_MAX_LANDSCAPE_SIZE = 540;
@@ -80,6 +82,7 @@ export function GameReviewScreen({
   pass1Nodes,
   freeAnalysisDepth,
   checkpointIntervalPlies,
+  animateKeyMomentJump,
   BoardComponent = Chessboard as unknown as GameReviewBoardComponent,
   onBack,
   onPracticeGamePuzzles
@@ -88,6 +91,7 @@ export function GameReviewScreen({
   const theme = useTheme();
   const { pieceSet } = useBoardAppearance();
   const viewport = usePracticeViewport();
+  const [measuredStageWidth, setMeasuredStageWidth] = useState<number | null>(null);
 
   const layout = useMemo(
     () =>
@@ -111,27 +115,30 @@ export function GameReviewScreen({
     ...(pass1Depth === undefined ? {} : { pass1Depth }),
     ...(pass1Nodes === undefined ? {} : { pass1Nodes }),
     ...(freeAnalysisDepth === undefined ? {} : { freeAnalysisDepth }),
-    ...(checkpointIntervalPlies === undefined ? {} : { checkpointIntervalPlies })
+    ...(checkpointIntervalPlies === undefined ? {} : { checkpointIntervalPlies }),
+    ...(animateKeyMomentJump === undefined ? {} : { animateKeyMomentJump })
   });
 
   const useHorizontalEvalBar = layout.isLargeText || viewport.width < 360;
   const boardSize = useMemo(() => {
     const evalReserve = useHorizontalEvalBar ? 0 : EVAL_BAR_SIDE_WIDTH;
     if (layout.usesSessionRail) {
-      const availableWidth =
+      const fallbackWidth =
         layout.contentWidth -
         PRACTICE_UI_PADDING * 2 -
         layout.sessionRailWidth -
-        layout.sessionRailGap -
-        evalReserve;
+        layout.sessionRailGap;
+      const stageWidth = measuredStageWidth ?? fallbackWidth;
+      const availableWidth = stageWidth - evalReserve - BOARD_FRAME_BORDER;
       const availableHeight = layout.contentHeight - 120;
       const raw = Math.min(availableWidth, availableHeight, BOARD_MAX_LANDSCAPE_SIZE);
       return Math.max(BOARD_MIN_SIZE, Math.floor(raw));
     }
-    const availableWidth = layout.contentWidth - PRACTICE_UI_PADDING * 2 - evalReserve;
+    const stageWidth = measuredStageWidth ?? layout.contentWidth - PRACTICE_UI_PADDING * 2;
+    const availableWidth = stageWidth - evalReserve - BOARD_FRAME_BORDER;
     const raw = Math.min(availableWidth, BOARD_MAX_PORTRAIT_SIZE);
     return Math.max(BOARD_MIN_SIZE, Math.floor(raw));
-  }, [layout, useHorizontalEvalBar]);
+  }, [layout, measuredStageWidth, useHorizontalEvalBar]);
 
   const boardColors = useMemo(() => chessboardColorsFor(theme), [theme]);
   const pieceSprite = useMemo(() => chessPieceSpriteFor(pieceSet), [pieceSet]);
@@ -166,24 +173,28 @@ export function GameReviewScreen({
     styles
   });
 
-  const modeOptions = useMemo(
-    () => [
-      {
-        value: "moments" as const,
-        label: GAME_REVIEW_COPY.header.modeKeyMoments,
-        testID: "game-review-mode-moments"
-      },
-      {
-        value: "moves" as const,
-        label: GAME_REVIEW_COPY.header.modeMoves,
-        testID: "game-review-mode-moves"
-      }
-    ],
-    []
-  );
+  const activeSelectedPly =
+    controller.mode === "moments" && controller.activeMoment && !controller.isFastForwarding
+      ? controller.activeMoment.ply
+      : controller.currentPly;
+
+  const showKeyMomentCard =
+    controller.mode === "moments" &&
+    !controller.isFastForwarding &&
+    controller.activeMoment !== null &&
+    (controller.activeMoment.kind === "puzzle" || controller.activeMoment.kind === "highlight");
 
   const boardStage = (
-    <View style={styles.boardSection} testID="game-review-board-section">
+    <View
+      onLayout={(event) => {
+        const width = Math.floor(event.nativeEvent.layout.width);
+        if (width > 0) {
+          setMeasuredStageWidth((prev) => (prev === width ? prev : width));
+        }
+      }}
+      style={styles.boardSection}
+      testID="game-review-board-section"
+    >
       {useHorizontalEvalBar ? (
         <EvalBar
           flipped={controller.flipped}
@@ -257,7 +268,7 @@ export function GameReviewScreen({
     <View style={styles.panelsStack}>
       <MoveVerdictStrip
         criticalCount={controller.criticalPlies.length}
-        currentPly={controller.currentPly}
+        currentPly={activeSelectedPly}
         currentPlyEval={controller.currentPlyEval}
         isHidingAnswer={controller.isPromptHidingAnswer}
         isScanning={isScanning}
@@ -265,14 +276,7 @@ export function GameReviewScreen({
         onPrevCritical={controller.jumpToPrevCriticalPly}
       />
 
-      <EvalGraph
-        onSelectPly={controller.selectPly}
-        points={controller.evalGraphPoints}
-        selectedPly={controller.currentPly}
-        totalPlies={controller.scanProgress.totalPlies}
-      />
-
-      {controller.mode === "moments" ? (
+      {showKeyMomentCard ? (
         <KeyMomentRetryCard
           inReview={activeMomentInReview}
           isScanning={isScanning}
@@ -296,8 +300,15 @@ export function GameReviewScreen({
         />
       ) : null}
 
+      <EvalGraph
+        onSelectPly={controller.selectPly}
+        points={controller.evalGraphPoints}
+        selectedPly={activeSelectedPly}
+        totalPlies={controller.scanProgress.totalPlies}
+      />
+
       <MoveListStrip
-        currentPly={controller.currentPly}
+        currentPly={activeSelectedPly}
         evalByPly={controller.evalByPly}
         onSelectPly={controller.selectPly}
         onStepFirst={controller.stepFirst}
@@ -306,6 +317,7 @@ export function GameReviewScreen({
         onStepPrev={controller.stepPrev}
         onToggleFlip={controller.toggleFlip}
         plies={controller.parsedGame?.plies ?? []}
+        suppressAutoScroll={controller.isFastForwarding}
       />
 
       {controller.freeAnalysisOpen ? (
@@ -376,14 +388,6 @@ export function GameReviewScreen({
             variant={controller.freeAnalysisOpen ? "primary" : "secondary"}
           />
         </View>
-
-        <SegmentedControl
-          accessibilityLabel={GAME_REVIEW_COPY.header.modeAccessibilityLabel}
-          onChange={controller.setMode}
-          options={modeOptions}
-          testID="game-review-mode-toggle"
-          value={controller.mode}
-        />
       </View>
 
       {scanBanner}
