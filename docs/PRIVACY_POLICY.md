@@ -68,6 +68,22 @@ Android Progress Backup may use Android or Google backup network services when
 enabled in the device's system settings. The app does not operate that service
 or add its own backup network connection.
 
+### Optional Public Game Import
+
+You can optionally import your own games for local analysis either by pasting
+or loading `.pgn` files (100% offline) or by explicitly requesting a public
+game lookup from Chess.com or Lichess by username.
+
+When you explicitly trigger a Chess.com or Lichess import, the app sends a
+direct, read-only HTTPS request from your device only to public game endpoints
+(`https://api.chess.com/pub/...` or `https://lichess.org/api/...`) with no
+cookies, no Chessticize account, no OAuth/login tokens, no device identifiers,
+and no background polling. Chessticize does not operate a proxy server and
+receives no telemetry from these requests. Chess.com or Lichess receives only
+the public username you request and standard HTTPS request metadata under
+their respective privacy policies, and imported games remain stored locally on
+your device.
+
 ## Store Ratings and Reviews
 
 The app may invite you to rate it using the platform store's own review screen.

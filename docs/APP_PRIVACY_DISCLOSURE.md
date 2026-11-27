@@ -30,6 +30,13 @@ Rationale:
   upload or receive this package automatically; the user controls any handoff
   through the iOS Share Sheet. This user-controlled on-device processing does not
   change the `Data Not Collected` answer.
+- The user can also optionally trigger public game imports directly from
+  Chess.com (`https://api.chess.com/pub/...`) or Lichess
+  (`https://lichess.org/api/...`) by entering a public username, or import
+  local `.pgn` files/text entirely offline. Remote imports use read-only HTTPS
+  requests with `credentials: "omit"` (no cookies, no login or OAuth tokens, no
+  background polling, no device identifiers, and zero Chessticize servers or
+  telemetry). Imported games stay local on the device.
 - Stockfish analysis runs on device.
 - Review reminders are local notifications and do not use a push notification
   server.
