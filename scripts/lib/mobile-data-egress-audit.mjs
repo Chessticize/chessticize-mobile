@@ -72,16 +72,32 @@ const RUNTIME_SOURCE_EXTENSIONS = new Set([
   ".tsx"
 ]);
 
+export const ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH =
+  "apps/mobile/src/platform/publicGameImportClient.ts";
+
+export const APPROVED_PUBLIC_GAME_IMPORT_HOSTS = Object.freeze([
+  "api.chess.com",
+  "lichess.org"
+]);
+
+const APPROVED_PUBLIC_GAME_IMPORT_HOST_SET = new Set(APPROVED_PUBLIC_GAME_IMPORT_HOSTS);
+
+const APPROVED_PUBLIC_GAME_IMPORT_PATH_PREFIXES = new Set([
+  "/pub/",
+  "/api/"
+]);
+
 const NETWORK_PRIMITIVES = Object.freeze([
-  { label: "JavaScript fetch API", pattern: /\bfetch\s*\(/u },
-  { label: "JavaScript browser transport", pattern: /\b(?:XMLHttpRequest|WebSocket|EventSource)\b/u },
-  { label: "JavaScript beacon transport", pattern: /\bnavigator\s*\.\s*sendBeacon\s*\(/u },
+  { id: "fetch", label: "JavaScript fetch API", pattern: /\bfetch\s*\(/u },
+  { id: "browser-transport", label: "JavaScript browser transport", pattern: /\b(?:XMLHttpRequest|WebSocket|EventSource)\b/u },
+  { id: "beacon", label: "JavaScript beacon transport", pattern: /\bnavigator\s*\.\s*sendBeacon\s*\(/u },
   {
+    id: "node-network",
     label: "Node network module",
     pattern: /(?:from\s*|require\s*\(\s*|import\s*\(\s*)["'](?:node:)?(?:http|https|net|tls|dgram)(?:\/[^"']*)?["']/u
   },
-  { label: "Android network API", pattern: /\b(?:java\.net|javax\.net|HttpURLConnection|HttpsURLConnection|Socket|DatagramSocket)\b/u },
-  { label: "Apple network API", pattern: /\b(?:NSURLSession|URLSession|NSURLConnection|CFHTTPMessage|NWConnection)\b/u }
+  { id: "android-network", label: "Android network API", pattern: /\b(?:java\.net|javax\.net|HttpURLConnection|HttpsURLConnection|Socket|DatagramSocket)\b/u },
+  { id: "apple-network", label: "Apple network API", pattern: /\b(?:NSURLSession|URLSession|NSURLConnection|CFHTTPMessage|NWConnection)\b/u }
 ]);
 
 export function auditMobileDataEgress({ repoRoot }) {
@@ -90,7 +106,12 @@ export function auditMobileDataEgress({ repoRoot }) {
 
   for (const path of scannedFiles) {
     const source = readFileSync(join(repoRoot, path), "utf8");
+    const isAllowlistedImportClient = path === ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH;
+
     for (const primitive of NETWORK_PRIMITIVES) {
+      if (isAllowlistedImportClient && primitive.id === "fetch") {
+        continue;
+      }
       if (primitive.pattern.test(source)) {
         findings.push({
           kind: "network-primitive",
@@ -98,6 +119,10 @@ export function auditMobileDataEgress({ repoRoot }) {
           detail: primitive.label
         });
       }
+    }
+
+    if (isAllowlistedImportClient) {
+      auditPublicGameImportClientSource({ source, path, findings });
     }
   }
 
@@ -138,6 +163,145 @@ export function auditMobileDataEgress({ repoRoot }) {
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function auditPublicGameImportClientSource({ source, path, findings }) {
+  const code = stripJsComments(source);
+  const requiredChecks = [
+    {
+      pattern: /["']https:["']/u,
+      detail: "Public game import client must enforce HTTPS protocol validation"
+    },
+    {
+      pattern: /["']api\.chess\.com["']/u,
+      detail: "Public game import client must explicitly allowlist api.chess.com"
+    },
+    {
+      pattern: /["']\/pub\/["']/u,
+      detail: "Public game import client must restrict api.chess.com requests to /pub/"
+    },
+    {
+      pattern: /["']lichess\.org["']/u,
+      detail: "Public game import client must explicitly allowlist lichess.org"
+    },
+    {
+      pattern: /["']\/api\/["']/u,
+      detail: "Public game import client must restrict lichess.org requests to /api/"
+    },
+    {
+      pattern: /\bcredentials\s*:\s*["']omit["']/u,
+      detail: "Public game import client must enforce credentials: \"omit\""
+    },
+    {
+      pattern: /["']disallowed_host["']/u,
+      detail: "Public game import client must fail closed with disallowed_host"
+    }
+  ];
+
+  for (const check of requiredChecks) {
+    if (!check.pattern.test(code)) {
+      findings.push({
+        kind: "egress-allowlist",
+        path,
+        detail: check.detail
+      });
+    }
+  }
+
+  if (/\bcredentials\s*:\s*["'](?:include|same-origin)["']/u.test(code)) {
+    findings.push({
+      kind: "egress-allowlist",
+      path,
+      detail: "Public game import client must not send credentials or cookies"
+    });
+  }
+
+  for (const match of code.matchAll(/\bhostname\s*:\s*["']([^"']+)["']/gu)) {
+    const host = match[1]?.toLowerCase();
+    if (host && !APPROVED_PUBLIC_GAME_IMPORT_HOST_SET.has(host)) {
+      findings.push({
+        kind: "egress-allowlist",
+        path,
+        detail: `Unapproved public game import host in allowlist: ${host}`
+      });
+    }
+  }
+
+  for (const match of code.matchAll(/\bpathPrefix\s*:\s*["']([^"']+)["']/gu)) {
+    const prefix = match[1];
+    if (prefix && !APPROVED_PUBLIC_GAME_IMPORT_PATH_PREFIXES.has(prefix)) {
+      findings.push({
+        kind: "egress-allowlist",
+        path,
+        detail: `Unapproved public game import path prefix in allowlist: ${prefix}`
+      });
+    }
+  }
+
+  for (const match of code.matchAll(/https?:\/\/([a-zA-Z0-9.-]+)/gu)) {
+    const host = match[1]?.toLowerCase();
+    if (host && !APPROVED_PUBLIC_GAME_IMPORT_HOST_SET.has(host)) {
+      findings.push({
+        kind: "egress-allowlist",
+        path,
+        detail: `Unapproved URL host in public game import client: ${host}`
+      });
+    }
+  }
+}
+
+function stripJsComments(source) {
+  let output = "";
+  let index = 0;
+  let quote = null;
+
+  while (index < source.length) {
+    const ch = source[index];
+    const next = source[index + 1];
+
+    if (quote !== null) {
+      output += ch;
+      if (ch === "\\" && index + 1 < source.length) {
+        output += next;
+        index += 2;
+        continue;
+      }
+      if (ch === quote) {
+        quote = null;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      output += ch;
+      index += 1;
+      continue;
+    }
+
+    if (ch === "/" && next === "/") {
+      index += 2;
+      while (index < source.length && source[index] !== "\n") {
+        index += 1;
+      }
+      continue;
+    }
+
+    if (ch === "/" && next === "*") {
+      index += 2;
+      while (index + 1 < source.length && !(source[index] === "*" && source[index + 1] === "/")) {
+        index += 1;
+      }
+      index += 2;
+      continue;
+    }
+
+    output += ch;
+    index += 1;
+  }
+
+  return output;
 }
 
 function dependencyNames(packageJson) {

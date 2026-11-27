@@ -25,6 +25,19 @@ or remote telemetry SDK. It does not upload gameplay, ratings, history, or
 device identifiers to a Chessticize service. Google Play platform signals such
 as Android Vitals are outside the app's data pipeline.
 
+## Optional User-Triggered Game Import
+
+Optional game import runs only when explicitly requested by the user:
+
+- Local `.pgn` file or pasted PGN imports run 100% offline with zero network
+  requests.
+- Public Chess.com / Lichess game imports query only the read-only public
+  endpoints `https://api.chess.com/pub/...` and `https://lichess.org/api/...`
+  directly from the device through a single audited, fail-closed adapter with
+  `credentials: "omit"`, no cookies, no login/OAuth credentials, no device
+  identifiers, no background polling, and zero Chessticize servers or telemetry.
+- Imported games are stored locally on the device.
+
 ## Optional Google Play reviews
 
 Android uses `com.google.android.play:review:2.0.2` to invoke Google Play's own
