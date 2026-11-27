@@ -130,7 +130,7 @@ function textContent(node: ReactTestInstance): string {
       parts.push(String(current));
       return;
     }
-    if (current.type === "Text") {
+    if ((current.type as unknown) === "Text") {
       const children = current.props.children;
       if (Array.isArray(children)) {
         parts.push(children.join(""));

@@ -123,11 +123,16 @@ export type LabScenarioId =
   | "sprint-result-redesign-zero-review"
   | "sprint-result-redesign-arrow-duel"
   | "sprint-result-redesign-focused-run"
-  | "sprint-result-redesign-largest-text";
+  | "sprint-result-redesign-largest-text"
+  | "games-hub"
+  | "games-import"
+  | "game-review-key-moment";
 
 export type LabScenarioGroup =
   | "Practice"
   | "Review"
+  | "Games"
+  | "Game Review"
   | "History"
   | "Settings"
   | "Release Notes"
@@ -409,6 +414,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "sprint-result-redesign-arrow-duel": defineScenario("sprint-result-redesign-arrow-duel", "Sprint Result redesign", "Arrow Duel", "sprint-result-redesign--arrow-duel", "A passed Arrow Duel Sprint with its own Rating, 2 to review and Replay mistakes.", "practice", ["Arrow Duel outcome", "Arrow Duel Rating", "Review row", "Replay mistakes"], ["Replay", "Practice Home", "History"], "contained"),
   "sprint-result-redesign-focused-run": defineScenario("sprint-result-redesign-focused-run", "Sprint Result redesign", "Focused Run", "sprint-result-redesign--focused-run", "An unrated Focused Run result: no trend action, Unrated with the unchanged Rating, elapsed time, and average solve against the usual pace (#616), returning to Practice.", "practice", ["Focused Run Result title", "No trend action", "Unrated", "Elapsed time", "Average solve against usual pace", "Back to Practice", "Replay mistakes"], ["Replay", "Practice Home", "History"], "contained"),
   "sprint-result-redesign-largest-text": defineScenario("sprint-result-redesign-largest-text", "Sprint Result redesign", "Largest accessibility text", "sprint-result-redesign--largest-text", "The items-to-review state at the largest accessibility text size (simulated AX5): stats become label and value rows and the actions scroll with the content.", "practice", ["Simulated AX5 text", "Stacked stats rows", "Wrapping rows", "Scrolling actions", "Capped hero numeral"], ["Replay", "Practice Home", "History"], "contained"),
+  "games-hub": defineScenario("games-hub", "Games", "Games Hub", "games--populated", "Games tab home showing linked public Chess.com/Lichess accounts, explicit Sync and Import PGN actions, foreground batch analysis, My Game Puzzles CTA, and recent games with Accuracy% and puzzle counts.", "games", ["Linked account strip and explicit Sync", "My Game Puzzles CTA", "Analyze recent foreground batch queue", "Status and time-class filters", "Game list with Accuracy% and puzzle badges"], ["Game Review", "My Game Puzzles practice"], "contained"),
+  "games-import": defineScenario("games-import", "Games", "Import Games Modal", "games--import-modal", "User-triggered modal to link public Chess.com/Lichess usernames or batch-import offline multi-game PGN text with deterministic deduplication.", "games", ["Chess.com / Lichess / Paste PGN switcher", "Username link without login", "Offline PGN color picker and batch import"], ["Games Hub"], "contained"),
+  "game-review-key-moment": defineScenario("game-review-key-moment", "Game Review", "Key Moment Retry (Arrow Duel)", "game-review--key-moment-arrow-duel", "Built-in offline Game Review showing interactive Eval Graph, Eval Bar, Key Moments Retry with Arrow Duel candidate arrows, punishment line playback, and live Stockfish MultiPV exploration.", "games", ["Interactive Eval Graph", "Eval Bar", "Hidden-answer Key Moments Retry", "Arrow Duel candidate comparison", "Auto-enroll into Review on Retry failure", "Live MultiPV engine lines"], ["Games Hub", "My Game Puzzles practice"], "contained"),
 };
 
 export const scenarioRegistry = Object.fromEntries(
@@ -429,6 +437,7 @@ export const navigationCoverage = {
   tabs: {
     practice: coveredBy("practice-home"),
     review: coveredBy("review-due"),
+    games: coveredBy("games-hub"),
     history: coveredBy("history-populated"),
     settings: coveredBy("settings-ios-sync"),
     analysis: coveredBy("settings-stockfish-diagnostics")
@@ -438,6 +447,7 @@ export const navigationCoverage = {
     "review-reminder-prompt": coveredBy("practice-reminder-prompt"),
     "history-filters": coveredBy("history-filters"),
     "review-filters": coveredBy("review-filters"),
+    "games-import": coveredBy("games-import"),
     "settings-advanced-ratings": notCataloged("Issue 253 moves name and current rating editing into each Run editor."),
     "custom-rating-editor": coveredBy("practice-custom-rating-editor"),
     "sprint-session-guide": coveredBy("practice-active-session-guide"),
@@ -452,6 +462,7 @@ export const navigationCoverage = {
   details: {
     "review-analysis": coveredBy("review-feedback-analysis"),
     "review-session": coveredBy("review-session"),
+    "game-review": coveredBy("game-review-key-moment"),
     "history-progress": coveredBy("history-progress"),
     "tactical-profile": coveredBy("practice-tactical-profile-ranked"),
     "practice-run-editor": coveredBy("practice-run-name-validation"),

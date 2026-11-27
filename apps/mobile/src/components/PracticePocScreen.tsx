@@ -39,7 +39,8 @@ import {
   resumeSprint as resumeSprintState,
   SERVER_CURATED_THEME_PRESENTATION,
   sprintHasRunDeadline,
-  sprintSessionGuidePlanFor
+  sprintSessionGuidePlanFor,
+  UciEngineArbiter
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
@@ -330,6 +331,7 @@ import {
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
 import { GamesHubScreen } from "./games/GamesHubScreen.tsx";
+import { GameReviewScreen } from "./gameReview/index.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
 interface Props {
@@ -982,6 +984,30 @@ export function PracticePocScreen({
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [gamesImportModalOpen, setGamesImportModalOpen] = useState(false);
   const [activeGameReviewId, setActiveGameReviewId] = useState<string | null>(null);
+  const gameReviewArbiterRef = useRef<UciEngineArbiter | null>(null);
+  useEffect(() => {
+    return () => {
+      gameReviewArbiterRef.current?.terminate();
+      gameReviewArbiterRef.current = null;
+    };
+  }, []);
+  const getSharedGameReviewArbiter = useCallback((): UciEngineArbiter | null => {
+    if (gameReviewArbiterRef.current) {
+      return gameReviewArbiterRef.current;
+    }
+    const transport = stockfish.createTransport();
+    if (!transport) {
+      return null;
+    }
+    gameReviewArbiterRef.current = new UciEngineArbiter(transport);
+    return gameReviewArbiterRef.current;
+  }, [stockfish]);
+  const activeReviewGame = useMemo(
+    () => (tab === "games" && activeGameReviewId !== null
+      ? service.getImportedGame(activeGameReviewId) ?? null
+      : null),
+    [activeGameReviewId, service, tab]
+  );
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
@@ -5532,29 +5558,49 @@ export function PracticePocScreen({
               />
             ) : null}
             {tab === "games" ? (
-              <GamesHubScreen
-                adaptiveLayout={adaptiveLayout}
-                importModalVisible={gamesImportModalOpen}
-                nowMs={nowMs}
-                service={service}
-                stockfish={stockfish}
-                onImportModalVisibleChange={setGamesImportModalOpen}
-                onOpenGameReview={(gameId) => {
-                  if (onOpenGameReview) {
-                    onOpenGameReview(gameId);
-                  } else {
-                    setActiveGameReviewId(gameId);
-                  }
-                }}
-                onPracticeMyGamePuzzles={() => {
-                  setError(null);
-                  try {
-                    adoptStartedSprint(service.startMyGamePuzzlesSession({}, captureLiveNowIso()));
-                  } catch (caught) {
-                    setError(errorMessage(caught));
-                  }
-                }}
-              />
+              activeReviewGame !== null ? (
+                <GameReviewScreen
+                  engine={getSharedGameReviewArbiter()}
+                  game={activeReviewGame}
+                  practiceService={service}
+                  store={service.gameReviewStore}
+                  onBack={() => setActiveGameReviewId(null)}
+                  onPracticeGamePuzzles={(gameId) => {
+                    setActiveGameReviewId(null);
+                    setError(null);
+                    try {
+                      adoptStartedSprint(service.startMyGamePuzzlesSession({ gameId }, captureLiveNowIso()));
+                    } catch (caught) {
+                      setError(errorMessage(caught));
+                    }
+                  }}
+                />
+              ) : (
+                <GamesHubScreen
+                  adaptiveLayout={adaptiveLayout}
+                  analysisEngine={tab === "games" ? getSharedGameReviewArbiter() : null}
+                  importModalVisible={gamesImportModalOpen}
+                  nowMs={nowMs}
+                  service={service}
+                  stockfish={stockfish}
+                  onImportModalVisibleChange={setGamesImportModalOpen}
+                  onOpenGameReview={(gameId) => {
+                    if (onOpenGameReview) {
+                      onOpenGameReview(gameId);
+                    } else {
+                      setActiveGameReviewId(gameId);
+                    }
+                  }}
+                  onPracticeMyGamePuzzles={() => {
+                    setError(null);
+                    try {
+                      adoptStartedSprint(service.startMyGamePuzzlesSession({}, captureLiveNowIso()));
+                    } catch (caught) {
+                      setError(errorMessage(caught));
+                    }
+                  }}
+                />
+              )
             ) : null}
             {tab === "settings" ? (
               <SettingsPanel
