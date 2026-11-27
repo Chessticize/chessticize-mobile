@@ -84,6 +84,34 @@ export {
 export type { EnrichTagsInput, TagPuzzleInput, TagPuzzleResult } from "./tagger.ts";
 
 export {
+  ARROW_DUEL_ELO_GRID,
+  DEFAULT_MAX_REVIEW_ABOVE_USER_RATING,
+  DIFFICULTY_MAX_RATING,
+  DIFFICULTY_MIN_RATING,
+  DIFFICULTY_SF_DEPTHS,
+  MAIA2_MOBILE_ELOS,
+  estimateGamePuzzleDifficulty,
+  evaluateTreeEnsemble,
+  extractDifficultyMaia2Features,
+  extractDifficultyStockfishFeatures,
+  extractDifficultyStructuralFeatures,
+  getDefaultDifficultyModels,
+  isWithinReviewDifficultyBand,
+  registerDefaultDifficultyModels,
+  solvePromptedArrowDuelRating
+} from "./difficulty.ts";
+export type {
+  EstimatePuzzleDifficultyOptions,
+  ExportedDecisionTree,
+  ExportedTreeEnsemble,
+  HumanPolicyEloStats,
+  HumanPolicyModel,
+  HumanPolicyMoveRequest,
+  HumanPolicyMoveResult,
+  PuzzleDifficultyEstimate
+} from "./difficulty.ts";
+
+export {
   ALREADY_WINNING_CP,
   CHECK_FOUND_LINE_DEPTH,
   CHECK_FOUND_LINE_MAX_WIN_CHANCE_DROP,

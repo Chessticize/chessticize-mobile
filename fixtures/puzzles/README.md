@@ -107,7 +107,11 @@ superseded by the corrected depth-20 `core-pack-v2` artifact. `core-pack-v3`
 adds immutable Puzzle Rating Deviation. `core-pack-v4` preserves the v3 puzzle
 rows while shipping the optimized stable-theme relation index described above.
 `core-pack-v5` preserves all v4 puzzle semantics while replacing the three
-large TEXT payload columns with the versioned binary codecs.
+large TEXT payload columns with the versioned binary codecs. `core-pack-v6`
+preserves all v5 puzzle rows, binary codecs, and Tactical Profile ratings while
+adding a nullable `arrow_duel_rating` column (and denormalized
+`puzzle_themes.arrow_duel_rating` index) computed for all 1,392,969 Arrow
+Duel-eligible puzzles using Maia-3 pairwise prompted-comparison 3PL-IRT.
 
 `packVersion` is the monotonic Core Pack content version and is independent of
 the SQLite schema and codec versions. Mobile builds bind their packaged and

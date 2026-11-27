@@ -1043,4 +1043,79 @@ describe("GamesHubScreen", () => {
     const sprint = service.startMyGamePuzzlesSession({ targetCorrect: 1 }, NOW_ISO);
     expect(sprint.puzzles[0]?.id).toBe(stored?.id);
   });
+
+  it("skips out-of-band over-rated puzzles during Add All to Review while allowing manual enrollment", () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    service.upsertImportedGames([
+      makeDraft({
+        id: "g-diff-filter",
+        userColor: "w",
+        white: { username: "alice", rating: 1400, isAi: false },
+        black: { username: "bob", rating: 1420, isAi: false }
+      })
+    ]);
+    const stored = store.replaceGameUserPuzzles(
+      "g-diff-filter",
+      [
+        {
+          idSeed: "ply-10",
+          ply: 10,
+          moveNumber: 5,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 85,
+          estimatedRating: 1380,
+          ratingSource: "maia2_sf_v1"
+        },
+        {
+          idSeed: "ply-20",
+          ply: 20,
+          moveNumber: 10,
+          puzzleKind: "line",
+          momentKind: "opponent_mistake_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R b KQkq - 0 4",
+          solutionMoves: ["d7d6", "c2c3", "e8g8"],
+          prevCp: 10,
+          cp: 280,
+          winChanceSwing: 25,
+          themes: ["quietMove"],
+          lengthTag: "short",
+          phaseTag: "middlegame",
+          caliberScore: 60,
+          estimatedRating: 1950,
+          ratingSource: "maia2_sf_v1"
+        }
+      ],
+      { opponentName: "bob", timeClass: "rapid" }
+    );
+
+    const renderer = render(
+      <GamesHubScreen
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+        onPracticeMyGamePuzzles={jest.fn()}
+      />
+    );
+
+    press(renderer, "games-hub-view-puzzles");
+    // Add All to Review enrolls the ~1380 puzzle and skips the ~1950 (> 1400 + 300) puzzle.
+    press(renderer, "games-puzzles-add-all-review");
+    const enrolled = service.listReviewQueue();
+    expect(enrolled.length).toBe(1);
+    expect(enrolled[0]?.puzzleId).toBe(stored[0]?.id);
+  });
 });

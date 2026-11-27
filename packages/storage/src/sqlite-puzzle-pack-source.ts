@@ -38,6 +38,7 @@ interface PuzzlePackRow {
   initial_fen: string | PuzzlePackBinaryValue;
   solution_moves: string | PuzzlePackBinaryValue;
   rating: number;
+  arrow_duel_rating?: number | null;
   rating_deviation?: number;
   stockfish_eval: number;
   stockfish_bestmove: string | PuzzlePackBinaryValue;
@@ -66,6 +67,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   private readonly candidateFloor: number;
   private readonly arrowDuelEligibility: SQLitePuzzlePackArrowDuelEligibility;
   private readonly rowEncoding: PuzzlePackRowEncoding;
+  private readonly hasArrowDuelRatingColumn: boolean;
+  private readonly hasThemeArrowDuelRatingColumn: boolean;
 
   constructor(db: SyncSqliteDatabase, options: SQLitePuzzlePackSourceOptions = {}) {
     this.db = db;
@@ -73,6 +76,32 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     this.candidateFloor = options.candidateFloor ?? 200;
     this.arrowDuelEligibility = options.arrowDuelEligibility ?? "validate";
     this.rowEncoding = readPuzzlePackRowEncoding(db);
+    this.hasArrowDuelRatingColumn = tableHasColumn(db, "puzzles", "arrow_duel_rating");
+    this.hasThemeArrowDuelRatingColumn = tableHasColumn(db, "puzzle_themes", "arrow_duel_rating");
+  }
+
+  private puzzleRatingColumn(modeOrChallenge: string): string {
+    return modeOrChallenge === "arrow_duel" && this.hasArrowDuelRatingColumn
+      ? "arrow_duel_rating"
+      : "rating";
+  }
+
+  private themeRatingColumn(modeOrChallenge: string): string {
+    return modeOrChallenge === "arrow_duel" && this.hasThemeArrowDuelRatingColumn
+      ? "arrow_duel_rating"
+      : "rating";
+  }
+
+  private rowRatingValue(row: PuzzlePackRow, modeOrChallenge: string): number {
+    if (
+      modeOrChallenge === "arrow_duel" &&
+      this.hasArrowDuelRatingColumn &&
+      typeof row.arrow_duel_rating === "number" &&
+      Number.isFinite(row.arrow_duel_rating)
+    ) {
+      return row.arrow_duel_rating;
+    }
+    return row.rating;
   }
 
   countPuzzles(filter?: PuzzleSelectionFilter): number {
@@ -89,9 +118,10 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       const minRating = filter.minRating ?? (filter.rating === undefined ? 0 : SERVER_PUZZLE_MIN_RATING);
       const maxRating = filter.maxRating ?? (filter.rating === undefined ? 4000 : SERVER_PUZZLE_MAX_RATING);
       if (selectedThemes.length === 0) {
+        const ratingCol = this.puzzleRatingColumn(filter.mode);
         const row = this.db.prepare(
           `SELECT COUNT(*) AS count FROM (
-             SELECT 1 FROM puzzles WHERE rating >= ? AND rating <= ? LIMIT ?
+             SELECT 1 FROM puzzles WHERE ${ratingCol} >= ? AND ${ratingCol} <= ? LIMIT ?
            )`
         ).get(minRating, maxRating, filter.limit) as { count: number };
         return row.count;
@@ -102,14 +132,15 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       if (themeIds.length === 0) {
         return 0;
       }
+      const themeRatingCol = this.themeRatingColumn(filter.mode);
       const row = this.db.prepare(`
         SELECT COUNT(*) AS count
         FROM (
           SELECT DISTINCT puzzle_id
           FROM puzzle_themes
           WHERE theme_id IN (${themeIds.map(() => "?").join(", ")})
-            AND rating >= ?
-            AND rating <= ?
+            AND ${themeRatingCol} >= ?
+            AND ${themeRatingCol} <= ?
           LIMIT ?
         )
       `).get(...themeIds, minRating, maxRating, filter.limit) as { count: number };
@@ -172,11 +203,12 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     if (input.challengeType === "arrow_duel" && this.arrowDuelEligibility === "validate") {
       return eligibleSurvivalPuzzles(this.allSurvivalPuzzles(input), input).length;
     }
+    const ratingCol = this.puzzleRatingColumn(input.challengeType);
     const row = this.db.prepare(`
       SELECT COUNT(*) AS count
       FROM puzzles
-      WHERE rating >= ?
-        AND rating <= ?
+      WHERE ${ratingCol} >= ?
+        AND ${ratingCol} <= ?
         ${this.survivalArrowDuelSql(input.challengeType)}
     `).get(input.level.minRating, input.level.maxRating) as { count: number };
     return row.count;
@@ -189,14 +221,15 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     if (input.challengeType === "arrow_duel" && this.arrowDuelEligibility === "validate") {
       return selectSurvivalPuzzleBatchFromPuzzles(this.allSurvivalPuzzles(input), input);
     }
+    const ratingCol = this.puzzleRatingColumn(input.challengeType);
     const eligibility = this.survivalArrowDuelSql(input.challengeType);
     const baseParams = [input.level.minRating, input.level.maxRating] as const;
     const rowsAtOffset = (limit: number, offset: number): PuzzlePackRow[] => (
       this.db.prepare(`
         SELECT *
         FROM puzzles
-        WHERE rating >= ?
-          AND rating <= ?
+        WHERE ${ratingCol} >= ?
+          AND ${ratingCol} <= ?
           ${eligibility}
         ORDER BY id ASC
         LIMIT ? OFFSET ?
@@ -210,8 +243,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       this.db.prepare(`
         SELECT *
         FROM puzzles
-        WHERE rating >= ?
-          AND rating <= ?
+        WHERE ${ratingCol} >= ?
+          AND ${ratingCol} <= ?
           ${eligibility}
           AND id > ?
           ${beforePuzzleId === undefined ? "" : "AND id < ?"}
@@ -228,8 +261,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       this.db.prepare(`
         SELECT *
         FROM puzzles
-        WHERE rating >= ?
-          AND rating <= ?
+        WHERE ${ratingCol} >= ?
+          AND ${ratingCol} <= ?
           ${eligibility}
           AND id < ?
         ORDER BY id ASC
@@ -389,6 +422,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         excludeIds: [...excludedIds],
         ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
       });
+    const ratingCol = `puzzles.${this.puzzleRatingColumn(filter.mode)}`;
     if (filter.preferredRating !== undefined) {
       const preferredRating = filter.preferredRating;
       const sideLimit = candidateLimit +
@@ -404,8 +438,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       ): PuzzlePackRow[] => this.db.prepare(`
         SELECT puzzles.*
         FROM puzzles
-        WHERE puzzles.rating >= ?
-          AND puzzles.rating <= ?
+        WHERE ${ratingCol} >= ?
+          AND ${ratingCol} <= ?
           ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
           AND NOT EXISTS (
             SELECT 1
@@ -413,8 +447,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
             WHERE puzzle_themes.puzzle_id = puzzles.id
               AND puzzle_themes.theme_id IN (${excludedThemeIds.map(() => "?").join(", ")})
           )
-          AND puzzles.rating ${operator} ?
-        ORDER BY puzzles.rating ${direction}, puzzles.id ASC
+          AND ${ratingCol} ${operator} ?
+        ORDER BY ${ratingCol} ${direction}, puzzles.id ASC
         LIMIT ?
       `).all(
         filter.minRating ?? 0,
@@ -429,8 +463,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ...rowsOnSide(">", "ASC")
       ]
         .sort((left, right) =>
-          Math.abs(left.rating - preferredRating) -
-            Math.abs(right.rating - preferredRating) ||
+          Math.abs(this.rowRatingValue(left, filter.mode) - preferredRating) -
+            Math.abs(this.rowRatingValue(right, filter.mode) - preferredRating) ||
           left.id.localeCompare(right.id)
         )
         .filter((row) => !excludedIds.has(row.id))
@@ -440,8 +474,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const queryPage = this.db.prepare(`
         SELECT puzzles.*
         FROM puzzles
-        WHERE puzzles.rating >= ?
-          AND puzzles.rating <= ?
+        WHERE ${ratingCol} >= ?
+          AND ${ratingCol} <= ?
           ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
           AND NOT EXISTS (
             SELECT 1
@@ -449,7 +483,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
             WHERE puzzle_themes.puzzle_id = puzzles.id
               AND puzzle_themes.theme_id IN (${excludedThemeIds.map(() => "?").join(", ")})
           )
-        ORDER BY puzzles.rating, puzzles.id
+        ORDER BY ${ratingCol}, puzzles.id
         LIMIT ? OFFSET ?
       `);
     const rows: PuzzlePackRow[] = [];
@@ -523,10 +557,11 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   private allSurvivalPuzzles(
     input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
   ): Puzzle[] {
+    const ratingCol = this.puzzleRatingColumn(input.challengeType);
     const rows = this.db.prepare(`
       SELECT *
       FROM puzzles
-      WHERE rating >= ? AND rating <= ?
+      WHERE ${ratingCol} >= ? AND ${ratingCol} <= ?
       ORDER BY id ASC
     `).all(input.level.minRating, input.level.maxRating) as PuzzlePackRow[];
     return this.puzzlesFromRows(rows);
@@ -638,13 +673,14 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const params: Array<string | number> = [];
     let from = "puzzles";
     let selectedColumns = "puzzles.*";
-    let ratingColumn = "puzzles.rating";
+    let ratingColumn = `puzzles.${this.puzzleRatingColumn(filter.mode)}`;
     let idColumn = "puzzles.id";
     if (themeId !== undefined) {
       from = "puzzle_themes";
+      const themeRatingCol = this.themeRatingColumn(filter.mode);
       selectedColumns =
-        "puzzle_themes.puzzle_id AS id, puzzle_themes.rating AS rating";
-      ratingColumn = "puzzle_themes.rating";
+        `puzzle_themes.puzzle_id AS id, puzzle_themes.${themeRatingCol} AS rating`;
+      ratingColumn = `puzzle_themes.${themeRatingCol}`;
       idColumn = "puzzle_themes.puzzle_id";
       clauses.push("puzzle_themes.theme_id = ?");
       params.push(themeId);
@@ -704,11 +740,19 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ...rowsOnSide("<=", "DESC"),
         ...rowsOnSide(">", "ASC")
       ]
-        .sort((left, right) =>
-          Math.abs(left.rating - preferredRating) -
-            Math.abs(right.rating - preferredRating) ||
-          left.id.localeCompare(right.id)
-        )
+        .sort((left, right) => {
+          const leftRating = themeId === undefined
+            ? this.rowRatingValue(left as PuzzlePackRow, filter.mode)
+            : left.rating;
+          const rightRating = themeId === undefined
+            ? this.rowRatingValue(right as PuzzlePackRow, filter.mode)
+            : right.rating;
+          return (
+            Math.abs(leftRating - preferredRating) -
+              Math.abs(rightRating - preferredRating) ||
+            left.id.localeCompare(right.id)
+          );
+        })
         .filter((row) => !inMemoryExcludedIds?.has(row.id))
         .slice(0, limit);
       return hydrateCandidateRows(rows);
@@ -815,6 +859,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ? decodeUciMoveLine(binaryField(row.solution_moves, "solution_moves"))
         : splitWords(textField(row.solution_moves, "solution_moves")),
       rating: row.rating,
+      ...(typeof row.arrow_duel_rating === "number" && Number.isFinite(row.arrow_duel_rating)
+        ? { arrowDuelRating: row.arrow_duel_rating }
+        : {}),
       ...(row.rating_deviation === undefined
         ? {}
         : { ratingDeviation: row.rating_deviation }),
@@ -911,4 +958,13 @@ function expandFen(fen: string): string {
 
 function splitWords(value: string): string[] {
   return value ? value.trim().split(/\s+/).filter(Boolean) : [];
+}
+
+function tableHasColumn(
+  db: SyncSqliteDatabase,
+  tableName: string,
+  columnName: string
+): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: string }>;
+  return rows.some((row) => row.name === columnName);
 }

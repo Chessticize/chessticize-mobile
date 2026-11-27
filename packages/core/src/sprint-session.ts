@@ -1,3 +1,4 @@
+import { effectivePuzzleRating } from "./types.ts";
 import type {
   AttemptEvent,
   CurrentPuzzleState,
@@ -347,7 +348,7 @@ export function serializeCurrentPuzzleView(currentPuzzle: CurrentPuzzleState): u
       kind: currentPuzzle.kind,
       puzzleId: currentPuzzle.puzzle.id,
       currentFen: currentPuzzle.currentFen,
-      rating: currentPuzzle.puzzle.rating,
+      rating: effectivePuzzleRating(currentPuzzle.puzzle, "arrow_duel"),
       themes: currentPuzzle.puzzle.themes,
       candidates: currentPuzzle.candidates,
       selectedMove: currentPuzzle.selectedMove,

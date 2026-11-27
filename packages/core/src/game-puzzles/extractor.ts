@@ -9,6 +9,10 @@
 import { Chess, type Color } from "chess.js";
 import type { EngineAnalysisLine } from "../engine-analysis.ts";
 import {
+  DEFAULT_MAX_REVIEW_ABOVE_USER_RATING,
+  estimateGamePuzzleDifficulty
+} from "./difficulty.ts";
+import {
   ARROW_DUEL_MATE_SCORE,
   ARROW_DUEL_MIN_BEST_CP,
   ARROW_DUEL_MIN_CP_SWING,
@@ -463,7 +467,41 @@ export async function extractGamePuzzles(
     }
   }
 
-  const ranked = [...dedupedByKey.values()].sort((a, b) => {
+  let candidates = [...dedupedByKey.values()];
+
+  if (options.estimateDifficulty && candidates.length > 0) {
+    const maxAbove = options.maxReviewAboveUserRating ?? DEFAULT_MAX_REVIEW_ABOVE_USER_RATING;
+    const ratedCandidates: ExtractedGamePuzzle[] = [];
+    for (const candidate of candidates) {
+      if (signal?.aborted) {
+        break;
+      }
+      const estimate = await estimateGamePuzzleDifficulty(candidate, engine, {
+        ...(options.humanPolicy !== undefined ? { humanPolicy: options.humanPolicy } : {}),
+        ...(signal !== undefined ? { signal } : {})
+      });
+      let adjustedCaliber = candidate.caliberScore;
+      if (options.userRating !== undefined && Number.isFinite(options.userRating)) {
+        const overBy = estimate.rating - (options.userRating + maxAbove);
+        if (overBy > 0) {
+          // Softly down-rank puzzles far above the player's current rating so
+          // high-ROI learning-zone puzzles win the per-game puzzle budget.
+          adjustedCaliber = Math.round((adjustedCaliber - Math.min(60, 20 + overBy * 0.1)) * 100) / 100;
+        } else if (estimate.rating >= options.userRating - 400 && estimate.rating <= options.userRating + 250) {
+          adjustedCaliber = Math.round((adjustedCaliber + 8) * 100) / 100;
+        }
+      }
+      ratedCandidates.push({
+        ...candidate,
+        caliberScore: adjustedCaliber,
+        estimatedRating: estimate.rating,
+        ratingSource: estimate.ratingSource
+      });
+    }
+    candidates = ratedCandidates;
+  }
+
+  const ranked = candidates.sort((a, b) => {
     if (b.caliberScore !== a.caliberScore) {
       return b.caliberScore - a.caliberScore;
     }

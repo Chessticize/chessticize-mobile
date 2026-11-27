@@ -7,6 +7,7 @@ import {
   createDefaultRating,
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultPuzzleTimingPolicy,
+  effectivePuzzleRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   isUserGamePuzzleId,
@@ -48,6 +49,7 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  UserGamePuzzleRatingSource,
   MoveClassification,
   Puzzle,
   PracticeRunKind,
@@ -205,6 +207,7 @@ interface PuzzleRow {
   initial_fen: string;
   moves_json: string;
   rating: number;
+  arrow_duel_rating: number | null;
   rating_deviation: number | null;
   popularity: number | null;
   nb_plays: number | null;
@@ -467,6 +470,7 @@ interface UserPuzzleRow {
   punishment_line_json: string | null;
   themes_json: string;
   rating: number;
+  rating_source: UserGamePuzzleRatingSource | null;
   opponent_name: string | null;
   played_at: string | null;
   time_class: string | null;
@@ -499,7 +503,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 27;
+export const CURRENT_SCHEMA_VERSION = 28;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -535,7 +539,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 23, to: 24, apply: migrateV23ToV24 },
   { from: 24, to: 25, apply: migrateV24ToV25 },
   { from: 25, to: 26, apply: migrateV25ToV26 },
-  { from: 26, to: 27, apply: migrateV26ToV27 }
+  { from: 26, to: 27, apply: migrateV26ToV27 },
+  { from: 27, to: 28, apply: migrateV27ToV28 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -851,6 +856,7 @@ export class SyncSQLiteStore implements PracticeStore {
         initial_fen,
         moves_json,
         rating,
+        arrow_duel_rating,
         rating_deviation,
         popularity,
         nb_plays,
@@ -861,7 +867,7 @@ export class SyncSQLiteStore implements PracticeStore {
         stockfish_eval,
         stockfish_bestmove,
         stockfish_eval_after_first_move
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const puzzle of puzzles) {
@@ -870,6 +876,7 @@ export class SyncSQLiteStore implements PracticeStore {
         puzzle.initialFen,
         JSON.stringify(puzzle.solutionMoves),
         puzzle.rating,
+        puzzle.arrowDuelRating ?? null,
         puzzle.ratingDeviation ?? null,
         puzzle.popularity ?? null,
         puzzle.nbPlays ?? null,
@@ -913,11 +920,15 @@ export class SyncSQLiteStore implements PracticeStore {
       source === "pack" && filter.includeIds !== undefined
         ? new Set(filter.includeIds.filter(isUserGamePuzzleId))
         : undefined;
+    const ratingExpr =
+      filter.mode === "arrow_duel"
+        ? "COALESCE(arrow_duel_rating, rating)"
+        : "rating";
     const rows = this.db
       .prepare(
         filter.preferredRating === undefined
-          ? "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC"
-          : "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY ABS(rating - ?) ASC, id ASC"
+          ? `SELECT * FROM puzzles WHERE ${ratingExpr} >= ? AND ${ratingExpr} <= ? ORDER BY ${ratingExpr} ASC, id ASC`
+          : `SELECT * FROM puzzles WHERE ${ratingExpr} >= ? AND ${ratingExpr} <= ? ORDER BY ABS(${ratingExpr} - ?) ASC, id ASC`
       )
       .all(
         filter.minRating ?? 0,
@@ -986,8 +997,12 @@ export class SyncSQLiteStore implements PracticeStore {
   private survivalPuzzleRows(
     input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
   ): Puzzle[] {
+    const ratingExpr =
+      input.challengeType === "arrow_duel"
+        ? "COALESCE(arrow_duel_rating, rating)"
+        : "rating";
     return (this.db.prepare(
-      "SELECT * FROM puzzles WHERE source != 'user_game' AND rating >= ? AND rating <= ? ORDER BY id ASC"
+      `SELECT * FROM puzzles WHERE source != 'user_game' AND ${ratingExpr} >= ? AND ${ratingExpr} <= ? ORDER BY id ASC`
     ).all(input.level.minRating, input.level.maxRating) as PuzzleRow[]).map(puzzleFromRow);
   }
 
@@ -1002,13 +1017,17 @@ export class SyncSQLiteStore implements PracticeStore {
       );
     }
     const widestHalfWidth = Math.max(...input.halfWidths, 0);
+    const ratingExpr =
+      input.filter.mode === "arrow_duel"
+        ? "COALESCE(arrow_duel_rating, rating)"
+        : "rating";
     const rows = this.db
       .prepare(
         `SELECT *
          FROM puzzles
          WHERE source != 'user_game'
-           AND rating >= ? AND rating <= ?
-         ORDER BY ABS(rating - ?) ASC, id ASC`
+           AND ${ratingExpr} >= ? AND ${ratingExpr} <= ?
+         ORDER BY ABS(${ratingExpr} - ?) ASC, id ASC`
       )
       .all(
         Math.max(0, input.ratingAnchor - widestHalfWidth),
@@ -2664,9 +2683,9 @@ export class SyncSQLiteStore implements PracticeStore {
           id, game_id, game_ply, game_move_number, puzzle_kind, game_moment_kind,
           initial_fen, solution_moves_json, stockfish_eval, stockfish_best_move,
           stockfish_eval_after_first_move, punishment_line_json, themes_json,
-          rating, opponent_name, played_at, time_class, clock_remaining_sec,
+          rating, rating_source, opponent_name, played_at, time_class, clock_remaining_sec,
           time_spent_sec, caliber_score, created_at, archived
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           game_id = excluded.game_id,
           game_ply = excluded.game_ply,
@@ -2681,6 +2700,7 @@ export class SyncSQLiteStore implements PracticeStore {
           punishment_line_json = excluded.punishment_line_json,
           themes_json = excluded.themes_json,
           rating = excluded.rating,
+          rating_source = excluded.rating_source,
           opponent_name = excluded.opponent_name,
           played_at = excluded.played_at,
           time_class = excluded.time_class,
@@ -2705,6 +2725,7 @@ export class SyncSQLiteStore implements PracticeStore {
           stored.punishmentLine === undefined ? null : JSON.stringify(stored.punishmentLine),
           JSON.stringify(stored.themes),
           stored.rating,
+          stored.ratingSource ?? null,
           stored.opponentName ?? null,
           stored.playedAt ?? null,
           stored.timeClass ?? null,
@@ -2750,6 +2771,14 @@ export class SyncSQLiteStore implements PracticeStore {
     if (filter?.timeClass !== undefined) {
       clauses.push("time_class = ?");
       params.push(filter.timeClass);
+    }
+    if (filter?.minRating !== undefined) {
+      clauses.push("rating >= ?");
+      params.push(filter.minRating);
+    }
+    if (filter?.maxRating !== undefined) {
+      clauses.push("rating <= ?");
+      params.push(filter.maxRating);
     }
     const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const rows = this.db
@@ -2994,7 +3023,7 @@ export class SyncSQLiteStore implements PracticeStore {
           ? {}
           : { runId: row.run_id, runName: row.run_name }),
         ...(perPuzzleSeconds === undefined ? {} : { perPuzzleSeconds }),
-        puzzleRating: puzzle.rating,
+        puzzleRating: effectivePuzzleRating(puzzle, row.mode),
         side,
         themes: puzzle.themes,
         curatedThemes: curatedPuzzleThemes(puzzle.themes)
@@ -3956,7 +3985,8 @@ function hasGameReviewSchema(db: SyncSqliteDatabase): boolean {
   return hasTable(db, "linked_accounts") &&
     hasTable(db, "imported_games") &&
     hasTable(db, "game_ply_evals") &&
-    hasTable(db, "user_puzzles");
+    hasTable(db, "user_puzzles") &&
+    hasColumn(db, "user_puzzles", "rating_source");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -5056,6 +5086,21 @@ function migrateV26ToV27(db: SyncSqliteDatabase): void {
   }
 }
 
+function migrateV27ToV28(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "user_puzzles",
+    "rating_source",
+    "ALTER TABLE user_puzzles ADD COLUMN rating_source TEXT"
+  );
+  ensureColumn(
+    db,
+    "puzzles",
+    "arrow_duel_rating",
+    "ALTER TABLE puzzles ADD COLUMN arrow_duel_rating INTEGER"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -5167,6 +5212,9 @@ function puzzleFromRow(row: PuzzleRow): Puzzle {
     initialFen: row.initial_fen,
     solutionMoves: JSON.parse(row.moves_json) as string[],
     rating: row.rating,
+    ...(row.arrow_duel_rating === null || row.arrow_duel_rating === undefined
+      ? {}
+      : { arrowDuelRating: row.arrow_duel_rating }),
     ...(row.rating_deviation === null ? {} : { ratingDeviation: row.rating_deviation }),
     ...(row.popularity === null ? {} : { popularity: row.popularity }),
     ...(row.nb_plays === null ? {} : { nbPlays: row.nb_plays }),
@@ -5682,6 +5730,9 @@ function userPuzzleFromRow(row: UserPuzzleRow): StoredUserPuzzle {
       : { punishmentLine: JSON.parse(row.punishment_line_json) as string[] }),
     themes: JSON.parse(row.themes_json) as string[],
     rating: row.rating,
+    ...(row.rating_source === null || row.rating_source === undefined
+      ? {}
+      : { ratingSource: row.rating_source }),
     ...(row.opponent_name === null ? {} : { opponentName: row.opponent_name }),
     ...(row.played_at === null ? {} : { playedAt: row.played_at }),
     ...(row.time_class === null ? {} : { timeClass: row.time_class }),
@@ -5823,6 +5874,7 @@ CREATE TABLE IF NOT EXISTS puzzles (
   initial_fen TEXT NOT NULL,
   moves_json TEXT NOT NULL,
   rating INTEGER NOT NULL,
+  arrow_duel_rating INTEGER,
   rating_deviation INTEGER,
   popularity INTEGER,
   nb_plays INTEGER,

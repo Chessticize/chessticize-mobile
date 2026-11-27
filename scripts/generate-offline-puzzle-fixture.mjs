@@ -667,6 +667,7 @@ function buildSqliteManifest(path, input, options) {
       presolveDepth: input.presolveDepth,
       licenseNote: input.licenseNote,
       manifestHash: input.manifestHash,
+      ...(input.packVersion === undefined ? {} : { packVersion: input.packVersion }),
       packFileHash: input.packFileHash,
       packFileBytes: input.packFileBytes,
       format: input.format,

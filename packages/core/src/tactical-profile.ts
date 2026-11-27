@@ -1,7 +1,8 @@
-import type {
-  AttemptEvent,
-  Puzzle,
-  SprintConfig
+import {
+  effectivePuzzleRating,
+  type AttemptEvent,
+  type Puzzle,
+  type SprintConfig
 } from "./types.ts";
 import {
   curatedPuzzleThemes,
@@ -1732,9 +1733,13 @@ function solveObservationFor(
 ): BaselineSolveObservation | undefined {
   const ratingDeviation = input.puzzle.ratingDeviation;
   const timeoutAfterSeconds = input.sessionConfig?.puzzleTiming?.timeoutAfterSeconds;
+  const puzzleRating = effectivePuzzleRating(
+    input.puzzle,
+    input.attempt.mode === "arrow_duel" ? "arrow_duel" : "line"
+  );
   if (
     !Number.isFinite(input.attempt.ratingBefore) ||
-    !Number.isFinite(input.puzzle.rating) ||
+    !Number.isFinite(puzzleRating) ||
     !Number.isFinite(ratingDeviation) ||
     (ratingDeviation as number) <= 0 ||
     timeoutAfterSeconds === null ||
@@ -1744,7 +1749,7 @@ function solveObservationFor(
     return undefined;
   }
   const features = tacticalProfileSolveBaselineFeatures({
-    puzzleRating: input.puzzle.rating,
+    puzzleRating,
     puzzleRatingDeviation: ratingDeviation as number,
     ratingBefore: input.attempt.ratingBefore,
     timeoutAfterSeconds: timeoutAfterSeconds as number,
@@ -1773,6 +1778,7 @@ function speedObservationFor(
   const elapsedMs = input.attempt.elapsedMs;
   const sessionConfig = input.sessionConfig;
   const puzzleTiming = sessionConfig?.puzzleTiming;
+  const puzzleRating = effectivePuzzleRating(input.puzzle, taskFamily);
   if (
     !speed ||
     input.attempt.result !== "correct" ||
@@ -1785,7 +1791,7 @@ function speedObservationFor(
     (elapsedMs as number) >= (puzzleTiming.timeoutAfterSeconds as number) * 1000 ||
     !Number.isFinite(sessionConfig.perPuzzleSeconds) ||
     sessionConfig.perPuzzleSeconds <= 0 ||
-    !Number.isFinite(input.puzzle.rating) ||
+    !Number.isFinite(puzzleRating) ||
     !Number.isFinite(input.attempt.ratingBefore)
   ) {
     return undefined;
@@ -1796,7 +1802,7 @@ function speedObservationFor(
   const features = tacticalProfileSpeedBaselineFeatures({
     decisionCount,
     perPuzzleSeconds: sessionConfig.perPuzzleSeconds,
-    puzzleRating: input.puzzle.rating,
+    puzzleRating,
     ratingBefore: input.attempt.ratingBefore,
     slowAfterSeconds: puzzleTiming.slowAfterSeconds,
     timeoutAfterSeconds: puzzleTiming.timeoutAfterSeconds as number

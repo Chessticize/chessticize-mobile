@@ -1,5 +1,6 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
+  effectivePuzzleRating,
   isServerCompatibleArrowDuelPuzzle,
   namedThemesForSelection,
   puzzleMatchesAnyTheme
@@ -146,7 +147,8 @@ function isEligiblePuzzle(
   filter: Omit<SelectUniquePuzzlesInput, "puzzles" | "limit" | "rating" | "excludeIds">,
   selectedThemes: readonly string[]
 ): boolean {
-  if (puzzle.rating < (filter.minRating ?? 0) || puzzle.rating > (filter.maxRating ?? 4000)) {
+  const puzzleRating = effectivePuzzleRating(puzzle, filter.mode);
+  if (puzzleRating < (filter.minRating ?? 0) || puzzleRating > (filter.maxRating ?? 4000)) {
     return false;
   }
   if (!puzzleMatchesAnyTheme(puzzle.themes, selectedThemes)) {

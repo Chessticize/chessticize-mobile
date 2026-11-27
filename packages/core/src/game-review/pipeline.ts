@@ -4,6 +4,7 @@ import type {
   ExtractGamePuzzlesResult,
   GameHighlightMoment,
   GamePlyEvalInput,
+  HumanPolicyModel,
   PuzzleExtractionEngine
 } from "../game-puzzles/index.ts";
 import { extractGamePuzzles } from "../game-puzzles/index.ts";
@@ -21,6 +22,10 @@ export interface FullGameReviewPipelineInput {
   userColor: "w" | "b";
   engine: GameReviewEngine & PuzzleExtractionEngine;
   timeControl?: string;
+  /** Optional on-device human policy model (e.g. Maia-2) for puzzle difficulty estimation. */
+  humanPolicy?: HumanPolicyModel;
+  /** Optional player rating for difficulty-aware caliber ranking of extracted puzzles. */
+  userRating?: number;
   pass1Options?: EvaluateGamePass1Options;
   extractionOptions?: ExtractGamePuzzlesOptions;
   onPass1Complete?: (report: GameReviewReport) => void;
@@ -71,6 +76,12 @@ export async function runFullGameReviewPipeline(
   }
 
   const timeControl = input.timeControl ?? report.parsedGame.timeControl;
+  const extractionOptions: ExtractGamePuzzlesOptions = {
+    estimateDifficulty: true,
+    ...(input.humanPolicy !== undefined ? { humanPolicy: input.humanPolicy } : {}),
+    ...(input.userRating !== undefined ? { userRating: input.userRating } : {}),
+    ...input.extractionOptions
+  };
   const extraction: ExtractGamePuzzlesResult = await extractGamePuzzles(
     {
       ...(input.gameId !== undefined ? { gameId: input.gameId } : {}),
@@ -79,7 +90,7 @@ export async function runFullGameReviewPipeline(
       ...(timeControl !== undefined ? { timeControl } : {})
     },
     input.engine,
-    input.extractionOptions
+    extractionOptions
   );
 
   return {
