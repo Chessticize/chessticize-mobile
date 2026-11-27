@@ -370,12 +370,162 @@ describe("GamesHubScreen", () => {
     expect(hasTestID(renderer, "game-row-g-blitz-unanalyzed")).toBe(true);
     expect(hasTestID(renderer, "game-row-g-bullet-partial")).toBe(true);
 
-    press(renderer, "games-filter-time-classical");
+    // Unused time classes (e.g. classical) are hidden; present time classes remain filterable.
+    expect(hasTestID(renderer, "games-filter-time-classical")).toBe(false);
+    expect(hasTestID(renderer, "games-filter-time-rapid")).toBe(true);
+    expect(hasTestID(renderer, "games-filter-time-blitz")).toBe(true);
+
+    // Combining status="unanalyzed" with timeClass="rapid" (which is analyzed) yields empty state.
+    press(renderer, "games-filter-time-rapid");
     expect(hasTestID(renderer, "games-filtered-empty")).toBe(true);
 
     press(renderer, "games-reset-filters");
     expect(hasTestID(renderer, "game-row-g-rapid-analyzed")).toBe(true);
     expect(hasTestID(renderer, "game-row-g-blitz-unanalyzed")).toBe(true);
+  });
+
+  it("auto-syncs incrementally on mount when autoSyncOnMount is enabled", async () => {
+    const service = new PracticeService(new MemoryStore());
+    service.upsertLinkedAccount({
+      platform: "lichess",
+      username: "alice",
+      lastSyncedAt: "2026-11-19T12:00:00.000Z"
+    });
+    const requests: string[] = [];
+    const httpClient: GameImportHttpClient = {
+      async getText(url) {
+        requests.push(url);
+        return {
+          status: 200,
+          text: `${JSON.stringify({
+            id: "autoSync1",
+            rated: true,
+            speed: "blitz",
+            createdAt: Date.parse("2026-11-20T12:00:00.000Z"),
+            status: "resign",
+            winner: "white",
+            players: {
+              white: { user: { name: "alice" }, rating: 1600 },
+              black: { user: { name: "bob" }, rating: 1590 }
+            },
+            pgn: SAMPLE_PGN_1
+          })}\n`
+        };
+      }
+    };
+
+    const renderer = render(
+      <GamesHubScreen
+        autoSyncOnMount
+        httpClient={httpClient}
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+    for (let tick = 0; tick < 6; tick += 1) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+
+    expect(requests.length).toBe(1);
+    expect(requests[0]).toContain("since=");
+    expect(service.listImportedGames()).toHaveLength(1);
+    expect(textContent(findByTestID(renderer, "games-sync-summary"))).toContain("1");
+  });
+
+  it("displays all user puzzles ordered by game recency with Add All to Review, Replay launch, and Game link", () => {
+    const service = new PracticeService(new MemoryStore());
+    service.upsertImportedGames([
+      makeDraft({
+        id: "g-older",
+        playedAt: "2026-11-18T12:00:00.000Z",
+        black: { username: "OldFoe", rating: 1500, isAi: false }
+      }),
+      makeDraft({
+        id: "g-newer",
+        playedAt: "2026-11-20T12:00:00.000Z",
+        black: { username: "NewFoe", rating: 1600, isAi: false }
+      })
+    ]);
+    const oldPuzzles = service.replaceGameUserPuzzles(
+      "g-older",
+      [
+        {
+          idSeed: "old-ply-10",
+          ply: 10,
+          moveNumber: 5,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 320,
+          winChanceSwing: 25,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 80
+        }
+      ],
+      { opponentName: "OldFoe", playedAt: "2026-11-18T12:00:00.000Z", timeClass: "blitz" }
+    );
+    const newPuzzles = service.replaceGameUserPuzzles(
+      "g-newer",
+      [
+        {
+          idSeed: "new-ply-8",
+          ply: 8,
+          moveNumber: 4,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 320,
+          winChanceSwing: 25,
+          themes: ["pin"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 85
+        }
+      ],
+      { opponentName: "NewFoe", playedAt: "2026-11-20T12:00:00.000Z", timeClass: "rapid" }
+    );
+
+    const onPractice = jest.fn();
+    const onOpenGame = jest.fn();
+    const renderer = render(
+      <GamesHubScreen
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={onOpenGame}
+        onPracticeMyGamePuzzles={onPractice}
+      />
+    );
+
+    press(renderer, "games-hub-view-puzzles");
+    expect(hasTestID(renderer, "games-puzzles-view")).toBe(true);
+
+    // Tapping a puzzle launches Replay with game-ordered IDs (newest game first!) at its index.
+    press(renderer, `games-puzzle-play-${oldPuzzles[0]!.id}`);
+    expect(onPractice).toHaveBeenCalledWith({
+      puzzleIds: [newPuzzles[0]!.id, oldPuzzles[0]!.id],
+      initialIndex: 1
+    });
+
+    // Tapping Game › opens the source game in Game Review.
+    press(renderer, `games-puzzle-open-game-${newPuzzles[0]!.id}`);
+    expect(onOpenGame).toHaveBeenCalledWith("g-newer");
+
+    // Add All to Review enrolls both puzzles.
+    press(renderer, "games-puzzles-add-all-review");
+    expect(service.listReviewQueue().length).toBe(2);
   });
 
   it("runs foreground batch analysis, auto-pauses on AppState background saving a checkpoint, and resumes to completion", async () => {

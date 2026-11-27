@@ -1426,7 +1426,7 @@ export const enMessages = {
 
   // Games Hub
   "games.empty.title": "Review your own games",
-  "games.empty.linkAccount": "Link Chess.com / Lichess",
+  "games.empty.linkAccount": "Add Chess.com / Lichess account",
   "games.empty.importPgn": "Import PGN",
   "games.action.import": "Import",
   "games.action.sync": "Sync",
@@ -1490,8 +1490,8 @@ export const enMessages = {
   "games.modal.usernamePlaceholder": "Enter username",
   "games.modal.maxGamesLabel": "Recent games",
   "games.modal.maxGamesOption": "Up to {{count}}",
-  "games.modal.linkAndSync": "Link & sync",
-  "games.modal.linkedAccounts": "Linked accounts",
+  "games.modal.linkAndSync": "Add & sync",
+  "games.modal.linkedAccounts": "Accounts",
   "games.modal.removeAccountA11y": "Remove {{platform}} account {{username}}",
   "games.modal.pgnLabel": "PGN text",
   "games.modal.pgnPlaceholder": "Paste one or more PGNs",

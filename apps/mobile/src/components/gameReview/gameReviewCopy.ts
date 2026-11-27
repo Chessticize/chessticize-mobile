@@ -35,8 +35,17 @@ export const GAME_REVIEW_COPY = {
     startPosition: "Starting position",
     evaluating: "Evaluating…",
     bestWas: (san: string) => `Best: ${san}`,
+    why: "Why?",
     prevKey: "Prev Key",
     nextKey: "Next Key"
+  },
+  whyPanel: {
+    title: "Opponent's best line",
+    loading: "Finding refutation…",
+    unavailable: "No refutation line available.",
+    prev: "Prev",
+    next: "Next",
+    close: "Close"
   },
   evalBar: {
     accessibilityLabel: (evalLabel: string, whiteWinPercent: number) =>
@@ -105,6 +114,7 @@ export const GAME_REVIEW_COPY = {
     thinking: "Calculating…",
     unavailable: "Engine unavailable",
     depthLabel: (depth: number) => `d${depth}`,
+    showArrows: "Show Arrows",
     backToGame: "Back to game",
     exploringOffset: (plies: number) => `+${plies} explored`,
     playLineA11y: (san: string, score: string) => `Play engine move ${san}, evaluation ${score}`
@@ -122,6 +132,8 @@ export const GAME_REVIEW_COPY = {
     moveNumberLabel: (moveNumber: number) => `Move ${moveNumber}`,
     practiceGamePuzzles: "Practice this game's puzzles",
     addToReview: "Add to Review",
-    inReview: "In Review"
+    inReview: "In Review",
+    addAllToReview: "Add All to Review",
+    allInReview: "All in Review"
   }
 } as const;

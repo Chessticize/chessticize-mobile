@@ -144,11 +144,28 @@ export async function verifyArrowDuelPair(
 
   const bestEvalWhite = relativeScoreToCp(scoreForPov(bestLine.score, "w"), ARROW_DUEL_MATE_SCORE);
   const blunderEvalWhite = relativeScoreToCp(scoreForPov(blunderLine.score, "w"), ARROW_DUEL_MATE_SCORE);
-  const punishmentLine = extractLegalPunishmentLine(
+  let punishmentLine = extractLegalPunishmentLine(
     blunderCheckBoard.fen(),
     normalizedBlunder,
     blunderLine.pv
   );
+  if (punishmentLine.length === 0 && !blunderCheckBoard.isGameOver()) {
+    const replyLines = await engine.analyze({
+      fen: blunderCheckBoard.fen(),
+      ...limit,
+      multiPv: 1,
+      priority: "batch",
+      ...(signal !== undefined ? { signal } : {})
+    });
+    const replyLine = pickTopLine(replyLines);
+    if (replyLine) {
+      punishmentLine = extractLegalPunishmentLine(
+        blunderCheckBoard.fen(),
+        "",
+        replyLine.pv.length > 0 ? replyLine.pv : [replyLine.move]
+      );
+    }
+  }
 
   return {
     bestMove: normalizedBest,

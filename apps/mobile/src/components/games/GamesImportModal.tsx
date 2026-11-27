@@ -77,6 +77,7 @@ export function GamesImportModal({
   useEffect(() => {
     if (visible) {
       setActiveTab(initialTab);
+      setUsername("");
     }
   }, [initialTab, visible]);
 

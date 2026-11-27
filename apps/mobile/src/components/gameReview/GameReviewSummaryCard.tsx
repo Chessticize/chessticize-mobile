@@ -15,6 +15,7 @@ export interface GameReviewSummaryCardProps {
   enrolledPuzzleIds: ReadonlySet<string>;
   onSelectPuzzle?: (puzzle: StoredUserPuzzle) => void;
   onToggleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
+  onEnrollAllPuzzles?: () => void;
   onPracticeGamePuzzles?: () => void;
   testID?: string;
 }
@@ -26,11 +27,14 @@ export function GameReviewSummaryCard({
   enrolledPuzzleIds,
   onSelectPuzzle,
   onToggleReviewEnrollment,
+  onEnrollAllPuzzles,
   onPracticeGamePuzzles,
   testID = "game-review-summary-card"
 }: GameReviewSummaryCardProps): React.JSX.Element {
   const styles = useStyles();
   const { puzzles } = summary;
+  const allPuzzlesInReview =
+    puzzles.length > 0 && puzzles.every((puzzle) => enrolledPuzzleIds.has(puzzle.id));
 
   return (
     <View style={styles.container} testID={testID}>
@@ -87,9 +91,25 @@ export function GameReviewSummaryCard({
       </View>
 
       <View style={styles.puzzlesSection} testID="game-review-summary-puzzles">
-        <AppText variant="subheadline">
-          {GAME_REVIEW_COPY.summary.puzzlesTitle(puzzles.length)}
-        </AppText>
+        <View style={styles.puzzlesHeaderRow}>
+          <AppText style={styles.puzzlesTitleText} variant="subheadline">
+            {GAME_REVIEW_COPY.summary.puzzlesTitle(puzzles.length)}
+          </AppText>
+          {puzzles.length > 1 && onEnrollAllPuzzles ? (
+            <Button
+              disabled={allPuzzlesInReview}
+              label={
+                allPuzzlesInReview
+                  ? GAME_REVIEW_COPY.summary.allInReview
+                  : GAME_REVIEW_COPY.summary.addAllToReview
+              }
+              onPress={onEnrollAllPuzzles}
+              size="compact"
+              testID="game-review-add-all-review"
+              variant={allPuzzlesInReview ? "plain" : "secondary"}
+            />
+          ) : null}
+        </View>
 
         {puzzles.length === 0 ? (
           <AppText tone="secondary" variant="footnote">
@@ -275,6 +295,16 @@ const useStyles = makeStyles((theme) => ({
     borderTopWidth: 1,
     gap: 8,
     paddingTop: 10
+  },
+  puzzlesHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  puzzlesTitleText: {
+    flexShrink: 1
   },
   puzzlesList: {
     gap: 8

@@ -5,8 +5,7 @@ import {
   parsePgnGame,
   type EngineAnalysisLine,
   type EngineSearchRequest,
-  type ExtractedGamePuzzle,
-  type GameHighlightMoment
+  type ExtractedGamePuzzle
 } from "../../../packages/core/src/index.ts";
 import {
   MemoryStore,
@@ -35,36 +34,14 @@ const SAMPLE_PGN = [
 
 const PARSED_SAMPLE = parsePgnGame(SAMPLE_PGN);
 
-// Board test double exposing the current FEN, flip state, and a deterministic move trigger.
-let latestBoardProps: GameReviewBoardProps | null = null;
+// Board test double exposing the current FEN and flip state.
 function MockReviewBoard(props: GameReviewBoardProps): React.JSX.Element {
-  latestBoardProps = props;
   return (
     <View testID="mock-review-board">
       <Text testID="mock-board-fen">{props.fen}</Text>
       <Text testID="mock-board-flipped">{props.flipped ? "black" : "white"}</Text>
     </View>
   );
-}
-
-function triggerBoardUciMove(uci: string): void {
-  if (!latestBoardProps?.onMove) {
-    throw new Error("Mock board has no onMove handler");
-  }
-  const from = uci.slice(0, 2);
-  const to = uci.slice(2, 4);
-  const promotion = uci.length > 4 ? uci.slice(4, 5) : undefined;
-  latestBoardProps.onMove({
-    move: {
-      from,
-      to,
-      ...(promotion ? { promotion } : {})
-    },
-    state: {
-      fen: latestBoardProps.fen,
-      isPromotion: Boolean(promotion)
-    }
-  } as Parameters<NonNullable<GameReviewBoardProps["onMove"]>>[0]);
 }
 
 function createSampleGame(overrides: Partial<StoredImportedGame> = {}): StoredImportedGame {
@@ -255,7 +232,6 @@ async function flushAsync(ticks = 6): Promise<void> {
 
 describe("GameReviewScreen (#767)", () => {
   beforeEach(() => {
-    latestBoardProps = null;
     (AppState as unknown as { __reset?: () => void }).__reset?.();
   });
 
@@ -283,11 +259,12 @@ describe("GameReviewScreen (#767)", () => {
 
     expect(analyzeSpy).not.toHaveBeenCalled();
     expect(queryByTestId(renderer, "game-review-scan-banner")).toBeNull();
+    expect(queryByTestId(renderer, "game-review-key-moment-card")).toBeNull();
     expect(findByTestId(renderer, "game-review-eval-graph")).toBeTruthy();
     expect(findByTestId(renderer, "game-review-summary-card")).toBeTruthy();
     expect(textContent(findByTestId(renderer, "game-review-accuracy-white-value"))).toBe("74%");
     expect(textContent(findByTestId(renderer, "game-review-accuracy-black-value"))).toBe("86%");
-    expect(textContent(findByTestId(renderer, "key-moment-counter"))).toBe("Key Moment 1 / 2");
+    expect(textContent(findByTestId(renderer, "game-review-eval-bar-label"))).not.toBe("—");
     expect(textContent(findByTestId(renderer, "mock-board-flipped"))).toBe("white");
 
     act(() => renderer.unmount());
@@ -416,99 +393,12 @@ describe("GameReviewScreen (#767)", () => {
     act(() => renderer.unmount());
   });
 
-  it("handles Line Key Moment Retry: solved does NOT auto-enroll in Review (manual toggle works), failed auto-enrolls in Review", () => {
+  it("supports per-puzzle and Add All to Review enrollment and jumps to puzzle ply from Game Summary without inline quizzing", () => {
     const { store, service, game } = setupAnalyzedStore();
     const puzzles = store.listUserPuzzles({ gameId: game.id });
     const linePuzzle = puzzles.find((p) => p.puzzleKind === "line")!;
+    const duelPuzzle = puzzles.find((p) => p.puzzleKind === "arrow_duel")!;
     const lineCtx = reviewContextForUserPuzzle(linePuzzle);
-
-    let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      renderer = TestRenderer.create(
-        <ThemeProvider appearance="light">
-          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
-            <GameReviewScreen
-              BoardComponent={MockReviewBoard}
-              game={game}
-              practiceService={service}
-              store={store}
-            />
-          </PracticeViewportProvider>
-        </ThemeProvider>
-      );
-    });
-
-    // Moment 1 is the Line puzzle (3... Nf6 -> White plays h5f7#). Answer must be hidden in prompt.
-    expect(queryByTestId(renderer, "game-review-arrow-overlay")).toBeNull();
-    expect(textContent(findByTestId(renderer, "game-review-eval-bar-label"))).toBe("—");
-
-    // Solve it correctly on board
-    act(() => {
-      triggerBoardUciMove("h5f7");
-    });
-
-    expect(findByTestId(renderer, "key-moment-solved-state")).toBeTruthy();
-    expect(service.getReviewQueueState(lineCtx)).toBeUndefined();
-
-    // One-tap manual enrollment into Review
-    act(() => {
-      findByTestId(renderer, "key-moment-review-toggle").props.onPress();
-    });
-    expect(service.getReviewQueueState(lineCtx)).toBeDefined();
-
-    // Remove back out, then retry and fail it to verify auto-enrollment
-    act(() => {
-      findByTestId(renderer, "key-moment-review-toggle").props.onPress();
-    });
-    expect(service.getReviewQueueState(lineCtx)).toBeUndefined();
-
-    // Switch to Retry via skip -> retry OR recreate clean failure in a fresh screen
-    act(() => renderer.unmount());
-
-    const second = setupAnalyzedStore();
-    const secondLine = second.store
-      .listUserPuzzles({ gameId: second.game.id })
-      .find((p) => p.puzzleKind === "line")!;
-    const secondCtx = reviewContextForUserPuzzle(secondLine);
-
-    act(() => {
-      renderer = TestRenderer.create(
-        <ThemeProvider appearance="light">
-          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
-            <GameReviewScreen
-              BoardComponent={MockReviewBoard}
-              game={second.game}
-              practiceService={second.service}
-              store={second.store}
-            />
-          </PracticeViewportProvider>
-        </ThemeProvider>
-      );
-    });
-
-    // Play wrong move (4. Qf3 = h5f3 instead of h5f7#)
-    act(() => {
-      triggerBoardUciMove("h5f3");
-    });
-
-    expect(findByTestId(renderer, "key-moment-failed-state")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-auto-enrolled-badge")).toBeTruthy();
-    expect(second.service.getReviewQueueState(secondCtx)).toBeDefined();
-
-    // User can still remove it from Review
-    act(() => {
-      findByTestId(renderer, "key-moment-review-toggle").props.onPress();
-    });
-    expect(second.service.getReviewQueueState(secondCtx)).toBeUndefined();
-
-    act(() => renderer.unmount());
-  });
-
-  it("handles Arrow Duel Key Moment Retry: shows both candidates, escaped tag, punishment line on fail & auto-enrolls in Review", () => {
-    const { store, service, game } = setupAnalyzedStore();
-    const duelPuzzle = store
-      .listUserPuzzles({ gameId: game.id })
-      .find((p) => p.puzzleKind === "arrow_duel")!;
     const duelCtx = reviewContextForUserPuzzle(duelPuzzle);
 
     let renderer!: TestRenderer.ReactTestRenderer;
@@ -528,78 +418,37 @@ describe("GameReviewScreen (#767)", () => {
       );
     });
 
-    // Advance to Key Moment 2 (Arrow Duel)
+    // Pure review: no inline quiz card and eval bar is always visible.
+    expect(queryByTestId(renderer, "game-review-key-moment-card")).toBeNull();
+    expect(queryByTestId(renderer, "game-review-arrow-duel-overlay")).toBeNull();
+    expect(textContent(findByTestId(renderer, "game-review-eval-bar-label"))).not.toBe("—");
+
+    // Tap a puzzle row in Game Summary to inspect that move on the board.
     act(() => {
-      findByTestId(renderer, "key-moment-next").props.onPress();
+      findByTestId(renderer, `summary-puzzle-open-${duelPuzzle.id}`).props.onPress();
     });
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+      PARSED_SAMPLE.plies[duelPuzzle.gamePly - 1]!.fenAfter
+    );
 
-    expect(findByTestId(renderer, "game-review-arrow-duel-overlay")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-escaped-badge")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-candidate-f3d1")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-candidate-f3c3")).toBeTruthy();
-
-    // Tap the blunder candidate (f3c3) -> fails, shows punishment line, auto-enrolls in Review
+    // Individual Add to Review toggle works cleanly.
     act(() => {
-      findByTestId(renderer, "key-moment-candidate-f3c3").props.onPress();
+      findByTestId(renderer, `summary-puzzle-review-toggle-${linePuzzle.id}`).props.onPress();
     });
+    expect(service.getReviewQueueState(lineCtx)).toBeDefined();
+    expect(service.getReviewQueueState(duelCtx)).toBeUndefined();
 
-    expect(findByTestId(renderer, "key-moment-failed-state")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-punishment-line")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-auto-enrolled-badge")).toBeTruthy();
+    // Remove back out, then test one-tap Add All to Review.
+    act(() => {
+      findByTestId(renderer, `summary-puzzle-review-toggle-${linePuzzle.id}`).props.onPress();
+    });
+    expect(service.getReviewQueueState(lineCtx)).toBeUndefined();
+
+    act(() => {
+      findByTestId(renderer, "game-review-add-all-review").props.onPress();
+    });
+    expect(service.getReviewQueueState(lineCtx)).toBeDefined();
     expect(service.getReviewQueueState(duelCtx)).toBeDefined();
-
-    // Step forward through the punishment line
-    act(() => {
-      findByTestId(renderer, "key-moment-refutation-next").props.onPress();
-    });
-    expect(textContent(findByTestId(renderer, "mock-board-fen"))).not.toBe(duelPuzzle.initialFen);
-
-    // Retry and choose best move (f3d1) -> solved!
-    act(() => {
-      findByTestId(renderer, "key-moment-retry-button").props.onPress();
-    });
-    act(() => {
-      findByTestId(renderer, "key-moment-candidate-f3d1").props.onPress();
-    });
-    expect(findByTestId(renderer, "key-moment-solved-state")).toBeTruthy();
-    expect(findByTestId(renderer, "key-moment-refutation-toggle")).toBeTruthy();
-
-    act(() => renderer.unmount());
-  });
-
-  it("celebrates opponent_*_caught highlights without creating a puzzle or forcing a retry", () => {
-    const { store, service, game } = setupAnalyzedStore();
-    store.replaceGameUserPuzzles(game.id, [], {});
-    const cleanGame = store.getImportedGame(game.id)!;
-    const highlight: GameHighlightMoment = {
-      ply: 10,
-      moveNumber: 5,
-      momentKind: "opponent_blunder_caught",
-      uci: "f6e4",
-      san: "Nxe4",
-      winChanceGain: 0.35
-    };
-
-    let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      renderer = TestRenderer.create(
-        <ThemeProvider appearance="light">
-          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
-            <GameReviewScreen
-              BoardComponent={MockReviewBoard}
-              game={cleanGame}
-              initialHighlights={[highlight]}
-              practiceService={service}
-              store={store}
-            />
-          </PracticeViewportProvider>
-        </ThemeProvider>
-      );
-    });
-
-    expect(findByTestId(renderer, "key-moment-highlight-badge")).toBeTruthy();
-    expect(textContent(findByTestId(renderer, "key-moment-highlight-detail"))).toContain("Nxe4");
-    expect(store.listUserPuzzles({ gameId: game.id })).toHaveLength(0);
 
     act(() => renderer.unmount());
   });
@@ -680,6 +529,13 @@ describe("GameReviewScreen (#767)", () => {
     );
     expect(findByTestId(renderer, "game-review-engine-line-1")).toBeTruthy();
     expect(findByTestId(renderer, "game-review-engine-line-3")).toBeTruthy();
+    // Engine arrows stay hidden until the user toggles Show Arrows on.
+    expect(queryByTestId(renderer, "game-review-arrow-engine-g1f3")).toBeNull();
+    act(() => {
+      findByTestId(renderer, "game-review-show-arrows-toggle").props.onPress();
+    });
+    expect(findByTestId(renderer, "game-review-arrow-engine-g1f3")).toBeTruthy();
+    expect(findByTestId(renderer, "game-review-arrow-engine-f1c4")).toBeTruthy();
 
     // Tap first engine candidate line to explore off-line
     act(() => {
@@ -849,7 +705,7 @@ describe("GameReviewScreen (#767)", () => {
     // Top Key Moments | Moves segmented control is removed in unified flow.
     expect(queryByTestId(renderer, "game-review-mode-toggle")).toBeNull();
 
-    // Starting at ply 1: verdict bar shows move verdict, Key › jumps to first critical ply (ply 6 blunder / Line puzzle).
+    // Starting at ply 1: verdict bar shows move verdict, Key › jumps to first critical ply (ply 6 blunder).
     expect(findByTestId(renderer, "game-review-verdict-bar")).toBeTruthy();
     act(() => {
       findByTestId(renderer, "game-review-next-critical").props.onPress();
@@ -857,9 +713,10 @@ describe("GameReviewScreen (#767)", () => {
     expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
       PARSED_SAMPLE.plies[5]!.fenAfter
     );
-    expect(findByTestId(renderer, "key-moment-counter")).toBeTruthy();
+    expect(findByTestId(renderer, "game-review-square-badge-blunder")).toBeTruthy();
+    expect(queryByTestId(renderer, "game-review-key-moment-card")).toBeNull();
 
-    // Key › again jumps to ply 7 (missed_win) and shows square badge, best-move green arrow & verdict "Best: Qxf7#".
+    // Key › again jumps to ply 7 (missed_win): shows square badge & Why? without spoiling Best move.
     act(() => {
       findByTestId(renderer, "game-review-next-critical").props.onPress();
     });
@@ -867,16 +724,42 @@ describe("GameReviewScreen (#767)", () => {
       PARSED_SAMPLE.plies[6]!.fenAfter
     );
     expect(findByTestId(renderer, "game-review-square-badge-missed_win")).toBeTruthy();
-    expect(findByTestId(renderer, "game-review-arrow-best-h5f7")).toBeTruthy();
+    expect(queryByTestId(renderer, "game-review-arrow-best-h5f7")).toBeNull();
     expect(textContent(findByTestId(renderer, "game-review-verdict-bar"))).toContain("Missed Win");
-    expect(textContent(findByTestId(renderer, "game-review-verdict-bar"))).toContain("Qxf7#");
+    expect(textContent(findByTestId(renderer, "game-review-verdict-bar"))).not.toContain("Qxf7#");
+    expect(findByTestId(renderer, "game-review-why-button")).toBeTruthy();
 
-    // ‹ Key jumps back to ply 6
+    // Jump to ply 9 (blunder with cached Arrow Duel punishmentLine) and tap Why? to inspect opponent's refutation.
+    act(() => {
+      findByTestId(renderer, "game-review-next-critical").props.onPress();
+    });
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+      PARSED_SAMPLE.plies[8]!.fenAfter
+    );
+    act(() => {
+      findByTestId(renderer, "game-review-why-button").props.onPress();
+    });
+    expect(findByTestId(renderer, "game-review-why-panel")).toBeTruthy();
+    expect(textContent(findByTestId(renderer, "game-review-why-san"))).toContain("Nxe4");
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).not.toBe(
+      PARSED_SAMPLE.plies[8]!.fenAfter
+    );
+
+    // Close Why? panel snaps back to the blunder ply.
+    act(() => {
+      findByTestId(renderer, "game-review-why-close").props.onPress();
+    });
+    expect(queryByTestId(renderer, "game-review-why-panel")).toBeNull();
+    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+      PARSED_SAMPLE.plies[8]!.fenAfter
+    );
+
+    // ‹ Key jumps back to ply 7
     act(() => {
       findByTestId(renderer, "game-review-prev-critical").props.onPress();
     });
     expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
-      PARSED_SAMPLE.plies[5]!.fenAfter
+      PARSED_SAMPLE.plies[6]!.fenAfter
     );
 
     act(() => renderer.unmount());
@@ -925,14 +808,15 @@ describe("GameReviewScreen (#767)", () => {
         PARSED_SAMPLE.plies[2]!.fenAfter
       );
 
-      // Advance remaining ticks -> arrives at ply 6 and opens Key Moment 1 retry card!
+      // Advance remaining ticks -> arrives at ply 6 with square badge & pure review (no inline quiz)!
       act(() => {
         jest.runAllTimers();
       });
       expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
         PARSED_SAMPLE.plies[5]!.fenAfter
       );
-      expect(findByTestId(renderer, "key-moment-counter")).toBeTruthy();
+      expect(findByTestId(renderer, "game-review-square-badge-blunder")).toBeTruthy();
+      expect(queryByTestId(renderer, "game-review-key-moment-card")).toBeNull();
 
       // Now jump backwards from ply 6 to ply 1 via step-first after starting a jump to ply 9:
       // verify manual step cancels fast-forward immediately.

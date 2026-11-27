@@ -221,8 +221,8 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
       quickEntry!.props.onPress();
     });
 
-    // Source provenance pill appears during the session
-    const provenance = findByTestID(renderer.root, "practice-user-game-provenance");
+    // Opens open-ended Replay session (not a timed Sprint) with source-game provenance link
+    const provenance = findByTestID(renderer.root, "review-open-source-game");
     expect(provenance).not.toBeNull();
 
     // Tapping the provenance pill opens the exact source game in Game Review

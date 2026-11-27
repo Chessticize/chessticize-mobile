@@ -56,6 +56,7 @@ export function useGameReviewController({
   engine = null,
   initialHighlights = [],
   initialMode,
+  initialPly,
   initialFreeAnalysisOpen = false,
   pass1Depth,
   pass1Nodes,
@@ -80,6 +81,11 @@ export function useGameReviewController({
 
   const totalPlies = parsedGame?.plies.length ?? 0;
 
+  const latestStoredGame = useMemo(
+    () => store.getImportedGame(game.id) ?? game,
+    [game, store]
+  );
+
   // Hydrate any cached ply evaluations and puzzles immediately from the store.
   const initialStoredEvals = useMemo(
     () => store.listGamePlyEvaluations(game.id).map(gamePlyEvaluationFromStored),
@@ -90,15 +96,19 @@ export function useGameReviewController({
     [game.id, store]
   );
 
-  const [analysisStatus, setAnalysisStatus] = useState<GameAnalysisStatus>(game.analysisStatus);
+  const [analysisStatus, setAnalysisStatus] = useState<GameAnalysisStatus>(
+    latestStoredGame.analysisStatus
+  );
   const [scanPhase, setScanPhase] = useState<GameReviewScanPhase>(() => {
-    if (game.analysisStatus === "complete") {
+    if (latestStoredGame.analysisStatus === "complete") {
       return "complete";
     }
     if (!engine || parseError) {
       return "idle";
     }
-    return game.analysisStatus === "pass1_done" ? "extracting_pass2" : "scanning_pass1";
+    return latestStoredGame.analysisStatus === "pass1_done"
+      ? "extracting_pass2"
+      : "scanning_pass1";
   });
   const [scanError, setScanError] = useState<string | null>(null);
   const [plyEvaluations, setPlyEvaluations] = useState<GamePlyEvaluation[]>(initialStoredEvals);
@@ -107,17 +117,13 @@ export function useGameReviewController({
   const [scanTrigger, setScanTrigger] = useState(0);
 
   const [flipped, setFlipped] = useState<boolean>(game.userColor === "b");
-  const [mode, setModeState] = useState<GameReviewMode>(() => {
-    if (initialMode) {
-      return initialMode;
+  const [mode, setModeState] = useState<GameReviewMode>(() => initialMode ?? "moves");
+  const [currentPly, setCurrentPly] = useState<number>(() => {
+    if (initialPly !== undefined && totalPlies > 0) {
+      return Math.max(0, Math.min(initialPly, totalPlies));
     }
-    return initialStoredPuzzles.length > 0 || initialHighlights.length > 0
-      ? "moments"
-      : "moves";
+    return totalPlies > 0 ? Math.min(1, totalPlies) : 0;
   });
-  const [currentPly, setCurrentPly] = useState<number>(() =>
-    totalPlies > 0 ? Math.min(1, totalPlies) : 0
-  );
   const [activeMomentIndex, setActiveMomentIndex] = useState<number>(0);
   const [retryStatesByMomentId, setRetryStatesByMomentId] = useState<
     Record<string, KeyMomentRetryState>
@@ -133,6 +139,16 @@ export function useGameReviewController({
   const [freeAnalysisLoading, setFreeAnalysisLoading] = useState<boolean>(false);
   const [freeAnalysisLines, setFreeAnalysisLines] = useState<EngineAnalysisLine[]>([]);
   const [freeAnalysisError, setFreeAnalysisError] = useState<string | null>(null);
+  const [showEngineArrows, setShowEngineArrows] = useState<boolean>(false);
+
+  // "Why?" opponent refutation playback on suboptimal moves (never spoils user's own best move)
+  const [whyOpen, setWhyOpen] = useState<boolean>(false);
+  const [whyLoading, setWhyLoading] = useState<boolean>(false);
+  const [whyBaseFen, setWhyBaseFen] = useState<string | null>(null);
+  const [whyMoves, setWhyMoves] = useState<string[]>([]);
+  const [whyStep, setWhyStep] = useState<number>(0);
+  const [whyError, setWhyError] = useState<string | null>(null);
+  const whyAbortRef = useRef<AbortController | null>(null);
 
   // Review queue enrollment state synced with PracticeService
   const [enrolledPuzzleIds, setEnrolledPuzzleIds] = useState<Set<string>>(() => {
@@ -176,7 +192,20 @@ export function useGameReviewController({
         fastForwardTimerRef.current = null;
       }
       fastForwardTargetPlyRef.current = null;
+      whyAbortRef.current?.abort();
+      whyAbortRef.current = null;
     };
+  }, []);
+
+  const closeWhyRefutation = useCallback(() => {
+    whyAbortRef.current?.abort();
+    whyAbortRef.current = null;
+    setWhyOpen(false);
+    setWhyLoading(false);
+    setWhyBaseFen(null);
+    setWhyMoves([]);
+    setWhyStep(0);
+    setWhyError(null);
   }, []);
 
   const syncEnrolledIds = useCallback(
@@ -336,9 +365,6 @@ export function useGameReviewController({
         }
         setAnalysisStatus("complete");
         setScanPhase("complete");
-        if (savedPuzzles.length > 0 || extraction.highlights.length > 0) {
-          setModeState((prev) => (prev === "moves" && initialMode === undefined ? "moments" : prev));
-        }
       } catch (error) {
         if (cancelled || controller.signal.aborted) {
           return;
@@ -474,6 +500,28 @@ export function useGameReviewController({
       };
     }
 
+    if (whyOpen && whyBaseFen && whyStep > 0 && whyMoves.length > 0) {
+      let fen = whyBaseFen;
+      let lastMove: string | null = null;
+      const limit = Math.min(whyStep, whyMoves.length);
+      for (let index = 0; index < limit; index += 1) {
+        const applied = tryApplyUciMove(fen, whyMoves[index]!);
+        if (!applied) {
+          break;
+        }
+        fen = applied.fen;
+        lastMove = applied.uci;
+      }
+      const plyEval = currentPly > 0 ? evalByPly.get(currentPly) : undefined;
+      const score = plyEval?.scoreAfter ?? EVEN_ANALYSIS_SCORE;
+      return {
+        currentFen: fen,
+        currentLastMoveUci: lastMove,
+        currentScore: score,
+        currentWhiteWinPercent: plyEval ? plyEval.whiteWinPercent : whiteWinPercentForScore(score)
+      };
+    }
+
     if (mode === "moments" && activeMoment && activeRetryState) {
       const momentBoard = fenForRetryState(activeMoment, activeRetryState);
       const momentEval = evalByPly.get(activeMoment.ply);
@@ -525,7 +573,11 @@ export function useGameReviewController({
     isExploringOffLine,
     mode,
     parsedGame,
-    plyEvaluations
+    plyEvaluations,
+    whyBaseFen,
+    whyMoves,
+    whyOpen,
+    whyStep
   ]);
 
   const isPromptHidingAnswer =
@@ -657,41 +709,34 @@ export function useGameReviewController({
           });
         }
       }
-    } else if (freeAnalysisOpen && freeAnalysisLines[0]?.move) {
-      arrows.push({
-        move: freeAnalysisLines[0].move,
-        role: "engine",
-        selected: true
-      });
-    } else if (
-      !isExploringOffLine &&
-      mode === "moves" &&
-      currentPlyEval &&
-      isSuboptimalClassification(currentPlyEval.classification) &&
-      currentPlyEval.bestMove &&
-      normalizeUciMove(currentPlyEval.bestMove) !== normalizeUciMove(currentPlyEval.uci)
-    ) {
-      arrows.push({
-        move: currentPlyEval.bestMove,
-        role: "best",
-        selected: true
-      });
+    } else if (freeAnalysisOpen && showEngineArrows && freeAnalysisLines.length > 0) {
+      for (let index = 0; index < Math.min(3, freeAnalysisLines.length); index += 1) {
+        const line = freeAnalysisLines[index];
+        if (line?.move) {
+          arrows.push({
+            move: line.move,
+            role: "engine",
+            selected: index === 0
+          });
+        }
+      }
     }
 
     return { boardArrows: arrows, arrowDuelCandidates: candidates };
   }, [
     activeMoment,
     activeRetryState,
-    currentPlyEval,
     freeAnalysisLines,
     freeAnalysisOpen,
     isExploringOffLine,
-    mode
+    mode,
+    showEngineArrows
   ]);
 
   const animateToPly = useCallback(
     (targetPly: number, onArrive?: () => void) => {
       cancelFastForward();
+      closeWhyRefutation();
       clearExploration();
       const clampedTarget = Math.max(0, Math.min(targetPly, totalPlies));
       const startPly =
@@ -734,12 +779,21 @@ export function useGameReviewController({
 
       fastForwardTimerRef.current = setTimeout(tick, stepMs);
     },
-    [activeMoment, animateKeyMomentJump, cancelFastForward, clearExploration, mode, totalPlies]
+    [
+      activeMoment,
+      animateKeyMomentJump,
+      cancelFastForward,
+      clearExploration,
+      closeWhyRefutation,
+      mode,
+      totalPlies
+    ]
   );
 
   const setMode = useCallback(
     (nextMode: GameReviewMode) => {
       cancelFastForward();
+      closeWhyRefutation();
       clearExploration();
       setModeState(nextMode);
       if (nextMode === "moments" && keyMoments[clampedMomentIndex]) {
@@ -748,19 +802,20 @@ export function useGameReviewController({
         setCurrentPly(ply);
       }
     },
-    [cancelFastForward, clampedMomentIndex, clearExploration, keyMoments]
+    [cancelFastForward, clampedMomentIndex, clearExploration, closeWhyRefutation, keyMoments]
   );
 
   const selectPly = useCallback(
     (ply: number) => {
       cancelFastForward();
+      closeWhyRefutation();
       clearExploration();
       const clamped = Math.max(0, Math.min(ply, totalPlies));
       currentPlyRef.current = clamped;
       setCurrentPly(clamped);
       setModeState("moves");
     },
-    [cancelFastForward, clearExploration, totalPlies]
+    [cancelFastForward, clearExploration, closeWhyRefutation, totalPlies]
   );
 
   const stepFirst = useCallback(() => selectPly(0), [selectPly]);
@@ -790,7 +845,7 @@ export function useGameReviewController({
       }
       animateToPly(target.ply, () => {
         setActiveMomentIndex(bounded);
-        setModeState("moments");
+        setModeState("moves");
       });
     },
     [animateToPly, keyMoments]
@@ -1068,8 +1123,132 @@ export function useGameReviewController({
     [practiceService]
   );
 
+  const enrollAllPuzzlesInReview = useCallback(() => {
+    if (userPuzzles.length === 0) {
+      return;
+    }
+    const enrolledIds = new Set<string>();
+    for (const puzzle of userPuzzles) {
+      const ctx = reviewContextForUserPuzzle(puzzle);
+      if (!practiceService.getReviewQueueState(ctx)) {
+        practiceService.enrollReview(ctx);
+      }
+      enrolledIds.add(puzzle.id);
+    }
+    setEnrolledPuzzleIds((previous) => {
+      const next = new Set(previous);
+      for (const id of enrolledIds) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [practiceService, userPuzzles]);
+
   const toggleFreeAnalysis = useCallback(() => {
     setFreeAnalysisOpen((value) => !value);
+  }, []);
+
+  const toggleShowEngineArrows = useCallback(() => {
+    setShowEngineArrows((value) => !value);
+  }, []);
+
+  const toggleWhyRefutation = useCallback(() => {
+    if (whyOpen) {
+      closeWhyRefutation();
+      return;
+    }
+    if (!currentPlyEval || !isSuboptimalClassification(currentPlyEval.classification)) {
+      return;
+    }
+    clearExploration();
+    whyAbortRef.current?.abort();
+    const baseFen = currentPlyEval.fenAfter;
+    setWhyOpen(true);
+    setWhyBaseFen(baseFen);
+    setWhyError(null);
+
+    // Prefer cached opponent punishment line from extracted puzzles when legal on fenAfter.
+    const matchingPuzzle = userPuzzles.find(
+      (puzzle) =>
+        puzzle.gamePly === currentPlyEval.ply &&
+        puzzle.punishmentLine &&
+        puzzle.punishmentLine.length > 0
+    );
+    if (matchingPuzzle?.punishmentLine) {
+      const legalMoves: string[] = [];
+      let probeFen = baseFen;
+      for (const move of matchingPuzzle.punishmentLine) {
+        const applied = tryApplyUciMove(probeFen, move);
+        if (!applied) {
+          break;
+        }
+        legalMoves.push(applied.uci);
+        probeFen = applied.fen;
+      }
+      if (legalMoves.length > 0) {
+        setWhyLoading(false);
+        setWhyMoves(legalMoves);
+        setWhyStep(1);
+        return;
+      }
+    }
+
+    if (!engine) {
+      setWhyLoading(false);
+      setWhyMoves([]);
+      setWhyStep(0);
+      return;
+    }
+
+    const controller = new AbortController();
+    whyAbortRef.current = controller;
+    setWhyLoading(true);
+    setWhyMoves([]);
+    setWhyStep(0);
+
+    engine
+      .analyze({
+        fen: baseFen,
+        multiPv: 1,
+        depth: freeAnalysisDepth,
+        priority: "interactive",
+        signal: controller.signal
+      })
+      .then((lines) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const top = lines[0];
+        const rawPv = top ? (top.pv.length > 0 ? top.pv : [top.move]) : [];
+        const legalMoves: string[] = [];
+        let probeFen = baseFen;
+        for (const move of rawPv.slice(0, 8)) {
+          const applied = tryApplyUciMove(probeFen, move);
+          if (!applied) {
+            break;
+          }
+          legalMoves.push(applied.uci);
+          probeFen = applied.fen;
+        }
+        setWhyLoading(false);
+        setWhyMoves(legalMoves);
+        setWhyStep(legalMoves.length > 0 ? 1 : 0);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setWhyLoading(false);
+        setWhyError(error instanceof Error ? error.message : "Engine unavailable");
+      });
+  }, [clearExploration, closeWhyRefutation, currentPlyEval, engine, freeAnalysisDepth, userPuzzles, whyOpen]);
+
+  const stepWhyForward = useCallback(() => {
+    setWhyStep((current) => Math.min(whyMoves.length, current + 1));
+  }, [whyMoves.length]);
+
+  const stepWhyBackward = useCallback(() => {
+    setWhyStep((current) => Math.max(0, current - 1));
   }, []);
 
   const playEngineLineMove = useCallback(
@@ -1103,16 +1282,12 @@ export function useGameReviewController({
       fastForwardTargetPlyRef.current ??
       (mode === "moments" && activeMoment ? activeMoment.ply : currentPly);
     const nextPly = criticalPlies.find((ply) => ply > anchorPly) ?? criticalPlies[0]!;
-    const matchingMomentIndex = keyMoments.findIndex(
-      (item) => item.ply === nextPly && (item.kind === "puzzle" || item.kind === "highlight")
-    );
+    const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === nextPly);
     animateToPly(nextPly, () => {
       if (matchingMomentIndex >= 0) {
         setActiveMomentIndex(matchingMomentIndex);
-        setModeState("moments");
-      } else {
-        setModeState("moves");
       }
+      setModeState("moves");
     });
   }, [activeMoment, animateToPly, criticalPlies, currentPly, keyMoments, mode]);
 
@@ -1131,16 +1306,12 @@ export function useGameReviewController({
       }
     }
     const targetPly = prevPly ?? criticalPlies[criticalPlies.length - 1]!;
-    const matchingMomentIndex = keyMoments.findIndex(
-      (item) => item.ply === targetPly && (item.kind === "puzzle" || item.kind === "highlight")
-    );
+    const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === targetPly);
     animateToPly(targetPly, () => {
       if (matchingMomentIndex >= 0) {
         setActiveMomentIndex(matchingMomentIndex);
-        setModeState("moments");
-      } else {
-        setModeState("moves");
       }
+      setModeState("moves");
     });
   }, [activeMoment, animateToPly, criticalPlies, currentPly, keyMoments, mode]);
 
@@ -1192,6 +1363,13 @@ export function useGameReviewController({
     freeAnalysisLoading,
     freeAnalysisLines,
     freeAnalysisError,
+    showEngineArrows,
+    whyOpen,
+    whyLoading,
+    whyBaseFen,
+    whyMoves,
+    whyStep,
+    whyError,
     isExploringOffLine,
     explorationPliesCount: explorationMoves.length,
     isFastForwarding,
@@ -1215,7 +1393,13 @@ export function useGameReviewController({
     stepRefutationForward,
     stepRefutationBackward,
     togglePuzzleReviewEnrollment,
+    enrollAllPuzzlesInReview,
     toggleFreeAnalysis,
+    toggleShowEngineArrows,
+    toggleWhyRefutation,
+    closeWhyRefutation,
+    stepWhyBackward,
+    stepWhyForward,
     playEngineLineMove,
     returnToGameLine,
     resumeAnalysis

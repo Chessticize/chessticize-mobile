@@ -14,7 +14,6 @@ import { makeStyles, useBoardAppearance, useTheme } from "../../theme/index.ts";
 import { buildPracticeAdaptiveLayout, PRACTICE_UI_PADDING } from "../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../PracticeViewport.tsx";
 import {
-  ArrowCandidateOverlay,
   ArrowHint,
   BoardCoordinateOverlay,
   useBoardMoveSquareTints
@@ -22,7 +21,7 @@ import {
 import { arrowFromTo, formatUci } from "../practice/shared/boardMove.ts";
 import { chessboardColorsFor } from "../practice/shared/chessboardColors.ts";
 import { chessPieceSpriteFor } from "../practice/shared/chessPieceSprite.ts";
-import { AppText, Badge, Button } from "../ui/index.tsx";
+import { AppText, Badge, Button, Icon } from "../ui/index.tsx";
 import { EvalBar } from "./EvalBar.tsx";
 import { EvalGraph } from "./EvalGraph.tsx";
 import { GAME_REVIEW_COPY } from "./gameReviewCopy.ts";
@@ -30,9 +29,9 @@ import {
   classificationBadgeMeta,
   formatEvalLabel,
   formatMoveNumberTag,
+  formatPvSanLine,
   isSuboptimalClassification,
-  normalizeUciMove,
-  uciToSan
+  normalizeUciMove
 } from "./gameReviewHelpers.ts";
 import { GameReviewSummaryCard } from "./GameReviewSummaryCard.tsx";
 import type {
@@ -41,7 +40,6 @@ import type {
   GameReviewLiveEngine,
   GameReviewMode
 } from "./gameReviewTypes.ts";
-import { KeyMomentRetryCard } from "./KeyMomentRetryCard.tsx";
 import { LiveEngineLinesPanel } from "./LiveEngineLinesPanel.tsx";
 import { MoveListStrip } from "./MoveListStrip.tsx";
 import { useGameReviewController } from "./useGameReviewController.ts";
@@ -53,6 +51,7 @@ export interface GameReviewScreenProps {
   engine?: GameReviewLiveEngine | null;
   initialHighlights?: readonly GameHighlightMoment[];
   initialMode?: GameReviewMode;
+  initialPly?: number;
   initialFreeAnalysisOpen?: boolean;
   pass1Depth?: number;
   pass1Nodes?: number;
@@ -77,6 +76,7 @@ export function GameReviewScreen({
   engine = null,
   initialHighlights,
   initialMode,
+  initialPly,
   initialFreeAnalysisOpen,
   pass1Depth,
   pass1Nodes,
@@ -111,6 +111,7 @@ export function GameReviewScreen({
     engine,
     ...(initialHighlights === undefined ? {} : { initialHighlights }),
     ...(initialMode === undefined ? {} : { initialMode }),
+    ...(initialPly === undefined ? {} : { initialPly }),
     ...(initialFreeAnalysisOpen === undefined ? {} : { initialFreeAnalysisOpen }),
     ...(pass1Depth === undefined ? {} : { pass1Depth }),
     ...(pass1Nodes === undefined ? {} : { pass1Nodes }),
@@ -155,12 +156,6 @@ export function GameReviewScreen({
     controller.submitBoardMove(formatUci(result.move));
   };
 
-  const activePuzzleId =
-    controller.activeMoment?.kind === "puzzle" ? controller.activeMoment.puzzle.id : null;
-  const activeMomentInReview = activePuzzleId
-    ? controller.enrolledPuzzleIds.has(activePuzzleId)
-    : false;
-
   const isScanning =
     controller.scanPhase === "scanning_pass1" || controller.scanPhase === "extracting_pass2";
 
@@ -173,16 +168,7 @@ export function GameReviewScreen({
     styles
   });
 
-  const activeSelectedPly =
-    controller.mode === "moments" && controller.activeMoment && !controller.isFastForwarding
-      ? controller.activeMoment.ply
-      : controller.currentPly;
-
-  const showKeyMomentCard =
-    controller.mode === "moments" &&
-    !controller.isFastForwarding &&
-    controller.activeMoment !== null &&
-    (controller.activeMoment.kind === "puzzle" || controller.activeMoment.kind === "highlight");
+  const activeSelectedPly = controller.currentPly;
 
   const boardStage = (
     <View
@@ -198,7 +184,7 @@ export function GameReviewScreen({
       {useHorizontalEvalBar ? (
         <EvalBar
           flipped={controller.flipped}
-          hidden={controller.isPromptHidingAnswer}
+          hidden={false}
           orientation="horizontal"
           score={controller.currentScore}
           whiteWinPercent={controller.currentWhiteWinPercent}
@@ -209,7 +195,7 @@ export function GameReviewScreen({
         {!useHorizontalEvalBar ? (
           <EvalBar
             flipped={controller.flipped}
-            hidden={controller.isPromptHidingAnswer}
+            hidden={false}
             length={boardSize}
             orientation="vertical"
             score={controller.currentScore}
@@ -234,14 +220,6 @@ export function GameReviewScreen({
               : { squareHighlights: lastMoveSquareTints })}
           />
           <BoardCoordinateOverlay boardSize={boardSize} flipped={controller.flipped} />
-          {controller.arrowDuelCandidates ? (
-            <ArrowCandidateOverlay
-              boardSize={boardSize}
-              candidates={controller.arrowDuelCandidates}
-              flipped={controller.flipped}
-              testID="game-review-arrow-duel-overlay"
-            />
-          ) : null}
           {controller.boardArrows.length > 0 ? (
             <GameReviewArrowOverlay
               arrows={controller.boardArrows}
@@ -249,9 +227,7 @@ export function GameReviewScreen({
               flipped={controller.flipped}
             />
           ) : null}
-          {!controller.isPromptHidingAnswer &&
-          controller.currentPlyEval &&
-          controller.currentLastMoveUci ? (
+          {!controller.whyOpen && controller.currentPlyEval && controller.currentLastMoveUci ? (
             <MoveClassificationBadgeOverlay
               boardSize={boardSize}
               classification={controller.currentPlyEval.classification}
@@ -270,33 +246,24 @@ export function GameReviewScreen({
         criticalCount={controller.criticalPlies.length}
         currentPly={activeSelectedPly}
         currentPlyEval={controller.currentPlyEval}
-        isHidingAnswer={controller.isPromptHidingAnswer}
+        isHidingAnswer={false}
         isScanning={isScanning}
         onNextCritical={controller.jumpToNextCriticalPly}
         onPrevCritical={controller.jumpToPrevCriticalPly}
+        onToggleWhy={controller.toggleWhyRefutation}
+        whyOpen={controller.whyOpen}
       />
 
-      {showKeyMomentCard ? (
-        <KeyMomentRetryCard
-          inReview={activeMomentInReview}
-          isScanning={isScanning}
-          moment={controller.activeMoment}
-          momentIndex={controller.activeMomentIndex}
-          onNext={controller.nextKeyMoment}
-          onPrev={controller.prevKeyMoment}
-          onRetry={controller.retryActiveKeyMoment}
-          onSelectCandidate={controller.selectArrowDuelCandidate}
-          onSkip={controller.skipActiveKeyMoment}
-          onStepRefutationBackward={controller.stepRefutationBackward}
-          onStepRefutationForward={controller.stepRefutationForward}
-          onToggleRefutation={controller.toggleRefutationPlayback}
-          onToggleReviewEnrollment={() => {
-            if (controller.activeMoment?.kind === "puzzle") {
-              controller.togglePuzzleReviewEnrollment(controller.activeMoment.puzzle);
-            }
-          }}
-          retryState={controller.activeRetryState}
-          totalMoments={controller.keyMoments.length}
+      {controller.whyOpen ? (
+        <WhyRefutationPanel
+          baseFen={controller.whyBaseFen}
+          error={controller.whyError}
+          loading={controller.whyLoading}
+          moves={controller.whyMoves}
+          onClose={controller.closeWhyRefutation}
+          onStepBackward={controller.stepWhyBackward}
+          onStepForward={controller.stepWhyForward}
+          step={controller.whyStep}
         />
       ) : null}
 
@@ -322,7 +289,7 @@ export function GameReviewScreen({
 
       {controller.freeAnalysisOpen ? (
         <LiveEngineLinesPanel
-          disabled={controller.isPromptHidingAnswer}
+          disabled={false}
           error={controller.freeAnalysisError}
           explorationPliesCount={controller.explorationPliesCount}
           fen={controller.currentFen}
@@ -331,6 +298,8 @@ export function GameReviewScreen({
           loading={controller.freeAnalysisLoading}
           onPlayMove={controller.playEngineLineMove}
           onReturnToGame={controller.returnToGameLine}
+          onToggleShowArrows={controller.toggleShowEngineArrows}
+          showArrows={controller.showEngineArrows}
         />
       ) : null}
 
@@ -338,6 +307,7 @@ export function GameReviewScreen({
         <GameReviewSummaryCard
           blackPlayerName={game.black.username}
           enrolledPuzzleIds={controller.enrolledPuzzleIds}
+          onEnrollAllPuzzles={controller.enrollAllPuzzlesInReview}
           onPracticeGamePuzzles={
             onPracticeGamePuzzles ? () => onPracticeGamePuzzles(game.id) : undefined
           }
@@ -347,6 +317,8 @@ export function GameReviewScreen({
             );
             if (index >= 0) {
               controller.selectKeyMoment(index);
+            } else {
+              controller.selectPly(puzzle.gamePly);
             }
           }}
           onToggleReviewEnrollment={controller.togglePuzzleReviewEnrollment}
@@ -376,17 +348,33 @@ export function GameReviewScreen({
           <AppText numberOfLines={1} style={styles.headerTitle} variant="headline">
             {headerTitle}
           </AppText>
-          <Button
-            label={
+          <Pressable
+            accessibilityLabel={
               controller.freeAnalysisOpen
                 ? GAME_REVIEW_COPY.header.engineActiveLabel
                 : GAME_REVIEW_COPY.header.engineToggle
             }
+            accessibilityRole="button"
+            accessibilityState={{ selected: controller.freeAnalysisOpen }}
             onPress={controller.toggleFreeAnalysis}
-            size="compact"
+            style={({ pressed }) => [
+              styles.analysisIconButton,
+              controller.freeAnalysisOpen ? styles.analysisIconButtonActive : null,
+              pressed ? styles.pressed : null
+            ]}
             testID="game-review-engine-toggle"
-            variant={controller.freeAnalysisOpen ? "primary" : "secondary"}
-          />
+          >
+            <Icon
+              color={
+                controller.freeAnalysisOpen
+                  ? theme.colors.text.onAccent
+                  : theme.colors.text.primary
+              }
+              name="search"
+              size={18}
+              weight="semibold"
+            />
+          </Pressable>
         </View>
       </View>
 
@@ -541,7 +529,7 @@ function GameReviewArrowOverlay({
               flipped={flipped}
               from={from}
               move={arrow.move}
-              opacity={0.78}
+              opacity={arrow.selected ? 0.84 : 0.42}
               selected={Boolean(arrow.selected)}
               squareSize={squareSize}
               stroke={stroke}
@@ -617,7 +605,9 @@ function MoveVerdictStrip({
   isHidingAnswer,
   isScanning,
   onNextCritical,
-  onPrevCritical
+  onPrevCritical,
+  onToggleWhy,
+  whyOpen
 }: {
   criticalCount: number;
   currentPly: number;
@@ -626,9 +616,14 @@ function MoveVerdictStrip({
   isScanning: boolean;
   onNextCritical: () => void;
   onPrevCritical: () => void;
+  onToggleWhy: () => void;
+  whyOpen: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const canExplainWhy = Boolean(
+    !isHidingAnswer && currentPlyEval && isSuboptimalClassification(currentPlyEval.classification)
+  );
 
   let leftContent: React.JSX.Element;
   if (isHidingAnswer) {
@@ -653,12 +648,6 @@ function MoveVerdictStrip({
     const meta = classificationBadgeMeta(currentPlyEval.classification, theme.colors);
     const moveTag = `${formatMoveNumberTag(currentPlyEval.moveNumber, currentPlyEval.color)} ${currentPlyEval.san}`;
     const evalLabel = formatEvalLabel(currentPlyEval.scoreAfter);
-    const bestSan =
-      isSuboptimalClassification(currentPlyEval.classification) &&
-      currentPlyEval.bestMove &&
-      normalizeUciMove(currentPlyEval.bestMove) !== normalizeUciMove(currentPlyEval.uci)
-        ? uciToSan(currentPlyEval.fenBefore, currentPlyEval.bestMove)
-        : null;
 
     leftContent = (
       <View style={styles.verdictLeft}>
@@ -675,9 +664,7 @@ function MoveVerdictStrip({
           </AppText>
         </View>
         <AppText numberOfLines={1} style={styles.verdictText} variant="footnote">
-          {bestSan
-            ? `${moveTag} · ${meta.label} (${evalLabel}) · ${GAME_REVIEW_COPY.verdict.bestWas(bestSan)}`
-            : `${moveTag} · ${meta.label} (${evalLabel})`}
+          {`${moveTag} · ${meta.label} (${evalLabel})`}
         </AppText>
       </View>
     );
@@ -686,32 +673,137 @@ function MoveVerdictStrip({
   return (
     <View style={styles.verdictBar} testID="game-review-verdict-bar">
       <View style={styles.verdictMain}>{leftContent}</View>
-      {criticalCount > 0 ? (
-        <View style={styles.criticalNavRow}>
+      <View style={styles.criticalNavRow}>
+        {canExplainWhy ? (
           <Pressable
-            accessibilityLabel={GAME_REVIEW_COPY.verdict.prevKey}
+            accessibilityLabel={GAME_REVIEW_COPY.verdict.why}
             accessibilityRole="button"
-            onPress={onPrevCritical}
-            style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
-            testID="game-review-prev-critical"
+            accessibilityState={{ selected: whyOpen }}
+            onPress={onToggleWhy}
+            style={({ pressed }) => [
+              styles.whyButton,
+              whyOpen ? styles.whyButtonActive : null,
+              pressed ? styles.pressed : null
+            ]}
+            testID="game-review-why-button"
           >
-            <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
-              ‹ Key
+            <AppText
+              maxFontSizeMultiplier={1.2}
+              style={whyOpen ? styles.whyButtonTextActive : styles.whyButtonText}
+              variant="caption"
+            >
+              {GAME_REVIEW_COPY.verdict.why}
             </AppText>
           </Pressable>
-          <Pressable
-            accessibilityLabel={GAME_REVIEW_COPY.verdict.nextKey}
-            accessibilityRole="button"
-            onPress={onNextCritical}
-            style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
-            testID="game-review-next-critical"
-          >
-            <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
-              Key ›
-            </AppText>
-          </Pressable>
+        ) : null}
+        {criticalCount > 0 ? (
+          <>
+            <Pressable
+              accessibilityLabel={GAME_REVIEW_COPY.verdict.prevKey}
+              accessibilityRole="button"
+              onPress={onPrevCritical}
+              style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
+              testID="game-review-prev-critical"
+            >
+              <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
+                ‹ Key
+              </AppText>
+            </Pressable>
+            <Pressable
+              accessibilityLabel={GAME_REVIEW_COPY.verdict.nextKey}
+              accessibilityRole="button"
+              onPress={onNextCritical}
+              style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
+              testID="game-review-next-critical"
+            >
+              <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
+                Key ›
+              </AppText>
+            </Pressable>
+          </>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function WhyRefutationPanel({
+  baseFen,
+  error,
+  loading,
+  moves,
+  onClose,
+  onStepBackward,
+  onStepForward,
+  step
+}: {
+  baseFen: string | null;
+  error: string | null;
+  loading: boolean;
+  moves: readonly string[];
+  onClose: () => void;
+  onStepBackward: () => void;
+  onStepForward: () => void;
+  step: number;
+}): React.JSX.Element {
+  const styles = useStyles();
+  const sanLine = baseFen && moves.length > 0 ? formatPvSanLine(baseFen, moves, 8) : "";
+
+  return (
+    <View style={styles.whyPanel} testID="game-review-why-panel">
+      <View style={styles.whyPanelHeader}>
+        <AppText tone="secondary" variant="caption">
+          {moves.length > 0
+            ? `${GAME_REVIEW_COPY.whyPanel.title} (${step}/${moves.length})`
+            : GAME_REVIEW_COPY.whyPanel.title}
+        </AppText>
+        <View style={styles.whyPanelActions}>
+          {moves.length > 0 ? (
+            <>
+              <Button
+                disabled={step <= 0}
+                label={GAME_REVIEW_COPY.whyPanel.prev}
+                onPress={onStepBackward}
+                size="compact"
+                testID="game-review-why-prev"
+                variant="plain"
+              />
+              <Button
+                disabled={step >= moves.length}
+                label={GAME_REVIEW_COPY.whyPanel.next}
+                onPress={onStepForward}
+                size="compact"
+                testID="game-review-why-next"
+                variant="plain"
+              />
+            </>
+          ) : null}
+          <Button
+            label={GAME_REVIEW_COPY.whyPanel.close}
+            onPress={onClose}
+            size="compact"
+            testID="game-review-why-close"
+            variant="plain"
+          />
         </View>
-      ) : null}
+      </View>
+      {error ? (
+        <AppText tone="negative" variant="footnote">
+          {error}
+        </AppText>
+      ) : loading ? (
+        <AppText testID="game-review-why-loading" tone="secondary" variant="footnote">
+          {GAME_REVIEW_COPY.whyPanel.loading}
+        </AppText>
+      ) : sanLine ? (
+        <AppText testID="game-review-why-san" variant="subheadline">
+          {sanLine}
+        </AppText>
+      ) : (
+        <AppText tone="secondary" variant="footnote">
+          {GAME_REVIEW_COPY.whyPanel.unavailable}
+        </AppText>
+      )}
     </View>
   );
 }
@@ -902,6 +994,64 @@ const useStyles = makeStyles((theme) => ({
   criticalNavText: {
     color: theme.colors.text.primary,
     fontWeight: theme.fontWeight.bold
+  },
+  analysisIconButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36
+  },
+  analysisIconButtonActive: {
+    backgroundColor: theme.colors.accent.fill,
+    borderColor: theme.colors.accent.fill
+  },
+  whyButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s200,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 3
+  },
+  whyButtonActive: {
+    backgroundColor: theme.colors.danger.s600,
+    borderColor: theme.colors.danger.s600
+  },
+  whyButtonText: {
+    color: theme.colors.danger.s600,
+    fontWeight: theme.fontWeight.bold
+  },
+  whyButtonTextActive: {
+    color: theme.colors.text.onTone,
+    fontWeight: theme.fontWeight.bold
+  },
+  whyPanel: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.danger.s200,
+    borderRadius: theme.shape.card,
+    borderWidth: 1,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  whyPanelHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "space-between"
+  },
+  whyPanelActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 2
   },
   pressed: {
     opacity: 0.72

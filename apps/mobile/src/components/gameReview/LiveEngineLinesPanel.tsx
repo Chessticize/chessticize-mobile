@@ -11,9 +11,11 @@ export interface LiveEngineLinesPanelProps {
   lines: readonly EngineAnalysisLine[];
   loading: boolean;
   error: string | null;
+  showArrows: boolean;
   isExploringOffLine: boolean;
   explorationPliesCount: number;
   disabled?: boolean;
+  onToggleShowArrows: () => void;
   onPlayMove: (uci: string) => void;
   onReturnToGame: () => void;
   testID?: string;
@@ -24,9 +26,11 @@ export function LiveEngineLinesPanel({
   lines,
   loading,
   error,
+  showArrows,
   isExploringOffLine,
   explorationPliesCount,
   disabled = false,
+  onToggleShowArrows,
   onPlayMove,
   onReturnToGame,
   testID = "game-review-engine-panel"
@@ -54,15 +58,24 @@ export function LiveEngineLinesPanel({
             />
           ) : null}
         </View>
-        {isExploringOffLine ? (
+        <View style={styles.headerActions}>
           <Button
-            label={GAME_REVIEW_COPY.enginePanel.backToGame}
-            onPress={onReturnToGame}
+            label={GAME_REVIEW_COPY.enginePanel.showArrows}
+            onPress={onToggleShowArrows}
             size="compact"
-            testID="game-review-back-to-game"
-            variant="secondary"
+            testID="game-review-show-arrows-toggle"
+            variant={showArrows ? "primary" : "secondary"}
           />
-        ) : null}
+          {isExploringOffLine ? (
+            <Button
+              label={GAME_REVIEW_COPY.enginePanel.backToGame}
+              onPress={onReturnToGame}
+              size="compact"
+              testID="game-review-back-to-game"
+              variant="secondary"
+            />
+          ) : null}
+        </View>
       </View>
 
       {error ? (
@@ -138,6 +151,12 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "space-between"
   },
   headerTitleGroup: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  headerActions: {
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",

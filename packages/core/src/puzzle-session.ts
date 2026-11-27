@@ -152,7 +152,7 @@ export function submitArrowDuelChoice(
     throw new Error(`Move ${move} is not one of the Arrow Duel candidates`);
   }
 
-  if (isCorrect && options.opponentReply) {
+  if (isCorrect && options.opponentReply && Boolean(state.puzzle.solutionMoves[1])) {
     const replyFen = appendMove(state.currentFen, [], state.wrongMove).currentFen;
     if (!new Chess(replyFen).isStalemate()) {
       return {

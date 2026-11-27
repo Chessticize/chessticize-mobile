@@ -241,6 +241,27 @@ test("Arrow Duel accepts any legal immediate mate as the reply", () => {
   assert.equal(new Chess(result.state.currentFen).isCheckmate(), true);
 });
 
+test("Arrow Duel skips opponent reply handoff cleanly when puzzle has no stored opponent reply", () => {
+  const puzzle: Puzzle = {
+    id: "ug_missing_reply",
+    initialFen: "6k1/pp2p2p/6p1/P2p4/4b3/2P3q1/1P1KBr2/R1Q1R3 w - - 0 1",
+    solutionMoves: ["c1d1"],
+    rating: 1500,
+    themes: ["advantage"],
+    source: "user_game",
+    stockfishBestMove: "d2d1"
+  };
+  const state = beginArrowDuelPuzzle(puzzle);
+  const result = submitArrowDuelChoice(state, state.correctMove, {
+    opponentReply: true
+  });
+
+  assert.equal(result.feedback.result, "correct");
+  assert.equal(result.feedback.puzzleSolved, true);
+  assert.equal(result.state.solved, true);
+  assert.equal(result.state.phase, "choice");
+});
+
 test("Arrow Duel Review follow-up uses the same immediate-mate exception", () => {
   const puzzle: Puzzle = {
     id: "alternate-review-mate",

@@ -152,6 +152,7 @@ export interface UseGameReviewControllerParams {
   engine?: GameReviewLiveEngine | null;
   initialHighlights?: readonly GameHighlightMoment[];
   initialMode?: GameReviewMode;
+  initialPly?: number;
   initialFreeAnalysisOpen?: boolean;
   pass1Depth?: number;
   pass1Nodes?: number;
@@ -195,6 +196,13 @@ export interface GameReviewController {
   freeAnalysisLoading: boolean;
   freeAnalysisLines: EngineAnalysisLine[];
   freeAnalysisError: string | null;
+  showEngineArrows: boolean;
+  whyOpen: boolean;
+  whyLoading: boolean;
+  whyBaseFen: string | null;
+  whyMoves: string[];
+  whyStep: number;
+  whyError: string | null;
   isExploringOffLine: boolean;
   explorationPliesCount: number;
   isFastForwarding: boolean;
@@ -218,7 +226,13 @@ export interface GameReviewController {
   stepRefutationForward: () => void;
   stepRefutationBackward: () => void;
   togglePuzzleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
+  enrollAllPuzzlesInReview: () => void;
   toggleFreeAnalysis: () => void;
+  toggleShowEngineArrows: () => void;
+  toggleWhyRefutation: () => void;
+  closeWhyRefutation: () => void;
+  stepWhyBackward: () => void;
+  stepWhyForward: () => void;
   playEngineLineMove: (uci: string) => void;
   returnToGameLine: () => void;
   resumeAnalysis: () => void;

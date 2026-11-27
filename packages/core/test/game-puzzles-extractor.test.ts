@@ -201,6 +201,25 @@ test("verifyArrowDuelPair enforces FEN/turn/caliber gates and captures punishmen
   assert.equal(blackPair.bestEvalWhite, 20);
   assert.equal(blackPair.blunderEvalWhite, 380);
   assert.deepEqual(blackPair.punishmentLine, ["e4f5", "g8f6"]);
+
+  // Single-ply searchMoves PV triggers fallback query on fenAfterBlunder to capture opponent reply.
+  const singlePlyPvEngine = createScriptedEngine((req) => {
+    if (req.searchMoves?.[0] === "f2f3") {
+      return [line(req.fen, "f2f3", whiteCp(-420, req.fen), { pv: ["f2f3"] })];
+    }
+    if (req.fen === startFen) {
+      return [line(req.fen, "g1f3", whiteCp(20, req.fen), { pv: ["g1f3"] })];
+    }
+    return [line(req.fen, "d8h4", whiteCp(-420, req.fen), { pv: ["d8h4", "g2g3"] })];
+  });
+  const recovered = await verifyArrowDuelPair({
+    engine: singlePlyPvEngine,
+    decisionFen: startFen,
+    blunderMove: "f2f3",
+    expectedUserColor: "w"
+  });
+  assert.ok(recovered);
+  assert.deepEqual(recovered.punishmentLine, ["d8h4", "g2g3"]);
 });
 
 test("all 8 moment kinds route properly (own_*_escaped included, opponent_*_caught only in highlights)", async () => {

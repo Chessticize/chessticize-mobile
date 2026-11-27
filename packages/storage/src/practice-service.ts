@@ -1093,9 +1093,13 @@ export class PracticeService {
     initiatingAttemptId?: string,
     timeZone?: string
   ): ReviewQueueState {
-    return this.store.transaction(() =>
-      this.store.enrollReview(context, now, initiatingAttemptId, timeZone)
-    );
+    return this.store.transaction(() => {
+      const puzzle = this.store.getPuzzle(context.puzzleId);
+      if (puzzle?.source === "user_game") {
+        this.store.seedPuzzles([puzzle]);
+      }
+      return this.store.enrollReview(context, now, initiatingAttemptId, timeZone);
+    });
   }
 
   recordGameReviewRetryOutcome(

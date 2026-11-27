@@ -66,6 +66,10 @@ import {
   FocusedRunUnavailableError,
   type PracticeService
 } from "../../../../packages/storage/src/practice-service.ts";
+import {
+  storedUserPuzzleToPuzzle,
+  USER_GAME_RATING_KEY_PREFIX
+} from "../../../../packages/storage/src/game-review-store.ts";
 import type {
   ReviewQueueDuePromotionResult
 } from "../../../../packages/storage/src/practice-store.ts";
@@ -985,6 +989,9 @@ export function PracticePocScreen({
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [gamesImportModalOpen, setGamesImportModalOpen] = useState(false);
   const [activeGameReviewId, setActiveGameReviewId] = useState<string | null>(null);
+  const [activeGameReviewInitialPly, setActiveGameReviewInitialPly] = useState<number | null>(null);
+  const [gamePracticeEntries, setGamePracticeEntries] = useState<ReviewEntry[]>([]);
+  const [gamePracticeInitialIndex, setGamePracticeInitialIndex] = useState<number>(0);
   const gameReviewArbiterRef = useRef<UciEngineArbiter | null>(null);
   useEffect(() => {
     return () => {
@@ -1013,31 +1020,57 @@ export function PracticePocScreen({
     options?: MyGamePuzzlesLaunchOptions
   ): void {
     setError(null);
-    const preferredModes: ReadonlyArray<"standard" | "arrow_duel"> = options?.mode
-      ? [options.mode]
-      : ["arrow_duel", "standard"];
-    let lastError: unknown = null;
-    for (const candidateMode of preferredModes) {
-      try {
-        const started = service.startMyGamePuzzlesSession(
-          {
-            mode: candidateMode,
-            ...(options?.timeClass ? { timeClass: options.timeClass } : {}),
-            ...(options?.themes && options.themes.length > 0 ? { themes: options.themes } : {}),
-            ...(options?.gameId ? { gameId: options.gameId } : {})
-          },
-          captureLiveNowIso()
-        );
-        setActiveGameReviewId(null);
-        adoptStartedSprint(started);
-        return;
-      } catch (caught) {
-        lastError = caught;
-      }
+    const kindFilter =
+      options?.mode === "arrow_duel"
+        ? "arrow_duel"
+        : options?.mode === "standard"
+          ? "line"
+          : undefined;
+    const rawStoredPuzzles = service.listUserPuzzles({
+      ...(kindFilter ? { puzzleKind: kindFilter } : {}),
+      ...(options?.gameId ? { gameId: options.gameId } : {}),
+      ...(options?.timeClass ? { timeClass: options.timeClass } : {}),
+      ...(options?.themes && options.themes.length > 0 ? { themes: options.themes } : {})
+    });
+    let orderedPuzzles = rawStoredPuzzles;
+    if (options?.puzzleIds && options.puzzleIds.length > 0) {
+      const byId = new Map(rawStoredPuzzles.map((puzzle) => [puzzle.id, puzzle]));
+      orderedPuzzles = options.puzzleIds
+        .map((id) => byId.get(id))
+        .filter((item): item is (typeof rawStoredPuzzles)[number] => item !== undefined);
+    } else {
+      const gameOrder = new Map<string, number>();
+      service.listImportedGames().forEach((g, idx) => gameOrder.set(g.id, idx));
+      orderedPuzzles = [...rawStoredPuzzles].sort((left, right) => {
+        const lOrder = gameOrder.get(left.gameId) ?? Number.MAX_SAFE_INTEGER;
+        const rOrder = gameOrder.get(right.gameId) ?? Number.MAX_SAFE_INTEGER;
+        if (lOrder !== rOrder) {
+          return lOrder - rOrder;
+        }
+        return left.gamePly - right.gamePly || left.id.localeCompare(right.id);
+      });
     }
-    if (lastError !== null) {
-      setError(errorMessage(lastError));
+    if (orderedPuzzles.length === 0) {
+      return;
     }
+    const entries = orderedPuzzles.map((stored) => {
+      const mode: "standard" | "arrow_duel" =
+        stored.puzzleKind === "arrow_duel" ? "arrow_duel" : "standard";
+      const puzzle = storedUserPuzzleToPuzzle(stored);
+      return buildServiceReviewEntry(service, {
+        puzzle,
+        mode,
+        ratingKey: `${USER_GAME_RATING_KEY_PREFIX}my_game_puzzles:${mode}`,
+        source: "history"
+      });
+    });
+    const clampedIndex = Math.max(
+      0,
+      Math.min(options?.initialIndex ?? 0, entries.length - 1)
+    );
+    setGamePracticeInitialIndex(clampedIndex);
+    setGamePracticeEntries(entries);
+    setTab("games");
   }
   function openUserGameSourceInReview(gameId: string): void {
     if (state?.status === "active") {
@@ -1109,7 +1142,8 @@ export function PracticePocScreen({
   // Android rail).
   const reviewSurfaceOpen = reviewSessionSource !== null
     || historyReviewEntries.length > 0
-    || historyUnavailableAttempt !== null;
+    || historyUnavailableAttempt !== null
+    || gamePracticeEntries.length > 0;
   const topLevelChromeVisible = isTopLevelChromeVisible({
     feedbackSnapshotVisible: feedbackSnapshot !== null,
     gameReviewOpen: activeGameReviewId !== null,
@@ -3904,7 +3938,8 @@ export function PracticePocScreen({
   // they freeze the page only while a touch that started on the board is active.
   // Edit Runs stays scrollable until a held card actually claims its drag, then
   // freezes through drop so the card moves without also panning the page.
-  const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
+  const reviewBoardVisible =
+    reviewSessionSource !== null || historyReviewEntries.length > 0 || gamePracticeEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
     || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
     || reviewBoardTouchActive;
@@ -4396,6 +4431,7 @@ export function PracticePocScreen({
       tab === "history"
       && (historyReviewEntries.length > 0 || historyUnavailableAttempt !== null)
     )
+    || (tab === "games" && gamePracticeEntries.length > 0)
   )
     ? t("common.replay")
     : screenTitleFor(tab, locale);
@@ -5652,13 +5688,53 @@ export function PracticePocScreen({
               />
             ) : null}
             {tab === "games" ? (
-              activeReviewGame !== null ? (
+              gamePracticeEntries.length > 0 ? (
+                <ReviewSession
+                  key={`games-replay:${gamePracticeInitialIndex}:${gamePracticeEntries.map((entry) => entry.puzzle.id).join("|")}`}
+                  adaptiveLayout={adaptiveLayout}
+                  boardBlocksExternalGesture={practiceScrollGestureRef}
+                  boardSize={boardSize}
+                  currentTimeMs={currentTimeMs}
+                  deferBackRelevantTransition={deferBackRelevantTransition}
+                  entries={gamePracticeEntries}
+                  explicitReplySideCopy={explicitReplySideCopy}
+                  opponentReplySettingsHint={opponentReplySettingsHint}
+                  initialIndex={gamePracticeInitialIndex}
+                  moveFeedbackClient={moveFeedbackClient}
+                  service={service}
+                  systemBackCommand={reviewBackCommand}
+                  onAnalysisActiveChange={setReviewAnalysisOpen}
+                  onBoardTouchActiveChange={setReviewBoardTouchActive}
+                  onComplete={() => {
+                    setGamePracticeEntries([]);
+                    refreshState();
+                  }}
+                  onOpenSourceGame={(gameId, gamePly) => {
+                    setGamePracticeEntries([]);
+                    setActiveGameReviewInitialPly(gamePly ?? null);
+                    setActiveGameReviewId(gameId);
+                    setTab("games");
+                  }}
+                  onReviewEnrollmentChanged={reviewScheduleChanged}
+                  onReturnToOwner={() => {
+                    setGamePracticeEntries([]);
+                    refreshState();
+                  }}
+                  replayTerminology
+                  reviewScheduleControlVisible
+                  stockfish={stockfish}
+                />
+              ) : activeReviewGame !== null ? (
                 <GameReviewScreen
                   engine={getSharedGameReviewArbiter()}
                   game={activeReviewGame}
+                  initialPly={activeGameReviewInitialPly ?? undefined}
                   practiceService={service}
                   store={service.gameReviewStore}
-                  onBack={() => setActiveGameReviewId(null)}
+                  onBack={() => {
+                    setActiveGameReviewId(null);
+                    setActiveGameReviewInitialPly(null);
+                  }}
                   onPracticeGamePuzzles={(gameId) => {
                     startMyGamePuzzlesSessionForOptions({ gameId });
                   }}
@@ -5667,6 +5743,7 @@ export function PracticePocScreen({
                 <GamesHubScreen
                   adaptiveLayout={adaptiveLayout}
                   analysisEngine={tab === "games" ? getSharedGameReviewArbiter() : null}
+                  autoSyncOnMount
                   importModalVisible={gamesImportModalOpen}
                   nowMs={nowMs}
                   service={service}
@@ -5676,6 +5753,7 @@ export function PracticePocScreen({
                     if (onOpenGameReview) {
                       onOpenGameReview(gameId);
                     } else {
+                      setActiveGameReviewInitialPly(null);
                       setActiveGameReviewId(gameId);
                     }
                   }}
