@@ -32,6 +32,8 @@ int main(int argc, char** argv) {
   int bestmoves = 0;
   int iterationUpdates = 0;
   int maxDepth = 0;
+  std::string lastBestmove;
+  std::string lastInfoWithPv;
 
   StockfishRunner runner(
       [&](std::string line) {
@@ -45,8 +47,17 @@ int main(int argc, char** argv) {
             if (line.find(" currmove ") != std::string::npos) {
               ++iterationUpdates;
             }
+            if (line.find(" pv ") != std::string::npos) {
+              lastInfoWithPv = line;
+            }
           } else if (line.rfind("bestmove ", 0) == 0) {
             ++bestmoves;
+            constexpr auto BestmovePrefixLength =
+                std::string_view("bestmove ").size();
+            const auto rest = line.substr(BestmovePrefixLength);
+            const auto spacePos = rest.find(' ');
+            lastBestmove =
+                spacePos == std::string::npos ? rest : rest.substr(0, spacePos);
           }
         }
         changed.notify_all();
@@ -114,8 +125,88 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Verify go nodes, go movetime, and go depth ... searchmoves ... primitives
+  // against the real Stockfish 18 runner.
+  int bestmovesBeforeNodes = 0;
+  {
+    std::lock_guard lock(mutex);
+    bestmovesBeforeNodes = bestmoves;
+    lastBestmove.clear();
+    lastInfoWithPv.clear();
+  }
+  runner.handle("setoption name MultiPV value 1");
+  runner.handle("position startpos");
+  runner.handle("go nodes 5000");
+
+  {
+    std::unique_lock lock(mutex);
+    if (!changed.wait_for(
+            lock,
+            std::chrono::seconds(10),
+            [&] { return bestmoves >= bestmovesBeforeNodes + 1; })) {
+      std::cerr << "go nodes 5000 did not complete cleanly.\n";
+      return 5;
+    }
+    if (lastBestmove.empty() ||
+        lastInfoWithPv.find(" nodes ") == std::string::npos) {
+      std::cerr << "go nodes 5000 did not emit expected info/bestmove.\n";
+      return 6;
+    }
+  }
+
+  int bestmovesBeforeMovetime = 0;
+  {
+    std::lock_guard lock(mutex);
+    bestmovesBeforeMovetime = bestmoves;
+    lastBestmove.clear();
+  }
+  runner.handle("go movetime 50");
+
+  {
+    std::unique_lock lock(mutex);
+    if (!changed.wait_for(
+            lock,
+            std::chrono::seconds(10),
+            [&] { return bestmoves >= bestmovesBeforeMovetime + 1; })) {
+      std::cerr << "go movetime 50 did not complete cleanly.\n";
+      return 7;
+    }
+    if (lastBestmove.empty()) {
+      std::cerr << "go movetime 50 emitted empty bestmove.\n";
+      return 8;
+    }
+  }
+
+  int bestmovesBeforeSearchmoves = 0;
+  {
+    std::lock_guard lock(mutex);
+    bestmovesBeforeSearchmoves = bestmoves;
+    lastBestmove.clear();
+    lastInfoWithPv.clear();
+  }
+  runner.handle("position startpos");
+  runner.handle("go depth 8 searchmoves a2a3");
+
+  {
+    std::unique_lock lock(mutex);
+    if (!changed.wait_for(
+            lock,
+            std::chrono::seconds(10),
+            [&] { return bestmoves >= bestmovesBeforeSearchmoves + 1; })) {
+      std::cerr << "go depth 8 searchmoves a2a3 did not complete cleanly.\n";
+      return 9;
+    }
+    if (lastBestmove != "a2a3" ||
+        lastInfoWithPv.find(" pv a2a3") == std::string::npos) {
+      std::cerr << "go depth 8 searchmoves a2a3 did not restrict search to "
+                   "a2a3 (bestmove="
+                << lastBestmove << ", info=" << lastInfoWithPv << ").\n";
+      return 10;
+    }
+  }
+
   std::cout
-      << "xBqI8 parent, shallow child, and callback-exercising full child "
-         "searches completed.\n";
+      << "xBqI8 parent, shallow child, callback-exercising full child, "
+         "go nodes, go movetime, and go searchmoves searches completed.\n";
   return 0;
 }
