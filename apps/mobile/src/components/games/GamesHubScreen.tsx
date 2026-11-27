@@ -34,6 +34,8 @@ import {
   Section,
   SegmentedControl
 } from "../ui/index.tsx";
+import { AppModal } from "../AppModal.tsx";
+import { SafeAreaModalBackdrop } from "../SafeAreaModalBackdrop.tsx";
 import { CollapsibleRegion } from "../practice/shared/CollapsibleRegion.tsx";
 import { FilterButton } from "../practice/shared/FilterButton.tsx";
 import { FilterGlyph } from "../practice/shared/Glyphs.tsx";
@@ -119,6 +121,7 @@ export function GamesHubScreen({
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
   const [timeClassFilter, setTimeClassFilter] = useState<GamesTimeClassFilter>("all");
   const [internalModalOpen, setInternalModalOpen] = useState(false);
+  const [olderPickerOpen, setOlderPickerOpen] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState<GamesImportTab>(initialImportTab);
   const [syncing, setSyncing] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -471,70 +474,58 @@ export function GamesHubScreen({
   }, [loadingOlder, locale, snapshot.linkedAccounts, syncAccount, syncing]);
 
   const handleImportOlderGames = useCallback(
-    async (targetAccount?: LinkedGameAccount): Promise<void> => {
+    async (
+      targetAccount: LinkedGameAccount,
+      options?: { fromImportModal?: boolean }
+    ): Promise<void> => {
       if (syncing || loadingOlder) {
-        return;
-      }
-      const accountsToLoad: LinkedGameAccount[] = targetAccount
-        ? [targetAccount]
-        : effectiveAccountFilter !== "all" && effectiveAccountFilter !== "pgn"
-          ? snapshot.linkedAccounts.filter(
-              (account) =>
-                `${account.platform}:${account.username.toLowerCase()}` === effectiveAccountFilter
-            )
-          : snapshot.linkedAccounts;
-      if (accountsToLoad.length === 0) {
         return;
       }
       setLoadingOlder(true);
       setHubError(null);
-      if (targetAccount) {
+      if (options?.fromImportModal) {
         setModalError(null);
         setModalStatus(null);
       }
       try {
         const client = resolveHttpClient();
         const syncedAt = new Date(nowMs).toISOString();
-        let totalInserted = 0;
-        for (const account of accountsToLoad) {
-          let oldestMs: number | undefined;
-          for (const game of snapshot.allGames) {
-            if (
-              game.platform === account.platform &&
-              (game.username ?? "").toLowerCase() === account.username.toLowerCase()
-            ) {
-              const playedAtMs = Date.parse(game.playedAt);
-              if (Number.isFinite(playedAtMs) && (oldestMs === undefined || playedAtMs < oldestMs)) {
-                oldestMs = playedAtMs;
-              }
+        let oldestMs: number | undefined;
+        for (const game of snapshot.allGames) {
+          if (
+            game.platform === targetAccount.platform &&
+            (game.username ?? "").toLowerCase() === targetAccount.username.toLowerCase()
+          ) {
+            const playedAtMs = Date.parse(game.playedAt);
+            if (Number.isFinite(playedAtMs) && (oldestMs === undefined || playedAtMs < oldestMs)) {
+              oldestMs = playedAtMs;
             }
           }
-          const drafts =
-            account.platform === "chess_com"
-              ? await importChessComGames(client, {
-                  username: account.username,
-                  maxGames: 50,
-                  ...(oldestMs !== undefined ? { until: oldestMs } : {})
-                })
-              : await importLichessGames(client, {
-                  username: account.username,
-                  maxGames: 50,
-                  ...(oldestMs !== undefined ? { until: oldestMs } : {})
-                });
-          const upsert = service.upsertImportedGames(drafts, syncedAt);
-          totalInserted += upsert.inserted;
         }
+        const drafts =
+          targetAccount.platform === "chess_com"
+            ? await importChessComGames(client, {
+                username: targetAccount.username,
+                maxGames: 50,
+                ...(oldestMs !== undefined ? { until: oldestMs } : {})
+              })
+            : await importLichessGames(client, {
+                username: targetAccount.username,
+                maxGames: 50,
+                ...(oldestMs !== undefined ? { until: oldestMs } : {})
+              });
+        const upsert = service.upsertImportedGames(drafts, syncedAt);
         refreshHub();
-        if (targetAccount) {
+        if (options?.fromImportModal) {
           setModalStatus(
-            totalInserted > 0
-              ? t("games.sync.added", { count: totalInserted })
+            upsert.inserted > 0
+              ? t("games.sync.added", { count: upsert.inserted })
               : t("games.sync.noOlderGames")
           );
         }
       } catch (error) {
         const message = gameImportErrorMessage(error, locale);
-        if (targetAccount) {
+        if (options?.fromImportModal) {
           setModalError(message);
         } else {
           setHubError(message);
@@ -544,7 +535,6 @@ export function GamesHubScreen({
       }
     },
     [
-      effectiveAccountFilter,
       loadingOlder,
       locale,
       nowMs,
@@ -552,11 +542,31 @@ export function GamesHubScreen({
       resolveHttpClient,
       service,
       snapshot.allGames,
-      snapshot.linkedAccounts,
       syncing,
       t
     ]
   );
+
+  const handlePressImportMore = useCallback((): void => {
+    if (syncing || loadingOlder || snapshot.linkedAccounts.length === 0) {
+      return;
+    }
+    if (effectiveAccountFilter !== "all" && effectiveAccountFilter !== "pgn") {
+      const matched = snapshot.linkedAccounts.find(
+        (account) =>
+          `${account.platform}:${account.username.toLowerCase()}` === effectiveAccountFilter
+      );
+      if (matched) {
+        void handleImportOlderGames(matched);
+        return;
+      }
+    }
+    if (snapshot.linkedAccounts.length === 1) {
+      void handleImportOlderGames(snapshot.linkedAccounts[0]!);
+      return;
+    }
+    setOlderPickerOpen(true);
+  }, [effectiveAccountFilter, handleImportOlderGames, loadingOlder, snapshot.linkedAccounts, syncing]);
 
   const autoSyncedOnMountRef = useRef(false);
   useEffect(() => {
@@ -1203,12 +1213,10 @@ export function GamesHubScreen({
                         ? t("games.action.importingOlder")
                         : t("games.action.importOlder")
                     }
-                    size="compact"
+                    stretch
                     testID="games-load-older"
                     variant="secondary"
-                    onPress={() => {
-                      void handleImportOlderGames();
-                    }}
+                    onPress={handlePressImportMore}
                   />
                 </View>
               ) : null}
@@ -1216,6 +1224,72 @@ export function GamesHubScreen({
           )}
         </>
       )}
+
+      {olderPickerOpen ? (
+        <AppModal
+          animationType="fade"
+          transparent
+          visible
+          onRequestClose={() => setOlderPickerOpen(false)}
+        >
+          <SafeAreaModalBackdrop style={styles.pickerBackdrop}>
+            <View
+              accessibilityViewIsModal
+              style={styles.pickerSheet}
+              testID="games-import-older-picker"
+            >
+              <View style={styles.pickerHeader}>
+                <AppText accessibilityRole="header" style={styles.pickerTitle} variant="headline">
+                  {t("games.olderPicker.title")}
+                </AppText>
+                <Button
+                  accessibilityLabel={t("common.close")}
+                  label={t("common.close")}
+                  size="compact"
+                  testID="games-older-picker-close"
+                  variant="plain"
+                  onPress={() => setOlderPickerOpen(false)}
+                />
+              </View>
+              <View style={styles.pickerList}>
+                {snapshot.linkedAccounts.map((account) => {
+                  const platformLabel = gamePlatformLabel(account.platform, locale);
+                  const count = snapshot.allGames.filter(
+                    (game) =>
+                      game.platform === account.platform &&
+                      (game.username ?? "").toLowerCase() === account.username.toLowerCase()
+                  ).length;
+                  return (
+                    <Pressable
+                      key={`${account.platform}:${account.username}`}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [
+                        styles.pickerAccountRow,
+                        pressed ? styles.gameRowPressed : null
+                      ]}
+                      testID={`games-older-picker-${account.platform}-${account.username}`}
+                      onPress={() => {
+                        setOlderPickerOpen(false);
+                        void handleImportOlderGames(account);
+                      }}
+                    >
+                      <View style={styles.pickerAccountCopy}>
+                        <AppText variant="headline">{account.username}</AppText>
+                        <AppText tone="secondary" variant="footnote">
+                          {`${platformLabel} · ${t("games.batch.gamesCount", { count })}`}
+                        </AppText>
+                      </View>
+                      <View style={styles.gameRowLeading}>
+                        <Badge label={t("games.action.importOlderShort")} tone="accent" />
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </SafeAreaModalBackdrop>
+        </AppModal>
+      ) : null}
 
       <GamesImportModal
         busy={syncing || loadingOlder}
@@ -1229,7 +1303,9 @@ export function GamesHubScreen({
           setModalStatus(null);
         }}
         onClose={() => setModalOpen(false)}
-        onImportOlderForAccount={handleImportOlderGames}
+        onImportOlderForAccount={(account) =>
+          handleImportOlderGames(account, { fromImportModal: true })
+        }
         onImportPgn={handleImportPgn}
         onLinkAndSync={handleLinkAndSync}
         onRemoveAccount={handleRemoveAccount}
@@ -1503,8 +1579,54 @@ const useStyles = makeStyles((theme) => ({
     gap: 8
   },
   loadOlderFooter: {
+    paddingTop: 2,
+    width: "100%"
+  },
+  pickerBackdrop: {
+    backgroundColor: theme.colors.scrim,
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 16
+  },
+  pickerSheet: {
+    alignSelf: "center",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.sheet,
+    borderWidth: 1,
+    gap: 12,
+    maxWidth: 480,
+    padding: 16,
+    width: "100%"
+  },
+  pickerHeader: {
     alignItems: "center",
-    paddingTop: 2
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  pickerTitle: {
+    flex: 1
+  },
+  pickerList: {
+    gap: 8
+  },
+  pickerAccountRow: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  pickerAccountCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
   },
   puzzleListRow: {
     alignItems: "center",

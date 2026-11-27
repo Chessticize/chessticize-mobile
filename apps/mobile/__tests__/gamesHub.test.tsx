@@ -843,6 +843,30 @@ describe("GamesHubScreen", () => {
     expect(service.listImportedGames().some((g) => g.id === "https://lichess.org/OlderGame1")).toBe(true);
     // Preserves forward sync cursor
     expect(service.listLinkedAccounts()[0]?.lastSyncedAt).toBe("2026-03-10T12:00:00.000Z");
+
+    // With 2+ linked accounts and no account filter, Import more… opens a picker so user chooses which account imports +50.
+    service.upsertLinkedAccount({
+      platform: "chess_com",
+      username: "alice_cc",
+      lastSyncedAt: "2026-03-10T12:00:00.000Z"
+    });
+    const rendererMulti = render(
+      <GamesHubScreen
+        httpClient={client}
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+    requestedUrls.length = 0;
+    press(rendererMulti, "games-load-older");
+    expect(hasTestID(rendererMulti, "games-import-older-picker")).toBe(true);
+    expect(requestedUrls).toHaveLength(0);
+
+    await pressAsync(rendererMulti, "games-older-picker-lichess-alice");
+    expect(hasTestID(rendererMulti, "games-import-older-picker")).toBe(false);
+    expect(requestedUrls).toHaveLength(1);
+    expect(requestedUrls[0]).toContain("lichess.org/api/games/user/alice");
   });
 
   it("renders Games as the 5th tab in PracticePocScreen and wires back intent cleanly", () => {
