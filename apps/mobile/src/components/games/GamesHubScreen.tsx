@@ -75,6 +75,9 @@ export interface MyGamePuzzlesLaunchOptions {
   initialIndex?: number;
 }
 
+const GAMES_PAGE_SIZE = 50;
+const PUZZLES_PAGE_SIZE = 50;
+
 export interface GamesHubScreenProps {
   service: PracticeService;
   adaptiveLayout?: AdaptiveLayout;
@@ -120,6 +123,10 @@ export function GamesHubScreen({
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
   const [timeClassFilter, setTimeClassFilter] = useState<GamesTimeClassFilter>("all");
+  const [puzzleKindFilter, setPuzzleKindFilter] = useState<"all" | "arrow_duel" | "line">("all");
+  const [puzzleThemeFilter, setPuzzleThemeFilter] = useState<string>("all");
+  const [visibleGamesLimit, setVisibleGamesLimit] = useState<number>(GAMES_PAGE_SIZE);
+  const [visiblePuzzlesLimit, setVisiblePuzzlesLimit] = useState<number>(PUZZLES_PAGE_SIZE);
   const [internalModalOpen, setInternalModalOpen] = useState(false);
   const [olderPickerOpen, setOlderPickerOpen] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState<GamesImportTab>(initialImportTab);
@@ -317,7 +324,7 @@ export function GamesHubScreen({
     [effectiveTimeClassFilter, matchesAccountFilter, snapshot.allGames, statusFilter]
   );
 
-  const filteredOrderedUserPuzzles = useMemo(
+  const puzzlesInGameScope = useMemo(
     () =>
       snapshot.orderedUserPuzzles.filter((puzzle) => {
         const sourceGame = snapshot.gameById.get(puzzle.gameId);
@@ -328,6 +335,69 @@ export function GamesHubScreen({
         return matchesGamesTimeClassFilter(puzzleTimeClass, effectiveTimeClassFilter);
       }),
     [effectiveTimeClassFilter, matchesAccountFilter, snapshot.gameById, snapshot.orderedUserPuzzles]
+  );
+
+  const hasBothPuzzleKindsInScope = useMemo(() => {
+    let hasArrow = false;
+    let hasLine = false;
+    for (const puzzle of puzzlesInGameScope) {
+      if (puzzle.puzzleKind === "arrow_duel") {
+        hasArrow = true;
+      } else {
+        hasLine = true;
+      }
+      if (hasArrow && hasLine) {
+        return true;
+      }
+    }
+    return false;
+  }, [puzzlesInGameScope]);
+
+  const effectivePuzzleKindFilter: "all" | "arrow_duel" | "line" =
+    hasBothPuzzleKindsInScope ? puzzleKindFilter : "all";
+
+  const availablePuzzleThemes = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const puzzle of puzzlesInGameScope) {
+      if (
+        effectivePuzzleKindFilter !== "all" &&
+        puzzle.puzzleKind !== effectivePuzzleKindFilter
+      ) {
+        continue;
+      }
+      for (const themeId of curatedPuzzleThemes(puzzle.themes)) {
+        counts.set(themeId, (counts.get(themeId) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([themeId, count]) => ({ themeId, count }))
+      .sort((left, right) => right.count - left.count || left.themeId.localeCompare(right.themeId));
+  }, [effectivePuzzleKindFilter, puzzlesInGameScope]);
+
+  const effectivePuzzleThemeFilter =
+    puzzleThemeFilter === "all" ||
+    availablePuzzleThemes.some((item) => item.themeId === puzzleThemeFilter)
+      ? puzzleThemeFilter
+      : "all";
+
+  const filteredOrderedUserPuzzles = useMemo(
+    () =>
+      puzzlesInGameScope.filter((puzzle) => {
+        if (
+          effectivePuzzleKindFilter !== "all" &&
+          puzzle.puzzleKind !== effectivePuzzleKindFilter
+        ) {
+          return false;
+        }
+        if (
+          effectivePuzzleThemeFilter !== "all" &&
+          !curatedPuzzleThemes(puzzle.themes).includes(effectivePuzzleThemeFilter)
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [effectivePuzzleKindFilter, effectivePuzzleThemeFilter, puzzlesInGameScope]
   );
 
   const filteredArrowDuelPuzzles = useMemo(
@@ -348,24 +418,53 @@ export function GamesHubScreen({
     );
     return diagnoseInGameWeaknesses({
       games: gamesInScope,
-      puzzles: filteredOrderedUserPuzzles
+      puzzles: puzzlesInGameScope
     });
   }, [
     effectiveTimeClassFilter,
-    filteredOrderedUserPuzzles,
     matchesAccountFilter,
+    puzzlesInGameScope,
     snapshot.allGames
+  ]);
+
+  const visibleGames = useMemo(
+    () => filteredGames.slice(0, visibleGamesLimit),
+    [filteredGames, visibleGamesLimit]
+  );
+
+  const visiblePuzzles = useMemo(
+    () => filteredOrderedUserPuzzles.slice(0, visiblePuzzlesLimit),
+    [filteredOrderedUserPuzzles, visiblePuzzlesLimit]
+  );
+
+  useEffect(() => {
+    setVisibleGamesLimit(GAMES_PAGE_SIZE);
+  }, [effectiveAccountFilter, effectiveTimeClassFilter, statusFilter]);
+
+  useEffect(() => {
+    setVisiblePuzzlesLimit(PUZZLES_PAGE_SIZE);
+  }, [
+    effectiveAccountFilter,
+    effectivePuzzleKindFilter,
+    effectivePuzzleThemeFilter,
+    effectiveTimeClassFilter
   ]);
 
   const hasActiveFilters =
     effectiveAccountFilter !== "all" ||
     statusFilter !== "all" ||
-    effectiveTimeClassFilter !== "all";
+    effectiveTimeClassFilter !== "all" ||
+    effectivePuzzleKindFilter !== "all" ||
+    effectivePuzzleThemeFilter !== "all";
 
   const resetAllFilters = useCallback((): void => {
     setAccountFilter("all");
     setStatusFilter("all");
     setTimeClassFilter("all");
+    setPuzzleKindFilter("all");
+    setPuzzleThemeFilter("all");
+    setVisibleGamesLimit(GAMES_PAGE_SIZE);
+    setVisiblePuzzlesLimit(PUZZLES_PAGE_SIZE);
   }, []);
 
   const unanalyzedGames = useMemo(
@@ -885,6 +984,58 @@ export function GamesHubScreen({
                 </View>
               </ScrollView>
             ) : null}
+            {effectiveHubView === "puzzles" && hasBothPuzzleKindsInScope ? (
+              <View
+                accessibilityLabel={t("games.filter.modeA11y")}
+                style={styles.filterRow}
+                testID="games-puzzle-kind-filters"
+              >
+                <FilterButton
+                  active={effectivePuzzleKindFilter === "all"}
+                  label={t("games.filter.all")}
+                  testID="games-filter-puzzle-kind-all"
+                  onPress={() => setPuzzleKindFilter("all")}
+                />
+                <FilterButton
+                  active={effectivePuzzleKindFilter === "arrow_duel"}
+                  label={t("common.arrowDuel")}
+                  testID="games-filter-puzzle-kind-arrow_duel"
+                  onPress={() => setPuzzleKindFilter("arrow_duel")}
+                />
+                <FilterButton
+                  active={effectivePuzzleKindFilter === "line"}
+                  label={t("common.standard")}
+                  testID="games-filter-puzzle-kind-line"
+                  onPress={() => setPuzzleKindFilter("line")}
+                />
+              </View>
+            ) : null}
+            {effectiveHubView === "puzzles" && availablePuzzleThemes.length > 0 ? (
+              <ScrollView
+                accessibilityLabel={t("games.filter.themeA11y")}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                testID="games-puzzle-theme-filters"
+              >
+                <View style={styles.filterRow}>
+                  <FilterButton
+                    active={effectivePuzzleThemeFilter === "all"}
+                    label={t("games.filter.all")}
+                    testID="games-filter-puzzle-theme-all"
+                    onPress={() => setPuzzleThemeFilter("all")}
+                  />
+                  {availablePuzzleThemes.map((item) => (
+                    <FilterButton
+                      key={item.themeId}
+                      active={effectivePuzzleThemeFilter === item.themeId}
+                      label={`${customThemeLabel(item.themeId, locale)} (${item.count})`}
+                      testID={`games-filter-puzzle-theme-${item.themeId}`}
+                      onPress={() => setPuzzleThemeFilter(item.themeId)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : null}
             {hasActiveFilters ? (
               <View style={styles.filterResetRow}>
                 <Button
@@ -897,28 +1048,6 @@ export function GamesHubScreen({
               </View>
             ) : null}
           </CollapsibleRegion>
-
-          {unanalyzedGames.length > 0 && !batchBusy ? (
-            <View style={styles.controlsStrip} testID="games-top-bar">
-              <View style={styles.secondaryActionRow}>
-                <Button
-                  label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
-                  size="compact"
-                  testID="games-analyze-recent"
-                  variant="secondary"
-                  onPress={handleAnalyzeAll}
-                />
-              </View>
-            </View>
-          ) : null}
-
-          <BatchAnalysisBanner
-            state={batch.state}
-            onCancel={batch.cancel}
-            onDismiss={batch.dismiss}
-            onPause={batch.pause}
-            onResume={batch.resume}
-          />
 
           {snapshot.userPuzzleCount > 0 ? (
             <SegmentedControl
@@ -954,7 +1083,11 @@ export function GamesHubScreen({
                       stretch
                       testID="games-practice-puzzles-cta"
                       onPress={() => {
-                        if (effectiveAccountFilter !== "all") {
+                        if (
+                          effectiveAccountFilter !== "all" ||
+                          effectivePuzzleKindFilter !== "all" ||
+                          effectivePuzzleThemeFilter !== "all"
+                        ) {
                           onPracticeMyGamePuzzles({
                             puzzleIds: filteredOrderedUserPuzzles.map((p) => p.id),
                             initialIndex: 0
@@ -980,7 +1113,10 @@ export function GamesHubScreen({
                           testID="games-practice-arrow-duel"
                           variant="secondary"
                           onPress={() => {
-                            if (effectiveAccountFilter !== "all") {
+                            if (
+                              effectiveAccountFilter !== "all" ||
+                              effectivePuzzleThemeFilter !== "all"
+                            ) {
                               onPracticeMyGamePuzzles({
                                 puzzleIds: filteredArrowDuelPuzzles.map((p) => p.id),
                                 initialIndex: 0
@@ -1001,7 +1137,10 @@ export function GamesHubScreen({
                           testID="games-practice-lines"
                           variant="secondary"
                           onPress={() => {
-                            if (effectiveAccountFilter !== "all") {
+                            if (
+                              effectiveAccountFilter !== "all" ||
+                              effectivePuzzleThemeFilter !== "all"
+                            ) {
                               onPracticeMyGamePuzzles({
                                 puzzleIds: filteredStandardPuzzles.map((p) => p.id),
                                 initialIndex: 0
@@ -1050,8 +1189,9 @@ export function GamesHubScreen({
                   </View>
                 </Section>
               ) : (
-                <Section rows testID="games-puzzles-list">
-                  {filteredOrderedUserPuzzles.map((puzzle, index) => {
+                <>
+                  <Section rows testID="games-puzzles-list">
+                    {visiblePuzzles.map((puzzle, index) => {
                     const sourceGame = snapshot.gameById.get(puzzle.gameId);
                     const opponentName =
                       puzzle.opponentName ??
@@ -1144,7 +1284,24 @@ export function GamesHubScreen({
                       </View>
                     );
                   })}
-                </Section>
+                  </Section>
+                  {filteredOrderedUserPuzzles.length > visiblePuzzles.length ? (
+                    <View style={styles.loadOlderFooter}>
+                      <Button
+                        label={t("games.action.showMore", {
+                          shown: visiblePuzzles.length,
+                          total: filteredOrderedUserPuzzles.length
+                        })}
+                        stretch
+                        testID="games-puzzles-show-more"
+                        variant="secondary"
+                        onPress={() =>
+                          setVisiblePuzzlesLimit((limit) => limit + PUZZLES_PAGE_SIZE)
+                        }
+                      />
+                    </View>
+                  ) : null}
+                </>
               )}
             </View>
           ) : (
@@ -1154,7 +1311,7 @@ export function GamesHubScreen({
                 onPracticeBlindspotTheme={
                   onPracticeMyGamePuzzles
                     ? (theme) => {
-                        const matchingIds = filteredOrderedUserPuzzles
+                        const matchingIds = puzzlesInGameScope
                           .filter((puzzle) =>
                             puzzle.themes.some(
                               (item) => item.toLowerCase() === theme.toLowerCase()
@@ -1176,6 +1333,28 @@ export function GamesHubScreen({
                 }
               />
 
+              <BatchAnalysisBanner
+                state={batch.state}
+                onCancel={batch.cancel}
+                onDismiss={batch.dismiss}
+                onPause={batch.pause}
+                onResume={batch.resume}
+              />
+
+              {unanalyzedGames.length > 0 && !batchBusy ? (
+                <View style={styles.controlsStrip} testID="games-top-bar">
+                  <View style={styles.secondaryActionRow}>
+                    <Button
+                      label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
+                      size="compact"
+                      testID="games-analyze-recent"
+                      variant="secondary"
+                      onPress={handleAnalyzeAll}
+                    />
+                  </View>
+                </View>
+              ) : null}
+
               {filteredGames.length === 0 ? (
                 <Section testID="games-filtered-empty">
                   <View style={styles.filteredEmptyContent}>
@@ -1193,7 +1372,7 @@ export function GamesHubScreen({
                 </Section>
               ) : (
                 <Section rows testID="games-list">
-                  {filteredGames.map((game) => (
+                  {visibleGames.map((game) => (
                     <GameRow
                       key={game.id}
                       game={game}
@@ -1203,6 +1382,21 @@ export function GamesHubScreen({
                   ))}
                 </Section>
               )}
+
+              {filteredGames.length > visibleGames.length ? (
+                <View style={styles.loadOlderFooter}>
+                  <Button
+                    label={t("games.action.showMore", {
+                      shown: visibleGames.length,
+                      total: filteredGames.length
+                    })}
+                    stretch
+                    testID="games-show-more"
+                    variant="secondary"
+                    onPress={() => setVisibleGamesLimit((limit) => limit + GAMES_PAGE_SIZE)}
+                  />
+                </View>
+              ) : null}
 
               {snapshot.linkedAccounts.length > 0 && effectiveAccountFilter !== "pgn" ? (
                 <View style={styles.loadOlderFooter}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import type {
   GamePlyEvaluation,
@@ -42,22 +42,31 @@ export function MoveListStrip({
   const scrollRef = useRef<ScrollView | null>(null);
   const chipOffsetsRef = useRef<Map<number, { x: number; width: number }>>(new Map());
   const scrollViewportWidthRef = useRef<number>(0);
+  const currentPlyRef = useRef<number>(currentPly);
+  currentPlyRef.current = currentPly;
+  const suppressAutoScrollRef = useRef<boolean>(suppressAutoScroll);
+  suppressAutoScrollRef.current = suppressAutoScroll;
   const totalPlies = plies.length;
   const atStart = currentPly <= 0;
   const atEnd = currentPly >= totalPlies;
 
-  useEffect(() => {
-    if (suppressAutoScroll) {
-      return;
-    }
-    const layout = chipOffsetsRef.current.get(currentPly);
+  const scrollToPly = useCallback((ply: number, animated: boolean) => {
+    const layout = chipOffsetsRef.current.get(ply);
     if (!layout || !scrollRef.current?.scrollTo) {
-      return;
+      return false;
     }
     const viewportWidth = scrollViewportWidthRef.current;
     const targetX = Math.max(0, layout.x - Math.max(0, (viewportWidth - layout.width) / 2));
-    scrollRef.current.scrollTo({ x: targetX, animated: true });
-  }, [currentPly, suppressAutoScroll]);
+    scrollRef.current.scrollTo({ x: targetX, animated });
+    return true;
+  }, []);
+
+  useEffect(() => {
+    // During fast-forward, follow along immediately without UIScrollView animation queue lag;
+    // when landing or stepping normally, center smoothly with animation.
+    const animated = !suppressAutoScroll;
+    scrollToPly(currentPly, animated);
+  }, [currentPly, scrollToPly, suppressAutoScroll]);
 
   return (
     <View style={styles.container} testID={testID}>
@@ -65,8 +74,12 @@ export function MoveListStrip({
         ref={scrollRef}
         contentContainerStyle={styles.movesContent}
         horizontal
+        onContentSizeChange={() => {
+          scrollToPly(currentPlyRef.current, false);
+        }}
         onLayout={(event) => {
           scrollViewportWidthRef.current = event.nativeEvent.layout.width;
+          scrollToPly(currentPlyRef.current, false);
         }}
         showsHorizontalScrollIndicator={false}
         style={styles.movesScroll}
@@ -81,6 +94,9 @@ export function MoveListStrip({
               x: event.nativeEvent.layout.x,
               width: event.nativeEvent.layout.width
             });
+            if (currentPlyRef.current === 0) {
+              scrollToPly(0, !suppressAutoScrollRef.current);
+            }
           }}
           onPress={() => onSelectPly(0)}
           style={[styles.moveChip, currentPly === 0 ? styles.moveChipSelected : null]}
@@ -116,6 +132,9 @@ export function MoveListStrip({
                   x: event.nativeEvent.layout.x,
                   width: event.nativeEvent.layout.width
                 });
+                if (currentPlyRef.current === ply.ply) {
+                  scrollToPly(ply.ply, !suppressAutoScrollRef.current);
+                }
               }}
               onPress={() => onSelectPly(ply.ply)}
               style={[styles.moveChip, selected ? styles.moveChipSelected : null]}

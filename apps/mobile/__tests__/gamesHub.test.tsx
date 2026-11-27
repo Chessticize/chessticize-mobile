@@ -869,6 +869,95 @@ describe("GamesHubScreen", () => {
     expect(requestedUrls[0]).toContain("lichess.org/api/games/user/alice");
   });
 
+  it("paginates large games lists in 50-item pages and supports theme/type filters in Puzzles view", () => {
+    const service = new PracticeService(new MemoryStore());
+    const manyGames = Array.from({ length: 65 }, (_, index) =>
+      makeDraft({
+        id: `g-page-${index}`,
+        playedAt: new Date(NOW_MS - index * 60_000).toISOString()
+      })
+    );
+    service.upsertImportedGames(manyGames);
+    service.replaceGameUserPuzzles(
+      "g-page-0",
+      [
+        {
+          idSeed: "p-fork",
+          ply: 10,
+          moveNumber: 5,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 320,
+          winChanceSwing: 25,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 80
+        },
+        {
+          idSeed: "p-pin",
+          ply: 14,
+          moveNumber: 7,
+          puzzleKind: "arrow_duel",
+          momentKind: "own_blunder_punished",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4"],
+          prevCp: 20,
+          cp: -280,
+          winChanceSwing: 30,
+          themes: ["pin"],
+          lengthTag: "oneMove",
+          phaseTag: "opening",
+          caliberScore: 85
+        }
+      ],
+      { opponentName: "bob", timeClass: "blitz" }
+    );
+
+    const renderer = render(
+      <GamesHubScreen
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+        onPracticeMyGamePuzzles={jest.fn()}
+      />
+    );
+
+    // Games list paginates at 50 initially and reveals the rest via Show more.
+    expect(hasTestID(renderer, "game-row-g-page-0")).toBe(true);
+    expect(hasTestID(renderer, "game-row-g-page-49")).toBe(true);
+    expect(hasTestID(renderer, "game-row-g-page-50")).toBe(false);
+    expect(textContent(findByTestID(renderer, "games-show-more"))).toContain("50/65");
+
+    press(renderer, "games-show-more");
+    expect(hasTestID(renderer, "game-row-g-page-64")).toBe(true);
+    expect(hasTestID(renderer, "games-show-more")).toBe(false);
+
+    // Puzzles view exposes type and tactical theme filters inside the filter drawer.
+    press(renderer, "games-hub-view-puzzles");
+    press(renderer, "games-filter-toggle");
+    expect(hasTestID(renderer, "games-puzzle-kind-filters")).toBe(true);
+    expect(hasTestID(renderer, "games-puzzle-theme-filters")).toBe(true);
+
+    const puzzles = service.listUserPuzzles();
+    const forkPuzzle = puzzles.find((p) => p.themes.includes("fork"))!;
+    const pinPuzzle = puzzles.find((p) => p.themes.includes("pin"))!;
+
+    press(renderer, "games-filter-puzzle-theme-fork");
+    expect(hasTestID(renderer, `games-puzzle-row-${forkPuzzle.id}`)).toBe(true);
+    expect(hasTestID(renderer, `games-puzzle-row-${pinPuzzle.id}`)).toBe(false);
+
+    press(renderer, "games-filter-drawer-reset");
+    expect(hasTestID(renderer, `games-puzzle-row-${pinPuzzle.id}`)).toBe(true);
+  });
+
   it("renders Games as the 5th tab in PracticePocScreen and wires back intent cleanly", () => {
     const service = createMobilePracticeService();
     service.upsertImportedGames([makeDraft({ id: "g-host-tab" })]);
