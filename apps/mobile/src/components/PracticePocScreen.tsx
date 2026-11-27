@@ -4,6 +4,7 @@ import {
   AppState,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -330,7 +331,7 @@ import {
   withAttemptClarity
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
-import { GamesHubScreen } from "./games/GamesHubScreen.tsx";
+import { GamesHubScreen, type MyGamePuzzlesLaunchOptions } from "./games/GamesHubScreen.tsx";
 import { GameReviewScreen } from "./gameReview/index.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
@@ -1008,6 +1009,48 @@ export function PracticePocScreen({
       : null),
     [activeGameReviewId, service, tab]
   );
+  function startMyGamePuzzlesSessionForOptions(
+    options?: MyGamePuzzlesLaunchOptions
+  ): void {
+    setError(null);
+    const preferredModes: ReadonlyArray<"standard" | "arrow_duel"> = options?.mode
+      ? [options.mode]
+      : ["arrow_duel", "standard"];
+    let lastError: unknown = null;
+    for (const candidateMode of preferredModes) {
+      try {
+        const started = service.startMyGamePuzzlesSession(
+          {
+            mode: candidateMode,
+            ...(options?.timeClass ? { timeClass: options.timeClass } : {}),
+            ...(options?.themes && options.themes.length > 0 ? { themes: options.themes } : {}),
+            ...(options?.gameId ? { gameId: options.gameId } : {})
+          },
+          captureLiveNowIso()
+        );
+        setActiveGameReviewId(null);
+        adoptStartedSprint(started);
+        return;
+      } catch (caught) {
+        lastError = caught;
+      }
+    }
+    if (lastError !== null) {
+      setError(errorMessage(lastError));
+    }
+  }
+  function openUserGameSourceInReview(gameId: string): void {
+    if (state?.status === "active") {
+      try {
+        service.pauseSprint(captureLiveNowIso());
+      } catch {
+        // Allow navigating back to the source game even if pause is unavailable.
+      }
+    }
+    setState(null);
+    setTab("games");
+    setActiveGameReviewId(gameId);
+  }
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
@@ -4713,6 +4756,29 @@ export function PracticePocScreen({
           mode={mode}
         />
       )}
+      {displayedPuzzle?.puzzle.userGameMeta ? (
+        <Pressable
+          accessibilityRole="button"
+          style={{
+            alignSelf: "center",
+            borderColor: appTheme.colors.border.default,
+            borderRadius: appTheme.shape.capsule,
+            borderWidth: 1,
+            backgroundColor: appTheme.colors.surfaceSunken,
+            marginTop: 4,
+            paddingHorizontal: 10,
+            paddingVertical: 3
+          }}
+          testID="practice-user-game-provenance"
+          onPress={() => openUserGameSourceInReview(displayedPuzzle.puzzle.userGameMeta!.gameId)}
+        >
+          <Text style={{ color: appTheme.colors.text.secondary, fontSize: 12, fontWeight: "600" }}>
+            {displayedPuzzle.puzzle.userGameMeta.opponentName
+              ? `vs ${displayedPuzzle.puzzle.userGameMeta.opponentName} · Move ${displayedPuzzle.puzzle.userGameMeta.gameMoveNumber}`
+              : `From game · Move ${displayedPuzzle.puzzle.userGameMeta.gameMoveNumber}`}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   ) : null;
   const sessionBottomFeedbackNode = shouldShowSessionBoard
@@ -5237,52 +5303,80 @@ export function PracticePocScreen({
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
-                  <PracticeHome
-                    adaptiveLayout={adaptiveLayout}
-                    mode={mode}
-                    modes={practiceModeSummaries}
-                    currentRating={activeRunManagementPresentation
-                      ? selectedManagedRun?.elo ?? RATING_FLOOR
-                      : currentRating}
-                    progress={practiceProgress}
-                    personalBestChallenge={personalBestPresentation}
-                    runManagement={activeRunManagementPresentation}
-                    sprintRulesGuide={sprintRulesGuidePresentation}
-                    sprintRulesGuideVisible={sprintRulesGuideVisible}
-                    tacticalProfile={resolvedTacticalProfilePresentation}
-                    resumableSprint={resumableSprint}
-                    onDismissSprintRulesGuide={() => {
-                      setSprintRulesGuideVisible(false);
-                      if (sprintGuidanceEnabled) {
-                        saveSprintGuideSeen("rules");
-                      }
-                    }}
-                    onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
-                    onOpenPersonalBestHub={(run) => {
-                      if (run) {
-                        selectPersonalBestPausedRun(run);
-                      }
-                      const showFirstEntryGuide = personalBestChallengeDesignPreview
-                        ? personalBestChallengeDesignPreview.homeGuideOnFirstEntry === true
-                          && !personalBestFirstEntryGuideAcknowledged
-                        : !service.getSurvivalPreferences().guideSeen;
-                      if (showFirstEntryGuide) {
-                        setPersonalBestGuideOpponentReplyEnabled(
-                          run?.opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
-                        );
-                        setPersonalBestHubVisible(false);
-                        setPersonalBestGuideIntent("first-entry");
-                        return;
-                      }
-                      setPersonalBestHubVisible(true);
-                    }}
-                    onSelectMode={setMode}
-                    onStartMode={(nextMode) => startSprint(nextMode)}
-                    onResumeSprint={resumeSprint}
-                    nativeRunReorderScrollController={nativeRunReorderScrollController}
-                    runReorderDesignPreview={runReorderDesignPreview}
-                    onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
-                  />
+                  <>
+                    <PracticeHome
+                      adaptiveLayout={adaptiveLayout}
+                      mode={mode}
+                      modes={practiceModeSummaries}
+                      currentRating={activeRunManagementPresentation
+                        ? selectedManagedRun?.elo ?? RATING_FLOOR
+                        : currentRating}
+                      progress={practiceProgress}
+                      personalBestChallenge={personalBestPresentation}
+                      runManagement={activeRunManagementPresentation}
+                      sprintRulesGuide={sprintRulesGuidePresentation}
+                      sprintRulesGuideVisible={sprintRulesGuideVisible}
+                      tacticalProfile={resolvedTacticalProfilePresentation}
+                      resumableSprint={resumableSprint}
+                      onDismissSprintRulesGuide={() => {
+                        setSprintRulesGuideVisible(false);
+                        if (sprintGuidanceEnabled) {
+                          saveSprintGuideSeen("rules");
+                        }
+                      }}
+                      onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
+                      onOpenPersonalBestHub={(run) => {
+                        if (run) {
+                          selectPersonalBestPausedRun(run);
+                        }
+                        const showFirstEntryGuide = personalBestChallengeDesignPreview
+                          ? personalBestChallengeDesignPreview.homeGuideOnFirstEntry === true
+                            && !personalBestFirstEntryGuideAcknowledged
+                          : !service.getSurvivalPreferences().guideSeen;
+                        if (showFirstEntryGuide) {
+                          setPersonalBestGuideOpponentReplyEnabled(
+                            run?.opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
+                          );
+                          setPersonalBestHubVisible(false);
+                          setPersonalBestGuideIntent("first-entry");
+                          return;
+                        }
+                        setPersonalBestHubVisible(true);
+                      }}
+                      onSelectMode={setMode}
+                      onStartMode={(nextMode) => startSprint(nextMode)}
+                      onResumeSprint={resumeSprint}
+                      nativeRunReorderScrollController={nativeRunReorderScrollController}
+                      runReorderDesignPreview={runReorderDesignPreview}
+                      onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
+                    />
+                    {service.countUserPuzzles() > 0 ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={{
+                          alignItems: "center",
+                          backgroundColor: appTheme.colors.surface,
+                          borderColor: appTheme.colors.border.default,
+                          borderRadius: appTheme.shape.control,
+                          borderWidth: 1,
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          marginTop: 10,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10
+                        }}
+                        testID="practice-home-my-game-puzzles"
+                        onPress={() => startMyGamePuzzlesSessionForOptions()}
+                      >
+                        <Text style={{ color: appTheme.colors.text.primary, fontSize: 14, fontWeight: "700" }}>
+                          {t("games.action.practicePuzzles", { count: service.countUserPuzzles() })}
+                        </Text>
+                        <Text style={{ color: appTheme.colors.accent.s500, fontSize: 13, fontWeight: "600" }}>
+                          {t("tabs.games")}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </>
                 ) : null}
 
                 {practiceRunEditorVisible && activeRunManagementPresentation ? (
@@ -5566,13 +5660,7 @@ export function PracticePocScreen({
                   store={service.gameReviewStore}
                   onBack={() => setActiveGameReviewId(null)}
                   onPracticeGamePuzzles={(gameId) => {
-                    setActiveGameReviewId(null);
-                    setError(null);
-                    try {
-                      adoptStartedSprint(service.startMyGamePuzzlesSession({ gameId }, captureLiveNowIso()));
-                    } catch (caught) {
-                      setError(errorMessage(caught));
-                    }
+                    startMyGamePuzzlesSessionForOptions({ gameId });
                   }}
                 />
               ) : (
@@ -5591,13 +5679,8 @@ export function PracticePocScreen({
                       setActiveGameReviewId(gameId);
                     }
                   }}
-                  onPracticeMyGamePuzzles={() => {
-                    setError(null);
-                    try {
-                      adoptStartedSprint(service.startMyGamePuzzlesSession({}, captureLiveNowIso()));
-                    } catch (caught) {
-                      setError(errorMessage(caught));
-                    }
+                  onPracticeMyGamePuzzles={(options) => {
+                    startMyGamePuzzlesSessionForOptions(options);
                   }}
                 />
               )

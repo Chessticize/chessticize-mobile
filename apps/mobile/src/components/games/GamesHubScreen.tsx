@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
+  diagnoseInGameWeaknesses,
   importChessComGames,
   importLichessGames,
   importPgnBatch,
@@ -32,6 +33,7 @@ import {
 import { FilterButton } from "../practice/shared/FilterButton.tsx";
 import { BatchAnalysisBanner } from "./BatchAnalysisBanner.tsx";
 import { GamesImportModal, type GamesImportTab } from "./GamesImportModal.tsx";
+import { InGameDiagnosisCard } from "./InGameDiagnosisCard.tsx";
 import {
   GAMES_STATUS_FILTERS,
   GAMES_TIME_CLASS_FILTERS,
@@ -57,6 +59,13 @@ import {
 
 const MAX_RECENT_BATCH_GAMES = 5;
 
+export interface MyGamePuzzlesLaunchOptions {
+  mode?: "standard" | "arrow_duel";
+  timeClass?: string;
+  themes?: string[];
+  gameId?: string;
+}
+
 export interface GamesHubScreenProps {
   service: PracticeService;
   adaptiveLayout?: AdaptiveLayout;
@@ -65,7 +74,7 @@ export interface GamesHubScreenProps {
   stockfish?: MobileStockfishCapabilities;
   nowMs?: number;
   onOpenGameReview: (gameId: string) => void;
-  onPracticeMyGamePuzzles?: () => void;
+  onPracticeMyGamePuzzles?: (options?: MyGamePuzzlesLaunchOptions) => void;
   importModalVisible?: boolean;
   onImportModalVisibleChange?: (visible: boolean) => void;
   initialImportTab?: GamesImportTab;
@@ -165,8 +174,22 @@ export function GamesHubScreen({
     void revision;
     const allGames = service.listImportedGames();
     const linkedAccounts = service.listLinkedAccounts();
-    const userPuzzleCount = service.countUserPuzzles();
-    return { allGames, linkedAccounts, userPuzzleCount };
+    const userPuzzles = service.listUserPuzzles();
+    const userPuzzleCount = userPuzzles.length;
+    const arrowDuelCount = userPuzzles.filter((puzzle) => puzzle.puzzleKind === "arrow_duel").length;
+    const lineCount = userPuzzles.filter((puzzle) => puzzle.puzzleKind === "line").length;
+    const diagnosis = diagnoseInGameWeaknesses({
+      games: allGames,
+      puzzles: userPuzzles
+    });
+    return {
+      allGames,
+      linkedAccounts,
+      userPuzzleCount,
+      arrowDuelCount,
+      lineCount,
+      diagnosis
+    };
   }, [revision, service]);
 
   const filteredGames = useMemo(
@@ -482,13 +505,47 @@ export function GamesHubScreen({
 
             <View style={styles.quickActionRow}>
               {snapshot.userPuzzleCount > 0 && onPracticeMyGamePuzzles ? (
-                <Button
-                  icon="play"
-                  label={t("games.action.practicePuzzles", { count: snapshot.userPuzzleCount })}
-                  stretch
-                  testID="games-practice-puzzles-cta"
-                  onPress={onPracticeMyGamePuzzles}
-                />
+                <>
+                  <Button
+                    icon="play"
+                    label={t("games.action.practicePuzzles", { count: snapshot.userPuzzleCount })}
+                    stretch
+                    testID="games-practice-puzzles-cta"
+                    onPress={() =>
+                      onPracticeMyGamePuzzles({
+                        ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
+                      })
+                    }
+                  />
+                  {snapshot.arrowDuelCount > 0 && snapshot.lineCount > 0 ? (
+                    <View style={styles.secondaryActionRow}>
+                      <Button
+                        label={`${t("common.arrowDuel")} (${snapshot.arrowDuelCount})`}
+                        size="compact"
+                        testID="games-practice-arrow-duel"
+                        variant="secondary"
+                        onPress={() =>
+                          onPracticeMyGamePuzzles({
+                            mode: "arrow_duel",
+                            ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
+                          })
+                        }
+                      />
+                      <Button
+                        label={`${t("common.standard")} (${snapshot.lineCount})`}
+                        size="compact"
+                        testID="games-practice-lines"
+                        variant="secondary"
+                        onPress={() =>
+                          onPracticeMyGamePuzzles({
+                            mode: "standard",
+                            ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
+                          })
+                        }
+                      />
+                    </View>
+                  ) : null}
+                </>
               ) : null}
               <View style={styles.secondaryActionRow}>
                 {unanalyzedGames.length > 0 && !batchBusy ? (
@@ -517,6 +574,19 @@ export function GamesHubScreen({
             onDismiss={batch.dismiss}
             onPause={batch.pause}
             onResume={batch.resume}
+          />
+
+          <InGameDiagnosisCard
+            diagnosis={snapshot.diagnosis}
+            onPracticeBlindspotTheme={
+              onPracticeMyGamePuzzles
+                ? (theme) =>
+                    onPracticeMyGamePuzzles({
+                      themes: [theme],
+                      ...(timeClassFilter !== "all" ? { timeClass: timeClassFilter } : {})
+                    })
+                : undefined
+            }
           />
 
           <View style={styles.filtersBlock} testID="games-filters">

@@ -1,4 +1,12 @@
-export { GamesHubScreen, type GamesHubScreenProps } from "./GamesHubScreen.tsx";
+export {
+  GamesHubScreen,
+  type GamesHubScreenProps,
+  type MyGamePuzzlesLaunchOptions
+} from "./GamesHubScreen.tsx";
+export {
+  InGameDiagnosisCard,
+  type InGameDiagnosisCardProps
+} from "./InGameDiagnosisCard.tsx";
 export {
   GamesImportModal,
   type GamesImportModalProps,
