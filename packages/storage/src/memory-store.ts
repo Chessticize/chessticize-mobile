@@ -5,6 +5,7 @@ import {
   createDefaultRating,
   defaultPracticeRuns,
   defaultSprintConfig,
+  effectivePuzzleRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   isUserGamePuzzleId,
@@ -1400,7 +1401,7 @@ export class MemoryStore implements PracticeStore {
       ...(session?.config.perPuzzleSeconds === undefined
         ? {}
         : { perPuzzleSeconds: session.config.perPuzzleSeconds }),
-      puzzleRating: puzzle.rating,
+      puzzleRating: effectivePuzzleRating(puzzle, attempt.mode),
       side: sideToMoveForHistoryPuzzle({ puzzle, mode: attempt.mode }),
       themes: puzzle.themes,
       curatedThemes: curatedPuzzleThemes(puzzle.themes)

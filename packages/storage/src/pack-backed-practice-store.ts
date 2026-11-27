@@ -106,7 +106,17 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   getPuzzle(id: string): Puzzle | undefined {
-    return this.userStore.getPuzzle(id) ?? this.puzzleSource.getPuzzle(id);
+    const cached = this.userStore.getPuzzle(id);
+    if (cached) {
+      if (cached.arrowDuelRating === undefined && cached.source !== "user_game") {
+        const fresh = this.puzzleSource.getPuzzle(id);
+        if (fresh?.arrowDuelRating !== undefined) {
+          return { ...cached, arrowDuelRating: fresh.arrowDuelRating };
+        }
+      }
+      return cached;
+    }
+    return this.puzzleSource.getPuzzle(id);
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {

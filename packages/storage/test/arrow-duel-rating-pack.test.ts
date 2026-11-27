@@ -4,7 +4,18 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { NodeSqliteDatabase, SQLitePuzzlePackSource } from "../src/index.ts";
+import {
+  beginArrowDuelPuzzle,
+  serializeCurrentPuzzleView,
+  type Puzzle
+} from "../../core/src/index.ts";
+import {
+  MemoryStore,
+  NodeSqliteDatabase,
+  PracticeService,
+  SQLitePuzzlePackSource,
+  SQLiteStore
+} from "../src/index.ts";
 
 test("SQLitePuzzlePackSource uses arrow_duel_rating for Arrow Duel selection and Survival while keeping rating for Standard", async () => {
   const dir = await mkdtemp(join(tmpdir(), "chessticize-ad-rating-pack-"));
@@ -112,4 +123,101 @@ test("SQLitePuzzlePackSource uses arrow_duel_rating for Arrow Duel selection and
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("Arrow Duel active puzzle view, local SQLite cache, History, and InMemory store use arrowDuelRating", async () => {
+  const puzzle: Puzzle = {
+    id: "ad_rating_e2e_1",
+    initialFen: "4k3/8/8/8/8/8/4R3/6K1 w - - 0 1",
+    solutionMoves: ["e2a2", "e8d7", "a2a7"],
+    rating: 2050,
+    arrowDuelRating: 780,
+    ratingDeviation: 75,
+    themes: ["fork"],
+    source: "lichess",
+    stockfishEval: 500,
+    stockfishBestMove: "e2e7",
+    stockfishEvalAfterFirstMove: -500
+  };
+
+  // 1. Live serialized current puzzle view exposes arrowDuelRating for Arrow Duel
+  const currentAd = beginArrowDuelPuzzle(puzzle);
+  const view = serializeCurrentPuzzleView(currentAd) as { rating: number };
+  assert.equal(view.rating, 780);
+
+  // 2. SQLiteStore persists puzzles.arrow_duel_rating and uses it for Arrow Duel History & Survival
+  const sqliteStore = new SQLiteStore(":memory:");
+  sqliteStore.migrate();
+  sqliteStore.seedPuzzles([puzzle]);
+  assert.equal(sqliteStore.getPuzzle(puzzle.id)?.arrowDuelRating, 780);
+  assert.equal(
+    sqliteStore.countSurvivalPuzzles({
+      challengeType: "arrow_duel",
+      level: { minRating: 700, maxRating: 900 }
+    }),
+    1
+  );
+  assert.equal(
+    sqliteStore.countSurvivalPuzzles({
+      challengeType: "arrow_duel",
+      level: { minRating: 1900, maxRating: 2200 }
+    }),
+    0
+  );
+
+  const sqliteService = new PracticeService(sqliteStore);
+  sqliteService.startSprint(
+    {
+      mode: "arrow_duel",
+      minRating: 700,
+      maxRating: 900,
+      opponentReply: { enabled: false, seconds: 10 }
+    },
+    "2026-11-27T12:00:00.000Z"
+  );
+  sqliteService.submitMove("e2e7", "2026-11-27T12:00:03.000Z");
+  const sqliteAdHistory = sqliteStore.getHistoryView({
+    mode: "arrow_duel",
+    timeRange: "max",
+    now: "2026-11-27T12:05:00.000Z"
+  });
+  assert.equal(sqliteAdHistory.attempts[0]?.puzzleRating, 780);
+
+  sqliteService.startSprint(
+    {
+      mode: "standard",
+      minRating: 1900,
+      maxRating: 2200
+    },
+    "2026-11-27T12:01:00.000Z"
+  );
+  sqliteService.submitMove("e8d7", "2026-11-27T12:01:02.000Z");
+  const sqliteStdHistory = sqliteStore.getHistoryView({
+    mode: "standard",
+    timeRange: "max",
+    now: "2026-11-27T12:05:00.000Z"
+  });
+  assert.equal(sqliteStdHistory.attempts[0]?.puzzleRating, 2050);
+  sqliteStore.close();
+
+  // 3. MemoryStore matches SQLite History behavior
+  const memStore = new MemoryStore();
+  memStore.seedPuzzles([puzzle]);
+  const memService = new PracticeService(memStore);
+  memService.startSprint(
+    {
+      mode: "arrow_duel",
+      minRating: 700,
+      maxRating: 900,
+      opponentReply: { enabled: false, seconds: 10 }
+    },
+    "2026-11-27T12:00:00.000Z"
+  );
+  memService.submitMove("e2e7", "2026-11-27T12:00:03.000Z");
+  const memHistory = memStore.getHistoryView({
+    mode: "arrow_duel",
+    timeRange: "max",
+    now: "2026-11-27T12:05:00.000Z"
+  });
+  assert.equal(memHistory.attempts[0]?.puzzleRating, 780);
 });

@@ -1229,6 +1229,13 @@
     "name": "puzzles",
     "columns": [
       {
+        "name": "arrow_duel_rating",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
         "name": "game_url",
         "type": "TEXT",
         "notNull": false,
