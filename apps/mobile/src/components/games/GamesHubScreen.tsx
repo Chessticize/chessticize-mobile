@@ -46,7 +46,6 @@ import {
   GAMES_STATUS_FILTERS,
   GAMES_TIME_CLASS_FILTERS,
   gameImportErrorMessage,
-  gameOpeningLabel,
   gameOpponentForUser,
   gameOutcomeForUser,
   gamePlatformLabel,
@@ -1162,13 +1161,13 @@ function GameRow({
   const opponent = gameOpponentForUser(game);
   const accuracy = gameUserAccuracy(game);
   const timeClass = gameTimeClassLabel(game.timeClass, locale);
-  const opening = gameOpeningLabel(game);
+  const colorLabel = game.userColor === "w" ? t("common.white") : t("common.black");
   const dateLabel = gameRelativeDateLabel(game.playedAt, nowMs, locale);
 
   const opponentLine = opponent.rating !== undefined
     ? `${opponent.username} (${opponent.rating})`
     : opponent.username;
-  const metaLine = [timeClass, opening, dateLabel].filter(Boolean).join(" · ");
+  const metaLine = [colorLabel, timeClass, dateLabel].filter(Boolean).join(" · ");
 
   const accentStyle =
     outcome === "win"
@@ -1246,9 +1245,17 @@ function GameRow({
         <AppText ellipsizeMode="tail" numberOfLines={1} variant="headline">
           {opponentLine}
         </AppText>
-        <AppText ellipsizeMode="tail" numberOfLines={1} tone="secondary" variant="footnote">
-          {metaLine}
-        </AppText>
+        <View style={styles.gameRowMeta}>
+          <View
+            style={[
+              styles.colorSwatch,
+              game.userColor === "w" ? styles.colorSwatchWhite : styles.colorSwatchBlack
+            ]}
+          />
+          <AppText ellipsizeMode="tail" numberOfLines={1} style={styles.gameRowMetaText} tone="secondary" variant="footnote">
+            {metaLine}
+          </AppText>
+        </View>
       </View>
       <View style={styles.gameRowTrailing}>{statusSlot}</View>
     </Pressable>
@@ -1450,6 +1457,27 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1,
     gap: 2,
     minWidth: 0
+  },
+  gameRowMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  gameRowMetaText: {
+    flex: 1
+  },
+  colorSwatch: {
+    borderColor: theme.colors.border.strong,
+    borderRadius: 2,
+    borderWidth: 1,
+    height: 9,
+    width: 9
+  },
+  colorSwatchWhite: {
+    backgroundColor: theme.name === "dark" ? theme.colors.surfaceInverse : theme.colors.surface
+  },
+  colorSwatchBlack: {
+    backgroundColor: theme.name === "dark" ? theme.colors.surfaceSunken : theme.colors.surfaceInverse
   },
   gameRowTrailing: {
     alignItems: "flex-end",
