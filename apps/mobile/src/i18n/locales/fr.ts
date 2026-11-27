@@ -1556,7 +1556,7 @@ export const frMessages = {
   "gameReview.verdict.evaluating": "Évaluation…",
   "gameReview.verdict.why": "Pourquoi ?",
   "gameReview.verdict.prevKey": "‹ Clé",
-  "gameReview.verdict.nextKey": "Clé ›",
+  "gameReview.verdict.nextKey": "Clé suiv. ›",
   "gameReview.verdict.prevKeyA11y": "Moment clé précédent",
   "gameReview.verdict.nextKeyA11y": "Moment clé suivant",
   "gameReview.why.title": "Réfutation",

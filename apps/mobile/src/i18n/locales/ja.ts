@@ -1527,7 +1527,7 @@ export const jaMessages = {
   "gameReview.verdict.evaluating": "評価中…",
   "gameReview.verdict.why": "理由",
   "gameReview.verdict.prevKey": "‹ 重要",
-  "gameReview.verdict.nextKey": "重要 ›",
+  "gameReview.verdict.nextKey": "次の重要手 ›",
   "gameReview.verdict.prevKeyA11y": "前の重要局面",
   "gameReview.verdict.nextKeyA11y": "次の重要局面",
   "gameReview.why.title": "反撃手順",

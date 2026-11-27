@@ -20,6 +20,7 @@ import {
   type GameReviewLiveEngine
 } from "../src/components/gameReview/index.tsx";
 import { PracticeViewportProvider } from "../src/components/PracticeViewport.tsx";
+import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback.ts";
 import { ThemeProvider } from "../src/theme/index.ts";
 
 const SAMPLE_PGN = [
@@ -778,13 +779,70 @@ describe("GameReviewScreen (#767)", () => {
       jest.useRealTimers();
     }
 
-    // ‹ Key jumps back to ply 7
+    // Single Next Key › button replaces ‹ Key / Key › and disables at the last key move (never wraps backwards).
+    expect(queryByTestId(renderer, "game-review-prev-critical")).toBeNull();
+    const nextCriticalBtn = findByTestId(renderer, "game-review-next-critical");
+    expect(nextCriticalBtn.props.disabled).toBe(true);
     act(() => {
-      findByTestId(renderer, "game-review-prev-critical").props.onPress();
+      nextCriticalBtn.props.onPress();
     });
     expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
-      PARSED_SAMPLE.plies[6]!.fenAfter
+      PARSED_SAMPLE.plies[8]!.fenAfter
     );
+
+    act(() => renderer.unmount());
+  });
+
+  it("emits move haptics on each move step when enabled and stays silent when disabled globally", () => {
+    const { store, service, game } = setupAnalyzedStore();
+    const moveFeedback = new FakeMoveFeedbackClient();
+    service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: { hapticsEnabled: true, soundEnabled: false }
+    });
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+            <GameReviewScreen
+              animateKeyMomentJump={false}
+              BoardComponent={MockReviewBoard}
+              game={game}
+              initialMode="moves"
+              moveFeedbackClient={moveFeedback}
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    // Initial render does not trigger a move haptic.
+    expect(moveFeedback.requests).toHaveLength(0);
+
+    // Stepping forward fires a haptic for each move.
+    act(() => {
+      findByTestId(renderer, "game-review-step-next").props.onPress();
+    });
+    expect(moveFeedback.requests).toHaveLength(1);
+    expect(moveFeedback.requests[0]).toEqual({
+      cue: "move",
+      playHaptic: true,
+      playSound: false
+    });
+
+    // Disabling global Haptic feedback silences subsequent moves immediately.
+    service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: { hapticsEnabled: false, soundEnabled: false }
+    });
+    act(() => {
+      findByTestId(renderer, "game-review-step-next").props.onPress();
+    });
+    expect(moveFeedback.requests).toHaveLength(1);
 
     act(() => renderer.unmount());
   });

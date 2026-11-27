@@ -1526,7 +1526,7 @@ export const zhHansMessages = {
   "gameReview.verdict.evaluating": "评估中…",
   "gameReview.verdict.why": "为什么？",
   "gameReview.verdict.prevKey": "‹ 关键",
-  "gameReview.verdict.nextKey": "关键 ›",
+  "gameReview.verdict.nextKey": "下一关键 ›",
   "gameReview.verdict.prevKeyA11y": "上一个关键回合",
   "gameReview.verdict.nextKeyA11y": "下一个关键回合",
   "gameReview.why.title": "惩罚变例",

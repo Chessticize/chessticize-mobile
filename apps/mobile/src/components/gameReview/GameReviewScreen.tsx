@@ -12,6 +12,11 @@ import type {
 import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import { makeStyles, useBoardAppearance, useTheme } from "../../theme/index.ts";
 import { useTranslation, type TranslateFn } from "../../i18n/index.ts";
+import {
+  emitCommittedMoveFeedback,
+  moveFeedbackCueForMove,
+  type MoveFeedbackClient
+} from "../../platform/moveFeedback.ts";
 import { buildPracticeAdaptiveLayout, PRACTICE_UI_PADDING } from "../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../PracticeViewport.tsx";
 import {
@@ -58,6 +63,7 @@ export interface GameReviewScreenProps {
   freeAnalysisDepth?: number;
   checkpointIntervalPlies?: number;
   animateKeyMomentJump?: boolean;
+  moveFeedbackClient?: MoveFeedbackClient | null;
   BoardComponent?: GameReviewBoardComponent;
   onBack?: () => void;
   onPracticeGamePuzzles?: (gameId: string) => void;
@@ -84,6 +90,7 @@ export function GameReviewScreen({
   freeAnalysisDepth,
   checkpointIntervalPlies,
   animateKeyMomentJump,
+  moveFeedbackClient = null,
   BoardComponent = Chessboard as unknown as GameReviewBoardComponent,
   onBack,
   onPracticeGamePuzzles
@@ -153,6 +160,36 @@ export function GameReviewScreen({
     lastMove,
     theme.colors.board.lastMoveSquare
   );
+
+  const prevBoardFenRef = useRef<string | null>(null);
+  const lastMoveHapticMsRef = useRef<number>(0);
+  useEffect(() => {
+    const prevFen = prevBoardFenRef.current;
+    prevBoardFenRef.current = controller.currentFen;
+    if (prevFen === null || prevFen === controller.currentFen || !moveFeedbackClient) {
+      return;
+    }
+    const now = Date.now();
+    if (controller.isFastForwarding && now - lastMoveHapticMsRef.current < 75) {
+      return;
+    }
+    lastMoveHapticMsRef.current = now;
+    const cue =
+      (controller.currentLastMoveUci
+        ? moveFeedbackCueForMove(prevFen, controller.currentLastMoveUci)
+        : null) ?? "move";
+    void emitCommittedMoveFeedback(
+      moveFeedbackClient,
+      { actor: "user", cue },
+      practiceService.getSettings().moveFeedback
+    );
+  }, [
+    controller.currentFen,
+    controller.currentLastMoveUci,
+    controller.isFastForwarding,
+    moveFeedbackClient,
+    practiceService
+  ]);
 
   const handleBoardMove = (result: MoveResult) => {
     controller.submitBoardMove(formatUci(result.move));
@@ -249,10 +286,10 @@ export function GameReviewScreen({
         criticalCount={controller.criticalPlies.length}
         currentPly={activeSelectedPly}
         currentPlyEval={controller.currentPlyEval}
+        hasNextCritical={controller.hasNextCritical}
         isHidingAnswer={false}
         isScanning={isScanning}
         onNextCritical={controller.jumpToNextCriticalPly}
-        onPrevCritical={controller.jumpToPrevCriticalPly}
         onToggleWhy={controller.toggleWhyRefutation}
         whyOpen={controller.whyOpen}
       />
@@ -630,20 +667,20 @@ function MoveVerdictStrip({
   criticalCount,
   currentPly,
   currentPlyEval,
+  hasNextCritical,
   isHidingAnswer,
   isScanning,
   onNextCritical,
-  onPrevCritical,
   onToggleWhy,
   whyOpen
 }: {
   criticalCount: number;
   currentPly: number;
   currentPlyEval: GamePlyEvaluation | null;
+  hasNextCritical: boolean;
   isHidingAnswer: boolean;
   isScanning: boolean;
   onNextCritical: () => void;
-  onPrevCritical: () => void;
   onToggleWhy: () => void;
   whyOpen: boolean;
 }): React.JSX.Element {
@@ -727,30 +764,23 @@ function MoveVerdictStrip({
           </Pressable>
         ) : null}
         {criticalCount > 0 ? (
-          <>
-            <Pressable
-              accessibilityLabel={t("gameReview.verdict.prevKeyA11y")}
-              accessibilityRole="button"
-              onPress={onPrevCritical}
-              style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
-              testID="game-review-prev-critical"
-            >
-              <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
-                {t("gameReview.verdict.prevKey")}
-              </AppText>
-            </Pressable>
-            <Pressable
-              accessibilityLabel={t("gameReview.verdict.nextKeyA11y")}
-              accessibilityRole="button"
-              onPress={onNextCritical}
-              style={({ pressed }) => [styles.criticalNavButton, pressed ? styles.pressed : null]}
-              testID="game-review-next-critical"
-            >
-              <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
-                {t("gameReview.verdict.nextKey")}
-              </AppText>
-            </Pressable>
-          </>
+          <Pressable
+            accessibilityLabel={t("gameReview.verdict.nextKeyA11y")}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !hasNextCritical }}
+            disabled={!hasNextCritical}
+            onPress={onNextCritical}
+            style={({ pressed }) => [
+              styles.criticalNavButton,
+              !hasNextCritical ? styles.criticalNavButtonDisabled : null,
+              pressed && hasNextCritical ? styles.pressed : null
+            ]}
+            testID="game-review-next-critical"
+          >
+            <AppText maxFontSizeMultiplier={1.2} style={styles.criticalNavText} variant="caption">
+              {t("gameReview.verdict.nextKey")}
+            </AppText>
+          </Pressable>
         ) : null}
       </View>
     </View>
@@ -1147,17 +1177,22 @@ const useStyles = makeStyles((theme) => ({
   },
   criticalNavButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceSunken,
-    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.accent.s100,
+    borderColor: theme.colors.accent.s300,
     borderRadius: theme.shape.capsule,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 28,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 3
   },
+  criticalNavButtonDisabled: {
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    opacity: 0.45
+  },
   criticalNavText: {
-    color: theme.colors.text.primary,
+    color: theme.colors.accent.s600,
     fontWeight: theme.fontWeight.bold
   },
   analysisIconButton: {

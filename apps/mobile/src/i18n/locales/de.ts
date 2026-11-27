@@ -1556,7 +1556,7 @@ export const deMessages = {
   "gameReview.verdict.evaluating": "Bewerte…",
   "gameReview.verdict.why": "Warum?",
   "gameReview.verdict.prevKey": "‹ Fokus",
-  "gameReview.verdict.nextKey": "Fokus ›",
+  "gameReview.verdict.nextKey": "Nächster ›",
   "gameReview.verdict.prevKeyA11y": "Vorheriger Schlüsselmoment",
   "gameReview.verdict.nextKeyA11y": "Nächster Schlüsselmoment",
   "gameReview.why.title": "Widerlegung",

@@ -1526,7 +1526,7 @@ export const koMessages = {
   "gameReview.verdict.evaluating": "평가 중…",
   "gameReview.verdict.why": "이유?",
   "gameReview.verdict.prevKey": "‹ 핵심",
-  "gameReview.verdict.nextKey": "핵심 ›",
+  "gameReview.verdict.nextKey": "다음 핵심 ›",
   "gameReview.verdict.prevKeyA11y": "이전 핵심 순간",
   "gameReview.verdict.nextKeyA11y": "다음 핵심 순간",
   "gameReview.why.title": "응징 수순",

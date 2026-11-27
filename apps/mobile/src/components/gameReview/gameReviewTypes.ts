@@ -179,6 +179,7 @@ export interface GameReviewController {
   currentWhiteWinPercent: number;
   currentLastMoveUci: string | null;
   criticalPlies: number[];
+  hasNextCritical: boolean;
   flipped: boolean;
   mode: GameReviewMode;
   keyMoments: KeyMomentItem[];

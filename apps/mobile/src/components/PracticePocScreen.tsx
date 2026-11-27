@@ -5107,6 +5107,7 @@ export function PracticePocScreen({
               engine={getSharedGameReviewArbiter()}
               game={activeReviewGame}
               initialPly={activeGameReviewInitialPly ?? undefined}
+              moveFeedbackClient={moveFeedbackClient}
               practiceService={service}
               store={service.gameReviewStore}
               onBack={() => {

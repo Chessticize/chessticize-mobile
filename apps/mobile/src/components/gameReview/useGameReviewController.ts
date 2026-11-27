@@ -1331,6 +1331,11 @@ export function useGameReviewController({
     setScanTrigger((value) => value + 1);
   }, [analysisStatus]);
 
+  const hasNextCritical = useMemo(() => {
+    const anchorPly = mode === "moments" && activeMoment ? activeMoment.ply : currentPly;
+    return criticalPlies.some((ply) => ply > anchorPly);
+  }, [activeMoment, criticalPlies, currentPly, mode]);
+
   const jumpToNextCriticalPly = useCallback(() => {
     if (criticalPlies.length === 0) {
       return;
@@ -1338,7 +1343,10 @@ export function useGameReviewController({
     const anchorPly =
       fastForwardTargetPlyRef.current ??
       (mode === "moments" && activeMoment ? activeMoment.ply : currentPly);
-    const nextPly = criticalPlies.find((ply) => ply > anchorPly) ?? criticalPlies[0]!;
+    const nextPly = criticalPlies.find((ply) => ply > anchorPly);
+    if (nextPly === undefined) {
+      return;
+    }
     const matchingMomentIndex = keyMoments.findIndex((item) => item.ply === nextPly);
     animateToPly(nextPly, () => {
       if (matchingMomentIndex >= 0) {
@@ -1403,6 +1411,7 @@ export function useGameReviewController({
     currentWhiteWinPercent,
     currentLastMoveUci,
     criticalPlies,
+    hasNextCritical,
     flipped,
     mode,
     keyMoments,

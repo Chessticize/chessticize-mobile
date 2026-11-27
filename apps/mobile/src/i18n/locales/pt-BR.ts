@@ -1556,7 +1556,7 @@ export const ptBRMessages = {
   "gameReview.verdict.evaluating": "Avaliando…",
   "gameReview.verdict.why": "Por quê?",
   "gameReview.verdict.prevKey": "‹ Chave",
-  "gameReview.verdict.nextKey": "Chave ›",
+  "gameReview.verdict.nextKey": "Próx. chave ›",
   "gameReview.verdict.prevKeyA11y": "Momento-chave anterior",
   "gameReview.verdict.nextKeyA11y": "Próximo momento-chave",
   "gameReview.why.title": "Refutação",

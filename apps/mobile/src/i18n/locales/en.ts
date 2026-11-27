@@ -1556,7 +1556,7 @@ export const enMessages = {
   "gameReview.verdict.evaluating": "Evaluating…",
   "gameReview.verdict.why": "Why?",
   "gameReview.verdict.prevKey": "‹ Key",
-  "gameReview.verdict.nextKey": "Key ›",
+  "gameReview.verdict.nextKey": "Next Key ›",
   "gameReview.verdict.prevKeyA11y": "Previous key moment",
   "gameReview.verdict.nextKeyA11y": "Next key moment",
   "gameReview.why.title": "Punishment line",
