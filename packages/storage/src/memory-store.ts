@@ -7,6 +7,7 @@ import {
   defaultSprintConfig,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
+  isUserGamePuzzleId,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
   namedThemesForSelection,
@@ -30,10 +31,12 @@ import type {
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
+  ExtractedGamePuzzle,
   HistoryAttemptView,
   HistoryEloPoint,
   HistoryQuery,
   HistoryView,
+  ImportedGameDraft,
   Puzzle,
   PracticeRunRecord,
   RatingRecord,
@@ -47,6 +50,27 @@ import type {
   SurvivalBestRecord,
   SurvivalPreferences
 } from "../../core/src/index.ts";
+import { selectUserGamePuzzlesFromStore } from "./composite-puzzle-source.ts";
+import {
+  extractedGamePuzzleToStoredUserPuzzle,
+  filterOutUserGameProgressV2Data,
+  inferUserGameMetaFromStoredGame,
+  isUserGameSprintSession,
+  matchesGameAnalysisStatusFilter,
+  matchesUserPuzzleFilter,
+  sameImportedGameDraft,
+  storedUserPuzzleToPuzzle,
+  type GameListFilter,
+  type LinkedGameAccount,
+  type LinkedGameAccountPlatform,
+  type ReplaceGameUserPuzzlesMeta,
+  type SaveGamePlyEvaluationsStatusUpdate,
+  type StoredGamePlyEval,
+  type StoredImportedGame,
+  type StoredUserPuzzle,
+  type UpsertImportedGamesResult,
+  type UserPuzzleFilter
+} from "./game-review-store.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
   ClearSyncedHistoryResult,
@@ -102,6 +126,10 @@ export class MemoryStore implements PracticeStore {
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
   private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
+  private readonly linkedAccounts = new Map<string, LinkedGameAccount>();
+  private readonly importedGames = new Map<string, StoredImportedGame>();
+  private readonly gamePlyEvals = new Map<string, Map<number, StoredGamePlyEval>>();
+  private readonly userPuzzles = new Map<string, StoredUserPuzzle>();
   private settings = defaultPracticeSettings();
   private appReviewRequestAttempt: AppReviewRequestAttempt | undefined;
   private tacticalProfileSourceRevision = 0;
@@ -117,27 +145,70 @@ export class MemoryStore implements PracticeStore {
   }
 
   countPuzzles(filter?: PuzzleSelectionFilter): number {
-    return filter === undefined
-      ? this.puzzles.size
-      : this.selectPuzzles(filter).length;
+    if (filter === undefined) {
+      return [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game").length;
+    }
+    return this.selectPuzzles(filter).length;
   }
 
   getPuzzle(id: string): Puzzle | undefined {
+    if (isUserGamePuzzleId(id)) {
+      const stored = this.userPuzzles.get(id);
+      if (stored) {
+        return storedUserPuzzleToPuzzle(stored);
+      }
+    }
     return this.puzzles.get(id);
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
+    const source = filter.source ?? "pack";
+    if (source === "user_game") {
+      return selectUserGamePuzzlesFromStore(this, filter);
+    }
+
+    const explicitUserIds =
+      source === "pack" && filter.includeIds !== undefined
+        ? new Set(filter.includeIds.filter(isUserGamePuzzleId))
+        : undefined;
+    const packPool = [...this.puzzles.values()].filter(
+      (puzzle) =>
+        puzzle.source !== "user_game" ||
+        (explicitUserIds !== undefined && explicitUserIds.has(puzzle.id))
+    );
+
+    if (source === "pack") {
+      return selectUniquePuzzles({
+        puzzles: packPool.sort((left, right) =>
+          filter.preferredRating === undefined
+            ? left.rating - right.rating || left.id.localeCompare(right.id)
+            : Math.abs(left.rating - filter.preferredRating) -
+                Math.abs(right.rating - filter.preferredRating) ||
+              left.id.localeCompare(right.id)
+        ),
+        mode: filter.mode,
+        limit: filter.limit,
+        ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+        ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+        ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        ...(filter.themes === undefined ? {} : { themes: filter.themes }),
+        ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
+        ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
+        ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+      });
+    }
+
+    // source === "all"
+    const userPuzzles = selectUserGamePuzzlesFromStore(this, filter);
+    if (filter.timeClass !== undefined || filter.gameId !== undefined) {
+      return userPuzzles;
+    }
+    const packSelected = this.selectPuzzles({ ...filter, source: "pack" });
     return selectUniquePuzzles({
-      puzzles: [...this.puzzles.values()].sort((left, right) =>
-        filter.preferredRating === undefined
-          ? left.rating - right.rating || left.id.localeCompare(right.id)
-          : Math.abs(left.rating - filter.preferredRating) -
-              Math.abs(right.rating - filter.preferredRating) ||
-            left.id.localeCompare(right.id)
-      ),
+      puzzles: [...userPuzzles, ...packSelected],
       mode: filter.mode,
       limit: filter.limit,
-      ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+      allPuzzlesArrowDuelEligible: filter.mode === "arrow_duel",
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
@@ -150,20 +221,33 @@ export class MemoryStore implements PracticeStore {
   countSurvivalPuzzles(
     input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
   ): number {
-    return eligibleSurvivalPuzzles([...this.puzzles.values()], input).length;
+    return eligibleSurvivalPuzzles(
+      [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game"),
+      input
+    ).length;
   }
 
   selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
-    return selectSurvivalPuzzleBatchFromPuzzles([...this.puzzles.values()], input);
+    return selectSurvivalPuzzleBatchFromPuzzles(
+      [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game"),
+      input
+    );
   }
 
   selectPuzzlesForRatingBands(
     input: RatingBandPuzzleSelectionInput
   ): RatingBandPuzzleSelection[] {
-    return selectUniquePuzzlesForRatingBands(
-      [...this.puzzles.values()],
-      input
-    );
+    const source = input.filter.source ?? "pack";
+    const pool =
+      source === "user_game"
+        ? this.listUserPuzzles({ includeArchived: false }).map(storedUserPuzzleToPuzzle)
+        : source === "all"
+          ? [
+              ...[...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game"),
+              ...this.listUserPuzzles({ includeArchived: false }).map(storedUserPuzzleToPuzzle)
+            ]
+          : [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game");
+    return selectUniquePuzzlesForRatingBands(pool, input);
   }
 
   getRating(key: string): RatingRecord {
@@ -454,14 +538,14 @@ export class MemoryStore implements PracticeStore {
   }
 
   private exportProgressV2Data(): LocalDataExport {
-    return {
+    return filterOutUserGameProgressV2Data({
       ...this.exportLocalData(),
       ratings: [...this.ratings.values()]
         .map((rating) => normalizeRatingRecord(rating))
         .sort((left, right) =>
           left.key.localeCompare(right.key) || left.generation - right.generation
         )
-    };
+    });
   }
 
   listSprintSessions(): ExportedSprintSession[] {
@@ -700,13 +784,15 @@ export class MemoryStore implements PracticeStore {
       sprintSessions: [...this.sessions.values()].filter((session) => !isOpenSprint(session)).length
     };
     this.progressV2.stageLocalTombstones([
-      ...this.attempts.map((attempt) => ({
-        kind: "attempt" as const,
-        entityKey: attempt.id,
-        deletedAt: now
-      })),
+      ...this.attempts
+        .filter((attempt) => !isUserGamePuzzleId(attempt.puzzleId))
+        .map((attempt) => ({
+          kind: "attempt" as const,
+          entityKey: attempt.id,
+          deletedAt: now
+        })),
       ...[...this.sessions.values()]
-        .filter((session) => !isOpenSprint(session))
+        .filter((session) => !isOpenSprint(session) && !isUserGameSprintSession(exportedSprintSessionFromState(session)))
         .map((session) => ({
           kind: "sprint_session" as const,
           entityKey: session.id,
@@ -779,9 +865,14 @@ export class MemoryStore implements PracticeStore {
     return next;
   }
 
-  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
+  enrollReview(
+    context: ReviewContext,
+    now: string,
+    initiatingAttemptId?: string,
+    timeZone?: string
+  ): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
-    const next = enrollReviewContext(context, now, previous);
+    const next = enrollReviewContext(context, now, previous, timeZone);
     let initiatingAttempt: { index: number; next: AttemptHistoryRow } | undefined;
     if (initiatingAttemptId) {
       const index = this.attempts.findIndex((attempt) => attempt.id === initiatingAttemptId);
@@ -927,6 +1018,281 @@ export class MemoryStore implements PracticeStore {
 
   transaction<T>(work: () => T): T {
     return work();
+  }
+
+  listLinkedAccounts(): LinkedGameAccount[] {
+    return [...this.linkedAccounts.values()]
+      .map((account) => ({ ...account }))
+      .sort(
+        (left, right) =>
+          left.platform.localeCompare(right.platform) ||
+          left.username.toLowerCase().localeCompare(right.username.toLowerCase())
+      );
+  }
+
+  upsertLinkedAccount(
+    account: Omit<LinkedGameAccount, "createdAt"> & { createdAt?: string }
+  ): LinkedGameAccount {
+    const username = account.username.trim();
+    if (!username) {
+      throw new Error("Linked account username must not be empty");
+    }
+    const key = linkedAccountMapKey(account.platform, username);
+    const existing = this.linkedAccounts.get(key);
+    const stored: LinkedGameAccount = {
+      platform: account.platform,
+      username,
+      ...(account.lastSyncedAt === undefined
+        ? existing?.lastSyncedAt === undefined
+          ? {}
+          : { lastSyncedAt: existing.lastSyncedAt }
+        : { lastSyncedAt: account.lastSyncedAt }),
+      createdAt: existing?.createdAt ?? account.createdAt ?? new Date().toISOString()
+    };
+    this.linkedAccounts.set(key, stored);
+    return { ...stored };
+  }
+
+  removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    this.linkedAccounts.delete(linkedAccountMapKey(platform, username.trim()));
+  }
+
+  upsertImportedGames(
+    games: readonly ImportedGameDraft[],
+    nowIso = new Date().toISOString()
+  ): UpsertImportedGamesResult {
+    let inserted = 0;
+    let skipped = 0;
+    let updated = 0;
+    const seenInBatch = new Set<string>();
+
+    for (const draft of games) {
+      if (seenInBatch.has(draft.id)) {
+        skipped += 1;
+        continue;
+      }
+      seenInBatch.add(draft.id);
+      const existing = this.importedGames.get(draft.id);
+      if (!existing) {
+        this.importedGames.set(draft.id, {
+          ...cloneImportedGameDraft(draft),
+          analysisStatus: "none",
+          analysisCheckpointPly: 0,
+          puzzleCount: 0,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        });
+        inserted += 1;
+        continue;
+      }
+      if (sameImportedGameDraft(existing, draft)) {
+        skipped += 1;
+        continue;
+      }
+      this.importedGames.set(draft.id, {
+        ...cloneImportedGameDraft(draft),
+        analysisStatus: existing.analysisStatus,
+        analysisCheckpointPly: existing.analysisCheckpointPly,
+        ...(existing.whiteAccuracy === undefined ? {} : { whiteAccuracy: existing.whiteAccuracy }),
+        ...(existing.blackAccuracy === undefined ? {} : { blackAccuracy: existing.blackAccuracy }),
+        puzzleCount: existing.puzzleCount,
+        createdAt: existing.createdAt,
+        updatedAt: nowIso
+      });
+      updated += 1;
+    }
+
+    return { inserted, skipped, updated };
+  }
+
+  listImportedGames(filter?: GameListFilter): StoredImportedGame[] {
+    const filtered = [...this.importedGames.values()]
+      .filter((game) => {
+        if (filter?.platform !== undefined && game.platform !== filter.platform) {
+          return false;
+        }
+        if (filter?.timeClass !== undefined && game.timeClass !== filter.timeClass) {
+          return false;
+        }
+        return matchesGameAnalysisStatusFilter(game.analysisStatus, filter?.analysisStatus);
+      })
+      .sort((left, right) => right.playedAt.localeCompare(left.playedAt) || right.id.localeCompare(left.id));
+
+    const offset = Math.max(0, Math.trunc(filter?.offset ?? 0));
+    const sliced =
+      filter?.limit === undefined
+        ? filtered.slice(offset)
+        : filtered.slice(offset, offset + Math.max(0, Math.trunc(filter.limit)));
+    return sliced.map(cloneStoredImportedGame);
+  }
+
+  countImportedGames(filter?: Omit<GameListFilter, "limit" | "offset">): number {
+    return this.listImportedGames(filter).length;
+  }
+
+  getImportedGame(gameId: string): StoredImportedGame | undefined {
+    const game = this.importedGames.get(gameId);
+    return game ? cloneStoredImportedGame(game) : undefined;
+  }
+
+  deleteImportedGame(gameId: string): void {
+    this.importedGames.delete(gameId);
+    this.gamePlyEvals.delete(gameId);
+    for (const [puzzleId, puzzle] of this.userPuzzles) {
+      if (puzzle.gameId === gameId) {
+        this.userPuzzles.delete(puzzleId);
+        if (!this.isPuzzleReferencedByHistoryOrReview(puzzleId)) {
+          this.puzzles.delete(puzzleId);
+        }
+      }
+    }
+  }
+
+  saveGamePlyEvaluations(
+    gameId: string,
+    evals: readonly StoredGamePlyEval[],
+    statusUpdate: SaveGamePlyEvaluationsStatusUpdate
+  ): void {
+    const game = this.importedGames.get(gameId);
+    if (!game) {
+      throw new Error(`Imported game ${gameId} was not found`);
+    }
+    let gameEvals = this.gamePlyEvals.get(gameId);
+    if (!gameEvals) {
+      gameEvals = new Map<number, StoredGamePlyEval>();
+      this.gamePlyEvals.set(gameId, gameEvals);
+    }
+    for (const item of evals) {
+      gameEvals.set(item.ply, { ...item, gameId });
+    }
+    const nextGame: StoredImportedGame = {
+      ...game,
+      analysisStatus: statusUpdate.analysisStatus,
+      analysisCheckpointPly: statusUpdate.analysisCheckpointPly,
+      ...(statusUpdate.whiteAccuracy === undefined
+        ? game.whiteAccuracy === undefined
+          ? {}
+          : { whiteAccuracy: game.whiteAccuracy }
+        : { whiteAccuracy: statusUpdate.whiteAccuracy }),
+      ...(statusUpdate.blackAccuracy === undefined
+        ? game.blackAccuracy === undefined
+          ? {}
+          : { blackAccuracy: game.blackAccuracy }
+        : { blackAccuracy: statusUpdate.blackAccuracy }),
+      updatedAt: statusUpdate.updatedAt ?? new Date().toISOString()
+    };
+    this.importedGames.set(gameId, nextGame);
+  }
+
+  listGamePlyEvaluations(gameId: string): StoredGamePlyEval[] {
+    const gameEvals = this.gamePlyEvals.get(gameId);
+    if (!gameEvals) {
+      return [];
+    }
+    return [...gameEvals.values()]
+      .sort((left, right) => left.ply - right.ply)
+      .map((item) => ({ ...item }));
+  }
+
+  replaceGameUserPuzzles(
+    gameId: string,
+    puzzles: readonly ExtractedGamePuzzle[],
+    gameMeta: ReplaceGameUserPuzzlesMeta
+  ): StoredUserPuzzle[] {
+    const game = this.importedGames.get(gameId);
+    if (!game) {
+      throw new Error(`Imported game ${gameId} was not found`);
+    }
+    const effectiveMeta = inferUserGameMetaFromStoredGame(game, gameMeta);
+    const nowIso = effectiveMeta.nowIso ?? new Date().toISOString();
+    const existingById = new Map<string, StoredUserPuzzle>();
+    for (const stored of this.userPuzzles.values()) {
+      if (stored.gameId === gameId) {
+        existingById.set(stored.id, stored);
+      }
+    }
+
+    const nextStored: StoredUserPuzzle[] = [];
+    const nextIds = new Set<string>();
+    for (const extracted of puzzles) {
+      const candidate = extractedGamePuzzleToStoredUserPuzzle(
+        gameId,
+        extracted,
+        { ...effectiveMeta, nowIso }
+      );
+      if (nextIds.has(candidate.id)) {
+        continue;
+      }
+      nextIds.add(candidate.id);
+      const prior = existingById.get(candidate.id);
+      const stored = prior
+        ? extractedGamePuzzleToStoredUserPuzzle(
+            gameId,
+            extracted,
+            { ...effectiveMeta, nowIso },
+            { createdAt: prior.createdAt, archived: prior.archived }
+          )
+        : candidate;
+      nextStored.push(stored);
+    }
+
+    for (const priorId of existingById.keys()) {
+      if (!nextIds.has(priorId)) {
+        this.userPuzzles.delete(priorId);
+        if (!this.isPuzzleReferencedByHistoryOrReview(priorId)) {
+          this.puzzles.delete(priorId);
+        }
+      }
+    }
+
+    for (const stored of nextStored) {
+      this.userPuzzles.set(stored.id, cloneStoredUserPuzzle(stored));
+      this.puzzles.set(stored.id, storedUserPuzzleToPuzzle(stored));
+    }
+
+    this.importedGames.set(gameId, {
+      ...game,
+      puzzleCount: nextStored.length,
+      updatedAt: nowIso
+    });
+
+    return nextStored.map(cloneStoredUserPuzzle);
+  }
+
+  listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
+    const filtered = [...this.userPuzzles.values()]
+      .filter((puzzle) => matchesUserPuzzleFilter(puzzle, filter))
+      .sort(compareStoredUserPuzzles);
+    const sliced =
+      filter?.limit === undefined
+        ? filtered
+        : filtered.slice(0, Math.max(0, Math.trunc(filter.limit)));
+    return sliced.map(cloneStoredUserPuzzle);
+  }
+
+  countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
+    return this.listUserPuzzles(filter).length;
+  }
+
+  getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
+    const stored = this.userPuzzles.get(puzzleId);
+    return stored ? cloneStoredUserPuzzle(stored) : undefined;
+  }
+
+  archiveUserPuzzle(puzzleId: string, archived = true): void {
+    const existing = this.userPuzzles.get(puzzleId);
+    if (!existing) {
+      return;
+    }
+    this.userPuzzles.set(puzzleId, { ...existing, archived });
+  }
+
+  private isPuzzleReferencedByHistoryOrReview(puzzleId: string): boolean {
+    return (
+      this.attempts.some((attempt) => attempt.puzzleId === puzzleId) ||
+      [...this.reviewQueue.values()].some((review) => review.puzzleId === puzzleId) ||
+      [...this.reviewRemovals.values()].some((removal) => removal.puzzleId === puzzleId)
+    );
   }
 
   private listReviewRemovals(): ReviewScheduleRemoval[] {
@@ -1101,7 +1467,48 @@ function isTacticalProfileEvidenceSession(
     session.config &&
     session.config.tacticalFocus === undefined &&
     session.config.survival === undefined &&
+    session.config.userGamePuzzles === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
+  );
+}
+
+function linkedAccountMapKey(platform: LinkedGameAccountPlatform, username: string): string {
+  return `${platform}\u0000${username.toLowerCase()}`;
+}
+
+function cloneImportedGameDraft(draft: ImportedGameDraft): ImportedGameDraft {
+  return {
+    ...draft,
+    white: { ...draft.white },
+    black: { ...draft.black }
+  };
+}
+
+function cloneStoredImportedGame(game: StoredImportedGame): StoredImportedGame {
+  return {
+    ...game,
+    white: { ...game.white },
+    black: { ...game.black }
+  };
+}
+
+function cloneStoredUserPuzzle(puzzle: StoredUserPuzzle): StoredUserPuzzle {
+  return {
+    ...puzzle,
+    solutionMoves: [...puzzle.solutionMoves],
+    themes: [...puzzle.themes],
+    ...(puzzle.punishmentLine === undefined ? {} : { punishmentLine: [...puzzle.punishmentLine] })
+  };
+}
+
+function compareStoredUserPuzzles(left: StoredUserPuzzle, right: StoredUserPuzzle): number {
+  const leftPlayedAt = left.playedAt ?? "";
+  const rightPlayedAt = right.playedAt ?? "";
+  return (
+    rightPlayedAt.localeCompare(leftPlayedAt) ||
+    right.createdAt.localeCompare(left.createdAt) ||
+    (right.caliberScore ?? 0) - (left.caliberScore ?? 0) ||
+    left.id.localeCompare(right.id)
   );
 }
 

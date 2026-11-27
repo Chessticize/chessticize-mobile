@@ -9,6 +9,7 @@ import {
   defaultPuzzleTimingPolicy,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
+  isUserGamePuzzleId,
   normalizeThemeSelection,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
@@ -37,11 +38,17 @@ import type {
   AttemptOutcome,
   AttemptResult,
   AttemptTimingStatus,
+  ClockBucket,
   CustomSprintConfigRecord,
+  ExtractedGamePuzzle,
+  GamePlatform,
+  GamePuzzleMomentKind,
   HistoryAttemptView,
   HistoryEloPoint,
   HistoryQuery,
   HistoryView,
+  ImportedGameDraft,
+  MoveClassification,
   Puzzle,
   PracticeRunKind,
   PracticeRunRecord,
@@ -119,6 +126,26 @@ import type {
   ProgressV2StatePatch,
   ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
+import { selectUserGamePuzzlesFromStore } from "./composite-puzzle-source.ts";
+import {
+  extractedGamePuzzleToStoredUserPuzzle,
+  filterOutUserGameProgressV2Data,
+  inferUserGameMetaFromStoredGame,
+  matchesUserPuzzleFilter,
+  sameImportedGameDraft,
+  storedUserPuzzleToPuzzle,
+  type GameAnalysisStatus,
+  type GameListFilter,
+  type LinkedGameAccount,
+  type LinkedGameAccountPlatform,
+  type ReplaceGameUserPuzzlesMeta,
+  type SaveGamePlyEvaluationsStatusUpdate,
+  type StoredGamePlyEval,
+  type StoredImportedGame,
+  type StoredUserPuzzle,
+  type UpsertImportedGamesResult,
+  type UserPuzzleFilter
+} from "./game-review-store.ts";
 
 interface AttemptHistoryDbRow extends Omit<
   AttemptHistoryRow,
@@ -184,7 +211,7 @@ interface PuzzleRow {
   themes_json: string;
   game_url: string | null;
   opening_tags_json: string;
-  source: "lichess" | "synthetic";
+  source: "lichess" | "synthetic" | "user_game";
   stockfish_eval: number | null;
   stockfish_bestmove: string | null;
   stockfish_eval_after_first_move: number | null;
@@ -362,6 +389,94 @@ interface ProgressV2TombstoneRow {
   deleted_at: string;
 }
 
+interface LinkedAccountRow {
+  platform: LinkedGameAccountPlatform;
+  username: string;
+  last_synced_at: string | null;
+  created_at: string;
+}
+
+interface ImportedGameRow {
+  id: string;
+  platform: GamePlatform;
+  username: string;
+  user_color: "w" | "b";
+  played_at: string;
+  time_control: string;
+  time_class: ImportedGameDraft["timeClass"];
+  rated: number;
+  url: string | null;
+  white_username: string;
+  white_rating: number | null;
+  white_is_ai: number;
+  black_username: string;
+  black_rating: number | null;
+  black_is_ai: number;
+  winner: ImportedGameDraft["winner"];
+  termination: ImportedGameDraft["termination"];
+  eco: string | null;
+  opening: string | null;
+  pgn: string;
+  analysis_status: GameAnalysisStatus;
+  analysis_checkpoint_ply: number;
+  white_accuracy: number | null;
+  black_accuracy: number | null;
+  puzzle_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface GamePlyEvalRow {
+  game_id: string;
+  ply: number;
+  move_number: number;
+  color: "w" | "b";
+  uci: string;
+  san: string;
+  fen_before: string;
+  fen_after: string;
+  eval_kind: "cp" | "mate";
+  white_score: number;
+  side_to_move_score: number;
+  white_win_percent: number;
+  mover_win_percent_before: number;
+  mover_win_percent_after: number;
+  win_percent_loss: number;
+  best_move: string | null;
+  classification: MoveClassification;
+  clock_remaining_sec: number | null;
+  time_spent_sec: number | null;
+  clock_bucket: ClockBucket;
+  is_key_moment_candidate: number;
+  from_pre_existing_eval: number;
+  deep_verified: number;
+}
+
+interface UserPuzzleRow {
+  id: string;
+  game_id: string;
+  game_ply: number;
+  game_move_number: number;
+  puzzle_kind: "line" | "arrow_duel";
+  game_moment_kind: GamePuzzleMomentKind;
+  initial_fen: string;
+  solution_moves_json: string;
+  stockfish_eval: number | null;
+  stockfish_best_move: string | null;
+  stockfish_eval_after_first_move: number | null;
+  punishment_line_json: string | null;
+  themes_json: string;
+  rating: number;
+  opponent_name: string | null;
+  played_at: string | null;
+  time_class: string | null;
+  clock_remaining_sec: number | null;
+  time_spent_sec: number | null;
+  caliber_score: number | null;
+  created_at: string;
+  archived: number;
+}
+
 export type SyncSqliteValue =
   | string
   | number
@@ -384,7 +499,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 26;
+export const CURRENT_SCHEMA_VERSION = 27;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -419,7 +534,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 22, to: 23, apply: migrateV22ToV23 },
   { from: 23, to: 24, apply: migrateV23ToV24 },
   { from: 24, to: 25, apply: migrateV24ToV25 },
-  { from: 25, to: 26, apply: migrateV25ToV26 }
+  { from: 25, to: 26, apply: migrateV25ToV26 },
+  { from: 26, to: 27, apply: migrateV26ToV27 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -460,7 +576,8 @@ export class SyncSQLiteStore implements PracticeStore {
       startingVersion === CURRENT_SCHEMA_VERSION &&
       hasCurrentSettingsColumns(this.db) &&
       hasProgressV2Schema(this.db) &&
-      hasSurvivalSchema(this.db)
+      hasSurvivalSchema(this.db) &&
+      hasGameReviewSchema(this.db)
     ) {
       return;
     }
@@ -679,12 +796,14 @@ export class SyncSQLiteStore implements PracticeStore {
           case "review_schedule": {
             const [puzzleId, mode, ratingKey] = tombstone.entityKey.split("\u001f");
             if (puzzleId && mode && ratingKey) {
-              this.saveReviewRemoval({
-                puzzleId,
-                mode: mode as SprintMode,
-                ratingKey,
-                removedAt: tombstone.deletedAt
-              });
+              if (this.getPuzzle(puzzleId)) {
+                this.saveReviewRemoval({
+                  puzzleId,
+                  mode: mode as SprintMode,
+                  ratingKey,
+                  removedAt: tombstone.deletedAt
+                });
+              }
               this.db.prepare(
                 "DELETE FROM review_queue WHERE puzzle_id = ? AND mode = ? AND rating_key = ?"
               ).run(puzzleId, mode, ratingKey);
@@ -769,16 +888,31 @@ export class SyncSQLiteStore implements PracticeStore {
     if (filter !== undefined) {
       return this.selectPuzzles(filter).length;
     }
-    const row = this.db.prepare("SELECT COUNT(*) AS count FROM puzzles").get() as { count: number };
+    const row = this.db.prepare("SELECT COUNT(*) AS count FROM puzzles WHERE source != 'user_game'").get() as { count: number };
     return row.count;
   }
 
   getPuzzle(id: string): Puzzle | undefined {
+    if (isUserGamePuzzleId(id)) {
+      const stored = this.getUserPuzzle(id);
+      if (stored) {
+        return storedUserPuzzleToPuzzle(stored);
+      }
+    }
     const row = this.db.prepare("SELECT * FROM puzzles WHERE id = ?").get(id) as PuzzleRow | undefined;
     return row ? puzzleFromRow(row) : undefined;
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
+    const source = filter.source ?? "pack";
+    if (source === "user_game") {
+      return selectUserGamePuzzlesFromStore(this, filter);
+    }
+
+    const explicitUserIds =
+      source === "pack" && filter.includeIds !== undefined
+        ? new Set(filter.includeIds.filter(isUserGamePuzzleId))
+        : undefined;
     const rows = this.db
       .prepare(
         filter.preferredRating === undefined
@@ -793,11 +927,43 @@ export class SyncSQLiteStore implements PracticeStore {
           : [filter.preferredRating])
       ) as PuzzleRow[];
 
+    if (source === "pack") {
+      const packPuzzles = rows
+        .filter(
+          (row) =>
+            row.source !== "user_game" ||
+            (explicitUserIds !== undefined && explicitUserIds.has(row.id))
+        )
+        .map((row) =>
+          row.source === "user_game"
+            ? (this.getPuzzle(row.id) ?? puzzleFromRow(row))
+            : puzzleFromRow(row)
+        );
+      return selectUniquePuzzles({
+        puzzles: packPuzzles,
+        mode: filter.mode,
+        limit: filter.limit,
+        ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+        ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+        ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        ...(filter.themes === undefined ? {} : { themes: filter.themes }),
+        ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
+        ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
+        ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+      });
+    }
+
+    // source === "all"
+    const userPuzzles = selectUserGamePuzzlesFromStore(this, filter);
+    if (filter.timeClass !== undefined || filter.gameId !== undefined) {
+      return userPuzzles;
+    }
+    const packSelected = this.selectPuzzles({ ...filter, source: "pack" });
     return selectUniquePuzzles({
-      puzzles: rows.map(puzzleFromRow),
+      puzzles: [...userPuzzles, ...packSelected],
       mode: filter.mode,
       limit: filter.limit,
-      ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+      allPuzzlesArrowDuelEligible: filter.mode === "arrow_duel",
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
@@ -821,19 +987,27 @@ export class SyncSQLiteStore implements PracticeStore {
     input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
   ): Puzzle[] {
     return (this.db.prepare(
-      "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY id ASC"
+      "SELECT * FROM puzzles WHERE source != 'user_game' AND rating >= ? AND rating <= ? ORDER BY id ASC"
     ).all(input.level.minRating, input.level.maxRating) as PuzzleRow[]).map(puzzleFromRow);
   }
 
   selectPuzzlesForRatingBands(
     input: RatingBandPuzzleSelectionInput
   ): RatingBandPuzzleSelection[] {
+    const source = input.filter.source ?? "pack";
+    if (source === "user_game") {
+      return selectUniquePuzzlesForRatingBands(
+        this.listUserPuzzles({ includeArchived: false }).map(storedUserPuzzleToPuzzle),
+        input
+      );
+    }
     const widestHalfWidth = Math.max(...input.halfWidths, 0);
     const rows = this.db
       .prepare(
         `SELECT *
          FROM puzzles
-         WHERE rating >= ? AND rating <= ?
+         WHERE source != 'user_game'
+           AND rating >= ? AND rating <= ?
          ORDER BY ABS(rating - ?) ASC, id ASC`
       )
       .all(
@@ -841,10 +1015,14 @@ export class SyncSQLiteStore implements PracticeStore {
         input.ratingAnchor + widestHalfWidth,
         input.ratingAnchor
       ) as PuzzleRow[];
-    return selectUniquePuzzlesForRatingBands(
-      rows.map(puzzleFromRow),
-      input
-    );
+    const pool =
+      source === "all"
+        ? [
+            ...rows.map(puzzleFromRow),
+            ...this.listUserPuzzles({ includeArchived: false }).map(storedUserPuzzleToPuzzle)
+          ]
+        : rows.map(puzzleFromRow);
+    return selectUniquePuzzlesForRatingBands(pool, input);
   }
 
   getRating(key: string): RatingRecord {
@@ -1685,10 +1863,10 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   private exportProgressV2Data(): LocalDataExport {
-    return {
+    return filterOutUserGameProgressV2Data({
       ...this.exportLocalData(),
       ratings: this.listAllRatingGenerations()
-    };
+    });
   }
 
   importLocalData(
@@ -1820,10 +1998,24 @@ export class SyncSQLiteStore implements PracticeStore {
       reviewQueue: countRows(this.db, "review_queue"),
       sprintSessions: countRows(this.db, "sprint_sessions", "status NOT IN ('active', 'paused')")
     };
-    const attemptIds = (this.db.prepare("SELECT id FROM attempts ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id);
-    const terminalSessionIds = (this.db.prepare(
-      "SELECT id FROM sprint_sessions WHERE status NOT IN ('active', 'paused') ORDER BY id"
-    ).all() as Array<{ id: string }>).map((row) => row.id);
+    const attemptIds = (
+      this.db
+        .prepare("SELECT id FROM attempts WHERE substr(puzzle_id, 1, 3) != 'ug_' ORDER BY id")
+        .all() as Array<{ id: string }>
+    ).map((row) => row.id);
+    const terminalSessionIds = (
+      this.db
+        .prepare(
+          `SELECT id
+           FROM sprint_sessions
+           WHERE status NOT IN ('active', 'paused')
+             AND substr(id, 1, 3) != 'ug_'
+             AND substr(id, 1, 18) != 'review-session:ug_'
+             AND substr(rating_key, 1, 3) != 'ug_'
+           ORDER BY id`
+        )
+        .all() as Array<{ id: string }>
+    ).map((row) => row.id);
     const tombstone = this.db.prepare(
       `INSERT INTO progress_v2_tombstones (kind, entity_key, deleted_at)
        VALUES (?, ?, ?)
@@ -1872,9 +2064,14 @@ export class SyncSQLiteStore implements PracticeStore {
     return next;
   }
 
-  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
+  enrollReview(
+    context: ReviewContext,
+    now: string,
+    initiatingAttemptId?: string,
+    timeZone?: string
+  ): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
-    const next = enrollReviewContext(context, now, previous);
+    const next = enrollReviewContext(context, now, previous, timeZone);
     let initiatingAttempt: AttemptHistoryRow | undefined;
     if (initiatingAttemptId) {
       initiatingAttempt = this.attemptById(initiatingAttemptId);
@@ -2024,7 +2221,9 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .all(today) as DueReviewItemDbRow[];
     return rows.map((row) => ({
-      puzzle: puzzleFromRow(row),
+      puzzle: isUserGamePuzzleId(row.id)
+        ? (this.getPuzzle(row.id) ?? puzzleFromRow(row))
+        : puzzleFromRow(row),
       review: reviewFromRow({
         puzzle_id: row.review_puzzle_id,
         mode: row.review_mode,
@@ -2072,6 +2271,537 @@ export class SyncSQLiteStore implements PracticeStore {
       reviews,
       allAttemptsForOptions: allAttempts
     });
+  }
+
+  listLinkedAccounts(): LinkedGameAccount[] {
+    const rows = this.db
+      .prepare(
+        `SELECT platform, username, last_synced_at, created_at
+         FROM linked_accounts
+         ORDER BY platform ASC, lower(username) ASC`
+      )
+      .all() as LinkedAccountRow[];
+    return rows.map(linkedAccountFromRow);
+  }
+
+  upsertLinkedAccount(
+    account: Omit<LinkedGameAccount, "createdAt"> & { createdAt?: string }
+  ): LinkedGameAccount {
+    const username = account.username.trim();
+    if (!username) {
+      throw new Error("Linked account username must not be empty");
+    }
+    const existing = this.db
+      .prepare(
+        `SELECT platform, username, last_synced_at, created_at
+         FROM linked_accounts
+         WHERE platform = ? AND username = ?`
+      )
+      .get(account.platform, username) as LinkedAccountRow | undefined;
+    const createdAt = existing?.created_at ?? account.createdAt ?? new Date().toISOString();
+    const lastSyncedAt =
+      account.lastSyncedAt === undefined ? existing?.last_synced_at ?? null : account.lastSyncedAt;
+
+    this.db
+      .prepare(
+        `INSERT INTO linked_accounts (platform, username, last_synced_at, created_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(platform, username) DO UPDATE SET
+           username = excluded.username,
+           last_synced_at = excluded.last_synced_at`
+      )
+      .run(account.platform, username, lastSyncedAt, createdAt);
+
+    return {
+      platform: account.platform,
+      username,
+      ...(lastSyncedAt === null ? {} : { lastSyncedAt }),
+      createdAt
+    };
+  }
+
+  removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    this.db
+      .prepare("DELETE FROM linked_accounts WHERE platform = ? AND username = ?")
+      .run(platform, username.trim());
+  }
+
+  upsertImportedGames(
+    games: readonly ImportedGameDraft[],
+    nowIso = new Date().toISOString()
+  ): UpsertImportedGamesResult {
+    let inserted = 0;
+    let skipped = 0;
+    let updated = 0;
+    const seenInBatch = new Set<string>();
+
+    const selectExisting = this.db.prepare("SELECT * FROM imported_games WHERE id = ?");
+    const insertGame = this.db.prepare(
+      `INSERT INTO imported_games (
+        id, platform, username, user_color, played_at, time_control, time_class, rated,
+        url, white_username, white_rating, white_is_ai, black_username, black_rating,
+        black_is_ai, winner, termination, eco, opening, pgn,
+        analysis_status, analysis_checkpoint_ply, white_accuracy, black_accuracy,
+        puzzle_count, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', 0, NULL, NULL, 0, ?, ?)`
+    );
+    const updateMetadata = this.db.prepare(
+      `UPDATE imported_games
+       SET platform = ?,
+           username = ?,
+           user_color = ?,
+           played_at = ?,
+           time_control = ?,
+           time_class = ?,
+           rated = ?,
+           url = ?,
+           white_username = ?,
+           white_rating = ?,
+           white_is_ai = ?,
+           black_username = ?,
+           black_rating = ?,
+           black_is_ai = ?,
+           winner = ?,
+           termination = ?,
+           eco = ?,
+           opening = ?,
+           pgn = ?,
+           updated_at = ?
+       WHERE id = ?`
+    );
+
+    this.transaction(() => {
+      for (const draft of games) {
+        if (seenInBatch.has(draft.id)) {
+          skipped += 1;
+          continue;
+        }
+        seenInBatch.add(draft.id);
+        const existingRow = selectExisting.get(draft.id) as ImportedGameRow | undefined;
+        if (!existingRow) {
+          insertGame.run(
+            draft.id,
+            draft.platform,
+            draft.username,
+            draft.userColor,
+            draft.playedAt,
+            draft.timeControl,
+            draft.timeClass,
+            boolToInt(draft.rated),
+            draft.url ?? null,
+            draft.white.username,
+            draft.white.rating ?? null,
+            boolToInt(draft.white.isAi),
+            draft.black.username,
+            draft.black.rating ?? null,
+            boolToInt(draft.black.isAi),
+            draft.winner,
+            draft.termination,
+            draft.eco ?? null,
+            draft.opening ?? null,
+            draft.pgn,
+            nowIso,
+            nowIso
+          );
+          inserted += 1;
+          continue;
+        }
+        const existing = importedGameFromRow(existingRow);
+        if (sameImportedGameDraft(existing, draft)) {
+          skipped += 1;
+          continue;
+        }
+        updateMetadata.run(
+          draft.platform,
+          draft.username,
+          draft.userColor,
+          draft.playedAt,
+          draft.timeControl,
+          draft.timeClass,
+          boolToInt(draft.rated),
+          draft.url ?? null,
+          draft.white.username,
+          draft.white.rating ?? null,
+          boolToInt(draft.white.isAi),
+          draft.black.username,
+          draft.black.rating ?? null,
+          boolToInt(draft.black.isAi),
+          draft.winner,
+          draft.termination,
+          draft.eco ?? null,
+          draft.opening ?? null,
+          draft.pgn,
+          nowIso,
+          draft.id
+        );
+        updated += 1;
+      }
+    });
+
+    return { inserted, skipped, updated };
+  }
+
+  listImportedGames(filter?: GameListFilter): StoredImportedGame[] {
+    const { whereSql, params } = buildImportedGameFilterSql(filter);
+    const limitClause =
+      filter?.limit === undefined
+        ? filter?.offset === undefined
+          ? ""
+          : " LIMIT -1 OFFSET ?"
+        : filter?.offset === undefined
+          ? " LIMIT ?"
+          : " LIMIT ? OFFSET ?";
+    const paginationParams: number[] = [];
+    if (filter?.limit !== undefined) {
+      paginationParams.push(Math.max(0, Math.trunc(filter.limit)));
+    }
+    if (filter?.offset !== undefined) {
+      paginationParams.push(Math.max(0, Math.trunc(filter.offset)));
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT *
+         FROM imported_games
+         ${whereSql}
+         ORDER BY played_at DESC, id DESC${limitClause}`
+      )
+      .all(...params, ...paginationParams) as ImportedGameRow[];
+    return rows.map(importedGameFromRow);
+  }
+
+  countImportedGames(filter?: Omit<GameListFilter, "limit" | "offset">): number {
+    const { whereSql, params } = buildImportedGameFilterSql(filter);
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS count FROM imported_games ${whereSql}`)
+      .get(...params) as { count: number };
+    return row.count;
+  }
+
+  getImportedGame(gameId: string): StoredImportedGame | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM imported_games WHERE id = ?")
+      .get(gameId) as ImportedGameRow | undefined;
+    return row ? importedGameFromRow(row) : undefined;
+  }
+
+  deleteImportedGame(gameId: string): void {
+    this.transaction(() => {
+      const userPuzzleIds = (
+        this.db
+          .prepare("SELECT id FROM user_puzzles WHERE game_id = ?")
+          .all(gameId) as Array<{ id: string }>
+      ).map((row) => row.id);
+      this.db.prepare("DELETE FROM imported_games WHERE id = ?").run(gameId);
+      for (const puzzleId of userPuzzleIds) {
+        this.deleteUnreferencedUserPuzzleCacheRow(puzzleId);
+      }
+    });
+  }
+
+  saveGamePlyEvaluations(
+    gameId: string,
+    evals: readonly StoredGamePlyEval[],
+    statusUpdate: SaveGamePlyEvaluationsStatusUpdate
+  ): void {
+    this.transaction(() => {
+      const existing = this.getImportedGame(gameId);
+      if (!existing) {
+        throw new Error(`Imported game ${gameId} was not found`);
+      }
+      const upsertEval = this.db.prepare(
+        `INSERT INTO game_ply_evals (
+          game_id, ply, move_number, color, uci, san, fen_before, fen_after,
+          eval_kind, white_score, side_to_move_score, white_win_percent,
+          mover_win_percent_before, mover_win_percent_after, win_percent_loss,
+          best_move, classification, clock_remaining_sec, time_spent_sec,
+          clock_bucket, is_key_moment_candidate, from_pre_existing_eval, deep_verified
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(game_id, ply) DO UPDATE SET
+          move_number = excluded.move_number,
+          color = excluded.color,
+          uci = excluded.uci,
+          san = excluded.san,
+          fen_before = excluded.fen_before,
+          fen_after = excluded.fen_after,
+          eval_kind = excluded.eval_kind,
+          white_score = excluded.white_score,
+          side_to_move_score = excluded.side_to_move_score,
+          white_win_percent = excluded.white_win_percent,
+          mover_win_percent_before = excluded.mover_win_percent_before,
+          mover_win_percent_after = excluded.mover_win_percent_after,
+          win_percent_loss = excluded.win_percent_loss,
+          best_move = excluded.best_move,
+          classification = excluded.classification,
+          clock_remaining_sec = excluded.clock_remaining_sec,
+          time_spent_sec = excluded.time_spent_sec,
+          clock_bucket = excluded.clock_bucket,
+          is_key_moment_candidate = excluded.is_key_moment_candidate,
+          from_pre_existing_eval = excluded.from_pre_existing_eval,
+          deep_verified = excluded.deep_verified`
+      );
+      for (const item of evals) {
+        upsertEval.run(
+          gameId,
+          item.ply,
+          item.moveNumber,
+          item.color,
+          item.uci,
+          item.san,
+          item.fenBefore,
+          item.fenAfter,
+          item.evalKind,
+          item.whiteScore,
+          item.sideToMoveScore,
+          item.whiteWinPercent,
+          item.moverWinPercentBefore,
+          item.moverWinPercentAfter,
+          item.winPercentLoss,
+          item.bestMove ?? null,
+          item.classification,
+          item.clockRemainingSec ?? null,
+          item.timeSpentSec ?? null,
+          item.clockBucket,
+          boolToInt(item.isKeyMomentCandidate),
+          boolToInt(item.fromPreExistingEval),
+          boolToInt(item.deepVerified)
+        );
+      }
+      const whiteAccuracy =
+        statusUpdate.whiteAccuracy === undefined
+          ? existing.whiteAccuracy ?? null
+          : statusUpdate.whiteAccuracy;
+      const blackAccuracy =
+        statusUpdate.blackAccuracy === undefined
+          ? existing.blackAccuracy ?? null
+          : statusUpdate.blackAccuracy;
+      const updatedAt = statusUpdate.updatedAt ?? new Date().toISOString();
+      this.db
+        .prepare(
+          `UPDATE imported_games
+           SET analysis_status = ?,
+               analysis_checkpoint_ply = ?,
+               white_accuracy = ?,
+               black_accuracy = ?,
+               updated_at = ?
+           WHERE id = ?`
+        )
+        .run(
+          statusUpdate.analysisStatus,
+          statusUpdate.analysisCheckpointPly,
+          whiteAccuracy,
+          blackAccuracy,
+          updatedAt,
+          gameId
+        );
+    });
+  }
+
+  listGamePlyEvaluations(gameId: string): StoredGamePlyEval[] {
+    const rows = this.db
+      .prepare(
+        `SELECT *
+         FROM game_ply_evals
+         WHERE game_id = ?
+         ORDER BY ply ASC`
+      )
+      .all(gameId) as GamePlyEvalRow[];
+    return rows.map(gamePlyEvalFromRow);
+  }
+
+  replaceGameUserPuzzles(
+    gameId: string,
+    puzzles: readonly ExtractedGamePuzzle[],
+    gameMeta: ReplaceGameUserPuzzlesMeta
+  ): StoredUserPuzzle[] {
+    return this.transaction(() => {
+      const game = this.getImportedGame(gameId);
+      if (!game) {
+        throw new Error(`Imported game ${gameId} was not found`);
+      }
+      const effectiveMeta = inferUserGameMetaFromStoredGame(game, gameMeta);
+      const nowIso = effectiveMeta.nowIso ?? new Date().toISOString();
+      const existingRows = this.db
+        .prepare("SELECT * FROM user_puzzles WHERE game_id = ?")
+        .all(gameId) as UserPuzzleRow[];
+      const existingById = new Map(
+        existingRows.map((row) => [row.id, userPuzzleFromRow(row)])
+      );
+
+      const nextStored: StoredUserPuzzle[] = [];
+      const nextIds = new Set<string>();
+      for (const extracted of puzzles) {
+        const candidate = extractedGamePuzzleToStoredUserPuzzle(
+          gameId,
+          extracted,
+          { ...effectiveMeta, nowIso }
+        );
+        if (nextIds.has(candidate.id)) {
+          continue;
+        }
+        nextIds.add(candidate.id);
+        const prior = existingById.get(candidate.id);
+        const stored = prior
+          ? extractedGamePuzzleToStoredUserPuzzle(
+              gameId,
+              extracted,
+              { ...effectiveMeta, nowIso },
+              { createdAt: prior.createdAt, archived: prior.archived }
+            )
+          : candidate;
+        nextStored.push(stored);
+      }
+
+      const deleteStale = this.db.prepare("DELETE FROM user_puzzles WHERE id = ?");
+      for (const priorId of existingById.keys()) {
+        if (!nextIds.has(priorId)) {
+          deleteStale.run(priorId);
+          this.deleteUnreferencedUserPuzzleCacheRow(priorId);
+        }
+      }
+
+      const upsertUserPuzzle = this.db.prepare(
+        `INSERT INTO user_puzzles (
+          id, game_id, game_ply, game_move_number, puzzle_kind, game_moment_kind,
+          initial_fen, solution_moves_json, stockfish_eval, stockfish_best_move,
+          stockfish_eval_after_first_move, punishment_line_json, themes_json,
+          rating, opponent_name, played_at, time_class, clock_remaining_sec,
+          time_spent_sec, caliber_score, created_at, archived
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          game_id = excluded.game_id,
+          game_ply = excluded.game_ply,
+          game_move_number = excluded.game_move_number,
+          puzzle_kind = excluded.puzzle_kind,
+          game_moment_kind = excluded.game_moment_kind,
+          initial_fen = excluded.initial_fen,
+          solution_moves_json = excluded.solution_moves_json,
+          stockfish_eval = excluded.stockfish_eval,
+          stockfish_best_move = excluded.stockfish_best_move,
+          stockfish_eval_after_first_move = excluded.stockfish_eval_after_first_move,
+          punishment_line_json = excluded.punishment_line_json,
+          themes_json = excluded.themes_json,
+          rating = excluded.rating,
+          opponent_name = excluded.opponent_name,
+          played_at = excluded.played_at,
+          time_class = excluded.time_class,
+          clock_remaining_sec = excluded.clock_remaining_sec,
+          time_spent_sec = excluded.time_spent_sec,
+          caliber_score = excluded.caliber_score,
+          archived = excluded.archived`
+      );
+      for (const stored of nextStored) {
+        upsertUserPuzzle.run(
+          stored.id,
+          stored.gameId,
+          stored.gamePly,
+          stored.gameMoveNumber,
+          stored.puzzleKind,
+          stored.momentKind,
+          stored.initialFen,
+          JSON.stringify(stored.solutionMoves),
+          stored.stockfishEval ?? null,
+          stored.stockfishBestMove ?? null,
+          stored.stockfishEvalAfterFirstMove ?? null,
+          stored.punishmentLine === undefined ? null : JSON.stringify(stored.punishmentLine),
+          JSON.stringify(stored.themes),
+          stored.rating,
+          stored.opponentName ?? null,
+          stored.playedAt ?? null,
+          stored.timeClass ?? null,
+          stored.clockRemainingSec ?? null,
+          stored.timeSpentSec ?? null,
+          stored.caliberScore ?? null,
+          stored.createdAt,
+          boolToInt(stored.archived)
+        );
+      }
+
+      if (nextStored.length > 0) {
+        this.seedPuzzles(nextStored.map(storedUserPuzzleToPuzzle));
+      }
+
+      this.db
+        .prepare(
+          `UPDATE imported_games
+           SET puzzle_count = ?,
+               updated_at = ?
+           WHERE id = ?`
+        )
+        .run(nextStored.length, nowIso, gameId);
+
+      return nextStored;
+    });
+  }
+
+  listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
+    const clauses: string[] = [];
+    const params: SyncSqliteValue[] = [];
+    if (!filter?.includeArchived) {
+      clauses.push("archived = 0");
+    }
+    if (filter?.puzzleKind !== undefined) {
+      clauses.push("puzzle_kind = ?");
+      params.push(filter.puzzleKind);
+    }
+    if (filter?.gameId !== undefined) {
+      clauses.push("game_id = ?");
+      params.push(filter.gameId);
+    }
+    if (filter?.timeClass !== undefined) {
+      clauses.push("time_class = ?");
+      params.push(filter.timeClass);
+    }
+    const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = this.db
+      .prepare(
+        `SELECT *
+         FROM user_puzzles
+         ${whereSql}
+         ORDER BY COALESCE(played_at, '') DESC, created_at DESC, COALESCE(caliber_score, 0) DESC, id ASC`
+      )
+      .all(...params) as UserPuzzleRow[];
+
+    const matched = rows
+      .map(userPuzzleFromRow)
+      .filter((puzzle) => matchesUserPuzzleFilter(puzzle, filter));
+    return filter?.limit === undefined
+      ? matched
+      : matched.slice(0, Math.max(0, Math.trunc(filter.limit)));
+  }
+
+  countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
+    return this.listUserPuzzles(filter).length;
+  }
+
+  getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM user_puzzles WHERE id = ?")
+      .get(puzzleId) as UserPuzzleRow | undefined;
+    return row ? userPuzzleFromRow(row) : undefined;
+  }
+
+  archiveUserPuzzle(puzzleId: string, archived = true): void {
+    this.db
+      .prepare("UPDATE user_puzzles SET archived = ? WHERE id = ?")
+      .run(boolToInt(archived), puzzleId);
+  }
+
+  private deleteUnreferencedUserPuzzleCacheRow(puzzleId: string): void {
+    const referenced = this.db
+      .prepare(
+        `SELECT 1 FROM attempts WHERE puzzle_id = ?
+         UNION ALL
+         SELECT 1 FROM review_queue WHERE puzzle_id = ?
+         UNION ALL
+         SELECT 1 FROM review_events WHERE puzzle_id = ?
+         UNION ALL
+         SELECT 1 FROM review_schedule_removals WHERE puzzle_id = ?
+         LIMIT 1`
+      )
+      .get(puzzleId, puzzleId, puzzleId, puzzleId);
+    if (!referenced) {
+      this.db.prepare("DELETE FROM puzzles WHERE id = ? AND source = 'user_game'").run(puzzleId);
+    }
   }
 
   private saveReviewQueueState(state: ReviewQueueState): void {
@@ -3179,6 +3909,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV23ToV24(db);
   migrateV24ToV25(db);
   migrateV25ToV26(db);
+  migrateV26ToV27(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -3219,6 +3950,13 @@ function hasSurvivalSchema(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "sprint_sessions", "resume_json") &&
     hasTable(db, "survival_bests") &&
     hasTable(db, "survival_preferences");
+}
+
+function hasGameReviewSchema(db: SyncSqliteDatabase): boolean {
+  return hasTable(db, "linked_accounts") &&
+    hasTable(db, "imported_games") &&
+    hasTable(db, "game_ply_evals") &&
+    hasTable(db, "user_puzzles");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -4073,6 +4811,251 @@ function migrateV25ToV26(db: SyncSqliteDatabase): void {
   );
 }
 
+// Local Game Review persistence (linked accounts, imported games, ply evals,
+// and user-game puzzles) plus ProgressV2 outbox guards keeping ug_* records local.
+function migrateV26ToV27(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS linked_accounts (
+      platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess')),
+      username TEXT NOT NULL COLLATE NOCASE CHECK (length(trim(username)) > 0),
+      last_synced_at TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (platform, username)
+    );
+
+    CREATE TABLE IF NOT EXISTS imported_games (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn')),
+      username TEXT NOT NULL,
+      user_color TEXT NOT NULL CHECK (user_color IN ('w', 'b')),
+      played_at TEXT NOT NULL,
+      time_control TEXT NOT NULL,
+      time_class TEXT NOT NULL,
+      rated INTEGER NOT NULL CHECK (rated IN (0, 1)),
+      url TEXT,
+      white_username TEXT NOT NULL,
+      white_rating INTEGER,
+      white_is_ai INTEGER NOT NULL DEFAULT 0 CHECK (white_is_ai IN (0, 1)),
+      black_username TEXT NOT NULL,
+      black_rating INTEGER,
+      black_is_ai INTEGER NOT NULL DEFAULT 0 CHECK (black_is_ai IN (0, 1)),
+      winner TEXT NOT NULL CHECK (winner IN ('w', 'b', 'none')),
+      termination TEXT NOT NULL,
+      eco TEXT,
+      opening TEXT,
+      pgn TEXT NOT NULL,
+      analysis_status TEXT NOT NULL DEFAULT 'none'
+        CHECK (analysis_status IN ('none', 'partial', 'pass1_done', 'complete')),
+      analysis_checkpoint_ply INTEGER NOT NULL DEFAULT 0 CHECK (analysis_checkpoint_ply >= 0),
+      white_accuracy REAL,
+      black_accuracy REAL,
+      puzzle_count INTEGER NOT NULL DEFAULT 0 CHECK (puzzle_count >= 0),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS imported_games_played_at_idx
+      ON imported_games(played_at DESC, id DESC);
+
+    CREATE INDEX IF NOT EXISTS imported_games_platform_time_status_idx
+      ON imported_games(platform, time_class, analysis_status, played_at DESC);
+
+    CREATE TABLE IF NOT EXISTS game_ply_evals (
+      game_id TEXT NOT NULL,
+      ply INTEGER NOT NULL CHECK (ply > 0),
+      move_number INTEGER NOT NULL CHECK (move_number > 0),
+      color TEXT NOT NULL CHECK (color IN ('w', 'b')),
+      uci TEXT NOT NULL,
+      san TEXT NOT NULL,
+      fen_before TEXT NOT NULL,
+      fen_after TEXT NOT NULL,
+      eval_kind TEXT NOT NULL CHECK (eval_kind IN ('cp', 'mate')),
+      white_score REAL NOT NULL,
+      side_to_move_score REAL NOT NULL,
+      white_win_percent REAL NOT NULL,
+      mover_win_percent_before REAL NOT NULL,
+      mover_win_percent_after REAL NOT NULL,
+      win_percent_loss REAL NOT NULL,
+      best_move TEXT,
+      classification TEXT NOT NULL,
+      clock_remaining_sec REAL,
+      time_spent_sec REAL,
+      clock_bucket TEXT NOT NULL,
+      is_key_moment_candidate INTEGER NOT NULL DEFAULT 0 CHECK (is_key_moment_candidate IN (0, 1)),
+      from_pre_existing_eval INTEGER NOT NULL DEFAULT 0 CHECK (from_pre_existing_eval IN (0, 1)),
+      deep_verified INTEGER NOT NULL DEFAULT 0 CHECK (deep_verified IN (0, 1)),
+      PRIMARY KEY (game_id, ply),
+      FOREIGN KEY (game_id) REFERENCES imported_games(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS user_puzzles (
+      id TEXT PRIMARY KEY CHECK (substr(id, 1, 3) = 'ug_'),
+      game_id TEXT NOT NULL,
+      game_ply INTEGER NOT NULL CHECK (game_ply > 0),
+      game_move_number INTEGER NOT NULL CHECK (game_move_number > 0),
+      puzzle_kind TEXT NOT NULL CHECK (puzzle_kind IN ('line', 'arrow_duel')),
+      game_moment_kind TEXT NOT NULL,
+      initial_fen TEXT NOT NULL,
+      solution_moves_json TEXT NOT NULL,
+      stockfish_eval REAL,
+      stockfish_best_move TEXT,
+      stockfish_eval_after_first_move REAL,
+      punishment_line_json TEXT,
+      themes_json TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      opponent_name TEXT,
+      played_at TEXT,
+      time_class TEXT,
+      clock_remaining_sec REAL,
+      time_spent_sec REAL,
+      caliber_score REAL,
+      created_at TEXT NOT NULL,
+      archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+      FOREIGN KEY (game_id) REFERENCES imported_games(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS user_puzzles_game_id_idx
+      ON user_puzzles(game_id, game_ply);
+
+    CREATE INDEX IF NOT EXISTS user_puzzles_filter_idx
+      ON user_puzzles(archived, puzzle_kind, time_class, rating, id);
+  `);
+
+  if (hasTable(db, "progress_v2_outbox") && hasTable(db, "progress_v2_sync_state")) {
+    db.exec(`
+      DROP TRIGGER IF EXISTS progress_v2_ratings_insert;
+      CREATE TRIGGER progress_v2_ratings_insert
+      AFTER INSERT ON ratings
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.key, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('rating', NEW.key || char(31) || NEW.generation,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+        DELETE FROM progress_v2_tombstones
+        WHERE kind = 'rating' AND entity_key = NEW.key || char(31) || NEW.generation;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_ratings_update;
+      CREATE TRIGGER progress_v2_ratings_update
+      AFTER UPDATE ON ratings
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.key, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('rating', NEW.key || char(31) || NEW.generation,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_attempts_insert;
+      CREATE TRIGGER progress_v2_attempts_insert
+      AFTER INSERT ON attempts
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.puzzle_id, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('attempt', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+        DELETE FROM progress_v2_tombstones WHERE kind = 'attempt' AND entity_key = NEW.id;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_attempts_update;
+      CREATE TRIGGER progress_v2_attempts_update
+      AFTER UPDATE ON attempts
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.puzzle_id, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('attempt', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_sprint_sessions_insert;
+      CREATE TRIGGER progress_v2_sprint_sessions_insert
+      AFTER INSERT ON sprint_sessions
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.id, 1, 3) != 'ug_'
+        AND substr(NEW.id, 1, 18) != 'review-session:ug_'
+        AND substr(NEW.rating_key, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('sprint_session', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+        DELETE FROM progress_v2_tombstones WHERE kind = 'sprint_session' AND entity_key = NEW.id;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_sprint_sessions_update;
+      CREATE TRIGGER progress_v2_sprint_sessions_update
+      AFTER UPDATE ON sprint_sessions
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.id, 1, 3) != 'ug_'
+        AND substr(NEW.id, 1, 18) != 'review-session:ug_'
+        AND substr(NEW.rating_key, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('sprint_session', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_review_queue_insert;
+      CREATE TRIGGER progress_v2_review_queue_insert
+      AFTER INSERT ON review_queue
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.puzzle_id, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_review_queue_update;
+      CREATE TRIGGER progress_v2_review_queue_update
+      AFTER UPDATE ON review_queue
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.puzzle_id, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_review_removals_insert;
+      CREATE TRIGGER progress_v2_review_removals_insert
+      AFTER INSERT ON review_schedule_removals
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.puzzle_id, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DROP TRIGGER IF EXISTS progress_v2_review_removals_update;
+      CREATE TRIGGER progress_v2_review_removals_update
+      AFTER UPDATE ON review_schedule_removals
+      WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+        AND substr(NEW.puzzle_id, 1, 3) != 'ug_'
+      BEGIN
+        INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+        VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      END;
+
+      DELETE FROM progress_v2_outbox
+      WHERE (kind = 'review_schedule' AND substr(entity_key, 1, 3) = 'ug_')
+         OR (kind = 'rating' AND substr(entity_key, 1, 3) = 'ug_')
+         OR (kind = 'sprint_session' AND (substr(entity_key, 1, 3) = 'ug_' OR substr(entity_key, 1, 18) = 'review-session:ug_'))
+         OR (kind = 'attempt' AND substr(entity_key, 1, 18) = 'review-attempt:ug_');
+    `);
+  }
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -4572,8 +5555,142 @@ function isTacticalProfileEvidenceSession(
     session.config &&
     session.config.tacticalFocus === undefined &&
     session.config.survival === undefined &&
+    session.config.userGamePuzzles === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
   );
+}
+
+function buildImportedGameFilterSql(
+  filter?: Omit<GameListFilter, "limit" | "offset">
+): { whereSql: string; params: SyncSqliteValue[] } {
+  const clauses: string[] = [];
+  const params: SyncSqliteValue[] = [];
+  if (filter?.platform !== undefined) {
+    clauses.push("platform = ?");
+    params.push(filter.platform);
+  }
+  if (filter?.timeClass !== undefined) {
+    clauses.push("time_class = ?");
+    params.push(filter.timeClass);
+  }
+  if (filter?.analysisStatus !== undefined) {
+    if (filter.analysisStatus === "analyzed") {
+      clauses.push("analysis_status IN ('pass1_done', 'complete')");
+    } else if (filter.analysisStatus === "unanalyzed") {
+      clauses.push("analysis_status IN ('none', 'partial')");
+    } else {
+      clauses.push("analysis_status = ?");
+      params.push(filter.analysisStatus);
+    }
+  }
+  return {
+    whereSql: clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "",
+    params
+  };
+}
+
+function linkedAccountFromRow(row: LinkedAccountRow): LinkedGameAccount {
+  return {
+    platform: row.platform,
+    username: row.username,
+    ...(row.last_synced_at === null ? {} : { lastSyncedAt: row.last_synced_at }),
+    createdAt: row.created_at
+  };
+}
+
+function importedGameFromRow(row: ImportedGameRow): StoredImportedGame {
+  return {
+    id: row.id,
+    platform: row.platform,
+    username: row.username,
+    userColor: row.user_color,
+    playedAt: row.played_at,
+    timeControl: row.time_control,
+    timeClass: row.time_class,
+    rated: intToBool(row.rated),
+    ...(row.url === null ? {} : { url: row.url }),
+    white: {
+      username: row.white_username,
+      ...(row.white_rating === null ? {} : { rating: row.white_rating }),
+      isAi: intToBool(row.white_is_ai)
+    },
+    black: {
+      username: row.black_username,
+      ...(row.black_rating === null ? {} : { rating: row.black_rating }),
+      isAi: intToBool(row.black_is_ai)
+    },
+    winner: row.winner,
+    termination: row.termination,
+    ...(row.eco === null ? {} : { eco: row.eco }),
+    ...(row.opening === null ? {} : { opening: row.opening }),
+    pgn: row.pgn,
+    analysisStatus: row.analysis_status,
+    analysisCheckpointPly: row.analysis_checkpoint_ply,
+    ...(row.white_accuracy === null ? {} : { whiteAccuracy: row.white_accuracy }),
+    ...(row.black_accuracy === null ? {} : { blackAccuracy: row.black_accuracy }),
+    puzzleCount: row.puzzle_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function gamePlyEvalFromRow(row: GamePlyEvalRow): StoredGamePlyEval {
+  return {
+    gameId: row.game_id,
+    ply: row.ply,
+    moveNumber: row.move_number,
+    color: row.color,
+    uci: row.uci,
+    san: row.san,
+    fenBefore: row.fen_before,
+    fenAfter: row.fen_after,
+    evalKind: row.eval_kind,
+    whiteScore: row.white_score,
+    sideToMoveScore: row.side_to_move_score,
+    whiteWinPercent: row.white_win_percent,
+    moverWinPercentBefore: row.mover_win_percent_before,
+    moverWinPercentAfter: row.mover_win_percent_after,
+    winPercentLoss: row.win_percent_loss,
+    ...(row.best_move === null ? {} : { bestMove: row.best_move }),
+    classification: row.classification,
+    ...(row.clock_remaining_sec === null ? {} : { clockRemainingSec: row.clock_remaining_sec }),
+    ...(row.time_spent_sec === null ? {} : { timeSpentSec: row.time_spent_sec }),
+    clockBucket: row.clock_bucket,
+    isKeyMomentCandidate: intToBool(row.is_key_moment_candidate),
+    fromPreExistingEval: intToBool(row.from_pre_existing_eval),
+    deepVerified: intToBool(row.deep_verified)
+  };
+}
+
+function userPuzzleFromRow(row: UserPuzzleRow): StoredUserPuzzle {
+  return {
+    id: row.id,
+    gameId: row.game_id,
+    gamePly: row.game_ply,
+    gameMoveNumber: row.game_move_number,
+    puzzleKind: row.puzzle_kind,
+    momentKind: row.game_moment_kind,
+    initialFen: row.initial_fen,
+    solutionMoves: JSON.parse(row.solution_moves_json) as string[],
+    ...(row.stockfish_eval === null ? {} : { stockfishEval: row.stockfish_eval }),
+    ...(row.stockfish_best_move === null ? {} : { stockfishBestMove: row.stockfish_best_move }),
+    ...(row.stockfish_eval_after_first_move === null
+      ? {}
+      : { stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move }),
+    ...(row.punishment_line_json === null
+      ? {}
+      : { punishmentLine: JSON.parse(row.punishment_line_json) as string[] }),
+    themes: JSON.parse(row.themes_json) as string[],
+    rating: row.rating,
+    ...(row.opponent_name === null ? {} : { opponentName: row.opponent_name }),
+    ...(row.played_at === null ? {} : { playedAt: row.played_at }),
+    ...(row.time_class === null ? {} : { timeClass: row.time_class }),
+    ...(row.clock_remaining_sec === null ? {} : { clockRemainingSec: row.clock_remaining_sec }),
+    ...(row.time_spent_sec === null ? {} : { timeSpentSec: row.time_spent_sec }),
+    ...(row.caliber_score === null ? {} : { caliberScore: row.caliber_score }),
+    createdAt: row.created_at,
+    archived: intToBool(row.archived)
+  };
 }
 
 function sprintSessionConfigJson(

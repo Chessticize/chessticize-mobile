@@ -69,12 +69,14 @@ import type {
   SprintCommandResult,
   SprintMode,
   SprintResultSummary,
+  SprintRunClock,
   SprintState,
   SurvivalBestRecord,
   SurvivalChallengeType,
   SurvivalLevel,
   SurvivalPreferences
 } from "../../core/src/index.ts";
+import { USER_GAME_RATING_KEY_PREFIX } from "./game-review-store.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
 import type {
   ClearSyncedHistoryResult,
@@ -208,6 +210,36 @@ export interface RecordReviewAttemptCommand extends ReviewContext {
   expectedMove: string;
   startedAt?: string;
   arrowDuelCandidateOrder?: string[];
+}
+
+export interface RecordGameReviewRetryOutcomeCommand {
+  puzzleId: string;
+  mode: SprintMode;
+  ratingKey: string;
+  result: AttemptResult;
+  now?: string;
+  timeZone?: string;
+}
+
+export interface GameReviewRetryOutcomeResult {
+  enrolled: boolean;
+  review?: ReviewQueueState;
+}
+
+export interface StartMyGamePuzzlesSessionCommand {
+  mode?: "standard" | "arrow_duel" | "custom";
+  durationSeconds?: number;
+  perPuzzleSeconds?: number;
+  targetCorrect?: number;
+  maxMistakes?: number;
+  opponentReply?: OpponentReplyConfig;
+  timeClass?: string;
+  themes?: string[];
+  gameId?: string;
+  limit?: number;
+  ratingPolicy?: "unrated" | "rated";
+  runClock?: SprintRunClock;
+  puzzleSelectionSeed?: string | number;
 }
 
 export class PracticeService {
@@ -966,9 +998,113 @@ export class PracticeService {
   enrollReview(
     context: ReviewContext,
     now = new Date().toISOString(),
-    initiatingAttemptId?: string
+    initiatingAttemptId?: string,
+    timeZone?: string
   ): ReviewQueueState {
-    return this.store.transaction(() => this.store.enrollReview(context, now, initiatingAttemptId));
+    return this.store.transaction(() =>
+      this.store.enrollReview(context, now, initiatingAttemptId, timeZone)
+    );
+  }
+
+  recordGameReviewRetryOutcome(
+    command: RecordGameReviewRetryOutcomeCommand
+  ): GameReviewRetryOutcomeResult {
+    const puzzle = this.store.getPuzzle(command.puzzleId);
+    if (!puzzle) {
+      throw new Error(`User game puzzle ${command.puzzleId} was not found`);
+    }
+    if (command.result !== "wrong") {
+      return { enrolled: false };
+    }
+    const now = command.now ?? new Date().toISOString();
+    const context: ReviewContext = {
+      puzzleId: command.puzzleId,
+      mode: command.mode,
+      ratingKey: command.ratingKey
+    };
+    const review = this.store.transaction(() => {
+      this.store.seedPuzzles([puzzle]);
+      return this.store.enrollReview(context, now, undefined, command.timeZone);
+    });
+    return { enrolled: true, review };
+  }
+
+  startMyGamePuzzlesSession(
+    command: StartMyGamePuzzlesSessionCommand = {},
+    now = new Date().toISOString()
+  ): SprintState {
+    if (
+      this.activeSprint &&
+      (this.activeSprint.status === "active" || this.activeSprint.status === "paused")
+    ) {
+      throw new ActiveSprintConflictError();
+    }
+    const mode = command.mode ?? "standard";
+    const ratingPolicy = command.ratingPolicy ?? "unrated";
+    const maxMistakes = command.maxMistakes ?? 3;
+    const normalizedThemes = normalizeThemeSelection(command.themes ?? []);
+    const requestedLimit =
+      command.limit ??
+      (command.targetCorrect === undefined
+        ? 10 + maxMistakes
+        : Math.max(command.targetCorrect + maxMistakes, command.targetCorrect));
+    const puzzles = this.store.selectPuzzles({
+      mode,
+      source: "user_game",
+      limit: requestedLimit,
+      ...(command.timeClass === undefined ? {} : { timeClass: command.timeClass }),
+      ...(normalizedThemes.length === 0 ? {} : { themes: normalizedThemes }),
+      ...(command.gameId === undefined ? {} : { gameId: command.gameId }),
+      ...(command.puzzleSelectionSeed === undefined
+        ? {}
+        : { randomSeed: command.puzzleSelectionSeed })
+    });
+    if (puzzles.length === 0) {
+      throw new Error("No eligible user game puzzles are available for this session");
+    }
+
+    const targetCorrect = Math.max(
+      1,
+      Math.min(command.targetCorrect ?? puzzles.length, puzzles.length)
+    );
+    const baseConfig = buildSprintConfig({
+      mode,
+      durationSeconds: command.durationSeconds ?? 5 * 60,
+      perPuzzleSeconds: command.perPuzzleSeconds ?? defaultPerPuzzleSeconds(mode),
+      targetCorrect,
+      maxMistakes,
+      ...(command.opponentReply === undefined ? {} : { opponentReply: command.opponentReply }),
+      ...(normalizedThemes.length === 0 ? {} : { themes: normalizedThemes })
+    });
+    const ratingKey = `${USER_GAME_RATING_KEY_PREFIX}my_game_puzzles:${mode}`;
+    const config: SprintConfig = this.effectiveSprintConfig({
+      ...baseConfig,
+      ratingKey,
+      ratingPolicy,
+      ...(command.runClock === undefined ? {} : { runClock: command.runClock }),
+      userGamePuzzles: {
+        ...(command.timeClass === undefined ? {} : { timeClass: command.timeClass }),
+        ...(command.gameId === undefined ? {} : { gameId: command.gameId })
+      }
+    });
+    const rating =
+      ratingPolicy === "unrated"
+        ? createDefaultRating(ratingKey)
+        : this.store.getRating(ratingKey);
+    const sprint = startSprint({
+      config,
+      puzzles,
+      ratingBefore: rating.rating,
+      ratingBeforeRecord: rating,
+      now
+    });
+    this.activeSprint = sprint;
+    this.store.transaction(() => {
+      this.store.seedPuzzles(puzzles);
+      this.advanceReplyCueForStartedSprint(config);
+      this.store.createSprintSession(sprint);
+    });
+    return sprint;
   }
 
   removeReview(context: ReviewContext, now = new Date().toISOString()): ReviewScheduleRemoval {
@@ -1577,7 +1713,8 @@ export class PracticeService {
     if (
       !this.tacticalProfile ||
       state.completedAt === undefined ||
-      state.config.survival !== undefined
+      state.config.survival !== undefined ||
+      state.config.userGamePuzzles !== undefined
     ) {
       return;
     }

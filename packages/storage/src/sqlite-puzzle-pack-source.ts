@@ -77,6 +77,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
 
   countPuzzles(filter?: PuzzleSelectionFilter): number {
     if (filter !== undefined) {
+      if (filter.source === "user_game") {
+        return 0;
+      }
       const requiresArrowDuelSelection =
         filter.mode === "arrow_duel" && this.arrowDuelEligibility !== "all";
       if (requiresArrowDuelSelection || filter.includeIds !== undefined || filter.excludeIds !== undefined) {
@@ -141,6 +144,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
+    if (filter.source === "user_game") {
+      return [];
+    }
     if (filter.rating !== undefined && filter.minRating === undefined && filter.maxRating === undefined) {
       return this.selectByRatingFallback(filter, filter.rating);
     }

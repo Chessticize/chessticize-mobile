@@ -276,9 +276,16 @@ function isSprintConfig(value: unknown): value is SprintConfig {
       candidate === "rated" || candidate === "unrated"
     ) &&
     isOptional(value.tacticalFocus, isTacticalFocus) &&
+    isOptional(value.userGamePuzzles, isUserGamePuzzlesConfig) &&
     isOptional(value.runClock, (candidate) =>
       candidate === "countdown" || candidate === "untimed"
     );
+}
+
+function isUserGamePuzzlesConfig(value: unknown): boolean {
+  return isRecord(value) &&
+    isOptional(value.timeClass, isNonEmptyString) &&
+    isOptional(value.gameId, isNonEmptyString);
 }
 
 function isTacticalFocus(value: unknown): boolean {

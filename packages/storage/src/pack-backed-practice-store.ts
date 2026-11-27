@@ -4,8 +4,10 @@ import type {
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
+  ExtractedGamePuzzle,
   HistoryQuery,
   HistoryView,
+  ImportedGameDraft,
   Puzzle,
   PracticeRunRecord,
   RatingRecord,
@@ -18,6 +20,19 @@ import type {
   SurvivalBestRecord,
   SurvivalPreferences
 } from "../../core/src/index.ts";
+import { CompositePuzzleSource } from "./composite-puzzle-source.ts";
+import type {
+  GameListFilter,
+  LinkedGameAccount,
+  LinkedGameAccountPlatform,
+  ReplaceGameUserPuzzlesMeta,
+  SaveGamePlyEvaluationsStatusUpdate,
+  StoredGamePlyEval,
+  StoredImportedGame,
+  StoredUserPuzzle,
+  UpsertImportedGamesResult,
+  UserPuzzleFilter
+} from "./game-review-store.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
   ClearSyncedHistoryResult,
@@ -61,6 +76,17 @@ export class PackBackedPracticeStore implements PracticeStore {
     if (filter === undefined) {
       return this.puzzleSource.countPuzzles();
     }
+    if (filter.source === "user_game") {
+      return this.puzzleSource instanceof CompositePuzzleSource
+        ? this.puzzleSource.countPuzzles(filter)
+        : this.userStore.countPuzzles(filter);
+    }
+    if (filter.source === "all") {
+      if (this.puzzleSource instanceof CompositePuzzleSource) {
+        return this.puzzleSource.countPuzzles(filter);
+      }
+      return this.selectPuzzles(filter).length;
+    }
     const localScopeIsSeeded = this.scopeIsFullySeeded(filter.includeIds);
     return localScopeIsSeeded
       ? this.userStore.countPuzzles(filter)
@@ -84,6 +110,24 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
+    if (filter.source === "user_game") {
+      const puzzles = this.puzzleSource instanceof CompositePuzzleSource
+        ? this.puzzleSource.selectPuzzles(filter)
+        : this.userStore.selectPuzzles(filter);
+      if (puzzles.length > 0) {
+        this.userStore.seedPuzzles(puzzles);
+      }
+      return puzzles;
+    }
+    if (filter.source === "all") {
+      const puzzles = this.puzzleSource instanceof CompositePuzzleSource
+        ? this.puzzleSource.selectPuzzles(filter)
+        : new CompositePuzzleSource(this.puzzleSource, this.userStore).selectPuzzles(filter);
+      if (puzzles.length > 0) {
+        this.userStore.seedPuzzles(puzzles);
+      }
+      return puzzles;
+    }
     const localScopeIsSeeded = this.scopeIsFullySeeded(filter.includeIds);
     const localScopedPuzzles = localScopeIsSeeded ? this.userStore.selectPuzzles(filter) : [];
     const puzzles = localScopeIsSeeded ? localScopedPuzzles : this.puzzleSource.selectPuzzles(filter);
@@ -306,8 +350,13 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.scheduleMistakeReview(context, now);
   }
 
-  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
-    return this.userStore.enrollReview(context, now, initiatingAttemptId);
+  enrollReview(
+    context: ReviewContext,
+    now: string,
+    initiatingAttemptId?: string,
+    timeZone?: string
+  ): ReviewQueueState {
+    return this.userStore.enrollReview(context, now, initiatingAttemptId, timeZone);
   }
 
   removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval {
@@ -353,6 +402,79 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   transaction<T>(work: () => T): T {
     return this.userStore.transaction(work);
+  }
+
+  listLinkedAccounts(): LinkedGameAccount[] {
+    return this.userStore.listLinkedAccounts();
+  }
+
+  upsertLinkedAccount(
+    account: Omit<LinkedGameAccount, "createdAt"> & { createdAt?: string }
+  ): LinkedGameAccount {
+    return this.userStore.upsertLinkedAccount(account);
+  }
+
+  removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    this.userStore.removeLinkedAccount(platform, username);
+  }
+
+  upsertImportedGames(
+    games: readonly ImportedGameDraft[],
+    nowIso?: string
+  ): UpsertImportedGamesResult {
+    return this.userStore.upsertImportedGames(games, nowIso);
+  }
+
+  listImportedGames(filter?: GameListFilter): StoredImportedGame[] {
+    return this.userStore.listImportedGames(filter);
+  }
+
+  countImportedGames(filter?: Omit<GameListFilter, "limit" | "offset">): number {
+    return this.userStore.countImportedGames(filter);
+  }
+
+  getImportedGame(gameId: string): StoredImportedGame | undefined {
+    return this.userStore.getImportedGame(gameId);
+  }
+
+  deleteImportedGame(gameId: string): void {
+    this.userStore.deleteImportedGame(gameId);
+  }
+
+  saveGamePlyEvaluations(
+    gameId: string,
+    evals: readonly StoredGamePlyEval[],
+    statusUpdate: SaveGamePlyEvaluationsStatusUpdate
+  ): void {
+    this.userStore.saveGamePlyEvaluations(gameId, evals, statusUpdate);
+  }
+
+  listGamePlyEvaluations(gameId: string): StoredGamePlyEval[] {
+    return this.userStore.listGamePlyEvaluations(gameId);
+  }
+
+  replaceGameUserPuzzles(
+    gameId: string,
+    puzzles: readonly ExtractedGamePuzzle[],
+    gameMeta: ReplaceGameUserPuzzlesMeta
+  ): StoredUserPuzzle[] {
+    return this.userStore.replaceGameUserPuzzles(gameId, puzzles, gameMeta);
+  }
+
+  listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
+    return this.userStore.listUserPuzzles(filter);
+  }
+
+  countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
+    return this.userStore.countUserPuzzles(filter);
+  }
+
+  getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
+    return this.userStore.getUserPuzzle(puzzleId);
+  }
+
+  archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
+    this.userStore.archiveUserPuzzle(puzzleId, archived);
   }
 }
 
