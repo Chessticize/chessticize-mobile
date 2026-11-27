@@ -72,7 +72,7 @@ export function InGameDiagnosisCard({
   const deliberatePct = Math.round(clock.knownShares.deliberate * 100);
 
   return (
-    <Section style={styles.card} testID="games-diagnosis-card">
+    <Section surfaceStyle={styles.card} testID="games-diagnosis-card">
       <View style={styles.headerRow}>
         <AppText style={styles.heading} variant="headline">
           In-Game Insights
@@ -142,7 +142,10 @@ export function InGameDiagnosisCard({
           showsHorizontalScrollIndicator={false}
           testID="games-diagnosis-blindspots"
         >
-          {diagnosis.topBlindspots.slice(0, 6).map((spot) => (
+          {[...diagnosis.topBlindspots]
+            .sort((left, right) => right.totalCount - left.totalCount)
+            .slice(0, 6)
+            .map((spot) => (
             <Pressable
               key={spot.theme}
               accessibilityRole={onPracticeBlindspotTheme ? "button" : "text"}
@@ -167,8 +170,7 @@ export function InGameDiagnosisCard({
 
 const useStyles = makeStyles((theme) => ({
   card: {
-    gap: 10,
-    padding: 14
+    gap: 10
   },
   headerRow: {
     alignItems: "center",

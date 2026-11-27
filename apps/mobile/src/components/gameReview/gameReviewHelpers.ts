@@ -117,6 +117,63 @@ export function tryApplyUciMove(fen: string, uci: string): { fen: string; san: s
   }
 }
 
+export interface PvMoveToken {
+  step: number;
+  uci: string;
+  san: string;
+  moveNumber: number;
+  color: "w" | "b";
+  label: string;
+}
+
+export function formatPvMoveTokens(
+  fen: string,
+  pv: readonly string[],
+  maxMoves = 8
+): PvMoveToken[] {
+  if (pv.length === 0) {
+    return [];
+  }
+  try {
+    const chess = new Chess(fen);
+    const tokens: PvMoveToken[] = [];
+    const limit = Math.min(pv.length, maxMoves);
+    for (let index = 0; index < limit; index += 1) {
+      const moveUci = normalizeUciMove(pv[index] ?? "");
+      if (moveUci.length < 4) {
+        break;
+      }
+      const color = chess.turn();
+      const moveNumber = chess.moveNumber();
+      const played = chess.move({
+        from: moveUci.slice(0, 2),
+        to: moveUci.slice(2, 4),
+        ...(moveUci.length > 4 ? { promotion: moveUci.slice(4, 5) } : {})
+      });
+      if (!played) {
+        break;
+      }
+      const prefix =
+        color === "w"
+          ? `${moveNumber}. `
+          : index === 0
+            ? `${moveNumber}... `
+            : "";
+      tokens.push({
+        step: index + 1,
+        uci: `${played.from}${played.to}${played.promotion ?? ""}`.toLowerCase(),
+        san: played.san,
+        moveNumber,
+        color,
+        label: `${prefix}${played.san}`
+      });
+    }
+    return tokens;
+  } catch {
+    return [];
+  }
+}
+
 export function formatPvSanLine(
   fen: string,
   pv: readonly string[],

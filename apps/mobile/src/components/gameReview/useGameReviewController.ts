@@ -48,6 +48,7 @@ const DEFAULT_MOBILE_PASS1_NODES = 40_000;
 const DEFAULT_MOBILE_PASS2_DEEP_LIMIT = { depth: 16, nodes: 250_000 } as const;
 const DEFAULT_FREE_ANALYSIS_DEPTH = 16;
 const DEFAULT_FREE_ANALYSIS_MULTIPV = 3;
+const WHY_AUTOPLAY_STEP_MS = 850;
 
 export function useGameReviewController({
   game,
@@ -147,6 +148,7 @@ export function useGameReviewController({
   const [whyBaseFen, setWhyBaseFen] = useState<string | null>(null);
   const [whyMoves, setWhyMoves] = useState<string[]>([]);
   const [whyStep, setWhyStep] = useState<number>(0);
+  const [whyAutoPlaying, setWhyAutoPlaying] = useState<boolean>(false);
   const [whyError, setWhyError] = useState<string | null>(null);
   const whyAbortRef = useRef<AbortController | null>(null);
 
@@ -205,8 +207,32 @@ export function useGameReviewController({
     setWhyBaseFen(null);
     setWhyMoves([]);
     setWhyStep(0);
+    setWhyAutoPlaying(false);
     setWhyError(null);
   }, []);
+
+  // Chess.com-style automatic playback through the entire punishment line (~850ms per ply).
+  useEffect(() => {
+    if (!whyOpen || !whyAutoPlaying || whyMoves.length === 0) {
+      return;
+    }
+    if (whyStep >= whyMoves.length) {
+      setWhyAutoPlaying(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setWhyStep((current) => {
+        const next = Math.min(whyMoves.length, current + 1);
+        if (next >= whyMoves.length) {
+          setWhyAutoPlaying(false);
+        }
+        return next;
+      });
+    }, WHY_AUTOPLAY_STEP_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [whyAutoPlaying, whyMoves.length, whyOpen, whyStep]);
 
   const syncEnrolledIds = useCallback(
     (puzzles: readonly StoredUserPuzzle[]) => {
@@ -587,7 +613,7 @@ export function useGameReviewController({
 
   // Live Free Stockfish Analysis (MultiPV=3, priority="interactive" preempts Pass-2 batch work!)
   useEffect(() => {
-    if (!freeAnalysisOpen || !engine || isPromptHidingAnswer || isFastForwarding) {
+    if (!freeAnalysisOpen || !engine || isPromptHidingAnswer || isFastForwarding || whyAutoPlaying) {
       freeAnalysisAbortRef.current?.abort();
       freeAnalysisAbortRef.current = null;
       setFreeAnalysisLoading(false);
@@ -640,7 +666,7 @@ export function useGameReviewController({
         freeAnalysisAbortRef.current = null;
       }
     };
-  }, [currentFen, engine, freeAnalysisDepth, freeAnalysisOpen, isFastForwarding, isPromptHidingAnswer]);
+  }, [currentFen, engine, freeAnalysisDepth, freeAnalysisOpen, isFastForwarding, isPromptHidingAnswer, whyAutoPlaying]);
 
   const currentPlyEval = useMemo<GamePlyEvaluation | null>(() => {
     if (isExploringOffLine) {
@@ -1189,6 +1215,7 @@ export function useGameReviewController({
         setWhyLoading(false);
         setWhyMoves(legalMoves);
         setWhyStep(1);
+        setWhyAutoPlaying(legalMoves.length > 1);
         return;
       }
     }
@@ -1197,6 +1224,7 @@ export function useGameReviewController({
       setWhyLoading(false);
       setWhyMoves([]);
       setWhyStep(0);
+      setWhyAutoPlaying(false);
       return;
     }
 
@@ -1205,6 +1233,7 @@ export function useGameReviewController({
     setWhyLoading(true);
     setWhyMoves([]);
     setWhyStep(0);
+    setWhyAutoPlaying(false);
 
     engine
       .analyze({
@@ -1233,21 +1262,49 @@ export function useGameReviewController({
         setWhyLoading(false);
         setWhyMoves(legalMoves);
         setWhyStep(legalMoves.length > 0 ? 1 : 0);
+        setWhyAutoPlaying(legalMoves.length > 1);
       })
       .catch((error) => {
         if (controller.signal.aborted) {
           return;
         }
         setWhyLoading(false);
+        setWhyAutoPlaying(false);
         setWhyError(error instanceof Error ? error.message : "Engine unavailable");
       });
   }, [clearExploration, closeWhyRefutation, currentPlyEval, engine, freeAnalysisDepth, userPuzzles, whyOpen]);
 
+  const selectWhyStep = useCallback(
+    (step: number) => {
+      setWhyAutoPlaying(false);
+      setWhyStep(Math.max(0, Math.min(whyMoves.length, step)));
+    },
+    [whyMoves.length]
+  );
+
+  const toggleWhyAutoPlay = useCallback(() => {
+    if (whyMoves.length === 0) {
+      return;
+    }
+    if (whyAutoPlaying) {
+      setWhyAutoPlaying(false);
+      return;
+    }
+    if (whyStep >= whyMoves.length) {
+      setWhyStep(1);
+      setWhyAutoPlaying(whyMoves.length > 1);
+    } else {
+      setWhyAutoPlaying(true);
+    }
+  }, [whyAutoPlaying, whyMoves.length, whyStep]);
+
   const stepWhyForward = useCallback(() => {
+    setWhyAutoPlaying(false);
     setWhyStep((current) => Math.min(whyMoves.length, current + 1));
   }, [whyMoves.length]);
 
   const stepWhyBackward = useCallback(() => {
+    setWhyAutoPlaying(false);
     setWhyStep((current) => Math.max(0, current - 1));
   }, []);
 
@@ -1369,6 +1426,7 @@ export function useGameReviewController({
     whyBaseFen,
     whyMoves,
     whyStep,
+    whyAutoPlaying,
     whyError,
     isExploringOffLine,
     explorationPliesCount: explorationMoves.length,
@@ -1398,6 +1456,8 @@ export function useGameReviewController({
     toggleShowEngineArrows,
     toggleWhyRefutation,
     closeWhyRefutation,
+    selectWhyStep,
+    toggleWhyAutoPlay,
     stepWhyBackward,
     stepWhyForward,
     playEngineLineMove,

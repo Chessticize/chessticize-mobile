@@ -730,29 +730,53 @@ describe("GameReviewScreen (#767)", () => {
     expect(findByTestId(renderer, "game-review-why-button")).toBeTruthy();
 
     // Jump to ply 9 (blunder with cached Arrow Duel punishmentLine) and tap Why? to inspect opponent's refutation.
-    act(() => {
-      findByTestId(renderer, "game-review-next-critical").props.onPress();
-    });
-    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
-      PARSED_SAMPLE.plies[8]!.fenAfter
-    );
-    act(() => {
-      findByTestId(renderer, "game-review-why-button").props.onPress();
-    });
-    expect(findByTestId(renderer, "game-review-why-panel")).toBeTruthy();
-    expect(textContent(findByTestId(renderer, "game-review-why-san"))).toContain("Nxe4");
-    expect(textContent(findByTestId(renderer, "mock-board-fen"))).not.toBe(
-      PARSED_SAMPLE.plies[8]!.fenAfter
-    );
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        findByTestId(renderer, "game-review-next-critical").props.onPress();
+      });
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[8]!.fenAfter
+      );
+      act(() => {
+        findByTestId(renderer, "game-review-why-button").props.onPress();
+      });
+      expect(findByTestId(renderer, "game-review-why-panel")).toBeTruthy();
+      expect(textContent(findByTestId(renderer, "game-review-why-san"))).toContain("Nxe4");
+      const fenAtStep1 = textContent(findByTestId(renderer, "mock-board-fen"));
+      expect(fenAtStep1).not.toBe(PARSED_SAMPLE.plies[8]!.fenAfter);
 
-    // Close Why? panel snaps back to the blunder ply.
-    act(() => {
-      findByTestId(renderer, "game-review-why-close").props.onPress();
-    });
-    expect(queryByTestId(renderer, "game-review-why-panel")).toBeNull();
-    expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
-      PARSED_SAMPLE.plies[8]!.fenAfter
-    );
+      // Automatically plays through remaining punishment moves at Chess.com-style cadence.
+      act(() => {
+        jest.advanceTimersByTime(900);
+      });
+      const fenAtStep2 = textContent(findByTestId(renderer, "mock-board-fen"));
+      expect(fenAtStep2).not.toBe(fenAtStep1);
+
+      // Tapping any move chip in the punishment strip jumps straight to that position.
+      act(() => {
+        findByTestId(renderer, "game-review-why-step-1").props.onPress();
+      });
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(fenAtStep1);
+
+      act(() => {
+        findByTestId(renderer, "game-review-why-step-0").props.onPress();
+      });
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[8]!.fenAfter
+      );
+
+      // Close Why? panel snaps back to the blunder ply.
+      act(() => {
+        findByTestId(renderer, "game-review-why-close").props.onPress();
+      });
+      expect(queryByTestId(renderer, "game-review-why-panel")).toBeNull();
+      expect(textContent(findByTestId(renderer, "mock-board-fen"))).toBe(
+        PARSED_SAMPLE.plies[8]!.fenAfter
+      );
+    } finally {
+      jest.useRealTimers();
+    }
 
     // ‹ Key jumps back to ply 7
     act(() => {

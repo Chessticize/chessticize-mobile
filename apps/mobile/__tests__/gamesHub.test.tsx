@@ -280,10 +280,10 @@ describe("GamesHubScreen", () => {
     expect(service.listImportedGames()).toHaveLength(1);
     expect(textContent(findByTestID(renderer, "games-sync-summary"))).toContain("+1 game");
 
-    // Re-syncing the same game reports "Up to date" without adding duplicates.
+    // Re-syncing the same game keeps no duplicates and omits a redundant "Up to date" badge.
     await pressAsync(renderer, "games-sync-button");
     expect(service.listImportedGames()).toHaveLength(1);
-    expect(textContent(findByTestID(renderer, "games-sync-summary"))).toContain("Up to date");
+    expect(hasTestID(renderer, "games-sync-summary")).toBe(false);
 
     // Tapping the game row opens Game Review with the gameId.
     press(renderer, "game-row-https://www.chess.com/game/live/1001");

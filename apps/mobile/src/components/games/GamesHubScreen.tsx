@@ -428,11 +428,9 @@ export function GamesHubScreen({
       setHubError(null);
       try {
         const result = await syncAccount({ platform, username }, maxGames);
-        const summary =
-          result.inserted > 0
-            ? t("games.sync.added", { count: result.inserted })
-            : t("games.sync.upToDate");
-        setSyncSummary(summary);
+        setSyncSummary(
+          result.inserted > 0 ? t("games.sync.added", { count: result.inserted }) : null
+        );
         setModalStatus(
           result.skipped > 0
             ? t("games.import.summaryWithSkipped", {
@@ -473,9 +471,7 @@ export function GamesHubScreen({
         totalInserted += result.inserted;
       }
       setSyncSummary(
-        totalInserted > 0
-          ? t("games.sync.added", { count: totalInserted })
-          : t("games.sync.upToDate")
+        totalInserted > 0 ? t("games.sync.added", { count: totalInserted }) : null
       );
     } catch (error) {
       setHubError(gameImportErrorMessage(error, locale));

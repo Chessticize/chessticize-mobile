@@ -40,12 +40,18 @@ export const GAME_REVIEW_COPY = {
     nextKey: "Next Key"
   },
   whyPanel: {
-    title: "Opponent's best line",
-    loading: "Finding refutation…",
-    unavailable: "No refutation line available.",
-    prev: "Prev",
-    next: "Next",
-    close: "Close"
+    title: "Punishment line",
+    loading: "Finding punishment line…",
+    unavailable: "No punishment line available.",
+    pause: "Pause",
+    play: "Play",
+    replay: "Replay",
+    prev: "‹",
+    next: "›",
+    close: "×",
+    prevA11y: "Previous punishment move",
+    nextA11y: "Next punishment move",
+    closeA11y: "Close punishment line"
   },
   evalBar: {
     accessibilityLabel: (evalLabel: string, whiteWinPercent: number) =>

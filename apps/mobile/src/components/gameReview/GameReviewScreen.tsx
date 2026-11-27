@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Chessboard, { type MoveResult } from "react-native-chessboard";
 import type {
@@ -29,7 +29,7 @@ import {
   classificationBadgeMeta,
   formatEvalLabel,
   formatMoveNumberTag,
-  formatPvSanLine,
+  formatPvMoveTokens,
   isSuboptimalClassification,
   normalizeUciMove
 } from "./gameReviewHelpers.ts";
@@ -257,13 +257,16 @@ export function GameReviewScreen({
 
       {controller.whyOpen ? (
         <WhyRefutationPanel
+          autoPlaying={controller.whyAutoPlaying}
           baseFen={controller.whyBaseFen}
           error={controller.whyError}
           loading={controller.whyLoading}
           moves={controller.whyMoves}
           onClose={controller.closeWhyRefutation}
+          onSelectStep={controller.selectWhyStep}
           onStepBackward={controller.stepWhyBackward}
           onStepForward={controller.stepWhyForward}
+          onToggleAutoPlay={controller.toggleWhyAutoPlay}
           step={controller.whyStep}
         />
       ) : null}
@@ -729,63 +732,135 @@ function MoveVerdictStrip({
 }
 
 function WhyRefutationPanel({
+  autoPlaying,
   baseFen,
   error,
   loading,
   moves,
   onClose,
+  onSelectStep,
   onStepBackward,
   onStepForward,
+  onToggleAutoPlay,
   step
 }: {
+  autoPlaying: boolean;
   baseFen: string | null;
   error: string | null;
   loading: boolean;
   moves: readonly string[];
   onClose: () => void;
+  onSelectStep: (step: number) => void;
   onStepBackward: () => void;
   onStepForward: () => void;
+  onToggleAutoPlay: () => void;
   step: number;
 }): React.JSX.Element {
   const styles = useStyles();
-  const sanLine = baseFen && moves.length > 0 ? formatPvSanLine(baseFen, moves, 8) : "";
+  const scrollRef = useRef<ScrollView | null>(null);
+  const chipOffsetsRef = useRef<Map<number, { x: number; width: number }>>(new Map());
+  const scrollViewportWidthRef = useRef<number>(0);
+
+  const tokens = useMemo(
+    () => (baseFen && moves.length > 0 ? formatPvMoveTokens(baseFen, moves, 8) : []),
+    [baseFen, moves]
+  );
+
+  useEffect(() => {
+    const layout = chipOffsetsRef.current.get(step);
+    if (!layout || !scrollRef.current?.scrollTo) {
+      return;
+    }
+    const viewportWidth = scrollViewportWidthRef.current;
+    const targetX = Math.max(0, layout.x - Math.max(0, (viewportWidth - layout.width) / 2));
+    scrollRef.current.scrollTo({ x: targetX, animated: true });
+  }, [step]);
+
+  const autoPlayLabel = autoPlaying
+    ? GAME_REVIEW_COPY.whyPanel.pause
+    : step >= tokens.length && tokens.length > 0
+      ? GAME_REVIEW_COPY.whyPanel.replay
+      : GAME_REVIEW_COPY.whyPanel.play;
 
   return (
     <View style={styles.whyPanel} testID="game-review-why-panel">
       <View style={styles.whyPanelHeader}>
-        <AppText tone="secondary" variant="caption">
-          {moves.length > 0
-            ? `${GAME_REVIEW_COPY.whyPanel.title} (${step}/${moves.length})`
+        <AppText numberOfLines={1} style={styles.whyPanelTitle} tone="secondary" variant="caption">
+          {tokens.length > 0
+            ? `${GAME_REVIEW_COPY.whyPanel.title} · ${step}/${tokens.length}`
             : GAME_REVIEW_COPY.whyPanel.title}
         </AppText>
         <View style={styles.whyPanelActions}>
-          {moves.length > 0 ? (
+          {tokens.length > 0 ? (
             <>
-              <Button
+              {tokens.length > 1 ? (
+                <Pressable
+                  accessibilityLabel={autoPlayLabel}
+                  accessibilityRole="button"
+                  onPress={onToggleAutoPlay}
+                  style={({ pressed }) => [
+                    styles.whyControlChip,
+                    autoPlaying ? styles.whyControlChipActive : null,
+                    pressed ? styles.pressed : null
+                  ]}
+                  testID="game-review-why-autoplay"
+                >
+                  <AppText
+                    maxFontSizeMultiplier={1.2}
+                    style={autoPlaying ? styles.whyControlTextActive : styles.whyControlText}
+                    variant="caption"
+                  >
+                    {autoPlayLabel}
+                  </AppText>
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityLabel={GAME_REVIEW_COPY.whyPanel.prevA11y}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: step <= 0 }}
                 disabled={step <= 0}
-                label={GAME_REVIEW_COPY.whyPanel.prev}
                 onPress={onStepBackward}
-                size="compact"
+                style={({ pressed }) => [
+                  styles.whyControlChip,
+                  step <= 0 ? styles.whyControlChipDisabled : null,
+                  pressed && step > 0 ? styles.pressed : null
+                ]}
                 testID="game-review-why-prev"
-                variant="plain"
-              />
-              <Button
-                disabled={step >= moves.length}
-                label={GAME_REVIEW_COPY.whyPanel.next}
+              >
+                <AppText maxFontSizeMultiplier={1.2} style={styles.whyControlText} variant="caption">
+                  {GAME_REVIEW_COPY.whyPanel.prev}
+                </AppText>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={GAME_REVIEW_COPY.whyPanel.nextA11y}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: step >= tokens.length }}
+                disabled={step >= tokens.length}
                 onPress={onStepForward}
-                size="compact"
+                style={({ pressed }) => [
+                  styles.whyControlChip,
+                  step >= tokens.length ? styles.whyControlChipDisabled : null,
+                  pressed && step < tokens.length ? styles.pressed : null
+                ]}
                 testID="game-review-why-next"
-                variant="plain"
-              />
+              >
+                <AppText maxFontSizeMultiplier={1.2} style={styles.whyControlText} variant="caption">
+                  {GAME_REVIEW_COPY.whyPanel.next}
+                </AppText>
+              </Pressable>
             </>
           ) : null}
-          <Button
-            label={GAME_REVIEW_COPY.whyPanel.close}
+          <Pressable
+            accessibilityLabel={GAME_REVIEW_COPY.whyPanel.closeA11y}
+            accessibilityRole="button"
             onPress={onClose}
-            size="compact"
+            style={({ pressed }) => [styles.whyControlChip, pressed ? styles.pressed : null]}
             testID="game-review-why-close"
-            variant="plain"
-          />
+          >
+            <AppText maxFontSizeMultiplier={1.2} style={styles.whyControlText} variant="caption">
+              {GAME_REVIEW_COPY.whyPanel.close}
+            </AppText>
+          </Pressable>
         </View>
       </View>
       {error ? (
@@ -796,10 +871,69 @@ function WhyRefutationPanel({
         <AppText testID="game-review-why-loading" tone="secondary" variant="footnote">
           {GAME_REVIEW_COPY.whyPanel.loading}
         </AppText>
-      ) : sanLine ? (
-        <AppText testID="game-review-why-san" variant="subheadline">
-          {sanLine}
-        </AppText>
+      ) : tokens.length > 0 ? (
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.whyMovesContent}
+          horizontal
+          onLayout={(event) => {
+            scrollViewportWidthRef.current = event.nativeEvent.layout.width;
+          }}
+          showsHorizontalScrollIndicator={false}
+          style={styles.whyMovesScroll}
+          testID="game-review-why-san"
+        >
+          <Pressable
+            accessibilityLabel={GAME_REVIEW_COPY.moveStrip.startLabel}
+            accessibilityRole="button"
+            accessibilityState={{ selected: step === 0 }}
+            onLayout={(event) => {
+              chipOffsetsRef.current.set(0, {
+                x: event.nativeEvent.layout.x,
+                width: event.nativeEvent.layout.width
+              });
+            }}
+            onPress={() => onSelectStep(0)}
+            style={[styles.whyMoveChip, step === 0 ? styles.whyMoveChipSelected : null]}
+            testID="game-review-why-step-0"
+          >
+            <AppText
+              maxFontSizeMultiplier={1.3}
+              style={step === 0 ? styles.whyMoveChipTextSelected : styles.whyMoveChipText}
+              variant="footnote"
+            >
+              {GAME_REVIEW_COPY.moveStrip.startLabel}
+            </AppText>
+          </Pressable>
+          {tokens.map((token) => {
+            const selected = token.step === step;
+            return (
+              <Pressable
+                key={`why-step-${token.step}-${token.uci}`}
+                accessibilityLabel={token.label}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onLayout={(event) => {
+                  chipOffsetsRef.current.set(token.step, {
+                    x: event.nativeEvent.layout.x,
+                    width: event.nativeEvent.layout.width
+                  });
+                }}
+                onPress={() => onSelectStep(token.step)}
+                style={[styles.whyMoveChip, selected ? styles.whyMoveChipSelected : null]}
+                testID={`game-review-why-step-${token.step}`}
+              >
+                <AppText
+                  maxFontSizeMultiplier={1.3}
+                  style={selected ? styles.whyMoveChipTextSelected : styles.whyMoveChipText}
+                  variant="footnote"
+                >
+                  {token.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       ) : (
         <AppText tone="secondary" variant="footnote">
           {GAME_REVIEW_COPY.whyPanel.unavailable}
@@ -1041,21 +1175,80 @@ const useStyles = makeStyles((theme) => ({
     borderColor: theme.colors.danger.s200,
     borderRadius: theme.shape.card,
     borderWidth: 1,
-    gap: 6,
-    paddingHorizontal: 12,
+    gap: 8,
+    paddingHorizontal: 10,
     paddingVertical: 8
   },
   whyPanelHeader: {
     alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
     justifyContent: "space-between"
+  },
+  whyPanelTitle: {
+    flex: 1,
+    fontWeight: theme.fontWeight.semibold
   },
   whyPanelActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 2
+    flexShrink: 0,
+    gap: 4
+  },
+  whyControlChip: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 26,
+    minWidth: 26,
+    paddingHorizontal: 8,
+    paddingVertical: 2
+  },
+  whyControlChipActive: {
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s200
+  },
+  whyControlChipDisabled: {
+    opacity: 0.4
+  },
+  whyControlText: {
+    color: theme.colors.text.primary,
+    fontWeight: theme.fontWeight.bold
+  },
+  whyControlTextActive: {
+    color: theme.colors.danger.s600,
+    fontWeight: theme.fontWeight.bold
+  },
+  whyMovesScroll: {
+    flexGrow: 0
+  },
+  whyMovesContent: {
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 2
+  },
+  whyMoveChip: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSunken,
+    borderRadius: theme.shape.capsule,
+    justifyContent: "center",
+    minHeight: 32,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  whyMoveChipSelected: {
+    backgroundColor: theme.colors.accent.fill
+  },
+  whyMoveChipText: {
+    color: theme.colors.text.primary,
+    fontWeight: theme.fontWeight.semibold
+  },
+  whyMoveChipTextSelected: {
+    color: theme.colors.text.onAccent,
+    fontWeight: theme.fontWeight.bold
   },
   pressed: {
     opacity: 0.72

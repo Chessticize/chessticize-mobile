@@ -202,6 +202,7 @@ export interface GameReviewController {
   whyBaseFen: string | null;
   whyMoves: string[];
   whyStep: number;
+  whyAutoPlaying: boolean;
   whyError: string | null;
   isExploringOffLine: boolean;
   explorationPliesCount: number;
@@ -231,6 +232,8 @@ export interface GameReviewController {
   toggleShowEngineArrows: () => void;
   toggleWhyRefutation: () => void;
   closeWhyRefutation: () => void;
+  selectWhyStep: (step: number) => void;
+  toggleWhyAutoPlay: () => void;
   stepWhyBackward: () => void;
   stepWhyForward: () => void;
   playEngineLineMove: (uci: string) => void;
