@@ -1,17 +1,17 @@
 {
   "id": "core",
   "title": "Core Pack",
-  "buildDate": "2026-08-03",
+  "buildDate": "2026-11-27",
   "source": "Lichess puzzle database",
   "sourceLicense": "CC0",
   "sourceSnapshotDate": "2025-07-24",
   "presolve": "Chessticize depth-20 Stockfish presolve",
   "presolveDepth": 20,
   "licenseNote": "Derived from Lichess puzzle data with Chessticize presolve metadata.",
-  "manifestHash": "sha256:b7233a1efce58ed3ba784571a7d380b3821dcd21f3af869668b0b36de4f33e4d",
-  "packVersion": 5,
-  "packFileHash": "sha256:4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811",
-  "packFileBytes": 164163584,
+  "manifestHash": "sha256:29a1ee5a9d6d8b9e80b4fddcc9ee24151b1be58ee2d81719d1cb8eecd184af1e",
+  "packVersion": 6,
+  "packFileHash": "sha256:1b36d8f6cc3a9ddaac77c7ff757d59ed046eda99775961403a9a76ecd39db851",
+  "packFileBytes": 215678976,
   "format": "sqlite",
   "packSchemaVersion": 2,
   "positionCodec": {
@@ -771,5 +771,116 @@
     "puzzleRatingDeviation": true,
     "featureHash": "sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295"
   },
-  "arrowDuelCount": 1392969
+  "arrowDuelCount": 1392969,
+  "arrowDuelRatingSource": {
+    "formula": {
+      "eloGrid": [
+        700,
+        1100,
+        1500,
+        1900,
+        2300
+      ],
+      "fullCheckRate": 1,
+      "glickoScale": 173.71779276130073,
+      "maxRating": 2200,
+      "minRating": 600,
+      "name": "prompted-comparison-3pl-irt-v1",
+      "sprintCheckRate": 0.75,
+      "targetProb": 0.75
+    },
+    "model": {
+      "checkpointFilename": "maia3-5m.pt",
+      "checkpointSha256": "sha256:ba14208b2992d85502f5fb501934abf6aaaeb355e9f3fdf90e326911f562524f",
+      "device": "mps",
+      "family": "maia3",
+      "name": "maia3-5m",
+      "parameterCount": 5230084,
+      "repoId": "UofTCSSLab/Maia3-5M"
+    },
+    "ratedCount": 1392969,
+    "ratingHash": "sha256:9aee313c17525918aa28406f628483224256edaefc8fb16740d959e6e161c105"
+  },
+  "arrowDuelRatingBuckets": [
+    {
+      "minRating": 600,
+      "maxRating": 699,
+      "puzzleCount": 265005
+    },
+    {
+      "minRating": 700,
+      "maxRating": 799,
+      "puzzleCount": 45174
+    },
+    {
+      "minRating": 800,
+      "maxRating": 899,
+      "puzzleCount": 69859
+    },
+    {
+      "minRating": 900,
+      "maxRating": 999,
+      "puzzleCount": 81550
+    },
+    {
+      "minRating": 1000,
+      "maxRating": 1099,
+      "puzzleCount": 89826
+    },
+    {
+      "minRating": 1100,
+      "maxRating": 1199,
+      "puzzleCount": 82340
+    },
+    {
+      "minRating": 1200,
+      "maxRating": 1299,
+      "puzzleCount": 82946
+    },
+    {
+      "minRating": 1300,
+      "maxRating": 1399,
+      "puzzleCount": 82340
+    },
+    {
+      "minRating": 1400,
+      "maxRating": 1499,
+      "puzzleCount": 78442
+    },
+    {
+      "minRating": 1500,
+      "maxRating": 1599,
+      "puzzleCount": 75082
+    },
+    {
+      "minRating": 1600,
+      "maxRating": 1699,
+      "puzzleCount": 73576
+    },
+    {
+      "minRating": 1700,
+      "maxRating": 1799,
+      "puzzleCount": 70740
+    },
+    {
+      "minRating": 1800,
+      "maxRating": 1899,
+      "puzzleCount": 67359
+    },
+    {
+      "minRating": 1900,
+      "maxRating": 1999,
+      "puzzleCount": 63896
+    },
+    {
+      "minRating": 2000,
+      "maxRating": 2099,
+      "puzzleCount": 58371
+    },
+    {
+      "minRating": 2100,
+      "maxRating": 2200,
+      "puzzleCount": 106463
+    }
+  ]
 }

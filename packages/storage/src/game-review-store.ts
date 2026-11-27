@@ -12,7 +12,8 @@ import {
   type ImportedGameDraft,
   type MoveClassification,
   type Puzzle,
-  type UserGamePuzzleMeta
+  type UserGamePuzzleMeta,
+  type UserGamePuzzleRatingSource
 } from "../../core/src/index.ts";
 import type { ExportedSprintSession, LocalDataExport } from "./practice-store.ts";
 import type { ProgressV2RecordIdentity } from "./progress-v2-persistence.ts";
@@ -84,6 +85,7 @@ export interface StoredUserPuzzle {
   punishmentLine?: string[];
   themes: string[];
   rating: number;
+  ratingSource?: UserGamePuzzleRatingSource;
   opponentName?: string;
   playedAt?: string;
   timeClass?: string;
@@ -107,6 +109,8 @@ export interface UserPuzzleFilter {
   gameId?: string;
   timeClass?: string;
   themes?: string[];
+  minRating?: number;
+  maxRating?: number;
   includeArchived?: boolean;
   limit?: number;
 }
@@ -191,7 +195,8 @@ export function storedUserPuzzleToPuzzle(stored: StoredUserPuzzle): Puzzle {
     ...(stored.punishmentLine === undefined
       ? {}
       : { punishmentLine: [...stored.punishmentLine] }),
-    ...(stored.caliberScore === undefined ? {} : { caliberScore: stored.caliberScore })
+    ...(stored.caliberScore === undefined ? {} : { caliberScore: stored.caliberScore }),
+    ...(stored.ratingSource === undefined ? {} : { ratingSource: stored.ratingSource })
   };
 
   return {
@@ -199,6 +204,7 @@ export function storedUserPuzzleToPuzzle(stored: StoredUserPuzzle): Puzzle {
     initialFen: stored.initialFen,
     solutionMoves: [...stored.solutionMoves],
     rating: stored.rating,
+    ...(stored.puzzleKind === "arrow_duel" ? { arrowDuelRating: stored.rating } : {}),
     themes: [...stored.themes],
     source: "user_game",
     ...(stored.stockfishEval === undefined ? {} : { stockfishEval: stored.stockfishEval }),
@@ -220,7 +226,11 @@ export function extractedGamePuzzleToStoredUserPuzzle(
 ): StoredUserPuzzle {
   const nowIso = gameMeta.nowIso ?? new Date().toISOString();
   const id = userGamePuzzleIdFor(gameId, extracted);
-  const rating = normalizeUserPuzzleRating(gameMeta.ratingAnchor);
+  const rating = normalizeUserPuzzleRating(extracted.estimatedRating ?? gameMeta.ratingAnchor);
+  const ratingSource: UserGamePuzzleRatingSource =
+    extracted.estimatedRating !== undefined
+      ? (extracted.ratingSource ?? "sf_heuristic_v1")
+      : "game_anchor";
 
   if (extracted.puzzleKind === "arrow_duel") {
     const arrowDuel = extracted.arrowDuel;
@@ -256,6 +266,7 @@ export function extractedGamePuzzleToStoredUserPuzzle(
           }),
       themes: [...extracted.themes],
       rating,
+      ratingSource,
       ...(gameMeta.opponentName === undefined ? {} : { opponentName: gameMeta.opponentName }),
       ...(gameMeta.playedAt === undefined ? {} : { playedAt: gameMeta.playedAt }),
       ...(gameMeta.timeClass === undefined ? {} : { timeClass: gameMeta.timeClass }),
@@ -280,6 +291,7 @@ export function extractedGamePuzzleToStoredUserPuzzle(
     solutionMoves: [...extracted.solutionMoves],
     themes: [...extracted.themes],
     rating,
+    ratingSource,
     ...(gameMeta.opponentName === undefined ? {} : { opponentName: gameMeta.opponentName }),
     ...(gameMeta.playedAt === undefined ? {} : { playedAt: gameMeta.playedAt }),
     ...(gameMeta.timeClass === undefined ? {} : { timeClass: gameMeta.timeClass }),
@@ -398,6 +410,12 @@ export function matchesUserPuzzleFilter(
     return false;
   }
   if (filter?.timeClass !== undefined && puzzle.timeClass !== filter.timeClass) {
+    return false;
+  }
+  if (filter?.minRating !== undefined && puzzle.rating < filter.minRating) {
+    return false;
+  }
+  if (filter?.maxRating !== undefined && puzzle.rating > filter.maxRating) {
     return false;
   }
   const selectedThemes = namedThemesForSelection(filter?.themes);

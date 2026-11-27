@@ -179,12 +179,15 @@ export function useGamesBatchAnalysis({
       }
 
       try {
+        const userRating =
+          latestGame.userColor === "w" ? latestGame.white.rating : latestGame.black.rating;
         const result = await runFullGameReviewPipeline({
           gameId: latestGame.id,
           pgn: latestGame.pgn,
           userColor: latestGame.userColor,
           engine,
           timeControl: latestGame.timeControl,
+          ...(userRating !== undefined && Number.isFinite(userRating) ? { userRating } : {}),
           pass1Options: {
             priority: "batch",
             depth: DEFAULT_MOBILE_BATCH_PASS1_LIMIT.depth,

@@ -14,7 +14,7 @@ import type { Puzzle, PuzzlePackManifest } from "../src/index.ts";
 
 test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t) => {
   const manifest = readBundledManifest();
-  assert.equal(manifest.packVersion, 5);
+  assert.equal(manifest.packVersion, 6);
   if (manifest.format === "sqlite") {
     if (!existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
       t.skip("core pack artifact not fetched; run pnpm fetch:core-pack (Mobile iOS CI verifies the real artifact)");

@@ -78,6 +78,11 @@ export function isUserGamePuzzleId(id: string): boolean {
   return id.startsWith(USER_GAME_PUZZLE_ID_PREFIX);
 }
 
+export type UserGamePuzzleRatingSource =
+  | "maia2_sf_v1"
+  | "sf_heuristic_v1"
+  | "game_anchor";
+
 export interface UserGamePuzzleMeta {
   gameId: string;
   gamePly: number;
@@ -91,6 +96,7 @@ export interface UserGamePuzzleMeta {
   timeSpentSec?: number;
   punishmentLine?: string[];
   caliberScore?: number;
+  ratingSource?: UserGamePuzzleRatingSource;
 }
 
 export interface Puzzle {
@@ -98,6 +104,8 @@ export interface Puzzle {
   initialFen: string;
   solutionMoves: string[];
   rating: number;
+  /** Optional dedicated Arrow Duel difficulty rating (600–2200) when available. */
+  arrowDuelRating?: number;
   ratingDeviation?: number;
   popularity?: number;
   nbPlays?: number;
@@ -109,6 +117,20 @@ export interface Puzzle {
   stockfishBestMove?: string;
   stockfishEvalAfterFirstMove?: number;
   userGameMeta?: UserGamePuzzleMeta;
+}
+
+export function effectivePuzzleRating(
+  puzzle: Pick<Puzzle, "rating" | "arrowDuelRating">,
+  mode: SprintMode | "line" | "puzzle"
+): number {
+  if (
+    mode === "arrow_duel" &&
+    puzzle.arrowDuelRating !== undefined &&
+    Number.isFinite(puzzle.arrowDuelRating)
+  ) {
+    return puzzle.arrowDuelRating;
+  }
+  return puzzle.rating;
 }
 
 export interface SprintConfig {

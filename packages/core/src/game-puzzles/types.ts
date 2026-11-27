@@ -7,6 +7,7 @@
  */
 
 import type { AnalysisScore, EngineAnalysisLine } from "../engine-analysis.ts";
+import type { UserGamePuzzleRatingSource } from "../types.ts";
 
 export type GamePuzzleMomentKind =
   | "own_mistake_punished"
@@ -61,6 +62,10 @@ export interface ExtractedGamePuzzle {
   clockRemainingSec?: number;
   timeSpentSec?: number;
   caliberScore: number;
+  /** Offline difficulty estimate (Lichess-aligned for `line`; Arrow Duel scale for `arrow_duel`). */
+  estimatedRating?: number;
+  /** Provenance of `estimatedRating` (`maia2_sf_v1`, `sf_heuristic_v1`, or `game_anchor`). */
+  ratingSource?: UserGamePuzzleRatingSource;
 }
 
 export interface GameHighlightMoment {
@@ -124,6 +129,8 @@ export interface ExtractGamePuzzlesInput {
   initialEval?: AnalysisScore;
 }
 
+import type { HumanPolicyModel } from "./difficulty.ts";
+
 export interface ExtractGamePuzzlesOptions {
   /** Maximum puzzles returned after ranking & deduplication. Defaults to 3. */
   maxPuzzlesPerGame?: number;
@@ -137,6 +144,14 @@ export interface ExtractGamePuzzlesOptions {
   signal?: AbortSignal;
   /** Optional engine-backed zugzwang check (defaults to false). */
   checkZugzwang?: boolean;
+  /** Enable offline difficulty estimation on extracted candidates (defaults to false unless enabled). */
+  estimateDifficulty?: boolean;
+  /** Optional on-device human policy model (e.g. Maia-2 INT8) for higher-accuracy rating estimates. */
+  humanPolicy?: HumanPolicyModel;
+  /** Optional player rating anchor used to softly down-rank puzzles far above the player's level. */
+  userRating?: number;
+  /** Maximum Elo above `userRating` before soft down-ranking applies (defaults to 300). */
+  maxReviewAboveUserRating?: number;
 }
 
 export interface ExtractGamePuzzlesResult {

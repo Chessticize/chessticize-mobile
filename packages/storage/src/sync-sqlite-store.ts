@@ -48,6 +48,7 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  UserGamePuzzleRatingSource,
   MoveClassification,
   Puzzle,
   PracticeRunKind,
@@ -467,6 +468,7 @@ interface UserPuzzleRow {
   punishment_line_json: string | null;
   themes_json: string;
   rating: number;
+  rating_source: UserGamePuzzleRatingSource | null;
   opponent_name: string | null;
   played_at: string | null;
   time_class: string | null;
@@ -499,7 +501,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 27;
+export const CURRENT_SCHEMA_VERSION = 28;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -535,7 +537,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 23, to: 24, apply: migrateV23ToV24 },
   { from: 24, to: 25, apply: migrateV24ToV25 },
   { from: 25, to: 26, apply: migrateV25ToV26 },
-  { from: 26, to: 27, apply: migrateV26ToV27 }
+  { from: 26, to: 27, apply: migrateV26ToV27 },
+  { from: 27, to: 28, apply: migrateV27ToV28 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -2664,9 +2667,9 @@ export class SyncSQLiteStore implements PracticeStore {
           id, game_id, game_ply, game_move_number, puzzle_kind, game_moment_kind,
           initial_fen, solution_moves_json, stockfish_eval, stockfish_best_move,
           stockfish_eval_after_first_move, punishment_line_json, themes_json,
-          rating, opponent_name, played_at, time_class, clock_remaining_sec,
+          rating, rating_source, opponent_name, played_at, time_class, clock_remaining_sec,
           time_spent_sec, caliber_score, created_at, archived
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           game_id = excluded.game_id,
           game_ply = excluded.game_ply,
@@ -2681,6 +2684,7 @@ export class SyncSQLiteStore implements PracticeStore {
           punishment_line_json = excluded.punishment_line_json,
           themes_json = excluded.themes_json,
           rating = excluded.rating,
+          rating_source = excluded.rating_source,
           opponent_name = excluded.opponent_name,
           played_at = excluded.played_at,
           time_class = excluded.time_class,
@@ -2705,6 +2709,7 @@ export class SyncSQLiteStore implements PracticeStore {
           stored.punishmentLine === undefined ? null : JSON.stringify(stored.punishmentLine),
           JSON.stringify(stored.themes),
           stored.rating,
+          stored.ratingSource ?? null,
           stored.opponentName ?? null,
           stored.playedAt ?? null,
           stored.timeClass ?? null,
@@ -2750,6 +2755,14 @@ export class SyncSQLiteStore implements PracticeStore {
     if (filter?.timeClass !== undefined) {
       clauses.push("time_class = ?");
       params.push(filter.timeClass);
+    }
+    if (filter?.minRating !== undefined) {
+      clauses.push("rating >= ?");
+      params.push(filter.minRating);
+    }
+    if (filter?.maxRating !== undefined) {
+      clauses.push("rating <= ?");
+      params.push(filter.maxRating);
     }
     const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const rows = this.db
@@ -3956,7 +3969,8 @@ function hasGameReviewSchema(db: SyncSqliteDatabase): boolean {
   return hasTable(db, "linked_accounts") &&
     hasTable(db, "imported_games") &&
     hasTable(db, "game_ply_evals") &&
-    hasTable(db, "user_puzzles");
+    hasTable(db, "user_puzzles") &&
+    hasColumn(db, "user_puzzles", "rating_source");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -5056,6 +5070,15 @@ function migrateV26ToV27(db: SyncSqliteDatabase): void {
   }
 }
 
+function migrateV27ToV28(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "user_puzzles",
+    "rating_source",
+    "ALTER TABLE user_puzzles ADD COLUMN rating_source TEXT"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -5682,6 +5705,9 @@ function userPuzzleFromRow(row: UserPuzzleRow): StoredUserPuzzle {
       : { punishmentLine: JSON.parse(row.punishment_line_json) as string[] }),
     themes: JSON.parse(row.themes_json) as string[],
     rating: row.rating,
+    ...(row.rating_source === null || row.rating_source === undefined
+      ? {}
+      : { ratingSource: row.rating_source }),
     ...(row.opponent_name === null ? {} : { opponentName: row.opponent_name }),
     ...(row.played_at === null ? {} : { playedAt: row.played_at }),
     ...(row.time_class === null ? {} : { timeClass: row.time_class }),

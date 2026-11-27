@@ -6,6 +6,7 @@ import {
   importChessComGames,
   importLichessGames,
   importPgnBatch,
+  isWithinReviewDifficultyBand,
   UciEngineArbiter,
   type GameColor,
   type GameImportHttpClient,
@@ -739,10 +740,29 @@ export function GamesHubScreen({
     [refreshHub, service]
   );
 
+  const isPuzzleWithinReviewBand = useCallback(
+    (puzzle: StoredUserPuzzle): boolean => {
+      if (!puzzle.ratingSource || puzzle.ratingSource === "game_anchor") {
+        return true;
+      }
+      const sourceGame = snapshot.gameById.get(puzzle.gameId);
+      const userRating = sourceGame
+        ? sourceGame.userColor === "w"
+          ? sourceGame.white.rating
+          : sourceGame.black.rating
+        : undefined;
+      return isWithinReviewDifficultyBand(puzzle.rating, userRating);
+    },
+    [snapshot.gameById]
+  );
+
   const handleAddAllUserPuzzlesToReview = useCallback(
     (puzzles: readonly StoredUserPuzzle[]): void => {
       let changed = false;
       for (const puzzle of puzzles) {
+        if (!isPuzzleWithinReviewBand(puzzle)) {
+          continue;
+        }
         const mode = puzzle.puzzleKind === "arrow_duel" ? "arrow_duel" : "standard";
         const ctx = {
           puzzleId: puzzle.id,
@@ -758,16 +778,17 @@ export function GamesHubScreen({
         refreshHub();
       }
     },
-    [refreshHub, service]
+    [isPuzzleWithinReviewBand, refreshHub, service]
   );
 
   const isEmpty = snapshot.allGames.length === 0;
   const batchBusy = batch.state.status === "running";
   const effectiveHubView: "games" | "puzzles" =
     snapshot.userPuzzleCount > 0 ? hubView : "games";
+  const reviewBandVisiblePuzzles = filteredOrderedUserPuzzles.filter(isPuzzleWithinReviewBand);
   const allVisiblePuzzlesEnrolled =
-    filteredOrderedUserPuzzles.length > 0 &&
-    filteredOrderedUserPuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
+    reviewBandVisiblePuzzles.length > 0 &&
+    reviewBandVisiblePuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
 
   return (
     <View
@@ -1219,6 +1240,9 @@ export function GamesHubScreen({
                       puzzle.puzzleKind === "arrow_duel"
                         ? t("common.arrowDuel")
                         : t("common.standard");
+                    const overReviewBand = !isPuzzleWithinReviewBand(puzzle);
+                    const hasEstimatedRating =
+                      puzzle.ratingSource !== undefined && puzzle.ratingSource !== "game_anchor";
 
                     return (
                       <View
@@ -1251,6 +1275,12 @@ export function GamesHubScreen({
                           ) : null}
                           <View style={styles.puzzleListBadges}>
                             <Badge label={kindLabel} tone="accent" />
+                            {hasEstimatedRating ? (
+                              <Badge
+                                label={`~${puzzle.rating}`}
+                                tone={overReviewBand ? "warning" : "neutral"}
+                              />
+                            ) : null}
                             {curatedThemes.slice(0, 2).map((themeId) => (
                               <Badge
                                 key={themeId}

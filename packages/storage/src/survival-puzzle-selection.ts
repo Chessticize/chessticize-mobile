@@ -1,4 +1,7 @@
-import { isServerCompatibleArrowDuelPuzzle } from "../../core/src/index.ts";
+import {
+  effectivePuzzleRating,
+  isServerCompatibleArrowDuelPuzzle
+} from "../../core/src/index.ts";
 import type { Puzzle } from "../../core/src/index.ts";
 import type {
   SurvivalPuzzleBatch,
@@ -10,14 +13,17 @@ export function eligibleSurvivalPuzzles(
   input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
 ): Puzzle[] {
   return [...new Map(puzzles.map((puzzle) => [puzzle.id, puzzle])).values()]
-    .filter((puzzle) => (
-      puzzle.rating >= input.level.minRating &&
-      puzzle.rating <= input.level.maxRating &&
-      (
-        input.challengeType === "puzzle" ||
-        isServerCompatibleArrowDuelPuzzle(puzzle)
-      )
-    ))
+    .filter((puzzle) => {
+      const rating = effectivePuzzleRating(puzzle, input.challengeType);
+      return (
+        rating >= input.level.minRating &&
+        rating <= input.level.maxRating &&
+        (
+          input.challengeType === "puzzle" ||
+          isServerCompatibleArrowDuelPuzzle(puzzle)
+        )
+      );
+    })
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 

@@ -282,6 +282,24 @@ overwrite an existing Core Pack release.
 - Published release: `core-pack-v5`; the fetch script references its immutable
   `bundled-core-pack.sqlite` asset.
 
+### Arrow Duel difficulty-rating release (2026-11-27)
+
+- Puzzle rows, `rating`, `rating_deviation`, and Tactical Profile feature hash
+  preserved unchanged (`1,400,000 / 1,400,000`).
+- Added `arrow_duel_rating INTEGER` column (and partial index) to `puzzles` and
+  `puzzle_themes`, populated for all **1,392,969** Arrow Duel-eligible rows from
+  `Chessticize/lichess-presolver` release `arrow-duel-ratings-maia3-5m-2026-11-27`
+  (`UofTCSSLab/Maia3-5M`, `prompted-comparison-3pl-irt-v1`, `[600, 2200]`).
+  Standard-only promotion candidates retain `NULL` `arrow_duel_rating`.
+- Arrow Duel rating digest:
+  `sha256:9aee313c17525918aa28406f628483224256edaefc8fb16740d959e6e161c105`.
+- SQLite integrity: `ok`; artifact size: `215,678,976` bytes (205.7 MiB, well
+  under the 700 MB budget).
+- Published SHA-256:
+  `1b36d8f6cc3a9ddaac77c7ff757d59ed046eda99775961403a9a76ecd39db851`.
+- Published release: `core-pack-v6`; the fetch script references its immutable
+  `bundled-core-pack.sqlite` asset.
+
 ## Regenerating And Publishing The Pack
 
 Follow this checklist whenever the sampling rules, seed, thresholds, or the
