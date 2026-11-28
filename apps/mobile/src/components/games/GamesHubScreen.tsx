@@ -51,6 +51,7 @@ import {
 } from "../ui/index.tsx";
 import { AppModal } from "../AppModal.tsx";
 import { ContextualGuideCard } from "../ContextualGuideCard.tsx";
+import { usePracticeViewport } from "../PracticeViewport.tsx";
 import { SafeAreaModalBackdrop } from "../SafeAreaModalBackdrop.tsx";
 import { CollapsibleRegion } from "../practice/shared/CollapsibleRegion.tsx";
 import { FilterButton } from "../practice/shared/FilterButton.tsx";
@@ -177,6 +178,10 @@ export function GamesHubScreen({
   const styles = useStyles();
   const theme = useTheme();
   const { locale, t } = useTranslation();
+  const viewport = usePracticeViewport();
+  const usesWideContent =
+    adaptiveLayout?.usesWideContent ??
+    (viewport.width >= 860 && (viewport.fontScale ?? 1) < 1.5);
 
   const [revision, setRevision] = useState(0);
   const [internalHubView, setInternalHubView] = useState<"games" | "puzzles">(initialHubView);
@@ -1074,7 +1079,7 @@ export function GamesHubScreen({
     <View
       style={[
         styles.container,
-        adaptiveLayout?.usesWideContent ? styles.containerWide : null
+        usesWideContent ? styles.containerWide : null
       ]}
       testID="games-hub-screen"
     >

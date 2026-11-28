@@ -536,7 +536,7 @@ export function GameReviewScreen({
 
   const railHeight = Math.min(
     Math.max(0, layout.contentHeight - PRACTICE_UI_PADDING * 2),
-    Math.max(boardSize, layout.isRegularWidth ? 600 : 320)
+    Math.max(boardSize, layout.isRegularWidth ? 460 : 320)
   );
 
   return (

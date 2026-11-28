@@ -316,7 +316,10 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: theme.spacing.screen,
-    paddingVertical: theme.spacing.row
+    paddingVertical: theme.spacing.row,
+    maxWidth: 560,
+    width: "100%",
+    alignSelf: "center"
   },
   backButton: {
     flexDirection: "row",

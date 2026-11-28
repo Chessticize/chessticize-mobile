@@ -98,7 +98,8 @@ const BOARD_MIN_SIZE = 220;
 const BOARD_MAX_PORTRAIT_SIZE = 480;
 const BOARD_MAX_REGULAR_LANDSCAPE_SIZE = 780;
 const BOARD_MAX_COMPACT_LANDSCAPE_SIZE = 380;
-const MAIA_PLAYER_STRIPS_VERTICAL_RESERVE = 96;
+const MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_REGULAR = 96;
+const MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_COMPACT = 80;
 const LOW_TIME_MS = 20_000;
 
 export function MaiaPlayGameView({
@@ -551,10 +552,15 @@ export function MaiaPlayGameView({
     if (layout.usesSessionRail) {
       // Header controls move into the right rail on landscape (matching the Puzzle session layout),
       // leaving the full viewport height for the board + top/bottom player strips.
+      const outerPadV = layout.isRegularWidth ? PRACTICE_UI_PADDING : 8;
+      const outerPadH = layout.isRegularWidth ? PRACTICE_UI_PADDING : 12;
+      const stripsReserve = layout.isRegularWidth
+        ? MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_REGULAR
+        : MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_COMPACT;
       const availableWidth =
-        layout.contentWidth - PRACTICE_UI_PADDING * 2 - railWidth - railGap - 4;
+        layout.contentWidth - outerPadH * 2 - railWidth - railGap - 4;
       const availableHeight =
-        layout.contentHeight - PRACTICE_UI_PADDING * 2 - MAIA_PLAYER_STRIPS_VERTICAL_RESERVE - 4;
+        layout.contentHeight - outerPadV * 2 - stripsReserve - 4;
       const maxLandscape = layout.isRegularWidth
         ? BOARD_MAX_REGULAR_LANDSCAPE_SIZE
         : BOARD_MAX_COMPACT_LANDSCAPE_SIZE;
@@ -698,7 +704,7 @@ export function MaiaPlayGameView({
       </Pressable>
 
       {gameState.status === "playing" ? (
-        <View style={styles.paceToggleWrap}>
+        <View style={layout.usesSessionRail ? styles.railPaceToggleWrap : styles.paceToggleWrap}>
           <SegmentedControl<MaiaThinkingPace>
             accessibilityLabel={t("maiaPlay.setup.thinkingPace")}
             options={[
@@ -944,6 +950,11 @@ const useStyles = makeStyles((theme) => ({
   paceToggleWrap: {
     width: 196
   },
+  railPaceToggleWrap: {
+    flex: 1,
+    maxWidth: 184,
+    minWidth: 132
+  },
   stageContainer: {
     paddingHorizontal: theme.spacing.row,
     paddingBottom: 32,
@@ -955,7 +966,8 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: PRACTICE_UI_PADDING
+    paddingHorizontal: 12,
+    paddingVertical: 8
   },
   railControlsScroll: {
     flexGrow: 0,
