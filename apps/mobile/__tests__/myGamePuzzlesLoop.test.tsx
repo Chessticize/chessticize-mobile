@@ -307,4 +307,42 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
     expect(findByTestID(renderer.root, "games-puzzles-view")).not.toBeNull();
     act(() => renderer.unmount());
   });
+
+  test("wrong choice on a 1-ply punishment Arrow Duel in Replay shows Solved after opponent punishment plays", async () => {
+    jest.useFakeTimers();
+    try {
+      const store = new MemoryStore();
+      const service = new PracticeService(store);
+      const game = makeDraft(1, "blitz");
+      service.upsertImportedGames([game]);
+      service.replaceGameUserPuzzles(game.id, [makeArrowDuelPuzzle(1)], {
+        opponentName: "Rival1",
+        timeClass: "blitz"
+      });
+
+      const capabilities = createTestMobilePlatformCapabilities({ practiceService: service });
+      const renderer = renderWithTheme(<PracticePocScreen platformCapabilities={capabilities} />);
+
+      act(() => {
+        findByTestID(renderer.root, "practice-home-my-game-puzzles")!.props.onPress();
+      });
+
+      const board = findByTestID(renderer.root, "mock-chessboard");
+      expect(board).not.toBeNull();
+
+      // Play the wrong Arrow Duel move (g2g4); punishment is 1 ply (d8h4#)
+      await act(async () => {
+        board!.props.onMove({
+          move: { from: "g2", to: "g4" },
+          state: { fen: "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2" }
+        });
+        await jest.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(findByTestID(renderer.root, "practice-prompt-solved-overlay")).not.toBeNull();
+      act(() => renderer.unmount());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

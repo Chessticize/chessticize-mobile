@@ -3,8 +3,9 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
   MAIA_MAX_OPPONENT_RATING,
   MAIA_MIN_RATING,
-  MAIA_OPPONENT_RATING_STEP,
   classifyMaiaTimeControl,
+  resolveMaiaOpponentRating,
+  stepMaiaOpponentRating,
   type MaiaColorPreference,
   type MaiaGameState,
   type MaiaRatingRecord,
@@ -23,6 +24,8 @@ import { MaiaTimeControlPickerModal } from "./MaiaTimeControlPickerModal.tsx";
 export interface MaiaPlaySetupViewProps {
   preferences: MaiaSetupPreferences;
   ratingsByClass: Readonly<Record<MaiaTimeClass, MaiaRatingRecord>>;
+  /** Explicit user override for Maia's rating; null/undefined defaults to matching the user's rating. */
+  customOpponentRating?: number | null;
   activeGame?: MaiaGameState | null;
   onPatchPreferences: (patch: Partial<MaiaSetupPreferences>) => void;
   onChangeInitialRating?: (timeClass: MaiaTimeClass, rating: number) => void;
@@ -34,6 +37,7 @@ export interface MaiaPlaySetupViewProps {
 export function MaiaPlaySetupView({
   preferences,
   ratingsByClass,
+  customOpponentRating = null,
   activeGame,
   onPatchPreferences,
   onStartGame,
@@ -48,6 +52,10 @@ export function MaiaPlaySetupView({
 
   const selectedTimeClass = classifyMaiaTimeControl(preferences.timeControl);
   const currentRating = ratingsByClass[selectedTimeClass];
+  const effectiveOpponentRating = resolveMaiaOpponentRating(
+    currentRating.rating,
+    customOpponentRating
+  );
   const hasResumable = activeGame != null && activeGame.status === "playing";
   const isCompactLandscape = viewport.width > viewport.height && viewport.height < 520;
 
@@ -117,35 +125,29 @@ export function MaiaPlaySetupView({
         <Pressable
           accessibilityLabel={t("maiaPlay.setup.decreaseOpponentRating")}
           accessibilityRole="button"
-          disabled={preferences.opponentRating <= MAIA_MIN_RATING}
+          disabled={effectiveOpponentRating <= MAIA_MIN_RATING}
           style={styles.stepButton}
           testID="maia-opponent-rating-dec"
           onPress={() =>
             onPatchPreferences({
-              opponentRating: Math.max(
-                MAIA_MIN_RATING,
-                preferences.opponentRating - MAIA_OPPONENT_RATING_STEP
-              )
+              opponentRating: stepMaiaOpponentRating(effectiveOpponentRating, -1)
             })
           }
         >
           <Icon color={theme.colors.text.primary} name="remove" size={18} />
         </Pressable>
         <AppText testID="maia-opponent-rating-value" variant="numeral">
-          {preferences.opponentRating}
+          {effectiveOpponentRating}
         </AppText>
         <Pressable
           accessibilityLabel={t("maiaPlay.setup.increaseOpponentRating")}
           accessibilityRole="button"
-          disabled={preferences.opponentRating >= MAIA_MAX_OPPONENT_RATING}
+          disabled={effectiveOpponentRating >= MAIA_MAX_OPPONENT_RATING}
           style={styles.stepButton}
           testID="maia-opponent-rating-inc"
           onPress={() =>
             onPatchPreferences({
-              opponentRating: Math.min(
-                MAIA_MAX_OPPONENT_RATING,
-                preferences.opponentRating + MAIA_OPPONENT_RATING_STEP
-              )
+              opponentRating: stepMaiaOpponentRating(effectiveOpponentRating, 1)
             })
           }
         >

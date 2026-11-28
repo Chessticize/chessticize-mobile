@@ -17,6 +17,7 @@ import {
   ARROW_DUEL_MIN_BEST_CP,
   ARROW_DUEL_MIN_CP_SWING,
   ARROW_DUEL_MIN_WIN_CHANCE_SWING,
+  trimPunishmentLineToTacticalPayoff,
   verifyArrowDuelPair
 } from "./arrow-duel.ts";
 import {
@@ -834,7 +835,6 @@ async function analyzePosition(params: {
       blunderMove: setupMove,
       expectedUserColor: input.userColor,
       limit: deepLimit,
-      ...(candidate.isMultiSolutionBlunder ? { maxPunishmentPlies: 1 } : {}),
       ...(signal !== undefined ? { signal } : {})
     });
 
@@ -845,9 +845,7 @@ async function analyzePosition(params: {
       const punishmentLine =
         cookedPunishment.length > 0
           ? cookedPunishment
-          : candidate.isMultiSolutionBlunder
-            ? arrowDuel.punishmentLine.slice(0, 1)
-            : arrowDuel.punishmentLine;
+          : trimPunishmentLineToTacticalPayoff(plyInput.fenAfter, arrowDuel.punishmentLine);
       const finalArrowDuel: ExtractedArrowDuelMeta = {
         ...arrowDuel,
         punishmentLine
@@ -918,7 +916,6 @@ async function analyzePosition(params: {
       blunderMove: actualUserPly.uci,
       expectedUserColor: input.userColor,
       limit: deepLimit,
-      maxPunishmentPlies: 1,
       ...(signal !== undefined ? { signal } : {})
     });
     if (!arrowDuel) {
@@ -927,7 +924,10 @@ async function analyzePosition(params: {
 
     const finalArrowDuel: ExtractedArrowDuelMeta = {
       ...arrowDuel,
-      punishmentLine: arrowDuel.punishmentLine.slice(0, 1)
+      punishmentLine: trimPunishmentLineToTacticalPayoff(
+        actualUserPly.fenAfter,
+        arrowDuel.punishmentLine
+      )
     };
 
     return {

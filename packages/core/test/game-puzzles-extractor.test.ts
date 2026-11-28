@@ -957,3 +957,54 @@ test("multi-solution own_blunder Arrow Duel caps punishmentLine to 1 ply instead
   assert.deepEqual(puzzle.arrowDuel?.punishmentLine, ["g2f3"]);
   assert.deepEqual(puzzle.solutionMoves, ["e2f3", "g2f3"]);
 });
+
+test("multi-solution tactical Arrow Duel keeps forcing punishment sequence through the material win", async () => {
+  // Real game pattern: Black blunders allowing Nxc6 (attacking Queen + uncovering Bxd6).
+  // After 1. Nxc6 bxc6 2. Bxd6 Qxd6 3. Qxd6, White wins a full bishop (5 plies),
+  // even if multiple White moves win on move 1.
+  const decisionFen = "r2q1rk1/pp3ppp/2nbp1b1/8/3Np3/P3P1B1/1PPQBPPP/R3K2R b KQ - 0 13";
+  const plies = buildPliesFromStart(
+    decisionFen,
+    [
+      { uci: "h7h6" },
+      { uci: "d4c6" }
+    ],
+    25
+  );
+  plies[0]!.evalAfter = whiteCp(500, plies[0]!.fenAfter);
+  plies[1]!.evalAfter = whiteCp(500, plies[1]!.fenAfter);
+
+  const tacticalPv = ["h7h6", "d4c6", "b7c6", "g3d6", "d8d6", "d2d6", "a8b8"];
+  const engine = createScriptedEngine((req) => {
+    if (req.fen === decisionFen && req.searchMoves?.[0] === "h7h6") {
+      return [line(req.fen, "h7h6", whiteCp(500, req.fen), { pv: tacticalPv })];
+    }
+    if (req.fen === decisionFen) {
+      return [line(req.fen, "c6d4", whiteCp(20, req.fen), { pv: ["c6d4", "e3d4"] })];
+    }
+    if (req.fen === plies[0]!.fenAfter) {
+      // Multi-solution blunder: both Nxc6 and Bxd6 win
+      return [
+        line(req.fen, "d4c6", whiteCp(500, req.fen), { multipv: 1, pv: tacticalPv.slice(1) }),
+        line(req.fen, "g3d6", whiteCp(450, req.fen), { multipv: 2, pv: ["g3d6", "d8d6"] })
+      ];
+    }
+    return [line(req.fen, "b7c6", whiteCp(500, req.fen), { pv: ["b7c6"] })];
+  });
+
+  const result = await extractGamePuzzles(
+    {
+      gameId: "tactical-nxc6-bishop-win",
+      userColor: "b",
+      plies,
+      initialEval: whiteCp(20, decisionFen)
+    },
+    engine
+  );
+
+  assert.equal(result.puzzles.length, 1);
+  const puzzle = result.puzzles[0]!;
+  assert.equal(puzzle.puzzleKind, "arrow_duel");
+  assert.deepEqual(puzzle.arrowDuel?.punishmentLine, ["d4c6", "b7c6", "g3d6", "d8d6", "d2d6"]);
+  assert.deepEqual(puzzle.solutionMoves, ["h7h6", "d4c6", "b7c6", "g3d6", "d8d6", "d2d6"]);
+});

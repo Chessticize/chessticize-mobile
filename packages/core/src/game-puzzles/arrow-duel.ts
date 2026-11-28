@@ -27,6 +27,7 @@ export const ARROW_DUEL_MIN_CP_SWING = 200;
 export const ARROW_DUEL_MIN_WIN_CHANCE_SWING = 0.35;
 export const ARROW_DUEL_MATE_SCORE = 10000;
 export const ARROW_DUEL_MAX_RAW_PV_PLIES = 6;
+export const ARROW_DUEL_MAX_TACTICAL_PUNISHMENT_PLIES = 5;
 
 export const DEFAULT_ARROW_DUEL_LIMIT: SearchLimitConfig = {
   depth: 18,
@@ -227,4 +228,134 @@ function extractLegalPunishmentLine(
     legalLine.push(move);
   }
   return legalLine;
+}
+
+const PIECE_MATERIAL_VALUES: Readonly<Record<string, number>> = {
+  p: 1,
+  n: 3,
+  b: 3,
+  r: 5,
+  q: 9,
+  k: 0
+};
+
+function materialBalanceFor(board: Chess, side: "w" | "b"): number {
+  let balance = 0;
+  for (const rank of board.board()) {
+    for (const square of rank) {
+      if (!square) {
+        continue;
+      }
+      const value = PIECE_MATERIAL_VALUES[square.type] ?? 0;
+      balance += square.color === side ? value : -value;
+    }
+  }
+  return balance;
+}
+
+/**
+ * Trim a raw Stockfish refutation PV after `blunderMove` to the tactical payoff:
+ * - Always keeps at least ply 1 (the opponent's immediate punishing reply).
+ * - Extends in opponent-ending pairs (`3`, `5`, ...) whenever the opponent delivers mate/promotion,
+ *   increases net material advantage (e.g. `Nxc6 bxc6 Bxd6` winning a bishop), or continues a
+ *   forcing capture/check after a user recapture or check escape.
+ * - Stops early before quiet positional continuations (e.g. `Qxf3 gxf3 Rad8 Kf2` -> `["g2f3"]`).
+ */
+export function trimPunishmentLineToTacticalPayoff(
+  fenAfterBlunder: string,
+  fullLine: readonly string[],
+  maxPlies = ARROW_DUEL_MAX_TACTICAL_PUNISHMENT_PLIES
+): string[] {
+  const effectiveMax = Math.max(1, Math.floor(maxPlies));
+  const oddCap = effectiveMax % 2 === 1 ? effectiveMax : Math.max(1, effectiveMax - 1);
+  if (fullLine.length === 0) {
+    return [];
+  }
+
+  let board: Chess;
+  try {
+    board = new Chess(fenAfterBlunder);
+  } catch {
+    return [];
+  }
+
+  const punishingSide = board.turn();
+  const played: Array<{
+    uci: string;
+    isCapture: boolean;
+    isCheck: boolean;
+    isCheckmate: boolean;
+    isPromotion: boolean;
+    wasInCheckBefore: boolean;
+    materialBalance: number;
+  }> = [];
+
+  for (const rawMove of fullLine) {
+    // Allow one lookahead ply beyond `oddCap` so we can detect immediate recaptures.
+    if (played.length >= oddCap + 1) {
+      break;
+    }
+    const uci = normalizeUci(rawMove);
+    const parsed = parseUciMove(uci);
+    if (!parsed) {
+      break;
+    }
+    const wasInCheckBefore = board.inCheck();
+    let moveResult: ReturnType<Chess["move"]> | null = null;
+    try {
+      moveResult = board.move({
+        from: parsed.from,
+        to: parsed.to,
+        ...(parsed.promotion ? { promotion: parsed.promotion } : {})
+      });
+    } catch {
+      moveResult = null;
+    }
+    if (!moveResult) {
+      break;
+    }
+    played.push({
+      uci,
+      isCapture: Boolean(moveResult.captured),
+      isCheck: board.inCheck(),
+      isCheckmate: board.isCheckmate(),
+      isPromotion: Boolean(moveResult.promotion),
+      wasInCheckBefore,
+      materialBalance: materialBalanceFor(board, punishingSide)
+    });
+  }
+
+  if (played.length === 0) {
+    return [];
+  }
+
+  let endIndex = 1;
+  let bestMaterialAtCutoff = played[0]!.materialBalance;
+  const maxOppIndex = Math.min(played.length, oddCap);
+
+  for (let i = 2; i < maxOppIndex; i += 2) {
+    const userMove = played[i - 1]!;
+    const oppMove = played[i]!;
+    const immediateRecapture = played[i + 1];
+    const stableMaterial =
+      immediateRecapture && immediateRecapture.isCapture
+        ? Math.min(oppMove.materialBalance, immediateRecapture.materialBalance)
+        : oppMove.materialBalance;
+    const gainedMaterial = stableMaterial > bestMaterialAtCutoff;
+    const continuesForcingSequence =
+      (oppMove.isCapture || oppMove.isCheck) &&
+      (userMove.isCapture || userMove.wasInCheckBefore || userMove.isCheck);
+
+    if (oppMove.isCheckmate || oppMove.isPromotion || gainedMaterial || continuesForcingSequence) {
+      endIndex = i + 1;
+      bestMaterialAtCutoff = Math.max(bestMaterialAtCutoff, stableMaterial);
+      if (oppMove.isCheckmate) {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return played.slice(0, endIndex).map((step) => step.uci);
 }

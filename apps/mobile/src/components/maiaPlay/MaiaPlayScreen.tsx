@@ -46,6 +46,10 @@ export function MaiaPlayScreen({
   );
   const preferencesRef = useRef<MaiaSetupPreferences>(preferences);
   preferencesRef.current = preferences;
+  // Null means Maia's rating tracks the user's current rating for the selected time class.
+  const [customOpponentRating, setCustomOpponentRating] = useState<number | null>(null);
+  const customOpponentRatingRef = useRef<number | null>(customOpponentRating);
+  customOpponentRatingRef.current = customOpponentRating;
 
   const initialResumable = useMemo(() => {
     const saved = service.getActiveMaiaGame();
@@ -93,6 +97,10 @@ export function MaiaPlayScreen({
 
   const handlePatchPreferences = useCallback(
     (patch: Partial<MaiaSetupPreferences>) => {
+      if (patch.opponentRating !== undefined) {
+        customOpponentRatingRef.current = patch.opponentRating;
+        setCustomOpponentRating(patch.opponentRating);
+      }
       const next: MaiaSetupPreferences = {
         ...preferencesRef.current,
         ...patch
@@ -118,12 +126,16 @@ export function MaiaPlayScreen({
     (prefs: MaiaSetupPreferences) => {
       const timeClass = classifyMaiaTimeControl(prefs.timeControl);
       const ratingRecord = service.getMaiaRating(timeClass);
+      const override = customOpponentRatingRef.current;
+      const effectivePrefs: MaiaSetupPreferences =
+        override !== null ? { ...prefs, opponentRating: override } : prefs;
       const game = createMaiaGameState({
         id: makeGameId(),
-        preferences: prefs,
-        userRating: ratingRecord.rating
+        preferences: effectivePrefs,
+        userRating: ratingRecord.rating,
+        matchUserRating: override === null
       });
-      service.saveMaiaSetupPreferences(prefs);
+      service.saveMaiaSetupPreferences(effectivePrefs);
       service.saveActiveMaiaGame(game);
       setActiveGame(game);
       setView("game");
@@ -219,6 +231,7 @@ export function MaiaPlayScreen({
   return (
     <MaiaPlaySetupView
       activeGame={storedResumable}
+      customOpponentRating={customOpponentRating}
       preferences={preferences}
       ratingsByClass={ratingsByClass}
       onBack={onBack}

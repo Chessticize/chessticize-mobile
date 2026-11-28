@@ -23,10 +23,12 @@ import {
   preferredMaiaRatingAnchor,
   recomputeMaiaRatingFromGames,
   resignMaiaGame,
+  resolveMaiaOpponentRating,
   resolveMaiaTimeout,
   resumeMaiaGameClock,
   selectMaiaMove,
   setMaiaGameThinkingPace,
+  stepMaiaOpponentRating,
   suggestInitialMaiaRating,
   type HumanPolicyModel,
   type MaiaGameState,
@@ -102,6 +104,22 @@ test("both Rated and Unrated honor custom opponent rating and scale Glicko-2 del
     winVsStronger.change.ratingChange > winVsWeaker.change.ratingChange,
     `Expected larger gain vs stronger Maia (${winVsStronger.change.ratingChange}) than weaker Maia (${winVsWeaker.change.ratingChange})`
   );
+
+  // Default matchUserRating keeps Maia matched to the user's exact rating (clamped to Maia bounds)
+  const matched = createMaiaGameState({
+    id: "g3",
+    preferences: { ...DEFAULT_MAIA_SETUP_PREFERENCES, rated: true, opponentRating: 1200, colorPreference: "w" },
+    userRating: 1392,
+    matchUserRating: true,
+    nowMs: 1_000
+  });
+  assert.equal(matched.maiaRating, 1392);
+  assert.equal(resolveMaiaOpponentRating(1392, null), 1392);
+  assert.equal(resolveMaiaOpponentRating(1392, 1600), 1600);
+  assert.equal(stepMaiaOpponentRating(1392, 1), 1400);
+  assert.equal(stepMaiaOpponentRating(1392, -1), 1300);
+  assert.equal(stepMaiaOpponentRating(1400, 1), 1500);
+  assert.equal(stepMaiaOpponentRating(1400, -1), 1300);
 });
 
 test("handles pawn promotion (queen and knight underpromotion) and checkmate", () => {

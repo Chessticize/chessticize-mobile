@@ -87,9 +87,11 @@ describe("Play with Maia UI", () => {
       unlimited: false
     });
 
-    // Rating cards strip is removed; Maia rating stepper is available in both Rated and Unrated modes
+    // Rating cards strip is removed; Maia rating defaults to matching the user's rating and stays editable in both Rated and Unrated modes
     expect(queryByTestId(renderer.root, "maia-rating-strip")).toBeNull();
     expect(queryByTestId(renderer.root, "maia-opponent-rating-stepper")).not.toBeNull();
+    const userBlitzRating = service.getMaiaRating("blitz").rating;
+    expect(findByTestId(renderer.root, "maia-opponent-rating-value").props.children).toBe(userBlitzRating);
     await act(async () => {
       findByTestId(renderer.root, "maia-opponent-rating-inc").props.onPress();
     });
@@ -277,6 +279,56 @@ describe("Play with Maia UI", () => {
     expect(Array.isArray(latestHighlights) && (latestHighlights as unknown[]).length).toBe(2);
     const activeGame = service.getActiveMaiaGame();
     expect(activeGame?.moves.length).toBe(2);
+
+    await act(async () => {
+      renderer.unmount();
+    });
+  });
+
+  test("setup defaults Maia rating to the player's current time-class rating and starts matched when unchanged", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    service.setInitialMaiaRating("rapid", 1392);
+    service.setInitialMaiaRating("blitz", 1520);
+    // Simulate legacy persisted opponentRating=1200 in preferences
+    service.saveMaiaSetupPreferences({
+      ...service.getMaiaSetupPreferences(),
+      opponentRating: 1200
+    });
+
+    const MockBoard: MaiaPlayBoardComponent = (props) =>
+      React.createElement(View, { testID: "mock-maia-board", accessibilityLabel: props.fen });
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <MaiaPlayScreen
+          BoardComponent={MockBoard}
+          policyModel={null}
+          service={service}
+          onBack={() => undefined}
+          onOpenGameReview={() => undefined}
+        />
+      );
+    });
+
+    // Rapid is default -> displays exact 1392 rather than legacy 1200
+    expect(findByTestId(renderer.root, "maia-opponent-rating-value").props.children).toBe(1392);
+
+    // Switching time class to Blitz automatically follows Blitz rating (1520)
+    await act(async () => {
+      findByTestId(renderer.root, "maia-setup-time-control").props.onPress();
+    });
+    await act(async () => {
+      findByTestId(renderer.root, "maia-tc-5+3").props.onPress();
+    });
+    expect(findByTestId(renderer.root, "maia-opponent-rating-value").props.children).toBe(1520);
+
+    // Starting without overriding uses exact matched 1520
+    await act(async () => {
+      findByTestId(renderer.root, "maia-start-game").props.onPress();
+    });
+    expect(service.getActiveMaiaGame()?.maiaRating).toBe(1520);
 
     await act(async () => {
       renderer.unmount();

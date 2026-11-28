@@ -1654,6 +1654,10 @@ export function GamesHubScreen({
                                 : t("games.puzzles.addToReview")
                             }
                             size="compact"
+                            style={[
+                              styles.puzzleListTrailingButton,
+                              inReview ? styles.puzzleListPlainButton : null
+                            ]}
                             testID={`games-puzzle-review-toggle-${puzzle.id}`}
                             variant={inReview ? "plain" : "secondary"}
                             onPress={() => handleToggleUserPuzzleReview(puzzle)}
@@ -1661,6 +1665,10 @@ export function GamesHubScreen({
                           <Button
                             label={t("games.puzzles.openGame")}
                             size="compact"
+                            style={[
+                              styles.puzzleListTrailingButton,
+                              styles.puzzleListPlainButton
+                            ]}
                             testID={`games-puzzle-open-game-${puzzle.id}`}
                             variant="plain"
                             onPress={() => onOpenGameReview(puzzle.gameId)}
@@ -2438,6 +2446,12 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "flex-end",
     flexShrink: 0,
     gap: 4
+  },
+  puzzleListTrailingButton: {
+    alignSelf: "flex-end"
+  },
+  puzzleListPlainButton: {
+    paddingRight: 0
   },
   errorBanner: {
     backgroundColor: theme.colors.danger.s100,
