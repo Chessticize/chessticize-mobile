@@ -60,6 +60,9 @@ export function BatchAnalysisBanner({
             current: state.currentIndex,
             total: state.totalGames
           });
+    if (!compact) {
+      detail = t("games.batch.runningHint");
+    }
   } else if (state.status === "paused") {
     headline = t("games.batch.paused", {
       current: state.currentIndex,

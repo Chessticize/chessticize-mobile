@@ -1482,6 +1482,7 @@ export const enMessages = {
   "games.batch.analyzingWithMove": "Analyzing {{current}} of {{total}} · Move {{ply}}/{{totalPlies}}",
   "games.batch.paused": "Paused ({{current}} of {{total}})",
   "games.batch.pausedBackground": "Paused in background. Checkpoint saved.",
+  "games.batch.runningHint": "You can keep practicing — analysis continues while you use the app.",
   "games.batch.pausedInteractive": "Paused while engine analysis is active. Will resume automatically.",
   "games.import.startAnalyzing": "Analyze games to find puzzles ({{count}})",
   "games.analyzePrompt.title": "Analyze games to find puzzles",

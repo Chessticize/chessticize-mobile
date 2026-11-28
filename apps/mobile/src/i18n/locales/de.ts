@@ -1482,6 +1482,7 @@ export const deMessages = {
   "games.batch.analyzingWithMove": "Analysiere {{current}} von {{total}} · Zug {{ply}}/{{totalPlies}}",
   "games.batch.paused": "Pausiert ({{current}} von {{total}})",
   "games.batch.pausedBackground": "Im Hintergrund pausiert. Fortschritt gespeichert.",
+  "games.batch.runningHint": "Du kannst weiter üben – die Analyse läuft in der App weiter.",
   "games.batch.pausedInteractive": "Während der Engine-Analyse pausiert. Wird automatisch fortgesetzt.",
   "games.import.startAnalyzing": "Partien analysieren & Aufgaben finden ({{count}})",
   "games.analyzePrompt.title": "Partien analysieren, um Aufgaben zu finden",
