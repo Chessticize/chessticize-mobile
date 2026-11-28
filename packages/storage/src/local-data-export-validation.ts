@@ -105,6 +105,7 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     !isOptional(value.pieceSet, isChessPieceSetId) ||
     !isOptional(value.language, isLanguagePreference) ||
     !isOptional(value.whatsNewSeenVersion, isReleaseVersionText) ||
+    !isOptional(value.onboarding, isOnboardingGuideProgress) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
     !isRecord(arrowDuel) ||
@@ -136,6 +137,13 @@ function isAppearancePreference(value: unknown): boolean {
 
 function isGameReviewSettings(value: unknown): boolean {
   return isRecord(value) && typeof value.autoAddRecommendedToReview === "boolean";
+}
+
+function isOnboardingGuideProgress(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.welcomeSeen === "boolean" &&
+    typeof value.gamesGuideSeen === "boolean" &&
+    typeof value.gameReviewGuideSeen === "boolean";
 }
 
 function isLanguagePreference(value: unknown): boolean {

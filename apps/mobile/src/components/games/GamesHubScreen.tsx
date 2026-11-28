@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
   curatedPuzzleThemes,
+  defaultOnboardingGuideProgress,
   diagnoseInGameWeaknesses,
   importChessComGames,
   importLichessGames,
@@ -37,6 +38,7 @@ import {
   SegmentedControl
 } from "../ui/index.tsx";
 import { AppModal } from "../AppModal.tsx";
+import { ContextualGuideCard } from "../ContextualGuideCard.tsx";
 import { SafeAreaModalBackdrop } from "../SafeAreaModalBackdrop.tsx";
 import { CollapsibleRegion } from "../practice/shared/CollapsibleRegion.tsx";
 import { FilterButton } from "../practice/shared/FilterButton.tsx";
@@ -1047,6 +1049,9 @@ export function GamesHubScreen({
             <AppText style={styles.emptyTitle} variant="title">
               {t("games.empty.title")}
             </AppText>
+            <AppText style={styles.emptySubtitle} tone="secondary" variant="subheadline">
+              {t("games.empty.subtitle")}
+            </AppText>
             {snapshot.linkedAccounts.length > 0 ? (
               <View style={styles.linkedPillsRow}>
                 {snapshot.linkedAccounts.map((account) => (
@@ -1251,6 +1256,29 @@ export function GamesHubScreen({
               </View>
             ) : null}
           </CollapsibleRegion>
+
+          {service.getSettings().onboarding?.gamesGuideSeen !== true ? (
+            <ContextualGuideCard
+              body={t("onboarding.gamesTip.body")}
+              dismissLabel={t("onboarding.gotIt")}
+              dismissTestID="games-guide-dismiss"
+              icon="whatsNew"
+              testID="games-first-use-guide"
+              title={t("onboarding.gamesTip.title")}
+              tone="accent"
+              onDismiss={() => {
+                const settings = service.getSettings();
+                service.saveSettings({
+                  ...settings,
+                  onboarding: {
+                    ...(settings.onboarding ?? defaultOnboardingGuideProgress()),
+                    gamesGuideSeen: true
+                  }
+                });
+                setRevision((current) => current + 1);
+              }}
+            />
+          ) : null}
 
           {snapshot.userPuzzleCount > 0 ? (
             <SegmentedControl
@@ -2009,6 +2037,9 @@ const useStyles = makeStyles((theme) => ({
     paddingVertical: 16
   },
   emptyTitle: {
+    textAlign: "center"
+  },
+  emptySubtitle: {
     textAlign: "center"
   },
   emptyActions: {

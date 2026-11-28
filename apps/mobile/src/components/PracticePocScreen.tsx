@@ -24,6 +24,7 @@ import {
   buildSprintConfig,
   collectHistoryRatingKeys,
   DEFAULT_OPPONENT_REPLY_SECONDS,
+  defaultOnboardingGuideProgress,
   defaultSprintConfig,
   historyAttemptReplayAvailability,
   selectMistakeReplayItems,
@@ -35,6 +36,7 @@ import {
   OPPONENT_REPLY_MIN_SECONDS,
   pauseSprint as pauseSprintState,
   RATING_FLOOR,
+  resetContextualOnboardingGuides,
   resetSprintGuideProgress,
   resolvePuzzleTimingPolicy,
   resumeSprint as resumeSprintState,
@@ -47,6 +49,7 @@ import type {
   AttemptEvent,
   ArrowDuelState,
   CurrentPuzzleState,
+  GameImportHttpClient,
   PuzzleFeedback,
   PracticeRunRecord,
   ReviewQueueItem,
@@ -149,6 +152,10 @@ import {
 } from "../navigation/topLevelNavigation.ts";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
 import { WhatsNewSheet } from "./WhatsNewSheet.tsx";
+import {
+  WelcomeOnboardingSheet,
+  type WelcomeOnboardingStep
+} from "./WelcomeOnboardingSheet.tsx";
 import { useWhatsNew } from "../whatsNew/useWhatsNew.ts";
 import {
   sessionGuideContainerTestID,
@@ -371,6 +378,8 @@ interface Props {
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
   tacticalProfilePresentation?: TacticalProfilePresentation;
+  welcomeOnboardingHttpClient?: GameImportHttpClient;
+  welcomeOnboardingInitialStep?: WelcomeOnboardingStep;
 }
 
 type PersonalBestGuideIntent = "first-entry" | "learn-hub";
@@ -624,7 +633,9 @@ export function PracticePocScreen({
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack,
-  tacticalProfilePresentation
+  tacticalProfilePresentation,
+  welcomeOnboardingHttpClient,
+  welcomeOnboardingInitialStep
 }: Props): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
@@ -5584,6 +5595,8 @@ export function PracticePocScreen({
                     seededHistoryStatus={seededHistoryStatus}
                     onShowWhatsNew={whatsNew.open}
                     onSimulateWhatsNewUpdate={whatsNew.simulateUpdate}
+                    onShowWelcomeOnboarding={whatsNew.openOnboarding}
+                    onSimulateFreshInstall={whatsNew.simulateFreshInstall}
                     {...(simulationProfile
                       ? {
                           simulationActive: simulationProfile.active,
@@ -5861,6 +5874,7 @@ export function PracticePocScreen({
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onPieceSetChange={savePieceSet}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
+                onOpenWelcomeOnboarding={whatsNew.openOnboarding}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
                 onSaveICloudSyncEnabled={saveICloudSyncEnabled}
@@ -5868,7 +5882,10 @@ export function PracticePocScreen({
                   const settings = service.getSettings();
                   service.saveSettings({
                     ...settings,
-                    sprintGuides: resetSprintGuideProgress()
+                    sprintGuides: resetSprintGuideProgress(),
+                    onboarding: resetContextualOnboardingGuides(
+                      settings.onboarding ?? defaultOnboardingGuideProgress()
+                    )
                   });
                   setSprintRulesGuideVisible(true);
                   setSettingsRevision((current) => current + 1);
@@ -5961,8 +5978,28 @@ export function PracticePocScreen({
       ) : null}
       <WhatsNewSheet
         content={whatsNew.content}
+        showLinkAccountAction={service.listLinkedAccounts().length === 0}
         visible={whatsNew.visible}
         onContinue={whatsNew.dismiss}
+        onLinkAccount={() => {
+          whatsNew.dismiss();
+          setTab("games");
+          setGamesImportModalOpen(true);
+        }}
+      />
+      <WelcomeOnboardingSheet
+        content={whatsNew.onboardingContent}
+        httpClient={welcomeOnboardingHttpClient}
+        initialStep={welcomeOnboardingInitialStep}
+        service={service}
+        visible={whatsNew.onboardingVisible}
+        onComplete={whatsNew.dismissOnboarding}
+        onCompleteAndOpenGames={() => {
+          whatsNew.dismissOnboarding();
+          setTab("games");
+          refreshState();
+        }}
+        onStoreMutated={refreshState}
       />
       </View>
   );

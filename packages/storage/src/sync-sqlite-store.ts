@@ -318,6 +318,9 @@ interface AppSettingsRow {
   sprint_arrow_duel_guide_seen: number;
   sprint_focused_run_guide_seen: number;
   sprint_arrow_duel_reply_cue_stage: number;
+  onboarding_welcome_seen?: number;
+  onboarding_games_guide_seen?: number;
+  onboarding_game_review_guide_seen?: number;
 }
 
 interface AppReviewRequestStateRow {
@@ -504,7 +507,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 29;
+export const CURRENT_SCHEMA_VERSION = 30;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -542,7 +545,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 25, to: 26, apply: migrateV25ToV26 },
   { from: 26, to: 27, apply: migrateV26ToV27 },
   { from: 27, to: 28, apply: migrateV27ToV28 },
-  { from: 28, to: 29, apply: migrateV28ToV29 }
+  { from: 28, to: 29, apply: migrateV28ToV29 },
+  { from: 29, to: 30, apply: migrateV29ToV30 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1258,8 +1262,11 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_active_session_guide_seen,
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
-          sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          sprint_arrow_duel_reply_cue_stage,
+          onboarding_welcome_seen,
+          onboarding_games_guide_seen,
+          onboarding_game_review_guide_seen
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
@@ -1279,7 +1286,10 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_active_session_guide_seen = excluded.sprint_active_session_guide_seen,
           sprint_arrow_duel_guide_seen = excluded.sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen = excluded.sprint_focused_run_guide_seen,
-          sprint_arrow_duel_reply_cue_stage = excluded.sprint_arrow_duel_reply_cue_stage`
+          sprint_arrow_duel_reply_cue_stage = excluded.sprint_arrow_duel_reply_cue_stage,
+          onboarding_welcome_seen = excluded.onboarding_welcome_seen,
+          onboarding_games_guide_seen = excluded.onboarding_games_guide_seen,
+          onboarding_game_review_guide_seen = excluded.onboarding_game_review_guide_seen`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -1302,7 +1312,10 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.sprintGuides.activeSessionSeen),
         boolToInt(cloned.sprintGuides.arrowDuelSeen),
         boolToInt(cloned.sprintGuides.focusedRunSeen ?? false),
-        cloned.sprintGuides.arrowDuelReplyCueStage ?? 0
+        cloned.sprintGuides.arrowDuelReplyCueStage ?? 0,
+        boolToInt(cloned.onboarding?.welcomeSeen ?? false),
+        boolToInt(cloned.onboarding?.gamesGuideSeen ?? false),
+        boolToInt(cloned.onboarding?.gameReviewGuideSeen ?? false)
       );
   }
 
@@ -3985,6 +3998,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV26ToV27(db);
   migrateV27ToV28(db);
   migrateV28ToV29(db);
+  migrateV29ToV30(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -4003,6 +4017,9 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_focused_run_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_arrow_duel_reply_cue_stage") &&
+    hasColumn(db, "app_settings", "onboarding_welcome_seen") &&
+    hasColumn(db, "app_settings", "onboarding_games_guide_seen") &&
+    hasColumn(db, "app_settings", "onboarding_game_review_guide_seen") &&
     hasTable(db, "app_review_request_state") &&
     hasColumn(db, "practice_runs", "opponent_reply_enabled") &&
     hasColumn(db, "practice_runs", "opponent_reply_seconds");
@@ -5158,6 +5175,30 @@ function migrateV28ToV29(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV29ToV30(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "onboarding_welcome_seen",
+    "ALTER TABLE app_settings ADD COLUMN onboarding_welcome_seen INTEGER NOT NULL DEFAULT 0 " +
+      "CHECK (onboarding_welcome_seen IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "onboarding_games_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN onboarding_games_guide_seen INTEGER NOT NULL DEFAULT 0 " +
+      "CHECK (onboarding_games_guide_seen IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "onboarding_game_review_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN onboarding_game_review_guide_seen INTEGER NOT NULL DEFAULT 0 " +
+      "CHECK (onboarding_game_review_guide_seen IN (0, 1))"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -5365,6 +5406,11 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
       arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
         row.sprint_arrow_duel_reply_cue_stage
       )
+    },
+    onboarding: {
+      welcomeSeen: intToBool(row.onboarding_welcome_seen ?? 0),
+      gamesGuideSeen: intToBool(row.onboarding_games_guide_seen ?? 0),
+      gameReviewGuideSeen: intToBool(row.onboarding_game_review_guide_seen ?? 0)
     }
   };
 }

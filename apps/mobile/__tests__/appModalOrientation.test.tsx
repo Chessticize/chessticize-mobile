@@ -44,6 +44,7 @@ describe("Modal orientation guard", () => {
       .sort();
     expect(users).toEqual([
       join("components", "ICloudSyncErrorDetails.tsx"),
+      join("components", "WelcomeOnboardingSheet.tsx"),
       join("components", "WhatsNewSheet.tsx"),
       join("components", "games", "GamesHubScreen.tsx"),
       join("components", "games", "GamesImportModal.tsx"),
