@@ -103,3 +103,36 @@ Before distributing any future writer that changes this contract:
 CloudKit schema deployment is additive and distinct from changing the manifest
 phase. A late V1 writer remains importable during `bridging`; after the approved
 1.4.2 gate advances the manifest to `sealed`, clients must not query V1.
+
+## Private custom zone: `GamesV1` (2.0 Game Review, Play with Maia & 2.0 Settings)
+
+Chessticize 2.0 adds a second private custom zone named `GamesV1` in the same
+iCloud container. It reuses the existing deployed `ProgressV2Record` record type
+(`kind: String`, `schemaVersion: Int64 = 2`, `payload: Bytes`) without adding
+any new CloudKit record types, fields, or indexes — zero CloudKit Dashboard
+schema changes are required.
+
+Keeping 2.0 records in `GamesV1` guarantees 100% backward compatibility with
+shipped 1.4.2 clients, which strictly validate every `ProgressV2` record kind
+and write `v2|preferences|default` with only 1.4.2 settings fields.
+
+Every record name in `GamesV1` is:
+
+```text
+g1|<kind>|<percent-encoded entity key>
+```
+
+Supported `kind` values in `GamesV1` are:
+
+- `linked_account` (`<platform>:<lowercased-username>`) — monotonic merge keeping earliest `createdAt` and latest `lastSyncedAt`
+- `imported_game` (`<deterministic gameId>`) — includes `plyEvals`; monotonic merge (`complete > pass1_done > partial > none`, deeper/more evals win) so two devices independently downloading or analyzing the same game never conflict or regress
+- `user_puzzle` (`<ug_<id>>`) — deterministic merge preferring higher `ratingSource` provenance (`maia2_sf_v1 > sf_heuristic_v1 > game_anchor`)
+- `ug_attempt`, `ug_review_schedule`, `ug_rating` — user-game puzzle attempts, review schedules/removals, and ratings (kept out of `ProgressV2` so 1.4.2 clients never encounter unknown `ug_*` puzzle IDs)
+- `maia_rated_game` (`<gameId>`) & `maia_rating_anchor` (`<timeClass>`) — append-only rated game ledger and earliest initial-rating anchor; each device deterministically replays all rated games in `(playedAt, gameId)` order so Play with Maia ratings converge identically regardless of multi-device sync order
+- `games_preferences` (`default`) — 2.0 synced settings (`arrowDuel.opponentReplyEnabled`, `appearance`, `lightBoardTheme`, `darkBoardTheme`, `pieceSet`, `gameReview.autoAddRecommendedToReview`, `gameReview.autoSyncCooldownMinutes`, and `maiaSetup`); device-local settings (`sync.iCloudEnabled`, `language`, `whatsNewSeenVersion`) remain local
+
+Deletions of `linked_account`, `imported_game`, and `user_puzzle` are represented
+as explicit tombstones (`state: "deleted"`, `deletedAt`) so deletes propagate
+reliably across devices without resurrecting stale copies, while deleting an
+imported Maia game from the Games library never deletes its `maia_rated_game`
+ledger entry.

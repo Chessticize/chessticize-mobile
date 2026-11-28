@@ -20,6 +20,8 @@ import {
   offerDrawToMaia,
   parsePgnGame,
   pauseMaiaGameClock,
+  preferredMaiaRatingAnchor,
+  recomputeMaiaRatingFromGames,
   resignMaiaGame,
   resolveMaiaTimeout,
   resumeMaiaGameClock,
@@ -27,7 +29,8 @@ import {
   setMaiaGameThinkingPace,
   suggestInitialMaiaRating,
   type HumanPolicyModel,
-  type MaiaGameState
+  type MaiaGameState,
+  type MaiaRatedGameRecord
 } from "../src/index.ts";
 
 test("time control presets cover Blitz (including 5+3), Rapid, and Classical (including Unlimited) without Bullet", () => {
@@ -462,4 +465,87 @@ test("selectMaiaMove uses HumanPolicyModel when present, falls back cleanly, and
     }),
     1500
   );
+});
+
+test("recomputeMaiaRatingFromGames converges identically across all out-of-order permutations and duplicates", () => {
+  const anchor = preferredMaiaRatingAnchor(
+    { timeClass: "rapid", initialRating: 1500, setAt: "2026-11-27T09:05:00.000Z" },
+    { timeClass: "rapid", initialRating: 1400, setAt: "2026-11-27T09:00:00.000Z" }
+  );
+  assert.equal(anchor.initialRating, 1400);
+  assert.equal(anchor.setAt, "2026-11-27T09:00:00.000Z");
+
+  // Same timestamp tie-breaks deterministically toward lower initialRating
+  const tied = preferredMaiaRatingAnchor(
+    { timeClass: "rapid", initialRating: 1600, setAt: "2026-11-27T09:00:00.000Z" },
+    { timeClass: "rapid", initialRating: 1300, setAt: "2026-11-27T09:00:00.000Z" }
+  );
+  assert.equal(tied.initialRating, 1300);
+
+  const games: MaiaRatedGameRecord[] = [
+    {
+      gameId: "maia-g1",
+      timeClass: "rapid",
+      outcome: "win",
+      playedAt: "2026-11-27T10:00:00.000Z",
+      initialRatingAnchor: 1400
+    },
+    {
+      gameId: "maia-g2",
+      timeClass: "rapid",
+      outcome: "loss",
+      playedAt: "2026-11-27T10:10:00.000Z",
+      initialRatingAnchor: 1400
+    },
+    {
+      gameId: "maia-g3",
+      timeClass: "rapid",
+      outcome: "draw",
+      playedAt: "2026-11-27T10:10:00.000Z",
+      initialRatingAnchor: 1400
+    },
+    {
+      gameId: "maia-g4",
+      timeClass: "rapid",
+      outcome: "win",
+      playedAt: "2026-11-27T10:30:00.000Z",
+      initialRatingAnchor: 1400
+    }
+  ];
+
+  // Expected sequential replay in canonical (playedAt, gameId) order
+  let expected = createDefaultMaiaRatingRecord("rapid", 1400, anchor.setAt);
+  for (const g of games) {
+    expected = applyMaiaGameRatingResult(expected, g.outcome, g.playedAt).nextRecord;
+  }
+
+  // Test all 24 permutations + injected duplicates + unrelated timeClass noise
+  function permute<T>(items: T[]): T[][] {
+    if (items.length <= 1) return [items];
+    const out: T[][] = [];
+    for (let i = 0; i < items.length; i += 1) {
+      const rest = [...items.slice(0, i), ...items.slice(i + 1)];
+      for (const tail of permute(rest)) {
+        out.push([items[i]!, ...tail]);
+      }
+    }
+    return out;
+  }
+
+  const blitzNoise: MaiaRatedGameRecord = {
+    gameId: "maia-blitz-1",
+    timeClass: "blitz",
+    outcome: "loss",
+    playedAt: "2026-11-27T10:05:00.000Z",
+    initialRatingAnchor: 1200
+  };
+
+  for (const perm of permute(games)) {
+    const recomputed = recomputeMaiaRatingFromGames({
+      timeClass: "rapid",
+      anchor,
+      ratedGames: [...perm, games[1]!, blitzNoise]
+    });
+    assert.deepEqual(recomputed, expected);
+  }
 });

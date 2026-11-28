@@ -1654,7 +1654,18 @@ export function PracticePocScreen({
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     internalRunManagement.refresh();
     setAggregateRevision((current) => current + 1);
+    const refreshedSettings = service.getSettings();
     setReviewReminderPreference(service.getReviewReminderPreference());
+    if (!sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting) {
+      setArrowDuelOpponentReplyGlobalEnabled(refreshedSettings.arrowDuel.opponentReplyEnabled);
+    }
+    setGameReviewAutoAddRecommendedEnabled(
+      refreshedSettings.gameReview?.autoAddRecommendedToReview ?? false
+    );
+    setGameReviewAutoSyncCooldownMinutes(
+      refreshedSettings.gameReview?.autoSyncCooldownMinutes ??
+        DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+    );
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
       activeSprint && (activeSprint.status === "active" || activeSprint.status === "paused") && stateRef.current?.id !== activeSprint.id

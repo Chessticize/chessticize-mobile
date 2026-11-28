@@ -82,6 +82,22 @@ export interface MaiaRatingRecord {
   updatedAt: string;
 }
 
+export interface MaiaRatedGameRecord {
+  gameId: string;
+  timeClass: MaiaTimeClass;
+  playedAt: string;
+  outcome: "win" | "loss" | "draw";
+  opponentRating: number;
+  /** Starting rating on the device when this was the first rated game (fallback anchor). */
+  initialRatingAnchor?: number;
+}
+
+export interface MaiaRatingAnchorRecord {
+  timeClass: MaiaTimeClass;
+  initialRating: number;
+  setAt: string;
+}
+
 export type MaiaGameStatus = "playing" | "finished" | "aborted";
 
 export type MaiaGameEndReason =

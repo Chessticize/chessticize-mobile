@@ -54,6 +54,8 @@ import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import type { PuzzleSource } from "./puzzle-source.ts";
 import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
 import type { ProgressV2Persistence } from "./progress-v2-persistence.ts";
+import type { GamesV1Persistence } from "./games-sync-v1.ts";
+import type { MaiaRatedGameRecord, MaiaRatingAnchorRecord } from "../../core/src/index.ts";
 
 export class PackBackedPracticeStore implements PracticeStore {
   private readonly userStore: PracticeStore;
@@ -68,6 +70,14 @@ export class PackBackedPracticeStore implements PracticeStore {
     const persistence = this.userStore.progressV2;
     if (!persistence) {
       throw new Error("Progress V2 persistence is unavailable for the user store");
+    }
+    return persistence;
+  }
+
+  get gamesV1(): GamesV1Persistence {
+    const persistence = this.userStore.gamesV1;
+    if (!persistence) {
+      throw new Error("Games V1 persistence is unavailable for the user store");
     }
     return persistence;
   }
@@ -511,6 +521,26 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   saveMaiaRating(record: MaiaRatingRecord): void {
     this.userStore.saveMaiaRating(record);
+  }
+
+  listMaiaRatedGames(timeClass?: MaiaTimeClass): MaiaRatedGameRecord[] {
+    return this.userStore.listMaiaRatedGames(timeClass);
+  }
+
+  upsertMaiaRatedGame(record: MaiaRatedGameRecord): void {
+    this.userStore.upsertMaiaRatedGame(record);
+  }
+
+  getMaiaRatingAnchor(timeClass: MaiaTimeClass): MaiaRatingAnchorRecord | undefined {
+    return this.userStore.getMaiaRatingAnchor(timeClass);
+  }
+
+  listMaiaRatingAnchors(): MaiaRatingAnchorRecord[] {
+    return this.userStore.listMaiaRatingAnchors();
+  }
+
+  saveMaiaRatingAnchor(anchor: MaiaRatingAnchorRecord): void {
+    this.userStore.saveMaiaRatingAnchor(anchor);
   }
 
   getMaiaSetupPreferences(): MaiaSetupPreferences {

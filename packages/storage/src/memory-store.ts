@@ -106,6 +106,22 @@ import {
   type ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
 import {
+  applyGamesV1BatchToTarget,
+  gamesV1IdentityMapKey,
+  linkedAccountEntityKey,
+  type GamesV1ApplyResult,
+  type GamesV1ImportedGameBundle,
+  type GamesV1LocalSnapshot,
+  type GamesV1LocalState,
+  type GamesV1Persistence,
+  type GamesV1RecordIdentity,
+  type GamesV1RemoteMergeBatch,
+  type GamesV1StatePatch,
+  type GamesV1Tombstone
+} from "./games-sync-v1.ts";
+import { isUserGameRatingKey } from "./game-review-store.ts";
+import type { MaiaRatedGameRecord, MaiaRatingAnchorRecord } from "../../core/src/index.ts";
+import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
 } from "./puzzle-selection.ts";
@@ -138,6 +154,8 @@ export class MemoryStore implements PracticeStore {
   private readonly gamePlyEvals = new Map<string, Map<number, StoredGamePlyEval>>();
   private readonly userPuzzles = new Map<string, StoredUserPuzzle>();
   private readonly maiaRatings = new Map<MaiaTimeClass, MaiaRatingRecord>();
+  private readonly maiaRatedGames = new Map<string, MaiaRatedGameRecord>();
+  private readonly maiaRatingAnchors = new Map<MaiaTimeClass, MaiaRatingAnchorRecord>();
   private maiaSetupPreferences: MaiaSetupPreferences = normalizeMaiaSetupPreferences(
     DEFAULT_MAIA_SETUP_PREFERENCES
   );
@@ -145,10 +163,40 @@ export class MemoryStore implements PracticeStore {
   private settings = defaultPracticeSettings();
   private appReviewRequestAttempt: AppReviewRequestAttempt | undefined;
   private tacticalProfileSourceRevision = 0;
+  private gamesV1State: GamesV1LocalState = { zoneInitialized: false };
+  private readonly gamesV1SyncedHashes = new Map<string, string>();
+  private readonly gamesV1Tombstones = new Map<string, GamesV1Tombstone>();
   readonly progressV2 = new InMemoryProgressV2Persistence(
     () => this.exportProgressV2Data(),
     (tombstones) => this.applyProgressV2MemoryTombstones(tombstones)
   );
+  readonly gamesV1: GamesV1Persistence = {
+    readState: () => ({ ...this.gamesV1State }),
+    writeState: (patch) => {
+      this.applyGamesV1StatePatch(patch);
+    },
+    readSyncedHashes: () => new Map(this.gamesV1SyncedHashes),
+    writeSyncedHashes: (updates, deletes) => {
+      for (const [k, v] of updates) {
+        this.gamesV1SyncedHashes.set(k, v);
+      }
+      if (deletes) {
+        for (const k of deletes) {
+          this.gamesV1SyncedHashes.delete(k);
+        }
+      }
+    },
+    listTombstones: () => [...this.gamesV1Tombstones.values()].map((t) => ({ ...t })),
+    recordTombstones: (tombstones) => {
+      this.recordGamesV1Tombstones(tombstones);
+    },
+    clearTombstone: (identity) => {
+      this.gamesV1Tombstones.delete(gamesV1IdentityMapKey(identity));
+    },
+    exportGamesV1Snapshot: () => this.exportGamesV1Snapshot(),
+    applyGamesV1RemoteBatch: (batch, statePatch, syncedHashUpdates) =>
+      this.applyGamesV1RemoteBatchInternal(batch, statePatch, syncedHashUpdates)
+  };
 
   seedPuzzles(puzzles: Puzzle[]): void {
     for (const puzzle of puzzles) {
@@ -1062,11 +1110,27 @@ export class MemoryStore implements PracticeStore {
       createdAt: existing?.createdAt ?? account.createdAt ?? new Date().toISOString()
     };
     this.linkedAccounts.set(key, stored);
+    this.gamesV1Tombstones.delete(
+      gamesV1IdentityMapKey({
+        kind: "linked_account",
+        entityKey: linkedAccountEntityKey(account.platform, username)
+      })
+    );
     return { ...stored };
   }
 
   removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
-    this.linkedAccounts.delete(linkedAccountMapKey(platform, username.trim()));
+    const trimmed = username.trim();
+    const key = linkedAccountMapKey(platform, trimmed);
+    if (this.linkedAccounts.delete(key)) {
+      this.recordGamesV1Tombstones([
+        {
+          kind: "linked_account",
+          entityKey: linkedAccountEntityKey(platform, trimmed),
+          deletedAt: new Date().toISOString()
+        }
+      ]);
+    }
   }
 
   upsertImportedGames(
@@ -1094,6 +1158,9 @@ export class MemoryStore implements PracticeStore {
           createdAt: nowIso,
           updatedAt: nowIso
         });
+        this.gamesV1Tombstones.delete(
+          gamesV1IdentityMapKey({ kind: "imported_game", entityKey: draft.id })
+        );
         inserted += 1;
         continue;
       }
@@ -1148,6 +1215,23 @@ export class MemoryStore implements PracticeStore {
   }
 
   deleteImportedGame(gameId: string): void {
+    const existed = this.importedGames.has(gameId);
+    const deletedPuzzleIds = this.deleteImportedGameRecords(gameId);
+    if (existed) {
+      const deletedAt = new Date().toISOString();
+      const tombstones: GamesV1Tombstone[] = [
+        { kind: "imported_game", entityKey: gameId, deletedAt },
+        ...[...deletedPuzzleIds].map((puzzleId) => ({
+          kind: "user_puzzle" as const,
+          entityKey: puzzleId,
+          deletedAt
+        }))
+      ];
+      this.recordGamesV1Tombstones(tombstones);
+    }
+  }
+
+  private deleteImportedGameRecords(gameId: string): Set<string> {
     this.importedGames.delete(gameId);
     this.gamePlyEvals.delete(gameId);
     const deletedPuzzleIds = new Set<string>();
@@ -1184,6 +1268,7 @@ export class MemoryStore implements PracticeStore {
         }
       }
     }
+    return deletedPuzzleIds;
   }
 
   saveGamePlyEvaluations(
@@ -1370,6 +1455,166 @@ export class MemoryStore implements PracticeStore {
 
   saveMaiaRating(record: MaiaRatingRecord): void {
     this.maiaRatings.set(record.timeClass, { ...record });
+  }
+
+  listMaiaRatedGames(timeClass?: MaiaTimeClass): MaiaRatedGameRecord[] {
+    return [...this.maiaRatedGames.values()]
+      .filter((game) => timeClass === undefined || game.timeClass === timeClass)
+      .sort(
+        (left, right) =>
+          left.playedAt.localeCompare(right.playedAt) || left.gameId.localeCompare(right.gameId)
+      )
+      .map((game) => ({ ...game }));
+  }
+
+  upsertMaiaRatedGame(record: MaiaRatedGameRecord): void {
+    const existing = this.maiaRatedGames.get(record.gameId);
+    if (!existing) {
+      this.maiaRatedGames.set(record.gameId, { ...record });
+      return;
+    }
+    if (existing.initialRatingAnchor === undefined && record.initialRatingAnchor !== undefined) {
+      this.maiaRatedGames.set(record.gameId, {
+        ...existing,
+        initialRatingAnchor: record.initialRatingAnchor
+      });
+    }
+  }
+
+  getMaiaRatingAnchor(timeClass: MaiaTimeClass): MaiaRatingAnchorRecord | undefined {
+    const existing = this.maiaRatingAnchors.get(timeClass);
+    return existing ? { ...existing } : undefined;
+  }
+
+  listMaiaRatingAnchors(): MaiaRatingAnchorRecord[] {
+    return [...this.maiaRatingAnchors.values()].map((anchor) => ({ ...anchor }));
+  }
+
+  saveMaiaRatingAnchor(anchor: MaiaRatingAnchorRecord): void {
+    this.maiaRatingAnchors.set(anchor.timeClass, { ...anchor });
+  }
+
+  private applyGamesV1StatePatch(patch: GamesV1StatePatch): void {
+    const next: Record<string, unknown> = { ...this.gamesV1State };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) {
+        delete next[key];
+      } else if (value !== undefined) {
+        next[key] = value;
+      }
+    }
+    this.gamesV1State = next as unknown as GamesV1LocalState;
+  }
+
+  private recordGamesV1Tombstones(tombstones: readonly GamesV1Tombstone[]): void {
+    for (const tombstone of tombstones) {
+      const key = gamesV1IdentityMapKey(tombstone);
+      const prev = this.gamesV1Tombstones.get(key);
+      if (!prev || tombstone.deletedAt > prev.deletedAt) {
+        this.gamesV1Tombstones.set(key, { ...tombstone });
+      }
+    }
+  }
+
+  private exportGamesV1Snapshot(): GamesV1LocalSnapshot {
+    const allExported = this.exportLocalData();
+    return {
+      settings: this.getSettings(),
+      maiaSetup: this.getMaiaSetupPreferences(),
+      linkedAccounts: this.listLinkedAccounts(),
+      importedGames: this.listImportedGames().map((game) => ({
+        game,
+        plyEvals: this.listGamePlyEvaluations(game.id)
+      })),
+      userPuzzles: this.listUserPuzzles({ includeArchived: true }),
+      ugAttempts: allExported.attempts.filter((a) => isUserGamePuzzleId(a.puzzleId)),
+      ugReviewQueue: allExported.reviewQueue.filter((r) => isUserGamePuzzleId(r.puzzleId)),
+      ugReviewRemovals: (allExported.reviewRemovals ?? []).filter((r) =>
+        isUserGamePuzzleId(r.puzzleId)
+      ),
+      ugRatings: allExported.ratings.filter((r) => isUserGameRatingKey(r.key)),
+      maiaRatedGames: this.listMaiaRatedGames(),
+      maiaRatingAnchors: this.listMaiaRatingAnchors()
+    };
+  }
+
+  private applyGamesV1RemoteBatchInternal(
+    batch: GamesV1RemoteMergeBatch,
+    statePatch: GamesV1StatePatch,
+    syncedHashUpdates: ReadonlyMap<string, string>
+  ): GamesV1ApplyResult {
+    const applied = applyGamesV1BatchToTarget(
+      {
+        getSettings: () => this.getSettings(),
+        saveSettings: (settings) => this.saveSettings(settings),
+        getMaiaSetupPreferences: () => this.getMaiaSetupPreferences(),
+        saveMaiaSetupPreferences: (prefs) => this.saveMaiaSetupPreferences(prefs),
+        listLinkedAccounts: () => this.listLinkedAccounts(),
+        upsertSyncedLinkedAccount: (account) => {
+          const key = linkedAccountMapKey(account.platform, account.username.trim());
+          this.linkedAccounts.set(key, { ...account });
+        },
+        removeLinkedAccountWithoutTombstone: (platform, username) => {
+          this.linkedAccounts.delete(linkedAccountMapKey(platform, username.trim()));
+        },
+        getImportedGame: (gameId) => this.getImportedGame(gameId),
+        listGamePlyEvaluations: (gameId) => this.listGamePlyEvaluations(gameId),
+        upsertSyncedImportedGameBundle: (bundle: GamesV1ImportedGameBundle) => {
+          this.importedGames.set(bundle.game.id, cloneStoredImportedGame(bundle.game));
+          if (bundle.plyEvals.length > 0) {
+            const evalMap = new Map<number, StoredGamePlyEval>();
+            for (const item of bundle.plyEvals) {
+              evalMap.set(item.ply, { ...item, gameId: bundle.game.id });
+            }
+            this.gamePlyEvals.set(bundle.game.id, evalMap);
+          }
+        },
+        deleteImportedGameWithoutTombstone: (gameId) => {
+          this.deleteImportedGameRecords(gameId);
+        },
+        getUserPuzzle: (puzzleId) => this.getUserPuzzle(puzzleId),
+        upsertSyncedUserPuzzle: (puzzle) => {
+          this.userPuzzles.set(puzzle.id, cloneStoredUserPuzzle(puzzle));
+          this.puzzles.set(puzzle.id, storedUserPuzzleToPuzzle(puzzle));
+        },
+        deleteSyncedUserPuzzle: (puzzleId) => {
+          this.userPuzzles.delete(puzzleId);
+          if (!this.isPuzzleReferencedByHistoryOrReview(puzzleId)) {
+            this.puzzles.delete(puzzleId);
+          }
+        },
+        importSyncedUserGameProgress: ({ attempts, reviewQueue, reviewRemovals, ratings }) => {
+          const res = this.importLocalData({
+            schemaVersion: 1,
+            settings: this.getSettings(),
+            ratings,
+            attempts,
+            reviewQueue,
+            reviewRemovals,
+            sprintSessions: [],
+            practiceRuns: []
+          });
+          return { attempts: res.attempts, reviewQueue: res.reviewQueue };
+        },
+        listMaiaRatedGames: (tc) => this.listMaiaRatedGames(tc),
+        upsertMaiaRatedGame: (record) => this.upsertMaiaRatedGame(record),
+        getMaiaRatingAnchor: (tc) => this.getMaiaRatingAnchor(tc),
+        saveMaiaRatingAnchor: (anchor) => this.saveMaiaRatingAnchor(anchor),
+        getMaiaRating: (tc) => this.getMaiaRating(tc),
+        saveMaiaRating: (record) => this.saveMaiaRating(record),
+        recordTombstones: (tombstones) => this.recordGamesV1Tombstones(tombstones),
+        clearTombstone: (identity: GamesV1RecordIdentity) => {
+          this.gamesV1Tombstones.delete(gamesV1IdentityMapKey(identity));
+        },
+        listTombstones: () => [...this.gamesV1Tombstones.values()].map((t) => ({ ...t }))
+      },
+      batch
+    );
+    for (const [k, v] of syncedHashUpdates) {
+      this.gamesV1SyncedHashes.set(k, v);
+    }
+    this.applyGamesV1StatePatch(statePatch);
+    return applied;
   }
 
   getMaiaSetupPreferences(): MaiaSetupPreferences {
