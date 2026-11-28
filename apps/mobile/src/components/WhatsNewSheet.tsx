@@ -120,6 +120,14 @@ export function WhatsNewSheet({
                 </View>
               ))}
             </View>
+            <AppText
+              style={styles.feedbackNote}
+              testID="whats-new-feedback-note"
+              tone="secondary"
+              variant="footnote"
+            >
+              {content.feedbackNote}
+            </AppText>
           </ScrollView>
           <View style={[styles.footer, short ? styles.footerShort : null]}>
             {showPrimaryLinkAction && onLinkAccount ? (
@@ -161,23 +169,23 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1
   },
   scrollContent: {
-    gap: 24,
+    gap: 18,
     paddingBottom: 8,
     paddingHorizontal: 28,
-    paddingTop: 32
+    paddingTop: 26
   },
   scrollContentShort: {
-    gap: 14,
-    paddingTop: 18
+    gap: 12,
+    paddingTop: 16
   },
   title: {
     textAlign: "center"
   },
   highlights: {
-    gap: 18
+    gap: 14
   },
   highlightsShort: {
-    gap: 12
+    gap: 10
   },
   highlight: {
     alignItems: "flex-start",
@@ -190,11 +198,14 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
+  feedbackNote: {
+    textAlign: "center"
+  },
   footer: {
     gap: 8,
-    paddingBottom: 22,
+    paddingBottom: 18,
     paddingHorizontal: 28,
-    paddingTop: 16
+    paddingTop: 12
   },
   footerShort: {
     gap: 4,

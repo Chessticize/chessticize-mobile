@@ -255,6 +255,14 @@ export function WelcomeOnboardingSheet({
                     </View>
                   ))}
                 </View>
+                <AppText
+                  style={styles.feedbackNote}
+                  testID="welcome-onboarding-feedback-note"
+                  tone="secondary"
+                  variant="footnote"
+                >
+                  {content.feedbackNote}
+                </AppText>
               </>
             ) : (
               <>
@@ -472,6 +480,9 @@ const useStyles = makeStyles((theme) => ({
     gap: 10
   },
   privacyNote: {
+    textAlign: "center"
+  },
+  feedbackNote: {
     textAlign: "center"
   },
   inputGroup: {

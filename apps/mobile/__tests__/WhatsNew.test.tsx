@@ -42,6 +42,7 @@ describe("WhatsNewSheet (2.0)", () => {
     expect(text(renderer, "whats-new-highlight-game-review")).toContain("Free offline Game Review");
     expect(text(renderer, "whats-new-highlight-personal-puzzles")).toContain("Puzzles from your own games");
     expect(text(renderer, "whats-new-highlight-play-maia")).toContain("Play offline against Maia");
+    expect(text(renderer, "whats-new-feedback-note")).toContain("Help & Feedback");
 
     expect(host(renderer, "whats-new-continue").props.accessibilityLabel).toBe("Continue");
     act(() => {
@@ -199,6 +200,7 @@ describe("Welcome Onboarding on fresh 2.0 install", () => {
     expect(text(renderer, "welcome-onboarding-highlight-import-review")).toContain("Learn from your online games");
     expect(text(renderer, "welcome-onboarding-highlight-offline-tactics")).toContain("Sharpen tactics anywhere");
     expect(text(renderer, "welcome-onboarding-highlight-maia-play")).toContain("Practice against Maia offline");
+    expect(text(renderer, "welcome-onboarding-feedback-note")).toContain("Help & Feedback");
 
     press(renderer, "welcome-onboarding-start-practicing");
     expect(isOnboardingShown(renderer)).toBe(false);
