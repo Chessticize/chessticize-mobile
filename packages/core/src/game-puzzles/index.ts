@@ -97,6 +97,7 @@ export {
   extractDifficultyStructuralFeatures,
   getDefaultDifficultyModels,
   isWithinReviewDifficultyBand,
+  normalizeGameRatingToPuzzleScale,
   registerDefaultDifficultyModels,
   solvePromptedArrowDuelRating
 } from "./difficulty.ts";
@@ -135,10 +136,14 @@ export { MAIA2_MOVE_TO_INDEX, MAIA2_MOVE_VOCAB } from "./maia2-vocab.ts";
 
 export {
   DEFAULT_MAX_RECOMMENDED_PUZZLES_PER_GAME,
+  computeEffectiveReviewBenchmarkRating,
   isEligibleForRecommendedGamePuzzleReview,
   selectRecommendedGamePuzzleIds
 } from "./recommended-review.ts";
 export type {
+  EffectiveReviewBenchmarkInput,
+  ExternalGameRatingSignal,
+  InternalRatingSignal,
   RecommendedGamePuzzleCandidate,
   RecommendedGamePuzzleEligibilityOptions,
   SelectRecommendedGamePuzzlesOptions

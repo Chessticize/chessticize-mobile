@@ -1568,7 +1568,7 @@ export const enMessages = {
   "games.puzzles.recommendedInReview": "Recommended in Review",
   "games.puzzles.recommendedInfoA11y": "Recommended puzzles criteria",
   "games.puzzles.recommendedCriteriaTitle": "How recommended puzzles are selected",
-  "games.puzzles.recommendedCriteriaBody": "Excludes time-pressure (<=15s, or <=10s in Bullet) and impulsive (<=2s) blunders, keeps puzzles within +300 of your game rating, and picks up to the top 2 highest-value puzzles per game.",
+  "games.puzzles.recommendedCriteriaBody": "Excludes time-pressure (<=15s, or <=10s in Bullet) and impulsive (<=2s) blunders, calibrates ratings to the Lichess scale using your highest current level (+300 cap), skips puzzles already removed from Review, and picks up to 2 top puzzles per game.",
   "games.action.select": "Select",
   "games.selection.selectAllFiltered": "Select all ({{count}})",
   "games.selection.deselectAll": "Deselect all",

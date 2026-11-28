@@ -166,6 +166,13 @@ export function useGameReviewController({
     }
     return enrolled;
   });
+  const [removedPuzzleIds, setRemovedPuzzleIds] = useState<Set<string>>(() =>
+    practiceService.listRemovedReviewPuzzleIds()
+  );
+  const effectiveUserRating = useMemo(
+    () => practiceService.getEffectiveReviewBenchmarkRating(game),
+    [game, practiceService]
+  );
 
   // Track latest streamed evaluations for checkpoint flushing on pause/background/unmount.
   const latestEvalsRef = useRef<GamePlyEvaluation[]>(plyEvaluations);
@@ -1154,11 +1161,21 @@ export function useGameReviewController({
           next.delete(puzzle.id);
           return next;
         });
+        setRemovedPuzzleIds((previous) => {
+          const next = new Set(previous);
+          next.add(puzzle.id);
+          return next;
+        });
       } else {
         practiceService.enrollReview(ctx);
         setEnrolledPuzzleIds((previous) => {
           const next = new Set(previous);
           next.add(puzzle.id);
+          return next;
+        });
+        setRemovedPuzzleIds((previous) => {
+          const next = new Set(previous);
+          next.delete(puzzle.id);
           return next;
         });
       }
@@ -1170,10 +1187,9 @@ export function useGameReviewController({
     if (userPuzzles.length === 0) {
       return;
     }
-    const userRating =
-      game.userColor === "w" ? game.white.rating : game.black.rating;
     const recommendedIds = selectRecommendedGamePuzzleIds(userPuzzles, {
-      getUserRating: () => userRating
+      getUserRating: () => effectiveUserRating,
+      excludedPuzzleIds: removedPuzzleIds
     });
     const enrolledIds = new Set<string>();
     for (const puzzle of userPuzzles) {
@@ -1196,7 +1212,7 @@ export function useGameReviewController({
       }
       return next;
     });
-  }, [game.black.rating, game.userColor, game.white.rating, practiceService, userPuzzles]);
+  }, [effectiveUserRating, practiceService, removedPuzzleIds, userPuzzles]);
 
   const enrollAllPuzzlesInReview = useCallback(() => {
     if (userPuzzles.length === 0) {
@@ -1473,6 +1489,8 @@ export function useGameReviewController({
     isPromptHidingAnswer,
     userPuzzles,
     enrolledPuzzleIds,
+    removedPuzzleIds,
+    effectiveUserRating,
     summary,
     freeAnalysisOpen,
     freeAnalysisLoading,

@@ -1538,7 +1538,7 @@ export const zhHantMessages = {
   "games.puzzles.recommendedInReview": "推薦題已全部加入",
   "games.puzzles.recommendedInfoA11y": "推薦題篩選標準",
   "games.puzzles.recommendedCriteriaTitle": "推薦複習題的篩選標準",
-  "games.puzzles.recommendedCriteriaBody": "排除讀秒（剩餘 ≤15 秒，Bullet ≤10 秒）與隨手快走（≤2 秒）失誤；題目估算分不超過該局等級分 +300；每盤精選最有價值的最多 2 題。",
+  "games.puzzles.recommendedCriteriaBody": "排除讀秒（剩餘 ≤15 秒，Bullet ≤10 秒）與隨手快走（≤2 秒）失誤；題目難度採用 Lichess 尺度，依跨平台校準後的目前最高水準 +300 篩選；已移出複習的題目不再重推；每盤精選最多 2 題。",
   "games.action.select": "選取",
   "games.selection.selectAllFiltered": "全選目前篩選 ({{count}})",
   "games.selection.deselectAll": "取消全選",

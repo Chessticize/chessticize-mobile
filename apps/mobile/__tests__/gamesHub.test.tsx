@@ -1103,7 +1103,8 @@ describe("GamesHubScreen", () => {
           lengthTag: "short",
           phaseTag: "middlegame",
           caliberScore: 60,
-          estimatedRating: 1950,
+          // Chess.com Rapid 1400 calibrates to ~1670 Lichess (+300 cap = ~1970), so 2100 is stretch.
+          estimatedRating: 2100,
           ratingSource: "maia2_sf_v1"
         }
       ],
@@ -1120,7 +1121,7 @@ describe("GamesHubScreen", () => {
     );
 
     press(renderer, "games-hub-view-puzzles");
-    // Add Recommended enrolls the ~1380 puzzle and skips the ~1950 (> 1400 + 300) puzzle.
+    // Add Recommended enrolls the ~1380 puzzle and skips the ~2100 (> calibrated ~1670 + 300) puzzle.
     press(renderer, "games-puzzles-add-recommended-review");
     const enrolled = service.listReviewQueue();
     expect(enrolled.length).toBe(1);
@@ -1397,7 +1398,8 @@ describe("GamesHubScreen", () => {
           caliberScore: 90,
           clockRemainingSec: 100,
           timeSpentSec: 15,
-          estimatedRating: 1900,
+          // Chess.com Blitz 1400 calibrates to ~1720 Lichess (+300 cap = ~2020), so 2150 is stretch.
+          estimatedRating: 2150,
           ratingSource: "maia2_sf_v1"
         }
       ],
@@ -1617,5 +1619,134 @@ describe("GamesHubScreen", () => {
     expect(service.getImportedGame("g-suspend-1")?.analysisStatus).toBe("complete");
 
     act(() => renderer.unmount());
+  });
+
+  it("calibrates Chess.com Blitz/Rapid ratings to the Lichess puzzle scale via max(...) and excludes retired Review puzzles from Recommended", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    // Player has Chess.com Blitz 1180 (~1530 Lichess) and Chess.com Rapid 1450 (~1705 Lichess),
+    // plus a low early Chessticize puzzle rating (~900) that must NOT drag down the benchmark.
+    service.upsertImportedGames([
+      makeDraft({
+        id: "g-chesscom-blitz",
+        platform: "chess_com",
+        timeClass: "blitz",
+        white: { username: "alice", rating: 1180, isAi: false },
+        black: { username: "opp1", rating: 1190, isAi: false }
+      }),
+      makeDraft({
+        id: "g-chesscom-rapid",
+        platform: "chess_com",
+        timeClass: "rapid",
+        white: { username: "alice", rating: 1450, isAi: false },
+        black: { username: "opp2", rating: 1440, isAi: false }
+      })
+    ]);
+    store.saveRating({
+      key: "standard:overall",
+      generation: 1,
+      rating: 900,
+      ratingDeviation: 120,
+      volatility: 0.06,
+      games: 10
+    });
+
+    const puzzles = service.replaceGameUserPuzzles(
+      "g-chesscom-blitz",
+      [
+        {
+          idSeed: "ply-26-1529",
+          ply: 26,
+          moveNumber: 13,
+          puzzleKind: "arrow_duel",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "middlegame",
+          caliberScore: 92,
+          clockRemainingSec: 120,
+          timeSpentSec: 10,
+          estimatedRating: 1529,
+          ratingSource: "maia2_sf_v1"
+        },
+        {
+          idSeed: "ply-32-stretch",
+          ply: 32,
+          moveNumber: 16,
+          puzzleKind: "line",
+          momentKind: "opponent_mistake_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R b KQkq - 0 4",
+          solutionMoves: ["d7d6", "c2c3", "e8g8"],
+          prevCp: 10,
+          cp: 280,
+          winChanceSwing: 25,
+          themes: ["pin"],
+          lengthTag: "short",
+          phaseTag: "middlegame",
+          caliberScore: 88,
+          clockRemainingSec: 110,
+          timeSpentSec: 12,
+          estimatedRating: 2150,
+          ratingSource: "maia2_sf_v1"
+        }
+      ],
+      { opponentName: "opp1", timeClass: "blitz" }
+    );
+
+    const puzzle1529 = puzzles[0]!;
+    const puzzleStretch = puzzles[1]!;
+
+    const renderer = render(
+      <GamesHubScreen
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+
+    // 1. ~1529 is within calibrated max(1530, 1705) + 300 = 2005 -> Recommended!
+    //    ~2150 is > 2005 -> Stretch (not Recommended).
+    press(renderer, "games-hub-view-puzzles");
+    expect(hasTestID(renderer, `games-puzzle-recommended-${puzzle1529.id}`)).toBe(true);
+    expect(hasTestID(renderer, `games-puzzle-recommended-${puzzleStretch.id}`)).toBe(false);
+
+    // 2. Enroll via Add Recommended -> enrolls only ~1529.
+    press(renderer, "games-puzzles-add-recommended-review");
+    const enrolled = service.listReviewQueue();
+    expect(enrolled.map((e) => e.puzzleId)).toEqual([puzzle1529.id]);
+
+    // 3. Retire/remove ~1529 from Review -> must NOT be recommended or re-added by Add Recommended.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    service.removeReview({
+      puzzleId: enrolled[0]!.puzzleId,
+      mode: enrolled[0]!.mode,
+      ratingKey: enrolled[0]!.ratingKey
+    });
+    expect(service.listReviewQueue()).toHaveLength(0);
+
+    // Re-mount to reflect external Review removal (as when returning from Review tab).
+    const remounted = render(
+      <GamesHubScreen
+        nowMs={NOW_MS + 1000}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+    press(remounted, "games-hub-view-puzzles");
+    expect(hasTestID(remounted, `games-puzzle-recommended-${puzzle1529.id}`)).toBe(false);
+    // Add Recommended button is hidden (0 remaining recommended), and manual toggle still allows re-adding.
+    expect(hasTestID(remounted, "games-puzzles-add-recommended-review")).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    press(remounted, `games-puzzle-review-toggle-${puzzle1529.id}`);
+    expect(service.listReviewQueue().map((e) => e.puzzleId)).toEqual([puzzle1529.id]);
   });
 });

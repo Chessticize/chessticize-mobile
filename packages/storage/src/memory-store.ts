@@ -1652,7 +1652,7 @@ export class MemoryStore implements PracticeStore {
     );
   }
 
-  private listReviewRemovals(): ReviewScheduleRemoval[] {
+  listReviewRemovals(): ReviewScheduleRemoval[] {
     return [...this.reviewRemovals.values()]
       .map((removal) => ({ ...removal }))
       .sort((left, right) => reviewQueueKey(left).localeCompare(reviewQueueKey(right)));

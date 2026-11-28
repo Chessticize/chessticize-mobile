@@ -1568,7 +1568,7 @@ export const frMessages = {
   "games.puzzles.recommendedInReview": "Recommandés en Révision",
   "games.puzzles.recommendedInfoA11y": "Critères des problèmes recommandés",
   "games.puzzles.recommendedCriteriaTitle": "Sélection des problèmes recommandés",
-  "games.puzzles.recommendedCriteriaBody": "Exclut le manque de temps (≤15 s, Bullet ≤10 s) et les coups impulsifs (≤2 s), limite à +300 au-dessus de votre classement et garde les 2 meilleurs par partie.",
+  "games.puzzles.recommendedCriteriaBody": "Exclut le manque de temps (≤15 s, Bullet ≤10 s) et les coups impulsifs (≤2 s), calibre sur l’échelle Lichess selon votre meilleur niveau actuel (+300), ignore les problèmes déjà retirés de Révision et garde les 2 meilleurs par partie.",
   "games.action.select": "Sélectionner",
   "games.selection.selectAllFiltered": "Tout sélectionner ({{count}})",
   "games.selection.deselectAll": "Tout désélectionner",

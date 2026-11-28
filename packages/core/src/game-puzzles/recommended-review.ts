@@ -2,10 +2,85 @@ import {
   classifyClockBucket,
   type GameTimeClass
 } from "../game-review/pgn-parser.ts";
+import type { GamePlatform } from "../game-import/types.ts";
 import type { UserGamePuzzleRatingSource } from "../types.ts";
-import { isWithinReviewDifficultyBand } from "./difficulty.ts";
+import {
+  isWithinReviewDifficultyBand,
+  normalizeGameRatingToPuzzleScale
+} from "./difficulty.ts";
 
 export const DEFAULT_MAX_RECOMMENDED_PUZZLES_PER_GAME = 2;
+
+export interface ExternalGameRatingSignal {
+  rating: number;
+  platform: GamePlatform;
+  timeClass?: string;
+}
+
+export interface InternalRatingSignal {
+  rating: number;
+  games: number;
+}
+
+export interface EffectiveReviewBenchmarkInput {
+  gameRating?: ExternalGameRatingSignal;
+  recentGameRatings?: readonly ExternalGameRatingSignal[];
+  puzzleRatings?: readonly InternalRatingSignal[];
+  maiaRatings?: readonly InternalRatingSignal[];
+}
+
+/**
+ * Computes the player's effective Lichess-aligned reference rating for deciding whether a
+ * game-extracted puzzle is within their recommended Review band (`<= benchmark + 300`).
+ *
+ * All external ratings are first calibrated onto the Lichess / Maia / puzzle Elo scale, then
+ * combined via `max(...)` so:
+ * - A low early Chessticize puzzle rating never drags down an established Chess.com / Lichess rating.
+ * - A Chess.com Blitz rating never penalizes puzzles when the player's Chess.com Rapid (or Lichess)
+ *   rating is higher.
+ * - As the player's rating improves over time, previously stretch puzzles automatically unlock.
+ */
+export function computeEffectiveReviewBenchmarkRating(
+  input: EffectiveReviewBenchmarkInput
+): number | undefined {
+  let best: number | undefined;
+  const consider = (value: number | undefined): void => {
+    if (value === undefined || !Number.isFinite(value)) {
+      return;
+    }
+    if (best === undefined || value > best) {
+      best = Math.round(value);
+    }
+  };
+
+  if (input.gameRating && Number.isFinite(input.gameRating.rating)) {
+    consider(
+      normalizeGameRatingToPuzzleScale(
+        input.gameRating.rating,
+        input.gameRating.platform,
+        input.gameRating.timeClass
+      )
+    );
+  }
+  for (const signal of input.recentGameRatings ?? []) {
+    if (Number.isFinite(signal.rating)) {
+      consider(
+        normalizeGameRatingToPuzzleScale(signal.rating, signal.platform, signal.timeClass)
+      );
+    }
+  }
+  for (const signal of input.puzzleRatings ?? []) {
+    if (signal.games >= 3 && Number.isFinite(signal.rating)) {
+      consider(signal.rating);
+    }
+  }
+  for (const signal of input.maiaRatings ?? []) {
+    if (signal.games >= 1 && Number.isFinite(signal.rating)) {
+      consider(signal.rating);
+    }
+  }
+  return best;
+}
 
 export interface RecommendedGamePuzzleCandidate {
   id: string;
@@ -28,12 +103,16 @@ export interface RecommendedGamePuzzleEligibilityOptions {
    * being auto-enrolled.
    */
   requireEstimatedRating?: boolean;
+  /** Puzzle IDs the user previously removed/retired from Review and should not be re-recommended. */
+  excludedPuzzleIds?: ReadonlySet<string>;
 }
 
 export interface SelectRecommendedGamePuzzlesOptions {
   getUserRating?: (gameId: string) => number | undefined;
   maxPerGame?: number;
   requireEstimatedRating?: boolean;
+  /** Puzzle IDs the user previously removed/retired from Review and should not be re-recommended. */
+  excludedPuzzleIds?: ReadonlySet<string>;
 }
 
 function normalizeTimeClassForClock(value: string | undefined): GameTimeClass {
@@ -54,7 +133,7 @@ export function isEligibleForRecommendedGamePuzzleReview(
   puzzle: RecommendedGamePuzzleCandidate,
   options: RecommendedGamePuzzleEligibilityOptions = {}
 ): boolean {
-  if (puzzle.archived) {
+  if (puzzle.archived || options.excludedPuzzleIds?.has(puzzle.id)) {
     return false;
   }
 
@@ -107,6 +186,9 @@ export function selectRecommendedGamePuzzleIds(
         ...(userRating !== undefined ? { userRating } : {}),
         ...(options.requireEstimatedRating !== undefined
           ? { requireEstimatedRating: options.requireEstimatedRating }
+          : {}),
+        ...(options.excludedPuzzleIds !== undefined
+          ? { excludedPuzzleIds: options.excludedPuzzleIds }
           : {})
       })
     ) {

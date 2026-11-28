@@ -1538,7 +1538,7 @@ export const zhHansMessages = {
   "games.puzzles.recommendedInReview": "推荐题已全部加入",
   "games.puzzles.recommendedInfoA11y": "推荐题筛选标准",
   "games.puzzles.recommendedCriteriaTitle": "推荐复习题的筛选标准",
-  "games.puzzles.recommendedCriteriaBody": "排除读秒（剩余 ≤15 秒，Bullet ≤10 秒）和随手快走（≤2 秒）失误；题目估算分不超过该局等级分 +300；每盘精选最有价值的最多 2 题。",
+  "games.puzzles.recommendedCriteriaBody": "排除读秒（剩余 ≤15 秒，Bullet ≤10 秒）和随手快走（≤2 秒）失误；题目难度采用 Lichess 尺度，按跨平台校准后的当前最高水平 +300 筛选；已移出复习的题不再重推；每盘精选最多 2 题。",
   "games.action.select": "选择",
   "games.selection.selectAllFiltered": "全选当前筛选 ({{count}})",
   "games.selection.deselectAll": "取消全选",

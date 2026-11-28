@@ -248,3 +248,93 @@ test("v29 -> v30 SQLite migration preserves existing imported_games, game_ply_ev
   const memService = new PracticeService(new MemoryStore());
   assert.equal(memService.listMaiaRatings().length, 3);
 });
+
+test("suggestSeedMaiaRating calibrates Chess.com ratings and getEffectiveReviewBenchmarkRating takes max across signals", () => {
+  const store = new SQLiteStore(":memory:");
+  store.migrate();
+  const service = new PracticeService(store);
+
+  // Chess.com Rapid 1450 calibrates onto Lichess-aligned Maia scale (~1700).
+  service.upsertImportedGames([
+    {
+      id: "chesscom_rapid_1",
+      platform: "chess_com",
+      username: "alice",
+      userColor: "w",
+      playedAt: "2026-11-26T12:00:00.000Z",
+      timeControl: "600",
+      timeClass: "rapid",
+      rated: true,
+      white: { username: "alice", rating: 1450, isAi: false },
+      black: { username: "bob", rating: 1440, isAi: false },
+      winner: "w",
+      termination: "mate",
+      pgn: "1. e4 e5 1-0"
+    },
+    {
+      id: "chesscom_blitz_1",
+      platform: "chess_com",
+      username: "alice",
+      userColor: "w",
+      playedAt: "2026-11-27T12:00:00.000Z",
+      timeControl: "180",
+      timeClass: "blitz",
+      rated: true,
+      white: { username: "alice", rating: 1180, isAi: false },
+      black: { username: "carol", rating: 1190, isAi: false },
+      winner: "w",
+      termination: "mate",
+      pgn: "1. e4 e5 1-0"
+    }
+  ]);
+
+  const seedRapid = service.getMaiaRating("rapid").rating;
+  assert.ok(seedRapid >= 1650 && seedRapid <= 1750, `Expected ~1700 Lichess-aligned seed, got ${seedRapid}`);
+
+  const blitzGame = service.getImportedGame("chesscom_blitz_1");
+  const benchmark = service.getEffectiveReviewBenchmarkRating(blitzGame);
+  assert.ok(
+    benchmark !== undefined && benchmark >= 1650 && benchmark <= 1750,
+    `Expected max benchmark from Chess.com Rapid (~1705), got ${benchmark}`
+  );
+
+  // Removing a real user puzzle from Review surfaces via listRemovedReviewPuzzleIds on SQLiteStore.
+  const [createdPuzzle] = service.replaceGameUserPuzzles(
+    "chesscom_blitz_1",
+    [
+      {
+        idSeed: "ply-10",
+        ply: 10,
+        moveNumber: 5,
+        puzzleKind: "line",
+        momentKind: "opponent_blunder_missed",
+        userColor: "w",
+        puzzleColor: "w",
+        initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+        solutionMoves: ["c6d4", "f3d4", "e5d4"],
+        prevCp: 20,
+        cp: 340,
+        winChanceSwing: 28,
+        themes: ["fork"],
+        lengthTag: "short",
+        phaseTag: "opening",
+        caliberScore: 90,
+        estimatedRating: 1529,
+        ratingSource: "maia2_sf_v1"
+      }
+    ],
+    { opponentName: "carol", timeClass: "blitz" }
+  );
+  assert.ok(createdPuzzle);
+  service.enrollReview(
+    { puzzleId: createdPuzzle.id, mode: "standard", ratingKey: "ug_my_game_puzzles:standard" },
+    "2026-11-27T12:30:00.000Z"
+  );
+  const enrolled = service.listReviewQueue();
+  assert.equal(enrolled.length, 1);
+  service.removeReview(
+    { puzzleId: enrolled[0]!.puzzleId, mode: enrolled[0]!.mode, ratingKey: enrolled[0]!.ratingKey },
+    "2026-11-27T13:00:00.000Z"
+  );
+  assert.equal(service.listRemovedReviewPuzzleIds().has(createdPuzzle.id), true);
+});

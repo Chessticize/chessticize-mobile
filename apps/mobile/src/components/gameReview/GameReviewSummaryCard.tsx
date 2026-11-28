@@ -18,6 +18,7 @@ export interface GameReviewSummaryCardProps {
   blackPlayerName: string;
   userRating?: number;
   enrolledPuzzleIds: ReadonlySet<string>;
+  removedPuzzleIds?: ReadonlySet<string>;
   onSelectPuzzle?: (puzzle: StoredUserPuzzle) => void;
   onToggleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
   onEnrollRecommendedPuzzles?: () => void;
@@ -32,6 +33,7 @@ export function GameReviewSummaryCard({
   blackPlayerName,
   userRating,
   enrolledPuzzleIds,
+  removedPuzzleIds,
   onSelectPuzzle,
   onToggleReviewEnrollment,
   onEnrollRecommendedPuzzles,
@@ -46,9 +48,10 @@ export function GameReviewSummaryCard({
   const recommendedPuzzleIds = useMemo(
     () =>
       selectRecommendedGamePuzzleIds(puzzles, {
-        getUserRating: () => userRating
+        getUserRating: () => userRating,
+        ...(removedPuzzleIds ? { excludedPuzzleIds: removedPuzzleIds } : {})
       }),
-    [puzzles, userRating]
+    [puzzles, removedPuzzleIds, userRating]
   );
   const recommendedPuzzles = useMemo(
     () => puzzles.filter((puzzle) => recommendedPuzzleIds.has(puzzle.id)),

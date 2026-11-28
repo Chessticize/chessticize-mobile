@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_MAX_RECOMMENDED_PUZZLES_PER_GAME,
+  computeEffectiveReviewBenchmarkRating,
   isEligibleForRecommendedGamePuzzleReview,
+  normalizeGameRatingToPuzzleScale,
   selectRecommendedGamePuzzleIds,
   type RecommendedGamePuzzleCandidate
 } from "../src/index.ts";
@@ -145,4 +147,66 @@ test("selects at most top 2 highest-caliber eligible puzzles per game", () => {
     }
   );
   assert.deepEqual([...selected].sort(), ["g1-b", "g1-c", "g2-a"]);
+});
+
+test("normalizeGameRatingToPuzzleScale calibrates Chess.com onto Lichess/Maia scale while preserving Lichess/Maia", () => {
+  // Chess.com Blitz 1200 -> ~1550 Lichess; Chess.com Rapid 1450 -> ~1700 Lichess
+  assert.equal(normalizeGameRatingToPuzzleScale(1200, "chess_com", "blitz"), 1550);
+  assert.equal(normalizeGameRatingToPuzzleScale(1450, "chess_com", "rapid"), 1700);
+  // Converges smoothly near 2400
+  assert.equal(normalizeGameRatingToPuzzleScale(2400, "chess_com", "rapid"), 2400);
+  // Lichess Rapid & Maia are already on Lichess scale
+  assert.equal(normalizeGameRatingToPuzzleScale(1650, "lichess", "rapid"), 1650);
+  assert.equal(normalizeGameRatingToPuzzleScale(1500, "maia", "rapid"), 1500);
+  // Lichess Blitz gets a modest +75 lift below 1800
+  assert.equal(normalizeGameRatingToPuzzleScale(1500, "lichess", "blitz"), 1575);
+});
+
+test("computeEffectiveReviewBenchmarkRating takes calibrated max across games, Maia, and puzzle ratings", () => {
+  // Chess.com Blitz 1180 game + Chess.com Rapid 1450 recent + low Chessticize puzzle rating 750:
+  // Rapid 1450 -> 1700 Lichess wins, never dragged down by low puzzle rating!
+  const benchmark = computeEffectiveReviewBenchmarkRating({
+    gameRating: { rating: 1180, platform: "chess_com", timeClass: "blitz" },
+    recentGameRatings: [
+      { rating: 1450, platform: "chess_com", timeClass: "rapid" },
+      { rating: 1180, platform: "chess_com", timeClass: "blitz" }
+    ],
+    puzzleRatings: [{ rating: 750, games: 10 }],
+    maiaRatings: [{ rating: 1520, games: 2 }]
+  });
+  assert.equal(benchmark, 1700);
+
+  // So a ~1529 Lichess-scale puzzle from the Chess.com Blitz 1180 game is cleanly recommended!
+  assert.equal(
+    isEligibleForRecommendedGamePuzzleReview(
+      makeCandidate({ rating: 1529, ratingSource: "maia2_sf_v1" }),
+      { userRating: benchmark }
+    ),
+    true
+  );
+
+  // If the player's puzzle rating later grows above 1800 (with >=3 games), it lifts the ceiling
+  const grown = computeEffectiveReviewBenchmarkRating({
+    gameRating: { rating: 1180, platform: "chess_com", timeClass: "blitz" },
+    puzzleRatings: [
+      { rating: 2050, games: 2 }, // <3 games ignored
+      { rating: 1860, games: 5 }
+    ]
+  });
+  assert.equal(grown, 1860);
+});
+
+test("excludedPuzzleIds prevents previously removed/retired puzzles from being re-recommended", () => {
+  const selected = selectRecommendedGamePuzzleIds(
+    [
+      makeCandidate({ id: "g1-removed", gameId: "g1", gamePly: 10, caliberScore: 99 }),
+      makeCandidate({ id: "g1-keep1", gameId: "g1", gamePly: 14, caliberScore: 85 }),
+      makeCandidate({ id: "g1-keep2", gameId: "g1", gamePly: 18, caliberScore: 75 })
+    ],
+    {
+      getUserRating: () => 1500,
+      excludedPuzzleIds: new Set(["g1-removed"])
+    }
+  );
+  assert.deepEqual([...selected].sort(), ["g1-keep1", "g1-keep2"]);
 });

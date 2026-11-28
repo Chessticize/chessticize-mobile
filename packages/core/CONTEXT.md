@@ -27,3 +27,6 @@ remains distinct from other attempts for the same Review Context, is cleared
 only explicitly or by Manual Review Enrollment initiated from that attempt,
 and is not restored by later Review Schedule Removal.
 _Avoid_: Unclear puzzle, Review candidate
+
+**Canonical Rating Scale**:
+All Chessticize-native Elo scales — Core Pack puzzle ratings, Standard/Custom Sprint ratings, Arrow Duel ratings, offline extracted game-puzzle difficulty estimates, and Play with Maia ratings (Maia-2 is trained on Lichess Rapid games) — share the **Lichess-aligned Elo scale**. External imported games display their original platform rating verbatim on game cards, and are calibrated onto the Lichess-aligned scale via `normalizeGameRatingToPuzzleScale` whenever compared against internal puzzle difficulties or used to seed initial Maia Play ratings.
