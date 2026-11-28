@@ -204,8 +204,6 @@ export function GamesHubScreen({
     const linkedAccounts = service.listLinkedAccounts();
     const userPuzzles = service.listUserPuzzles();
     const userPuzzleCount = userPuzzles.length;
-    const arrowDuelCount = userPuzzles.filter((puzzle) => puzzle.puzzleKind === "arrow_duel").length;
-    const lineCount = userPuzzles.filter((puzzle) => puzzle.puzzleKind === "line").length;
     const gameById = new Map<string, StoredImportedGame>();
     const gameOrderById = new Map<string, number>();
     allGames.forEach((game, index) => {
@@ -243,8 +241,6 @@ export function GamesHubScreen({
       orderedUserPuzzles,
       enrolledPuzzleIds,
       userPuzzleCount,
-      arrowDuelCount,
-      lineCount,
       diagnosis
     };
   }, [revision, service]);
@@ -456,16 +452,6 @@ export function GamesHubScreen({
       isPuzzleWithinReviewBand,
       puzzlesInGameScope
     ]
-  );
-
-  const filteredArrowDuelPuzzles = useMemo(
-    () => filteredOrderedUserPuzzles.filter((puzzle) => puzzle.puzzleKind === "arrow_duel"),
-    [filteredOrderedUserPuzzles]
-  );
-
-  const filteredStandardPuzzles = useMemo(
-    () => filteredOrderedUserPuzzles.filter((puzzle) => puzzle.puzzleKind === "line"),
-    [filteredOrderedUserPuzzles]
   );
 
   const filteredDiagnosis = useMemo(() => {
@@ -1203,62 +1189,6 @@ export function GamesHubScreen({
                     />
                   ) : null}
                   <View style={styles.puzzlesTabActions}>
-                    {onPracticeMyGamePuzzles &&
-                    filteredArrowDuelPuzzles.length > 0 &&
-                    filteredStandardPuzzles.length > 0 ? (
-                      <>
-                        <Button
-                          label={`${t("common.arrowDuel")} (${filteredArrowDuelPuzzles.length})`}
-                          size="compact"
-                          testID="games-practice-arrow-duel"
-                          variant="secondary"
-                          onPress={() => {
-                            if (
-                              effectiveAccountFilter !== "all" ||
-                              effectivePuzzleDifficultyFilter !== "all" ||
-                              effectivePuzzleThemeFilter !== "all"
-                            ) {
-                              onPracticeMyGamePuzzles({
-                                puzzleIds: filteredArrowDuelPuzzles.map((p) => p.id),
-                                initialIndex: 0
-                              });
-                            } else {
-                              onPracticeMyGamePuzzles({
-                                mode: "arrow_duel",
-                                ...(effectiveTimeClassFilter !== "all"
-                                  ? { timeClass: effectiveTimeClassFilter }
-                                  : {})
-                              });
-                            }
-                          }}
-                        />
-                        <Button
-                          label={`${t("common.standard")} (${filteredStandardPuzzles.length})`}
-                          size="compact"
-                          testID="games-practice-lines"
-                          variant="secondary"
-                          onPress={() => {
-                            if (
-                              effectiveAccountFilter !== "all" ||
-                              effectivePuzzleDifficultyFilter !== "all" ||
-                              effectivePuzzleThemeFilter !== "all"
-                            ) {
-                              onPracticeMyGamePuzzles({
-                                puzzleIds: filteredStandardPuzzles.map((p) => p.id),
-                                initialIndex: 0
-                              });
-                            } else {
-                              onPracticeMyGamePuzzles({
-                                mode: "standard",
-                                ...(effectiveTimeClassFilter !== "all"
-                                  ? { timeClass: effectiveTimeClassFilter }
-                                  : {})
-                              });
-                            }
-                          }}
-                        />
-                      </>
-                    ) : null}
                     <Button
                       disabled={allVisiblePuzzlesEnrolled}
                       label={

@@ -174,28 +174,45 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
     });
     expect(launches[0]).toEqual({ themes: ["fork"] });
 
-    // Switch to the Puzzles view for mode-specific puzzle launch buttons
+    // Switch to the Puzzles view: redundant quick-launch mode buttons are omitted;
+    // mode filtering lives in the filter drawer and feeds the primary Practice CTA.
     const puzzlesTabBtn = findByTestID(rendererFull.root, "games-hub-view-puzzles");
     expect(puzzlesTabBtn).not.toBeNull();
     act(() => {
       puzzlesTabBtn!.props.onPress();
     });
 
-    // Tapping Arrow Duel quick launch passes mode: "arrow_duel"
-    const arrowDuelBtn = findByTestID(rendererFull.root, "games-practice-arrow-duel");
-    expect(arrowDuelBtn).not.toBeNull();
-    act(() => {
-      arrowDuelBtn!.props.onPress();
-    });
-    expect(launches[1]).toEqual({ mode: "arrow_duel" });
+    expect(findByTestID(rendererFull.root, "games-practice-arrow-duel")).toBeNull();
+    expect(findByTestID(rendererFull.root, "games-practice-lines")).toBeNull();
 
-    // Tapping Tactical Lines quick launch passes mode: "standard"
-    const linesBtn = findByTestID(rendererFull.root, "games-practice-lines");
-    expect(linesBtn).not.toBeNull();
+    // Expand filter drawer, filter to Arrow Duel, and tap primary CTA
+    const filterToggle = findByTestID(rendererFull.root, "games-filter-toggle");
+    expect(filterToggle).not.toBeNull();
     act(() => {
-      linesBtn!.props.onPress();
+      filterToggle!.props.onPress();
     });
-    expect(launches[2]).toEqual({ mode: "standard" });
+    const arrowDuelFilter = findByTestID(rendererFull.root, "games-filter-puzzle-kind-arrow_duel");
+    expect(arrowDuelFilter).not.toBeNull();
+    act(() => {
+      arrowDuelFilter!.props.onPress();
+    });
+    const practiceCta = findByTestID(rendererFull.root, "games-practice-puzzles-cta");
+    expect(practiceCta).not.toBeNull();
+    act(() => {
+      practiceCta!.props.onPress();
+    });
+    expect(launches[1]?.puzzleIds).toHaveLength(3);
+
+    // Filter to Standard and tap primary CTA
+    const lineFilter = findByTestID(rendererFull.root, "games-filter-puzzle-kind-line");
+    expect(lineFilter).not.toBeNull();
+    act(() => {
+      lineFilter!.props.onPress();
+    });
+    act(() => {
+      findByTestID(rendererFull.root, "games-practice-puzzles-cta")!.props.onPress();
+    });
+    expect(launches[2]?.puzzleIds).toHaveLength(1);
 
     act(() => rendererFull.unmount());
   });
