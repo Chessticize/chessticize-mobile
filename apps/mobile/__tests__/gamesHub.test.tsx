@@ -1117,5 +1117,16 @@ describe("GamesHubScreen", () => {
     const enrolled = service.listReviewQueue();
     expect(enrolled.length).toBe(1);
     expect(enrolled[0]?.puzzleId).toBe(stored[0]?.id);
+
+    // Difficulty filter pills toggle between At my level and Stretch puzzles cleanly.
+    press(renderer, "games-filter-toggle");
+    expect(hasTestID(renderer, "games-puzzle-difficulty-filters")).toBe(true);
+    press(renderer, "games-filter-puzzle-difficulty-at_level");
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[0]!.id}`)).toBe(true);
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[1]!.id}`)).toBe(false);
+
+    press(renderer, "games-filter-puzzle-difficulty-stretch");
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[0]!.id}`)).toBe(false);
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[1]!.id}`)).toBe(true);
   });
 });

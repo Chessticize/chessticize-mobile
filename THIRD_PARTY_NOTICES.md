@@ -163,6 +163,20 @@ published win-chances curve:
   - Source: https://github.com/Chessticize/chessticize-worker
   - Notes: Adapted puzzle extraction, 8-case game-moment classification, Arrow Duel verification, clock-metric parsing, and PR #26/#27 tagger fixes ported to pure TypeScript in `packages/core/src/game-puzzles/`.
 
+## Maia-2 & ONNX Runtime (offline difficulty rating)
+
+- **Maia-2 Rapid**
+  - Authors: CSSLab (University of Toronto)
+  - License: MIT License (https://github.com/CSSLab/maia2/blob/main/LICENSE)
+  - Source: https://github.com/CSSLab/maia2
+  - Notes: Quantized INT8 human-move policy weights (`maia2-rapid-int8.onnx` on Android, compiled `maia2-rapid-int8.mlmodelc` on iOS) and canonical 1,880-move vocabulary used for on-device personal game puzzle difficulty estimation.
+
+- **ONNX Runtime Android** (`com.microsoft.onnxruntime:onnxruntime-android:1.20.0`)
+  - Authors: Microsoft Corporation
+  - License: MIT License (https://github.com/microsoft/onnxruntime/blob/main/LICENSE)
+  - Source: https://github.com/microsoft/onnxruntime
+  - Notes: Native Android inference runtime for executing offline quantized Maia-2 weights without network access.
+
 ## React Native and mobile runtime package inventory
 
 The app is built with React Native and related open-source packages. The

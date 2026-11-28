@@ -19,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
         add(ChessticizeTestLaunchConfigPackage())
         add(MobilePredictiveBackPackage())
         add(MoveFeedbackPackage())
+        add(NativeHumanPolicyPackage())
         add(NativeStockfishEnginePackage())
         add(ReviewReminderNotificationsPackage())
         add(SystemBarsPackage())

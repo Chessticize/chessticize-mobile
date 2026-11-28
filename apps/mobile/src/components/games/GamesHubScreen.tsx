@@ -125,6 +125,9 @@ export function GamesHubScreen({
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
   const [timeClassFilter, setTimeClassFilter] = useState<GamesTimeClassFilter>("all");
   const [puzzleKindFilter, setPuzzleKindFilter] = useState<"all" | "arrow_duel" | "line">("all");
+  const [puzzleDifficultyFilter, setPuzzleDifficultyFilter] = useState<
+    "all" | "at_level" | "stretch"
+  >("all");
   const [puzzleThemeFilter, setPuzzleThemeFilter] = useState<string>("all");
   const [visibleGamesLimit, setVisibleGamesLimit] = useState<number>(GAMES_PAGE_SIZE);
   const [visiblePuzzlesLimit, setVisiblePuzzlesLimit] = useState<number>(PUZZLES_PAGE_SIZE);
@@ -381,12 +384,59 @@ export function GamesHubScreen({
       ? puzzleThemeFilter
       : "all";
 
+  const isPuzzleWithinReviewBand = useCallback(
+    (puzzle: StoredUserPuzzle): boolean => {
+      if (!puzzle.ratingSource || puzzle.ratingSource === "game_anchor") {
+        return true;
+      }
+      const sourceGame = snapshot.gameById.get(puzzle.gameId);
+      const userRating = sourceGame
+        ? sourceGame.userColor === "w"
+          ? sourceGame.white.rating
+          : sourceGame.black.rating
+        : undefined;
+      return isWithinReviewDifficultyBand(puzzle.rating, userRating);
+    },
+    [snapshot.gameById]
+  );
+
+  const hasDifficultySplitInScope = useMemo(() => {
+    let hasWithin = false;
+    let hasStretch = false;
+    for (const puzzle of puzzlesInGameScope) {
+      if (isPuzzleWithinReviewBand(puzzle)) {
+        hasWithin = true;
+      } else {
+        hasStretch = true;
+      }
+      if (hasWithin && hasStretch) {
+        return true;
+      }
+    }
+    return false;
+  }, [isPuzzleWithinReviewBand, puzzlesInGameScope]);
+
+  const effectivePuzzleDifficultyFilter: "all" | "at_level" | "stretch" =
+    hasDifficultySplitInScope ? puzzleDifficultyFilter : "all";
+
   const filteredOrderedUserPuzzles = useMemo(
     () =>
       puzzlesInGameScope.filter((puzzle) => {
         if (
           effectivePuzzleKindFilter !== "all" &&
           puzzle.puzzleKind !== effectivePuzzleKindFilter
+        ) {
+          return false;
+        }
+        if (
+          effectivePuzzleDifficultyFilter === "at_level" &&
+          !isPuzzleWithinReviewBand(puzzle)
+        ) {
+          return false;
+        }
+        if (
+          effectivePuzzleDifficultyFilter === "stretch" &&
+          isPuzzleWithinReviewBand(puzzle)
         ) {
           return false;
         }
@@ -398,7 +448,13 @@ export function GamesHubScreen({
         }
         return true;
       }),
-    [effectivePuzzleKindFilter, effectivePuzzleThemeFilter, puzzlesInGameScope]
+    [
+      effectivePuzzleDifficultyFilter,
+      effectivePuzzleKindFilter,
+      effectivePuzzleThemeFilter,
+      isPuzzleWithinReviewBand,
+      puzzlesInGameScope
+    ]
   );
 
   const filteredArrowDuelPuzzles = useMemo(
@@ -446,6 +502,7 @@ export function GamesHubScreen({
     setVisiblePuzzlesLimit(PUZZLES_PAGE_SIZE);
   }, [
     effectiveAccountFilter,
+    effectivePuzzleDifficultyFilter,
     effectivePuzzleKindFilter,
     effectivePuzzleThemeFilter,
     effectiveTimeClassFilter
@@ -456,6 +513,7 @@ export function GamesHubScreen({
     statusFilter !== "all" ||
     effectiveTimeClassFilter !== "all" ||
     effectivePuzzleKindFilter !== "all" ||
+    effectivePuzzleDifficultyFilter !== "all" ||
     effectivePuzzleThemeFilter !== "all";
 
   const resetAllFilters = useCallback((): void => {
@@ -463,6 +521,7 @@ export function GamesHubScreen({
     setStatusFilter("all");
     setTimeClassFilter("all");
     setPuzzleKindFilter("all");
+    setPuzzleDifficultyFilter("all");
     setPuzzleThemeFilter("all");
     setVisibleGamesLimit(GAMES_PAGE_SIZE);
     setVisiblePuzzlesLimit(PUZZLES_PAGE_SIZE);
@@ -740,22 +799,6 @@ export function GamesHubScreen({
     [refreshHub, service]
   );
 
-  const isPuzzleWithinReviewBand = useCallback(
-    (puzzle: StoredUserPuzzle): boolean => {
-      if (!puzzle.ratingSource || puzzle.ratingSource === "game_anchor") {
-        return true;
-      }
-      const sourceGame = snapshot.gameById.get(puzzle.gameId);
-      const userRating = sourceGame
-        ? sourceGame.userColor === "w"
-          ? sourceGame.white.rating
-          : sourceGame.black.rating
-        : undefined;
-      return isWithinReviewDifficultyBand(puzzle.rating, userRating);
-    },
-    [snapshot.gameById]
-  );
-
   const handleAddAllUserPuzzlesToReview = useCallback(
     (puzzles: readonly StoredUserPuzzle[]): void => {
       let changed = false;
@@ -1031,6 +1074,32 @@ export function GamesHubScreen({
                 />
               </View>
             ) : null}
+            {effectiveHubView === "puzzles" && hasDifficultySplitInScope ? (
+              <View
+                accessibilityLabel={t("games.filter.difficultyA11y")}
+                style={styles.filterRow}
+                testID="games-puzzle-difficulty-filters"
+              >
+                <FilterButton
+                  active={effectivePuzzleDifficultyFilter === "all"}
+                  label={t("games.filter.all")}
+                  testID="games-filter-puzzle-difficulty-all"
+                  onPress={() => setPuzzleDifficultyFilter("all")}
+                />
+                <FilterButton
+                  active={effectivePuzzleDifficultyFilter === "at_level"}
+                  label={t("games.filter.atMyLevel")}
+                  testID="games-filter-puzzle-difficulty-at_level"
+                  onPress={() => setPuzzleDifficultyFilter("at_level")}
+                />
+                <FilterButton
+                  active={effectivePuzzleDifficultyFilter === "stretch"}
+                  label={t("games.filter.stretch")}
+                  testID="games-filter-puzzle-difficulty-stretch"
+                  onPress={() => setPuzzleDifficultyFilter("stretch")}
+                />
+              </View>
+            ) : null}
             {effectiveHubView === "puzzles" && availablePuzzleThemes.length > 0 ? (
               <ScrollView
                 accessibilityLabel={t("games.filter.themeA11y")}
@@ -1107,6 +1176,7 @@ export function GamesHubScreen({
                         if (
                           effectiveAccountFilter !== "all" ||
                           effectivePuzzleKindFilter !== "all" ||
+                          effectivePuzzleDifficultyFilter !== "all" ||
                           effectivePuzzleThemeFilter !== "all"
                         ) {
                           onPracticeMyGamePuzzles({
@@ -1136,6 +1206,7 @@ export function GamesHubScreen({
                           onPress={() => {
                             if (
                               effectiveAccountFilter !== "all" ||
+                              effectivePuzzleDifficultyFilter !== "all" ||
                               effectivePuzzleThemeFilter !== "all"
                             ) {
                               onPracticeMyGamePuzzles({
@@ -1160,6 +1231,7 @@ export function GamesHubScreen({
                           onPress={() => {
                             if (
                               effectiveAccountFilter !== "all" ||
+                              effectivePuzzleDifficultyFilter !== "all" ||
                               effectivePuzzleThemeFilter !== "all"
                             ) {
                               onPracticeMyGamePuzzles({

@@ -1,0 +1,47 @@
+{
+  "id": "maia2-rapid-int8",
+  "version": 1,
+  "upstream": {
+    "project": "Maia-2",
+    "modelType": "rapid",
+    "license": "MIT",
+    "source": "https://github.com/CSSLab/maia2"
+  },
+  "eloCategories": {
+    "<1100": 0,
+    "1100-1199": 1,
+    "1200-1299": 2,
+    "1300-1399": 3,
+    "1400-1499": 4,
+    "1500-1599": 5,
+    "1600-1699": 6,
+    "1700-1799": 7,
+    "1800-1899": 8,
+    "1900-1999": 9,
+    ">=2000": 10
+  },
+  "vocabSize": 1880,
+  "vocabSha256": "sha256:51c2e0b27cee55239b32cb3ab1dfae202a649ed7f6e990d153594653eb05c72b",
+  "artifacts": {
+    "onnxInt8": {
+      "filename": "maia2-rapid-int8.onnx",
+      "bytes": 21323309,
+      "sha256": "sha256:f856bf5864aa34fc3a0e0d2c8d5f7240b0856248e2b4ef0860097fee880b0ec5"
+    },
+    "coremlInt8Zip": {
+      "filename": "maia2-rapid-int8.mlmodelc.zip",
+      "bytes": 18214641,
+      "sha256": "sha256:c743b5ba7107d8a13f31d15a250ad14ae4324968e7fd14388fd46cd1c896551c",
+      "weightBinBytes": 21178544,
+      "weightBinSha256": "sha256:5dd3b6dd385f1f826f5f5e5d72de06e78ff47a83d731f8b5c79859c21c701b07",
+      "bundleDirName": "maia2-rapid-int8.mlmodelc"
+    }
+  },
+  "parity": {
+    "samplePositions": 10,
+    "maxProbDiffOnnxVsFp32": 0.12644,
+    "maxProbDiffCoremlVsFp32": 0.05532,
+    "maxProbDiffOnnxVsCoreml": 0.11598
+  },
+  "elapsedSeconds": 6.61
+}

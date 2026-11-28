@@ -37,6 +37,7 @@
     "optimize:offline-puzzles": "node --experimental-strip-types scripts/optimize-offline-puzzle-pack.mjs",
     "encode:offline-puzzles": "node --experimental-strip-types scripts/encode-offline-puzzle-pack.mjs",
     "update:offline-puzzle-presolve": "node --experimental-strip-types scripts/update-offline-puzzle-pack-presolve.mjs",
+    "fetch:maia2-model": "node scripts/fetch-maia2-model.mjs",
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",
     "mobile:ios": "pnpm --filter ChessticizeMobile ios",
