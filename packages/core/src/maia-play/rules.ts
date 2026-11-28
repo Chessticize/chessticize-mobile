@@ -472,9 +472,7 @@ export function createMaiaGameState(input: {
       : prefs.colorPreference;
 
   const userRatingBefore = Math.max(RATING_FLOOR, Math.round(input.userRating));
-  const maiaRating = prefs.rated
-    ? userRatingBefore
-    : clampMaiaOpponentRating(prefs.opponentRating);
+  const maiaRating = clampMaiaOpponentRating(prefs.opponentRating);
 
   const clocksMs: MaiaGameClocksMs | null = prefs.timeControl.unlimited
     ? null

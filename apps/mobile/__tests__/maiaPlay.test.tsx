@@ -87,16 +87,17 @@ describe("Play with Maia UI", () => {
       unlimited: false
     });
 
-    // In Rated mode, opponent rating stepper is hidden; in Unrated mode, stepper unlocks
-    expect(queryByTestId(renderer.root, "maia-opponent-rating-stepper")).toBeNull();
-    await act(async () => {
-      findByTestId(renderer.root, "maia-mode-unrated").props.onPress();
-    });
+    // Rating cards strip is removed; Maia rating stepper is available in both Rated and Unrated modes
+    expect(queryByTestId(renderer.root, "maia-rating-strip")).toBeNull();
     expect(queryByTestId(renderer.root, "maia-opponent-rating-stepper")).not.toBeNull();
     await act(async () => {
       findByTestId(renderer.root, "maia-opponent-rating-inc").props.onPress();
     });
     expect(service.getMaiaSetupPreferences().opponentRating).toBe(1300);
+    await act(async () => {
+      findByTestId(renderer.root, "maia-mode-unrated").props.onPress();
+    });
+    expect(queryByTestId(renderer.root, "maia-opponent-rating-stepper")).not.toBeNull();
 
     // Switch back to Rated, pick White, pick Human-like pace, and start game
     await act(async () => {
@@ -107,6 +108,9 @@ describe("Play with Maia UI", () => {
     await act(async () => {
       findByTestId(renderer.root, "maia-start-game").props.onPress();
     });
+
+    // Live game uses the chosen custom Maia rating even in Rated mode
+    expect(service.getActiveMaiaGame()?.maiaRating).toBe(1300);
 
     // Live game view renders board, Abort (before 2 plies), and no Undo button
     expect(queryByTestId(renderer.root, "maia-play-game")).not.toBeNull();
