@@ -273,6 +273,13 @@ describe("GamesHubScreen", () => {
     changeText(renderer, "games-import-username-input", "alice");
     await pressAsync(renderer, "games-import-link-submit");
 
+    // Modal stays open after Link & Sync so users can add multiple accounts, and clears the username input.
+    expect(hasTestID(renderer, "games-import-modal")).toBe(true);
+    expect(findByTestID(renderer, "games-import-username-input").props.value).toBe("");
+    expect(hasTestID(renderer, "games-import-status")).toBe(true);
+    press(renderer, "games-import-close");
+    expect(hasTestID(renderer, "games-import-modal")).toBe(false);
+
     expect(requests.length).toBe(2);
     expect(hasTestID(renderer, "games-empty-state")).toBe(false);
     expect(hasTestID(renderer, "games-list")).toBe(true);

@@ -257,4 +257,54 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
     expect(findByTestID(renderer.root, "game-review-screen")).not.toBeNull();
     act(() => renderer.unmount());
   });
+
+  test("exiting a My Game Puzzle returns to Puzzles sub-tab when launched from Puzzles and to Practice Home when launched from Practice Home", () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    const game = makeDraft(1, "blitz");
+    service.upsertImportedGames([game]);
+    service.saveGamePlyEvaluations(game.id, [], {
+      analysisStatus: "complete",
+      analysisCheckpointPly: 4,
+      whiteAccuracy: 71,
+      blackAccuracy: 90
+    });
+    const storedPuzzles = service.replaceGameUserPuzzles(game.id, [makeArrowDuelPuzzle(1)], {
+      opponentName: "Rival1",
+      timeClass: "blitz"
+    });
+
+    const capabilities = createTestMobilePlatformCapabilities({ practiceService: service });
+    const renderer = renderWithTheme(<PracticePocScreen platformCapabilities={capabilities} />);
+
+    // 1. Launch from Practice Home -> exit Replay -> returns to Practice Home.
+    act(() => {
+      findByTestID(renderer.root, "practice-home-my-game-puzzles")!.props.onPress();
+    });
+    expect(findByTestID(renderer.root, "review-exit")).not.toBeNull();
+    act(() => {
+      findByTestID(renderer.root, "review-exit")!.props.onPress();
+    });
+    expect(findByTestID(renderer.root, "practice-home-my-game-puzzles")).not.toBeNull();
+
+    // 2. Navigate to Games tab -> switch to Puzzles sub-tab -> open puzzle -> exit Replay -> stays on Puzzles sub-tab.
+    act(() => {
+      findByTestID(renderer.root, "games-tab")!.props.onPress();
+    });
+    act(() => {
+      findByTestID(renderer.root, "games-hub-view-puzzles")!.props.onPress();
+    });
+    expect(findByTestID(renderer.root, "games-puzzles-view")).not.toBeNull();
+
+    act(() => {
+      findByTestID(renderer.root, `games-puzzle-play-${storedPuzzles[0]!.id}`)!.props.onPress();
+    });
+    expect(findByTestID(renderer.root, "review-exit")).not.toBeNull();
+
+    act(() => {
+      findByTestID(renderer.root, "review-exit")!.props.onPress();
+    });
+    expect(findByTestID(renderer.root, "games-puzzles-view")).not.toBeNull();
+    act(() => renderer.unmount());
+  });
 });

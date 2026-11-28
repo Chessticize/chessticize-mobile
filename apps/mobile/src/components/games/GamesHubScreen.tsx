@@ -89,6 +89,8 @@ export interface GamesHubScreenProps {
   nowMs?: number;
   onOpenGameReview: (gameId: string) => void;
   onPracticeMyGamePuzzles?: (options?: MyGamePuzzlesLaunchOptions) => void;
+  hubView?: "games" | "puzzles";
+  onHubViewChange?: (view: "games" | "puzzles") => void;
   importModalVisible?: boolean;
   onImportModalVisibleChange?: (visible: boolean) => void;
   initialImportTab?: GamesImportTab;
@@ -107,6 +109,8 @@ export function GamesHubScreen({
   nowMs = Date.now(),
   onOpenGameReview,
   onPracticeMyGamePuzzles,
+  hubView: controlledHubView,
+  onHubViewChange,
   importModalVisible,
   onImportModalVisibleChange,
   initialImportTab = "chess_com",
@@ -120,7 +124,18 @@ export function GamesHubScreen({
   const { locale, t } = useTranslation();
 
   const [revision, setRevision] = useState(0);
-  const [hubView, setHubView] = useState<"games" | "puzzles">("games");
+  const [internalHubView, setInternalHubView] = useState<"games" | "puzzles">("games");
+  const hubView = controlledHubView ?? internalHubView;
+  const setHubView = useCallback(
+    (next: "games" | "puzzles"): void => {
+      if (onHubViewChange) {
+        onHubViewChange(next);
+      } else {
+        setInternalHubView(next);
+      }
+    },
+    [onHubViewChange]
+  );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
@@ -569,7 +584,7 @@ export function GamesHubScreen({
       platform: LinkedGameAccountPlatform;
       username: string;
       maxGames: number;
-    }): Promise<void> => {
+    }): Promise<boolean> => {
       setSyncing(true);
       setModalError(null);
       setModalStatus(null);
@@ -584,15 +599,16 @@ export function GamesHubScreen({
               })
             : t("games.import.summary", { count: result.inserted })
         );
-        setModalOpen(false);
+        return true;
       } catch (error) {
         const message = gameImportErrorMessage(error, locale);
         setModalError(message);
+        return false;
       } finally {
         setSyncing(false);
       }
     },
-    [locale, setModalOpen, syncAccount, t]
+    [locale, syncAccount, t]
   );
 
   const handleSyncAllLinked = useCallback(async (): Promise<void> => {

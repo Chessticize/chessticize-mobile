@@ -988,10 +988,12 @@ export function PracticePocScreen({
   } | null>(null);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [gamesImportModalOpen, setGamesImportModalOpen] = useState(false);
+  const [gamesHubView, setGamesHubView] = useState<"games" | "puzzles">("games");
   const [activeGameReviewId, setActiveGameReviewId] = useState<string | null>(null);
   const [activeGameReviewInitialPly, setActiveGameReviewInitialPly] = useState<number | null>(null);
   const [gamePracticeEntries, setGamePracticeEntries] = useState<ReviewEntry[]>([]);
   const [gamePracticeInitialIndex, setGamePracticeInitialIndex] = useState<number>(0);
+  const gamePracticeReturnTabRef = useRef<Tab>("games");
   const gameReviewArbiterRef = useRef<UciEngineArbiter | null>(null);
   useEffect(() => {
     return () => {
@@ -1068,6 +1070,7 @@ export function PracticePocScreen({
       0,
       Math.min(options?.initialIndex ?? 0, entries.length - 1)
     );
+    gamePracticeReturnTabRef.current = tab;
     setGamePracticeInitialIndex(clampedIndex);
     setGamePracticeEntries(entries);
     setTab("games");
@@ -5746,6 +5749,7 @@ export function PracticePocScreen({
                   onBoardTouchActiveChange={setReviewBoardTouchActive}
                   onComplete={() => {
                     setGamePracticeEntries([]);
+                    setTab(gamePracticeReturnTabRef.current);
                     refreshState();
                   }}
                   onOpenSourceGame={(gameId, gamePly) => {
@@ -5757,6 +5761,7 @@ export function PracticePocScreen({
                   onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => {
                     setGamePracticeEntries([]);
+                    setTab(gamePracticeReturnTabRef.current);
                     refreshState();
                   }}
                   replayTerminology
@@ -5768,10 +5773,12 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   analysisEngine={tab === "games" ? getSharedGameReviewArbiter() : null}
                   autoSyncOnMount
+                  hubView={gamesHubView}
                   importModalVisible={gamesImportModalOpen}
                   nowMs={nowMs}
                   service={service}
                   stockfish={stockfish}
+                  onHubViewChange={setGamesHubView}
                   onImportModalVisibleChange={setGamesImportModalOpen}
                   onOpenGameReview={(gameId) => {
                     if (onOpenGameReview) {
