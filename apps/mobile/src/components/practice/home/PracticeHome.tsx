@@ -11,7 +11,16 @@ import {
   View
 } from "react-native";
 import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
-import { defaultSprintConfig, type SprintConfig, type SprintMode, type SprintState } from "../../../../../../packages/core/src/index.ts";
+import {
+  defaultSprintConfig,
+  type MaiaGameState,
+  type MaiaRatingRecord,
+  type MaiaSetupPreferences,
+  type SprintConfig,
+  type SprintMode,
+  type SprintState
+} from "../../../../../../packages/core/src/index.ts";
+import { MaiaPlayHomeCard } from "../../maiaPlay/MaiaPlayHomeCard.tsx";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import { TITLE_MAX_FONT_SCALE } from "../../../theme/scales.ts";
@@ -78,6 +87,7 @@ export function PracticeHome({
   mode,
   modes,
   currentRating,
+  maiaPlay,
   personalBestChallenge,
   progress,
   runManagement,
@@ -86,6 +96,7 @@ export function PracticeHome({
   tacticalProfile,
   resumableSprint,
   onDismissSprintRulesGuide,
+  onOpenMaiaPlay,
   onOpenPersonalBestHub,
   onOpenSprintRulesGuide,
   onSelectMode,
@@ -99,6 +110,11 @@ export function PracticeHome({
   mode: SprintMode;
   modes: PracticeModeSummary[];
   currentRating: number;
+  maiaPlay?: {
+    activeGame?: MaiaGameState | null;
+    preferences: MaiaSetupPreferences;
+    rating: MaiaRatingRecord;
+  };
   personalBestChallenge?: PersonalBestChallengeDesignPreview;
   progress: PracticeProgressSummary;
   runManagement?: PracticeRunManagementPresentation;
@@ -107,6 +123,7 @@ export function PracticeHome({
   tacticalProfile?: TacticalProfilePresentation;
   resumableSprint: SprintState | null;
   onDismissSprintRulesGuide: () => void;
+  onOpenMaiaPlay?: () => void;
   onOpenPersonalBestHub: (run?: PersonalBestPausedRunPresentation) => void;
   onOpenSprintRulesGuide: () => void;
   onSelectMode: (next: SprintMode) => void;
@@ -199,6 +216,15 @@ export function PracticeHome({
             <PersonalBestHomeCard
               presentation={personalBestChallenge}
               onOpenHub={onOpenPersonalBestHub}
+            />
+          ) : null}
+
+          {maiaPlay && onOpenMaiaPlay ? (
+            <MaiaPlayHomeCard
+              activeGame={maiaPlay.activeGame}
+              preferences={maiaPlay.preferences}
+              rating={maiaPlay.rating}
+              onOpen={onOpenMaiaPlay}
             />
           ) : null}
 

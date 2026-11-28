@@ -5,12 +5,14 @@ import {
   clonePracticeRun,
   buildSessionMistakeReview,
   createDefaultRating,
+  DEFAULT_MAIA_SETUP_PREFERENCES,
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultPuzzleTimingPolicy,
   effectivePuzzleRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   isUserGamePuzzleId,
+  normalizeMaiaSetupPreferences,
   normalizeThemeSelection,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
@@ -49,6 +51,10 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   UserGamePuzzleRatingSource,
   MoveClassification,
   Puzzle,
@@ -504,7 +510,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 29;
+export const CURRENT_SCHEMA_VERSION = 30;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -542,7 +548,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 25, to: 26, apply: migrateV25ToV26 },
   { from: 26, to: 27, apply: migrateV26ToV27 },
   { from: 27, to: 28, apply: migrateV27ToV28 },
-  { from: 28, to: 29, apply: migrateV28ToV29 }
+  { from: 28, to: 29, apply: migrateV28ToV29 },
+  { from: 29, to: 30, apply: migrateV29ToV30 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -584,29 +591,38 @@ export class SyncSQLiteStore implements PracticeStore {
       hasCurrentSettingsColumns(this.db) &&
       hasProgressV2Schema(this.db) &&
       hasSurvivalSchema(this.db) &&
-      hasGameReviewSchema(this.db)
+      hasGameReviewSchema(this.db) &&
+      hasMaiaPlaySchema(this.db)
     ) {
       return;
     }
 
-    this.transaction(() => {
-      let version = startingVersion;
-      while (version < CURRENT_SCHEMA_VERSION) {
-        const migration = SQLITE_MIGRATIONS.find((candidate) => candidate.from === version);
-        if (!migration || migration.to !== version + 1 || migration.to > CURRENT_SCHEMA_VERSION) {
-          throw new Error(`No SQLite migration is registered from schema version ${version}`);
+    // Disable FK enforcement during schema rebuilds (e.g., v30 imported_games CHECK widening)
+    // so parent table swaps never cascade-delete child evals/puzzles, then re-verify immediately.
+    this.db.exec("PRAGMA foreign_keys = OFF");
+    try {
+      this.transaction(() => {
+        let version = startingVersion;
+        while (version < CURRENT_SCHEMA_VERSION) {
+          const migration = SQLITE_MIGRATIONS.find((candidate) => candidate.from === version);
+          if (!migration || migration.to !== version + 1 || migration.to > CURRENT_SCHEMA_VERSION) {
+            throw new Error(`No SQLite migration is registered from schema version ${version}`);
+          }
+          migration.apply(this.db);
+          assertForeignKeyIntegrity(this.db);
+          setSchemaVersion(this.db, migration.to);
+          version = migration.to;
         }
-        migration.apply(this.db);
+        if (version !== CURRENT_SCHEMA_VERSION) {
+          throw new Error(`SQLite migration stopped at schema version ${version}`);
+        }
+        repairKnownSchemaDrift(this.db);
         assertForeignKeyIntegrity(this.db);
-        setSchemaVersion(this.db, migration.to);
-        version = migration.to;
-      }
-      if (version !== CURRENT_SCHEMA_VERSION) {
-        throw new Error(`SQLite migration stopped at schema version ${version}`);
-      }
-      repairKnownSchemaDrift(this.db);
-      assertForeignKeyIntegrity(this.db);
-    });
+      });
+    } finally {
+      this.db.exec("PRAGMA foreign_keys = ON");
+    }
+    assertForeignKeyIntegrity(this.db);
   }
 
   transaction<T>(work: () => T): T {
@@ -2859,6 +2875,185 @@ export class SyncSQLiteStore implements PracticeStore {
       .run(boolToInt(archived), puzzleId);
   }
 
+  getMaiaRating(timeClass: MaiaTimeClass): MaiaRatingRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT time_class, rating, rating_deviation, volatility, games, wins, losses, draws, updated_at
+         FROM maia_ratings
+         WHERE time_class = ?`
+      )
+      .get(timeClass) as
+      | {
+          time_class: MaiaTimeClass;
+          rating: number;
+          rating_deviation: number;
+          volatility: number;
+          games: number;
+          wins: number;
+          losses: number;
+          draws: number;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      timeClass: row.time_class,
+      rating: row.rating,
+      ratingDeviation: row.rating_deviation,
+      volatility: row.volatility,
+      games: row.games,
+      wins: row.wins,
+      losses: row.losses,
+      draws: row.draws,
+      updatedAt: row.updated_at
+    };
+  }
+
+  listMaiaRatings(): MaiaRatingRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT time_class, rating, rating_deviation, volatility, games, wins, losses, draws, updated_at
+         FROM maia_ratings
+         ORDER BY time_class ASC`
+      )
+      .all() as Array<{
+      time_class: MaiaTimeClass;
+      rating: number;
+      rating_deviation: number;
+      volatility: number;
+      games: number;
+      wins: number;
+      losses: number;
+      draws: number;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      timeClass: row.time_class,
+      rating: row.rating,
+      ratingDeviation: row.rating_deviation,
+      volatility: row.volatility,
+      games: row.games,
+      wins: row.wins,
+      losses: row.losses,
+      draws: row.draws,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  saveMaiaRating(record: MaiaRatingRecord): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_ratings (
+          time_class,
+          rating,
+          rating_deviation,
+          volatility,
+          games,
+          wins,
+          losses,
+          draws,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        record.timeClass,
+        Math.round(record.rating),
+        record.ratingDeviation,
+        record.volatility,
+        record.games,
+        record.wins,
+        record.losses,
+        record.draws,
+        record.updatedAt
+      );
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    const row = this.db
+      .prepare(
+        `SELECT time_control_json, rated, opponent_rating, color_preference, thinking_pace
+         FROM maia_preferences
+         WHERE singleton_id = 1`
+      )
+      .get() as
+      | {
+          time_control_json: string;
+          rated: number;
+          opponent_rating: number;
+          color_preference: string;
+          thinking_pace: string;
+        }
+      | undefined;
+    if (!row) {
+      return normalizeMaiaSetupPreferences(DEFAULT_MAIA_SETUP_PREFERENCES);
+    }
+    try {
+      const parsedTimeControl = JSON.parse(row.time_control_json) as MaiaSetupPreferences["timeControl"];
+      return normalizeMaiaSetupPreferences({
+        timeControl: parsedTimeControl,
+        rated: row.rated !== 0,
+        opponentRating: row.opponent_rating,
+        colorPreference: row.color_preference as MaiaSetupPreferences["colorPreference"],
+        thinkingPace: row.thinking_pace as MaiaSetupPreferences["thinkingPace"]
+      });
+    } catch {
+      return normalizeMaiaSetupPreferences(DEFAULT_MAIA_SETUP_PREFERENCES);
+    }
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    const normalized = normalizeMaiaSetupPreferences(preferences);
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_preferences (
+          singleton_id,
+          time_control_json,
+          rated,
+          opponent_rating,
+          color_preference,
+          thinking_pace,
+          updated_at
+        ) VALUES (1, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        JSON.stringify(normalized.timeControl),
+        boolToInt(normalized.rated),
+        normalized.opponentRating,
+        normalized.colorPreference,
+        normalized.thinkingPace,
+        new Date().toISOString()
+      );
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    const row = this.db
+      .prepare("SELECT state_json FROM maia_active_game WHERE singleton_id = 1")
+      .get() as { state_json: string } | undefined;
+    if (!row?.state_json) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(row.state_json) as MaiaGameState;
+    } catch {
+      return undefined;
+    }
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_active_game (singleton_id, state_json, updated_at)
+         VALUES (1, ?, ?)`
+      )
+      .run(JSON.stringify(state), new Date().toISOString());
+  }
+
+  clearActiveMaiaGame(): void {
+    this.db.prepare("DELETE FROM maia_active_game WHERE singleton_id = 1").run();
+  }
+
   private deleteUnreferencedUserPuzzleCacheRow(puzzleId: string): void {
     const referenced = this.db
       .prepare(
@@ -3985,6 +4180,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV26ToV27(db);
   migrateV27ToV28(db);
   migrateV28ToV29(db);
+  migrateV29ToV30(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -4034,6 +4230,20 @@ function hasGameReviewSchema(db: SyncSqliteDatabase): boolean {
     hasTable(db, "game_ply_evals") &&
     hasTable(db, "user_puzzles") &&
     hasColumn(db, "user_puzzles", "rating_source");
+}
+
+function importedGamesAllowsMaiaPlatform(db: SyncSqliteDatabase): boolean {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'imported_games'")
+    .get() as { sql?: string } | undefined;
+  return typeof row?.sql === "string" && row.sql.includes("'maia'");
+}
+
+function hasMaiaPlaySchema(db: SyncSqliteDatabase): boolean {
+  return hasTable(db, "maia_ratings") &&
+    hasTable(db, "maia_preferences") &&
+    hasTable(db, "maia_active_game") &&
+    importedGamesAllowsMaiaPlatform(db);
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -4902,7 +5112,7 @@ function migrateV26ToV27(db: SyncSqliteDatabase): void {
 
     CREATE TABLE IF NOT EXISTS imported_games (
       id TEXT PRIMARY KEY,
-      platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn')),
+      platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn', 'maia')),
       username TEXT NOT NULL,
       user_color TEXT NOT NULL CHECK (user_color IN ('w', 'b')),
       played_at TEXT NOT NULL,
@@ -5156,6 +5366,121 @@ function migrateV28ToV29(db: SyncSqliteDatabase): void {
     "ALTER TABLE app_settings ADD COLUMN game_review_auto_add_recommended INTEGER NOT NULL DEFAULT 0 " +
       "CHECK (game_review_auto_add_recommended IN (0, 1))"
   );
+}
+
+// Local Play-with-Maia persistence (independent blitz/rapid/classical Glicko-2 ratings,
+// remembered setup preferences, resumable active game, and widening imported_games.platform
+// CHECK to include 'maia' without touching ProgressV2 sync).
+function migrateV29ToV30(db: SyncSqliteDatabase): void {
+  if (hasTable(db, "imported_games") && !importedGamesAllowsMaiaPlatform(db)) {
+    const existingCount = countRows(db, "imported_games");
+    db.exec(`
+      CREATE TABLE imported_games_v30 (
+        id TEXT PRIMARY KEY,
+        platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn', 'maia')),
+        username TEXT NOT NULL,
+        user_color TEXT NOT NULL CHECK (user_color IN ('w', 'b')),
+        played_at TEXT NOT NULL,
+        time_control TEXT NOT NULL,
+        time_class TEXT NOT NULL,
+        rated INTEGER NOT NULL CHECK (rated IN (0, 1)),
+        url TEXT,
+        white_username TEXT NOT NULL,
+        white_rating INTEGER,
+        white_is_ai INTEGER NOT NULL DEFAULT 0 CHECK (white_is_ai IN (0, 1)),
+        black_username TEXT NOT NULL,
+        black_rating INTEGER,
+        black_is_ai INTEGER NOT NULL DEFAULT 0 CHECK (black_is_ai IN (0, 1)),
+        winner TEXT NOT NULL CHECK (winner IN ('w', 'b', 'none')),
+        termination TEXT NOT NULL,
+        eco TEXT,
+        opening TEXT,
+        pgn TEXT NOT NULL,
+        analysis_status TEXT NOT NULL DEFAULT 'none'
+          CHECK (analysis_status IN ('none', 'partial', 'pass1_done', 'complete')),
+        analysis_checkpoint_ply INTEGER NOT NULL DEFAULT 0 CHECK (analysis_checkpoint_ply >= 0),
+        white_accuracy REAL,
+        black_accuracy REAL,
+        puzzle_count INTEGER NOT NULL DEFAULT 0 CHECK (puzzle_count >= 0),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO imported_games_v30 (
+        id, platform, username, user_color, played_at, time_control, time_class, rated, url,
+        white_username, white_rating, white_is_ai, black_username, black_rating, black_is_ai,
+        winner, termination, eco, opening, pgn, analysis_status, analysis_checkpoint_ply,
+        white_accuracy, black_accuracy, puzzle_count, created_at, updated_at
+      )
+      SELECT
+        id, platform, username, user_color, played_at, time_control, time_class, rated, url,
+        white_username, white_rating, white_is_ai, black_username, black_rating, black_is_ai,
+        winner, termination, eco, opening, pgn, analysis_status, analysis_checkpoint_ply,
+        white_accuracy, black_accuracy, puzzle_count, created_at, updated_at
+      FROM imported_games;
+    `);
+    if (countRows(db, "imported_games_v30") !== existingCount) {
+      throw new Error("SQLite v30 imported_games rebuild changed the row count");
+    }
+    db.exec(`
+      DROP TABLE imported_games;
+      ALTER TABLE imported_games_v30 RENAME TO imported_games;
+
+      CREATE INDEX IF NOT EXISTS imported_games_played_at_idx
+        ON imported_games(played_at DESC, id DESC);
+
+      CREATE INDEX IF NOT EXISTS imported_games_platform_time_status_idx
+        ON imported_games(platform, time_class, analysis_status, played_at DESC);
+    `);
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS maia_ratings (
+      time_class TEXT PRIMARY KEY CHECK (time_class IN ('blitz', 'rapid', 'classical')),
+      rating INTEGER NOT NULL CHECK (rating >= 600),
+      rating_deviation REAL NOT NULL DEFAULT 350,
+      volatility REAL NOT NULL DEFAULT 0.06,
+      games INTEGER NOT NULL DEFAULT 0 CHECK (games >= 0),
+      wins INTEGER NOT NULL DEFAULT 0 CHECK (wins >= 0),
+      losses INTEGER NOT NULL DEFAULT 0 CHECK (losses >= 0),
+      draws INTEGER NOT NULL DEFAULT 0 CHECK (draws >= 0),
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS maia_preferences (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      time_control_json TEXT NOT NULL,
+      rated INTEGER NOT NULL DEFAULT 1 CHECK (rated IN (0, 1)),
+      opponent_rating INTEGER NOT NULL DEFAULT 1200 CHECK (opponent_rating >= 600),
+      color_preference TEXT NOT NULL DEFAULT 'random' CHECK (color_preference IN ('random', 'w', 'b')),
+      thinking_pace TEXT NOT NULL DEFAULT 'human' CHECK (thinking_pace IN ('human', 'instant')),
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT OR IGNORE INTO maia_preferences (
+      singleton_id,
+      time_control_json,
+      rated,
+      opponent_rating,
+      color_preference,
+      thinking_pace,
+      updated_at
+    ) VALUES (
+      1,
+      '{"initialMinutes":10,"incrementSeconds":0,"unlimited":false}',
+      1,
+      1200,
+      'random',
+      'human',
+      '1970-01-01T00:00:00.000Z'
+    );
+
+    CREATE TABLE IF NOT EXISTS maia_active_game (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      state_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
 }
 
 function migrateV21ToV22(db: SyncSqliteDatabase): void {

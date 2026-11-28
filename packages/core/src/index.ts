@@ -203,3 +203,4 @@ export * from "./app-review-request.ts";
 export * from "./survival.ts";
 export * from "./whats-new.ts";
 export * from "./locale.ts";
+export * from "./maia-play/index.ts";

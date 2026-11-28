@@ -8,6 +8,10 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   Puzzle,
   PracticeRunRecord,
   RatingRecord,
@@ -495,6 +499,38 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
     this.userStore.archiveUserPuzzle(puzzleId, archived);
+  }
+
+  getMaiaRating(timeClass: MaiaTimeClass): MaiaRatingRecord | undefined {
+    return this.userStore.getMaiaRating(timeClass);
+  }
+
+  listMaiaRatings(): MaiaRatingRecord[] {
+    return this.userStore.listMaiaRatings();
+  }
+
+  saveMaiaRating(record: MaiaRatingRecord): void {
+    this.userStore.saveMaiaRating(record);
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    return this.userStore.getMaiaSetupPreferences();
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    this.userStore.saveMaiaSetupPreferences(preferences);
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    return this.userStore.getActiveMaiaGame();
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.userStore.saveActiveMaiaGame(state);
+  }
+
+  clearActiveMaiaGame(): void {
+    this.userStore.clearActiveMaiaGame();
   }
 }
 

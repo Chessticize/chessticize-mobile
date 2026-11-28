@@ -3,12 +3,14 @@ import {
   curatedPuzzleThemes,
   clonePracticeRun,
   createDefaultRating,
+  DEFAULT_MAIA_SETUP_PREFERENCES,
   defaultPracticeRuns,
   defaultSprintConfig,
   effectivePuzzleRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   isUserGamePuzzleId,
+  normalizeMaiaSetupPreferences,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
   namedThemesForSelection,
@@ -38,6 +40,10 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   Puzzle,
   PracticeRunRecord,
   RatingRecord,
@@ -131,6 +137,11 @@ export class MemoryStore implements PracticeStore {
   private readonly importedGames = new Map<string, StoredImportedGame>();
   private readonly gamePlyEvals = new Map<string, Map<number, StoredGamePlyEval>>();
   private readonly userPuzzles = new Map<string, StoredUserPuzzle>();
+  private readonly maiaRatings = new Map<MaiaTimeClass, MaiaRatingRecord>();
+  private maiaSetupPreferences: MaiaSetupPreferences = normalizeMaiaSetupPreferences(
+    DEFAULT_MAIA_SETUP_PREFERENCES
+  );
+  private activeMaiaGame: MaiaGameState | undefined;
   private settings = defaultPracticeSettings();
   private appReviewRequestAttempt: AppReviewRequestAttempt | undefined;
   private tacticalProfileSourceRevision = 0;
@@ -1346,6 +1357,46 @@ export class MemoryStore implements PracticeStore {
       return;
     }
     this.userPuzzles.set(puzzleId, { ...existing, archived });
+  }
+
+  getMaiaRating(timeClass: MaiaTimeClass): MaiaRatingRecord | undefined {
+    const existing = this.maiaRatings.get(timeClass);
+    return existing ? { ...existing } : undefined;
+  }
+
+  listMaiaRatings(): MaiaRatingRecord[] {
+    return [...this.maiaRatings.values()].map((record) => ({ ...record }));
+  }
+
+  saveMaiaRating(record: MaiaRatingRecord): void {
+    this.maiaRatings.set(record.timeClass, { ...record });
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    return {
+      ...this.maiaSetupPreferences,
+      timeControl: { ...this.maiaSetupPreferences.timeControl }
+    };
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    const normalized = normalizeMaiaSetupPreferences(preferences);
+    this.maiaSetupPreferences = {
+      ...normalized,
+      timeControl: { ...normalized.timeControl }
+    };
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    return this.activeMaiaGame ? JSON.parse(JSON.stringify(this.activeMaiaGame)) as MaiaGameState : undefined;
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.activeMaiaGame = JSON.parse(JSON.stringify(state)) as MaiaGameState;
+  }
+
+  clearActiveMaiaGame(): void {
+    this.activeMaiaGame = undefined;
   }
 
   private isPuzzleReferencedByHistoryOrReview(puzzleId: string): boolean {
