@@ -515,17 +515,24 @@ export async function estimateGamePuzzleDifficulty(
   let ratingSource: UserGamePuzzleRatingSource;
 
   if (options.humanPolicy && maiaModel) {
-    const maiaFeats = await extractDifficultyMaia2Features(
-      decisionFen,
-      lineMoves,
-      options.humanPolicy
-    );
-    standardRating = evaluateTreeEnsemble(maiaModel, {
-      ...maiaFeats,
-      ...sfFeats,
-      ...structFeats
-    });
-    ratingSource = "maia2_sf_v1";
+    try {
+      const maiaFeats = await extractDifficultyMaia2Features(
+        decisionFen,
+        lineMoves,
+        options.humanPolicy
+      );
+      standardRating = evaluateTreeEnsemble(maiaModel, {
+        ...maiaFeats,
+        ...sfFeats,
+        ...structFeats
+      });
+      ratingSource = "maia2_sf_v1";
+    } catch {
+      standardRating = sfModel
+        ? evaluateTreeEnsemble(sfModel, { ...sfFeats, ...structFeats })
+        : fallbackLinearHeuristic(structFeats, sfFeats);
+      ratingSource = "sf_heuristic_v1";
+    }
   } else if (sfModel) {
     standardRating = evaluateTreeEnsemble(sfModel, {
       ...sfFeats,
@@ -542,13 +549,18 @@ export async function estimateGamePuzzleDifficulty(
     if (options.humanPolicy) {
       const good = normalizeUci(puzzle.arrowDuel.bestMove);
       const bad = normalizeUci(puzzle.arrowDuel.blunderMove);
-      const [adRes] = await options.humanPolicy.scoreMoves([
-        {
-          fen: decisionFen,
-          moves: [good, bad],
-          elos: ARROW_DUEL_ELO_GRID
-        }
-      ]);
+      let adRes: HumanPolicyMoveResult | undefined;
+      try {
+        [adRes] = await options.humanPolicy.scoreMoves([
+          {
+            fen: decisionFen,
+            moves: [good, bad],
+            elos: ARROW_DUEL_ELO_GRID
+          }
+        ]);
+      } catch {
+        adRes = undefined;
+      }
       if (adRes) {
         const qs = ARROW_DUEL_ELO_GRID.map((elo) => {
           const stats = adRes.byElo[elo];
