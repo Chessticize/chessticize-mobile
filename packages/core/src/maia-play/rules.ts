@@ -112,6 +112,36 @@ export function clampMaiaOpponentRating(rating: number): number {
   return Math.max(MAIA_MIN_RATING, Math.min(MAIA_MAX_OPPONENT_RATING, rounded));
 }
 
+/**
+ * Resolve Maia's effective opponent rating: defaults to matching the user's own rating
+ * (clamped to Maia's supported bounds) unless a custom opponent rating was explicitly chosen.
+ */
+export function resolveMaiaOpponentRating(
+  userRating: number,
+  customOpponentRating?: number | null
+): number {
+  if (customOpponentRating != null && Number.isFinite(customOpponentRating)) {
+    return clampMaiaOpponentRating(customOpponentRating);
+  }
+  if (!Number.isFinite(userRating)) {
+    return MAIA_DEFAULT_RATING;
+  }
+  return Math.max(MAIA_MIN_RATING, Math.min(MAIA_MAX_OPPONENT_RATING, Math.round(userRating)));
+}
+
+/**
+ * Step Maia's opponent rating to the next/previous 100-point boundary from any starting value
+ * (e.g., 1392 +1 -> 1400, 1392 -1 -> 1300, 1400 +1 -> 1500, 1400 -1 -> 1300).
+ */
+export function stepMaiaOpponentRating(currentRating: number, direction: -1 | 1): number {
+  const safe = Number.isFinite(currentRating) ? currentRating : MAIA_DEFAULT_RATING;
+  const next =
+    direction > 0
+      ? (Math.floor(safe / MAIA_OPPONENT_RATING_STEP) + 1) * MAIA_OPPONENT_RATING_STEP
+      : (Math.ceil(safe / MAIA_OPPONENT_RATING_STEP) - 1) * MAIA_OPPONENT_RATING_STEP;
+  return Math.max(MAIA_MIN_RATING, Math.min(MAIA_MAX_OPPONENT_RATING, next));
+}
+
 export function normalizeMaiaSetupPreferences(
   input: Partial<MaiaSetupPreferences> | undefined
 ): MaiaSetupPreferences {
@@ -454,6 +484,8 @@ export function createMaiaGameState(input: {
   id: string;
   preferences: MaiaSetupPreferences;
   userRating: number;
+  /** When true, Maia's rating matches the user's current rating (clamped to Maia bounds) instead of preferences.opponentRating. */
+  matchUserRating?: boolean;
   nowMs?: number;
   nowIso?: string;
   rng?: () => number;
@@ -472,7 +504,9 @@ export function createMaiaGameState(input: {
       : prefs.colorPreference;
 
   const userRatingBefore = Math.max(RATING_FLOOR, Math.round(input.userRating));
-  const maiaRating = clampMaiaOpponentRating(prefs.opponentRating);
+  const maiaRating = input.matchUserRating
+    ? resolveMaiaOpponentRating(userRatingBefore)
+    : clampMaiaOpponentRating(prefs.opponentRating);
 
   const clocksMs: MaiaGameClocksMs | null = prefs.timeControl.unlimited
     ? null

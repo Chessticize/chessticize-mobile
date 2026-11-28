@@ -460,7 +460,10 @@ export function ReviewSession({
       : currentEntry.puzzle.solutionMoves.length > 2
   );
   const reviewBoardLocked = boardLocked || reviewEntryPreview.locked;
-  const boardGestureEnabled = !reviewBoardLocked;
+  const reviewPuzzleFinished = reviewState.kind === "line"
+    ? reviewState.line.solved
+    : reviewState.duel.solved;
+  const boardGestureEnabled = !reviewBoardLocked && (analysisEnabled || !reviewPuzzleFinished);
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const reviewSideToMove = sideToMove(displayFen);
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
@@ -892,11 +895,25 @@ export function ReviewSession({
         await animateReviewBoardMoves(replyMoves, finalFen);
         await sleep(FEEDBACK_SNAPSHOT_MS);
       }
+      const nextLine = lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves);
       setReviewState({
         kind: "line",
-        line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves),
+        line: nextLine,
         arrowDuelLineKind: "punishment"
       });
+      if (nextLine.solved) {
+        setFeedback({
+          ...result.feedback,
+          autoPlayedMoves: [],
+          currentFen: nextLine.currentFen,
+          puzzleSolved: true
+        });
+        advanceReview("wrong", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
+        return;
+      }
       setFeedback(null);
       setBoardLocked(false);
     } catch {
