@@ -80,7 +80,10 @@ const BOARD_FRAME_BORDER = 2;
 const REVIEW_CONTENT_HORIZONTAL_PADDING = 12;
 const BOARD_MIN_SIZE = 220;
 const BOARD_MAX_PORTRAIT_SIZE = 500;
-const BOARD_MAX_LANDSCAPE_SIZE = 540;
+const BOARD_MAX_REGULAR_LANDSCAPE_SIZE = 860;
+const BOARD_MAX_COMPACT_LANDSCAPE_SIZE = 440;
+const REGULAR_RAIL_GAP = 24;
+const COMPACT_RAIL_GAP = 14;
 
 export function GameReviewScreen({
   game,
@@ -141,25 +144,42 @@ export function GameReviewScreen({
   });
 
   const useHorizontalEvalBar = layout.isLargeText || viewport.width < 360;
+  const railGap = layout.isRegularWidth ? REGULAR_RAIL_GAP : COMPACT_RAIL_GAP;
+  const railWidth = useMemo(() => {
+    if (!layout.usesSessionRail) {
+      return layout.sessionRailWidth;
+    }
+    if (layout.isRegularWidth) {
+      return Math.min(400, Math.max(340, Math.floor(layout.contentWidth * 0.32)));
+    }
+    return layout.sessionRailWidth;
+  }, [layout.contentWidth, layout.isRegularWidth, layout.sessionRailWidth, layout.usesSessionRail]);
+
   const boardSize = useMemo(() => {
     const evalReserve = useHorizontalEvalBar ? 0 : EVAL_BAR_SIDE_WIDTH;
     if (layout.usesSessionRail) {
-      const fallbackWidth =
+      // In landscape, header chrome lives inside the right rail (matching the Puzzle session
+      // layout), so the EvalBar + Board use the full available height without an artificial cap.
+      const availableWidth =
         layout.contentWidth -
         PRACTICE_UI_PADDING * 2 -
-        layout.sessionRailWidth -
-        layout.sessionRailGap;
-      const stageWidth = measuredStageWidth ?? fallbackWidth;
-      const availableWidth = stageWidth - evalReserve - BOARD_FRAME_BORDER;
-      const availableHeight = layout.contentHeight - 120;
-      const raw = Math.min(availableWidth, availableHeight, BOARD_MAX_LANDSCAPE_SIZE);
+        railWidth -
+        railGap -
+        evalReserve -
+        BOARD_FRAME_BORDER;
+      const availableHeight =
+        layout.contentHeight - PRACTICE_UI_PADDING * 2 - BOARD_FRAME_BORDER;
+      const maxLandscape = layout.isRegularWidth
+        ? BOARD_MAX_REGULAR_LANDSCAPE_SIZE
+        : BOARD_MAX_COMPACT_LANDSCAPE_SIZE;
+      const raw = Math.min(availableWidth, availableHeight, maxLandscape);
       return Math.max(BOARD_MIN_SIZE, Math.floor(raw));
     }
     const stageWidth = measuredStageWidth ?? layout.contentWidth - REVIEW_CONTENT_HORIZONTAL_PADDING * 2;
     const availableWidth = stageWidth - evalReserve - BOARD_FRAME_BORDER;
     const raw = Math.min(availableWidth, BOARD_MAX_PORTRAIT_SIZE);
     return Math.max(BOARD_MIN_SIZE, Math.floor(raw));
-  }, [layout, measuredStageWidth, useHorizontalEvalBar]);
+  }, [layout, measuredStageWidth, railGap, railWidth, useHorizontalEvalBar]);
 
   const boardColors = useMemo(() => chessboardColorsFor(theme), [theme]);
   const pieceSprite = useMemo(() => chessPieceSpriteFor(pieceSet), [pieceSet]);
@@ -467,54 +487,62 @@ export function GameReviewScreen({
     black: resolvedBlackName
   });
 
+  const headerBar = (
+    <View style={layout.usesSessionRail ? styles.railHeader : styles.header}>
+      <View style={styles.headerTopRow}>
+        {onBack ? (
+          <Button
+            icon="chevronLeft"
+            label={t("gameReview.header.back")}
+            onPress={onBack}
+            size="compact"
+            testID="game-review-back"
+            variant="plain"
+          />
+        ) : null}
+        <AppText numberOfLines={1} style={styles.headerTitle} variant="headline">
+          {headerTitle}
+        </AppText>
+        <Pressable
+          accessibilityLabel={
+            controller.freeAnalysisOpen
+              ? t("gameReview.header.engineActive")
+              : t("gameReview.header.engineToggle")
+          }
+          accessibilityRole="button"
+          accessibilityState={{ selected: controller.freeAnalysisOpen }}
+          onPress={controller.toggleFreeAnalysis}
+          style={({ pressed }) => [
+            styles.analysisIconButton,
+            controller.freeAnalysisOpen ? styles.analysisIconButtonActive : null,
+            pressed ? styles.pressed : null
+          ]}
+          testID="game-review-engine-toggle"
+        >
+          <Icon
+            color={
+              controller.freeAnalysisOpen
+                ? theme.colors.text.onAccent
+                : theme.colors.text.primary
+            }
+            name="search"
+            size={18}
+            weight="semibold"
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const railHeight = Math.min(
+    Math.max(0, layout.contentHeight - PRACTICE_UI_PADDING * 2),
+    Math.max(boardSize, layout.isRegularWidth ? 460 : 320)
+  );
+
   return (
     <View style={styles.screen} testID="game-review-screen">
-      <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          {onBack ? (
-            <Button
-              icon="chevronLeft"
-              label={t("gameReview.header.back")}
-              onPress={onBack}
-              size="compact"
-              testID="game-review-back"
-              variant="plain"
-            />
-          ) : null}
-          <AppText numberOfLines={1} style={styles.headerTitle} variant="headline">
-            {headerTitle}
-          </AppText>
-          <Pressable
-            accessibilityLabel={
-              controller.freeAnalysisOpen
-                ? t("gameReview.header.engineActive")
-                : t("gameReview.header.engineToggle")
-            }
-            accessibilityRole="button"
-            accessibilityState={{ selected: controller.freeAnalysisOpen }}
-            onPress={controller.toggleFreeAnalysis}
-            style={({ pressed }) => [
-              styles.analysisIconButton,
-              controller.freeAnalysisOpen ? styles.analysisIconButtonActive : null,
-              pressed ? styles.pressed : null
-            ]}
-            testID="game-review-engine-toggle"
-          >
-            <Icon
-              color={
-                controller.freeAnalysisOpen
-                  ? theme.colors.text.onAccent
-                  : theme.colors.text.primary
-              }
-              name="search"
-              size={18}
-              weight="semibold"
-            />
-          </Pressable>
-        </View>
-      </View>
-
-      {scanBanner}
+      {!layout.usesSessionRail ? headerBar : null}
+      {!layout.usesSessionRail ? scanBanner : null}
 
       {controller.parseError ? (
         <View style={styles.errorBox} testID="game-review-parse-error">
@@ -523,14 +551,19 @@ export function GameReviewScreen({
           </AppText>
         </View>
       ) : layout.usesSessionRail ? (
-        <View style={styles.railLayout} testID="game-review-rail-layout">
+        <View style={[styles.railLayout, { gap: railGap }]} testID="game-review-rail-layout">
           <View style={styles.railBoardColumn}>{boardStage}</View>
-          <ScrollView
-            contentContainerStyle={styles.railPanelsContent}
-            style={[styles.railPanelsColumn, { width: layout.sessionRailWidth }]}
-          >
-            {panelsContent}
-          </ScrollView>
+          <View style={[styles.railSideColumn, { width: railWidth, height: railHeight }]}>
+            {headerBar}
+            {scanBanner}
+            <ScrollView
+              contentContainerStyle={styles.railPanelsContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.railPanelsScroll}
+            >
+              {panelsContent}
+            </ScrollView>
+          </View>
         </View>
       ) : (
         <ScrollView
@@ -1154,28 +1187,36 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: REVIEW_CONTENT_HORIZONTAL_PADDING,
     paddingTop: 10
   },
+  railHeader: {
+    borderBottomColor: theme.colors.border.default,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 10
+  },
   railLayout: {
+    alignItems: "center",
     flex: 1,
     flexDirection: "row",
-    gap: 14,
+    justifyContent: "center",
     padding: PRACTICE_UI_PADDING
   },
   railBoardColumn: {
     alignItems: "center",
-    flex: 1,
-    justifyContent: "flex-start"
+    justifyContent: "center"
   },
-  railPanelsColumn: {
-    flexGrow: 0
+  railSideColumn: {
+    flexShrink: 0,
+    gap: 10
+  },
+  railPanelsScroll: {
+    flex: 1
   },
   railPanelsContent: {
     gap: 10,
-    paddingBottom: 16
+    paddingBottom: 24
   },
   boardSection: {
     alignItems: "center",
-    gap: 6,
-    width: "100%"
+    gap: 6
   },
   boardRow: {
     alignItems: "center",

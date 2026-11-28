@@ -1177,4 +1177,40 @@ describe("GameReviewScreen (#767)", () => {
     expect(service.listReviewQueue().length).toBeGreaterThan(0);
     act(() => renderer.unmount());
   });
+
+  it("uses Puzzle-style centered full-height landscape rail with header inside the rail on iPad landscape", () => {
+    const { store, service, game } = setupAnalyzedStore();
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 1366, height: 960, fontScale: 1 }}>
+            <GameReviewScreen
+              BoardComponent={MockReviewBoard}
+              game={game}
+              onBack={jest.fn()}
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    const rail = findByTestId(renderer, "game-review-rail-layout");
+    expect(rail).toBeTruthy();
+    // Back button and engine toggle live inside the right rail in landscape (no full-width top bar).
+    const backInRail = rail.findAll((node) => node.props.testID === "game-review-back");
+    expect(backInRail.length).toBeGreaterThan(0);
+    // Board utilizes full iPad landscape height (well above the old 540px cap).
+    const boardFrame = findByTestId(renderer, "game-review-board-frame");
+    const frameStyles = Array.isArray(boardFrame.props.style)
+      ? Object.assign({}, ...boardFrame.props.style.filter(Boolean))
+      : boardFrame.props.style;
+    expect(frameStyles.width).toBeGreaterThanOrEqual(760);
+    expect(frameStyles.height).toBe(frameStyles.width);
+
+    act(() => renderer.unmount());
+  });
 });

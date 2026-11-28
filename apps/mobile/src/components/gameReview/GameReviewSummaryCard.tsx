@@ -423,7 +423,8 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6
+    gap: 6,
+    maxWidth: "100%"
   },
   recommendedActionGroup: {
     alignItems: "center",

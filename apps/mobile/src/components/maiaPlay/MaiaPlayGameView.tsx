@@ -96,7 +96,10 @@ export interface MaiaPlayGameViewProps {
 
 const BOARD_MIN_SIZE = 220;
 const BOARD_MAX_PORTRAIT_SIZE = 480;
-const BOARD_MAX_LANDSCAPE_SIZE = 520;
+const BOARD_MAX_REGULAR_LANDSCAPE_SIZE = 780;
+const BOARD_MAX_COMPACT_LANDSCAPE_SIZE = 380;
+const MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_REGULAR = 96;
+const MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_COMPACT = 80;
 const LOW_TIME_MS = 20_000;
 
 export function MaiaPlayGameView({
@@ -534,23 +537,41 @@ export function MaiaPlayGameView({
     [viewport.fontScale, viewport.height, viewport.width]
   );
 
+  const railGap = layout.isRegularWidth ? 24 : 14;
+  const railWidth = useMemo(() => {
+    if (!layout.usesSessionRail) {
+      return layout.sessionRailWidth;
+    }
+    if (layout.isRegularWidth) {
+      return Math.min(380, Math.max(320, Math.floor(layout.contentWidth * 0.3)));
+    }
+    return layout.sessionRailWidth;
+  }, [layout.contentWidth, layout.isRegularWidth, layout.sessionRailWidth, layout.usesSessionRail]);
+
   const boardSize = useMemo(() => {
     if (layout.usesSessionRail) {
-      const fallbackWidth =
-        layout.contentWidth -
-        PRACTICE_UI_PADDING * 2 -
-        layout.sessionRailWidth -
-        layout.sessionRailGap;
-      const stageWidth = measuredStageWidth ?? fallbackWidth;
-      const availableHeight = layout.contentHeight - 170;
+      // Header controls move into the right rail on landscape (matching the Puzzle session layout),
+      // leaving the full viewport height for the board + top/bottom player strips.
+      const outerPadV = layout.isRegularWidth ? PRACTICE_UI_PADDING : 8;
+      const outerPadH = layout.isRegularWidth ? PRACTICE_UI_PADDING : 12;
+      const stripsReserve = layout.isRegularWidth
+        ? MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_REGULAR
+        : MAIA_PLAYER_STRIPS_VERTICAL_RESERVE_COMPACT;
+      const availableWidth =
+        layout.contentWidth - outerPadH * 2 - railWidth - railGap - 4;
+      const availableHeight =
+        layout.contentHeight - outerPadV * 2 - stripsReserve - 4;
+      const maxLandscape = layout.isRegularWidth
+        ? BOARD_MAX_REGULAR_LANDSCAPE_SIZE
+        : BOARD_MAX_COMPACT_LANDSCAPE_SIZE;
       return Math.max(
         BOARD_MIN_SIZE,
-        Math.floor(Math.min(stageWidth - 4, availableHeight, BOARD_MAX_LANDSCAPE_SIZE))
+        Math.floor(Math.min(availableWidth, availableHeight, maxLandscape))
       );
     }
     const stageWidth = measuredStageWidth ?? layout.contentWidth - 24;
     return Math.max(BOARD_MIN_SIZE, Math.floor(Math.min(stageWidth - 4, BOARD_MAX_PORTRAIT_SIZE)));
-  }, [layout, measuredStageWidth]);
+  }, [layout, measuredStageWidth, railGap, railWidth]);
 
   const boardColors = useMemo(() => chessboardColorsFor(theme), [theme]);
   const pieceSprite = useMemo(() => chessPieceSpriteFor(pieceSet), [pieceSet]);
@@ -607,7 +628,10 @@ export function MaiaPlayGameView({
 
   const boardColumn = (
     <View
-      style={styles.boardColumn}
+      style={[
+        styles.boardColumn,
+        layout.usesSessionRail ? { width: boardSize } : styles.boardColumnPortrait
+      ]}
       onLayout={(event) => {
         const width = Math.floor(event.nativeEvent.layout.width);
         if (width > 0) {
@@ -615,7 +639,7 @@ export function MaiaPlayGameView({
         }
       }}
     >
-      <View style={styles.playerStrip} testID="maia-opponent-strip">
+      <View style={[styles.playerStrip, { width: boardSize }]} testID="maia-opponent-strip">
         <View style={styles.playerIdentity}>
           <AppText variant="headline">{`${colorBadgeSymbol(maiaColor)} Maia ${gameState.maiaRating}`}</AppText>
           {material[maiaColor] > 0 ? (
@@ -651,7 +675,7 @@ export function MaiaPlayGameView({
         <BoardCoordinateOverlay boardSize={boardSize} flipped={flipped} />
       </View>
 
-      <View style={styles.playerStrip} testID="maia-user-strip">
+      <View style={[styles.playerStrip, { width: boardSize }]} testID="maia-user-strip">
         <View style={styles.playerIdentity}>
           <AppText variant="headline">
             {`${colorBadgeSymbol(gameState.userColor)} ${t("maiaPlay.you")} (${gameState.userRatingAfter ?? gameState.userRatingBefore})`}
@@ -665,8 +689,43 @@ export function MaiaPlayGameView({
     </View>
   );
 
+  const topBarContent = (
+    <View style={layout.usesSessionRail ? styles.railTopBar : styles.topBar}>
+      <Pressable
+        accessibilityLabel={t("common.back")}
+        accessibilityRole="button"
+        hitSlop={10}
+        style={styles.backButton}
+        testID="maia-game-back"
+        onPress={handleBackOrPause}
+      >
+        <Icon color={theme.colors.text.primary} name="chevronLeft" size={20} />
+        <AppText variant="subheadline">{t("common.back")}</AppText>
+      </Pressable>
+
+      {gameState.status === "playing" ? (
+        <View style={layout.usesSessionRail ? styles.railPaceToggleWrap : styles.paceToggleWrap}>
+          <SegmentedControl<MaiaThinkingPace>
+            accessibilityLabel={t("maiaPlay.setup.thinkingPace")}
+            options={[
+              { value: "human", label: t("maiaPlay.pace.humanShort"), testID: "maia-live-pace-human" },
+              { value: "instant", label: t("maiaPlay.pace.instant"), testID: "maia-live-pace-instant" }
+            ]}
+            semantics="radio"
+            testID="maia-live-pace-toggle"
+            value={gameState.thinkingPace}
+            onChange={handleToggleThinkingPace}
+          />
+        </View>
+      ) : (
+        <AppText variant="headline">{t("maiaPlay.title")}</AppText>
+      )}
+    </View>
+  );
+
   const controlsColumn = (
-    <View style={[styles.controlsColumn, layout.usesSessionRail ? { width: layout.sessionRailWidth } : null]}>
+    <View style={[styles.controlsColumn, layout.usesSessionRail ? { width: railWidth } : null]}>
+      {layout.usesSessionRail ? topBarContent : null}
       <View style={styles.moveStripCard}>
         <ScrollView
           ref={moveStripRef}
@@ -795,48 +854,28 @@ export function MaiaPlayGameView({
 
   return (
     <View style={styles.root} testID="maia-play-game">
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel={t("common.back")}
-          accessibilityRole="button"
-          hitSlop={10}
-          style={styles.backButton}
-          testID="maia-game-back"
-          onPress={handleBackOrPause}
+      {!layout.usesSessionRail ? topBarContent : null}
+
+      {layout.usesSessionRail ? (
+        <View style={[styles.stageContainerRail, { gap: railGap }]}>
+          {boardColumn}
+          <ScrollView
+            contentContainerStyle={styles.railControlsContent}
+            showsVerticalScrollIndicator={false}
+            style={[styles.railControlsScroll, { width: railWidth }]}
+          >
+            {controlsColumn}
+          </ScrollView>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.stageContainer}
+          showsVerticalScrollIndicator={false}
         >
-          <Icon color={theme.colors.text.primary} name="chevronLeft" size={20} />
-          <AppText variant="subheadline">{t("common.back")}</AppText>
-        </Pressable>
-
-        {gameState.status === "playing" ? (
-          <View style={styles.paceToggleWrap}>
-            <SegmentedControl<MaiaThinkingPace>
-              accessibilityLabel={t("maiaPlay.setup.thinkingPace")}
-              options={[
-                { value: "human", label: t("maiaPlay.pace.humanShort"), testID: "maia-live-pace-human" },
-                { value: "instant", label: t("maiaPlay.pace.instant"), testID: "maia-live-pace-instant" }
-              ]}
-              semantics="radio"
-              testID="maia-live-pace-toggle"
-              value={gameState.thinkingPace}
-              onChange={handleToggleThinkingPace}
-            />
-          </View>
-        ) : (
-          <AppText variant="headline">{t("maiaPlay.title")}</AppText>
-        )}
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.stageContainer,
-          layout.usesSessionRail ? styles.stageContainerRail : null
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {boardColumn}
-        {controlsColumn}
-      </ScrollView>
+          {boardColumn}
+          {controlsColumn}
+        </ScrollView>
+      )}
 
       <AppModal
         animationType="fade"
@@ -893,6 +932,15 @@ const useStyles = makeStyles((theme) => ({
     paddingVertical: theme.spacing.inline,
     gap: theme.spacing.row
   },
+  railTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border.default,
+    gap: theme.spacing.inline
+  },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -902,6 +950,11 @@ const useStyles = makeStyles((theme) => ({
   paceToggleWrap: {
     width: 196
   },
+  railPaceToggleWrap: {
+    flex: 1,
+    maxWidth: 184,
+    minWidth: 132
+  },
   stageContainer: {
     paddingHorizontal: theme.spacing.row,
     paddingBottom: 32,
@@ -909,17 +962,29 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center"
   },
   stageContainerRail: {
+    flex: 1,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: theme.spacing.screen,
-    gap: theme.spacing.section
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  railControlsScroll: {
+    flexGrow: 0,
+    maxHeight: "100%"
+  },
+  railControlsContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 8
   },
   boardColumn: {
-    width: "100%",
-    maxWidth: 500,
     alignItems: "center",
     gap: theme.spacing.inline
+  },
+  boardColumnPortrait: {
+    width: "100%",
+    maxWidth: 500
   },
   playerStrip: {
     width: "100%",
