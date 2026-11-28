@@ -805,3 +805,93 @@ test("isAutoReviewCaliberEligible enforces chessticize-server#629 rules", () => 
   assert.equal(isAutoReviewCaliberEligible({ ...baseLine, cp: -100 }), false);
   assert.equal(isAutoReviewCaliberEligible({ ...baseLine, clockRemainingSec: 8 }), false);
 });
+
+test("terminal opponent blunder with immediate opponent resignation does not fabricate opponent_missed puzzle", async () => {
+  // Position where Black hangs a knight on d5 (11... Nd5?? -> 12. Rxd5) and immediately resigns (1-0).
+  const startFen = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4";
+  const terminalPlies = buildPliesFromStart(startFen, [{ uci: "f6g4" }]);
+  terminalPlies[0]!.evalAfter = whiteCp(500, terminalPlies[0]!.fenAfter);
+
+  const afterReply = new Chess(terminalPlies[0]!.fenAfter);
+  afterReply.move({ from: "c4", to: "f7" });
+  const afterKing = new Chess(afterReply.fen());
+  afterKing.move({ from: "e8", to: "f7" });
+
+  const engine = createScriptedEngine((req) => {
+    const key = fenPositionKey(req.fen);
+    if (key === fenPositionKey(terminalPlies[0]!.fenAfter)) {
+      return [
+        line(req.fen, "c4f7", whiteCp(500, req.fen), { multipv: 1, pv: ["c4f7", "e8f7", "f3g5"] }),
+        line(req.fen, "e1g1", whiteCp(50, req.fen), { multipv: 2 })
+      ];
+    }
+    if (key === fenPositionKey(afterReply.fen())) {
+      return [line(req.fen, "e8f7", whiteCp(500, req.fen), { multipv: 1 })];
+    }
+    if (key === fenPositionKey(afterKing.fen())) {
+      return [
+        line(req.fen, "f3g5", whiteCp(500, req.fen), { multipv: 1 }),
+        line(req.fen, "d2d3", whiteCp(480, req.fen), { multipv: 2 })
+      ];
+    }
+    return [line(req.fen, "a7a6", whiteCp(500, req.fen))];
+  });
+
+  // White user won (Black resigned right after blundering) -> skip! Neither puzzle nor highlight.
+  const whenOpponentResigned = await extractGamePuzzles(
+    {
+      gameId: "resign-terminal",
+      userColor: "w",
+      gameResult: "1-0",
+      plies: terminalPlies,
+      initialEval: whiteCp(0, startFen)
+    },
+    engine
+  );
+  assert.equal(whenOpponentResigned.puzzles.length, 0);
+  assert.equal(whenOpponentResigned.highlights.length, 0);
+
+  // White user lost or drew (White resigned/flagged/agreed draw right after Black blundered) -> genuine miss!
+  const whenUserResigned = await extractGamePuzzles(
+    {
+      gameId: "user-resign-terminal",
+      userColor: "w",
+      gameResult: "0-1",
+      plies: terminalPlies,
+      initialEval: whiteCp(0, startFen)
+    },
+    engine
+  );
+  assert.equal(whenUserResigned.puzzles.length, 1);
+  assert.equal(whenUserResigned.puzzles[0]!.momentKind, "opponent_mistake_missed");
+
+  // Multi-move line where White played move 0, Black replied move 1, then Black resigned (1-0) before White's move 2 -> found!
+  const multiPlies = buildPliesFromStart(startFen, [
+    { uci: "f6g4" },
+    { uci: "c4f7" },
+    { uci: "e8f7" }
+  ]);
+  multiPlies[0]!.evalAfter = whiteCp(500, multiPlies[0]!.fenAfter);
+  multiPlies[1]!.evalAfter = whiteCp(500, multiPlies[1]!.fenAfter);
+  multiPlies[2]!.evalAfter = whiteCp(500, multiPlies[2]!.fenAfter);
+
+  const foundWhenOpponentResignedBeforeMove2 = await checkIfUserFoundLine({
+    engine,
+    plies: multiPlies,
+    startPlyIndex: 0,
+    solutionMoves: ["c4f7", "e8f7", "f3g5"],
+    winner: "w",
+    gameResult: "1-0"
+  });
+  assert.equal(foundWhenOpponentResignedBeforeMove2, true);
+
+  const missedWhenUserResignedBeforeMove2 = await checkIfUserFoundLine({
+    engine,
+    plies: multiPlies,
+    startPlyIndex: 0,
+    solutionMoves: ["c4f7", "e8f7", "f3g5"],
+    winner: "w",
+    gameResult: "0-1"
+  });
+  assert.equal(missedWhenUserResignedBeforeMove2, false);
+});

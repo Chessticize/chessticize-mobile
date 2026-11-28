@@ -1,5 +1,5 @@
 import React from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { makeStyles } from "../../theme/index.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { AppText, Button } from "../ui/index.tsx";
@@ -11,6 +11,9 @@ export interface BatchAnalysisBannerProps {
   onResume: () => void;
   onCancel: () => void;
   onDismiss: () => void;
+  compact?: boolean;
+  onOpenGames?: () => void;
+  testID?: string;
 }
 
 export function BatchAnalysisBanner({
@@ -18,7 +21,10 @@ export function BatchAnalysisBanner({
   onPause,
   onResume,
   onCancel,
-  onDismiss
+  onDismiss,
+  compact = false,
+  onOpenGames,
+  testID = "games-batch-banner"
 }: BatchAnalysisBannerProps): React.JSX.Element | null {
   const styles = useStyles();
   const { t } = useTranslation();
@@ -59,7 +65,9 @@ export function BatchAnalysisBanner({
       current: state.currentIndex,
       total: state.totalGames
     });
-    if (state.pausedByBackground) {
+    if (state.pausedByInteractiveEngine) {
+      detail = t("games.batch.pausedInteractive");
+    } else if (state.pausedByBackground) {
       detail = t("games.batch.pausedBackground");
     }
   } else if (state.status === "completed") {
@@ -74,11 +82,88 @@ export function BatchAnalysisBanner({
         : t("games.batch.error");
   }
 
+  if (compact) {
+    return (
+      <View
+        accessibilityLiveRegion="polite"
+        style={styles.compactCard}
+        testID={testID}
+      >
+        <View style={styles.compactRow}>
+          <Pressable
+            accessibilityRole={onOpenGames ? "button" : undefined}
+            disabled={!onOpenGames}
+            style={styles.compactCopy}
+            testID={`${testID}-open`}
+            onPress={onOpenGames}
+          >
+            <AppText numberOfLines={1} testID={`${testID}-status-text`} variant="footnote">
+              {headline}
+            </AppText>
+            {detail ? (
+              <AppText numberOfLines={1} tone="secondary" variant="caption">
+                {detail}
+              </AppText>
+            ) : null}
+          </Pressable>
+          <View style={styles.compactActions}>
+            {state.status === "running" ? (
+              <Button
+                label={t("common.pause")}
+                size="compact"
+                testID={`${testID}-pause`}
+                variant="plain"
+                onPress={onPause}
+              />
+            ) : null}
+            {state.status === "paused" && !state.pausedByInteractiveEngine ? (
+              <Button
+                label={t("common.resume")}
+                size="compact"
+                testID={`${testID}-resume`}
+                variant="plain"
+                onPress={onResume}
+              />
+            ) : null}
+            {state.status === "completed" || state.status === "error" ? (
+              <Button
+                label={t("games.action.dismiss")}
+                size="compact"
+                testID={`${testID}-dismiss`}
+                variant="plain"
+                onPress={onDismiss}
+              />
+            ) : null}
+          </View>
+        </View>
+        {state.status === "running" || state.status === "paused" ? (
+          <View
+            accessibilityRole="progressbar"
+            accessibilityValue={{
+              min: 0,
+              max: 100,
+              now: Math.round(completedFraction * 100)
+            }}
+            style={styles.compactProgressTrack}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                state.status === "paused" ? styles.progressFillPaused : null,
+                { width: progressWidthPercent }
+              ]}
+            />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View
       accessibilityLiveRegion="polite"
       style={styles.card}
-      testID="games-batch-banner"
+      testID={testID}
     >
       <View style={styles.copy}>
         <AppText testID="games-batch-status-text" variant="headline">
@@ -195,5 +280,39 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  compactCard: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    gap: 6,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  compactRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  compactCopy: {
+    flex: 1,
+    gap: 1,
+    minWidth: 0
+  },
+  compactActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: 4
+  },
+  compactProgressTrack: {
+    backgroundColor: theme.colors.surfaceSunken,
+    borderRadius: theme.shape.capsule,
+    height: 3,
+    overflow: "hidden",
+    width: "100%"
   }
 }));

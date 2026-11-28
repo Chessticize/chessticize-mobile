@@ -1482,6 +1482,10 @@ export const esMessages = {
   "games.batch.analyzingWithMove": "Analizando {{current}} de {{total}} · Jugada {{ply}}/{{totalPlies}}",
   "games.batch.paused": "En pausa ({{current}} de {{total}})",
   "games.batch.pausedBackground": "En pausa al pasar a segundo plano. Progreso guardado.",
+  "games.batch.pausedInteractive": "En pausa mientras el motor analiza. Se reanudará automáticamente.",
+  "games.import.startAnalyzing": "Analizar partidas para hallar ejercicios ({{count}})",
+  "games.analyzePrompt.title": "Analiza tus partidas para encontrar ejercicios",
+  "games.analyzePrompt.action": "Iniciar análisis ({{count}})",
   "games.batch.completed": "Analizadas {{games}} · {{puzzles}}",
   "games.batch.gamesCount": {
     one: "{{count}} partida",

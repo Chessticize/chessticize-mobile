@@ -1482,6 +1482,10 @@ export const ptBRMessages = {
   "games.batch.analyzingWithMove": "Analisando {{current}} de {{total}} · Lance {{ply}}/{{totalPlies}}",
   "games.batch.paused": "Pausado ({{current}} de {{total}})",
   "games.batch.pausedBackground": "Pausado em segundo plano. Progresso salvo.",
+  "games.batch.pausedInteractive": "Pausado durante a análise do motor. Será retomado automaticamente.",
+  "games.import.startAnalyzing": "Analisar partidas para gerar exercícios ({{count}})",
+  "games.analyzePrompt.title": "Analise suas partidas para encontrar exercícios",
+  "games.analyzePrompt.action": "Iniciar análise ({{count}})",
   "games.batch.completed": "{{games}} analisadas · {{puzzles}}",
   "games.batch.gamesCount": {
     one: "{{count}} partida",

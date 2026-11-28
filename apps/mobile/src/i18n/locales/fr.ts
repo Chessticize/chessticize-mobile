@@ -1482,6 +1482,10 @@ export const frMessages = {
   "games.batch.analyzingWithMove": "Analyse {{current}} sur {{total}} · Coup {{ply}}/{{totalPlies}}",
   "games.batch.paused": "En pause ({{current}} sur {{total}})",
   "games.batch.pausedBackground": "En pause en arrière-plan. Progression enregistrée.",
+  "games.batch.pausedInteractive": "En pause pendant l’analyse moteur. Reprise automatique ensuite.",
+  "games.import.startAnalyzing": "Analyser les parties pour trouver des problèmes ({{count}})",
+  "games.analyzePrompt.title": "Analysez vos parties pour trouver des problèmes",
+  "games.analyzePrompt.action": "Lancer l’analyse ({{count}})",
   "games.batch.completed": "{{games}} analysées · {{puzzles}}",
   "games.batch.gamesCount": {
     one: "{{count}} partie",

@@ -1453,6 +1453,10 @@ export const koMessages = {
   "games.batch.analyzingWithMove": "{{total}}국 중 {{current}}국 분석 중 · {{ply}}/{{totalPlies}}수",
   "games.batch.paused": "일시 정지됨 ({{current}}/{{total}})",
   "games.batch.pausedBackground": "백그라운드 전환으로 일시 정지되었습니다. 진행 상태가 저장되었습니다.",
+  "games.batch.pausedInteractive": "엔진 분석 중 일시 정지됨. 종료 후 자동으로 재개됩니다.",
+  "games.import.startAnalyzing": "대국을 분석해 문제 찾기 ({{count}})",
+  "games.analyzePrompt.title": "대국을 분석해 실전 문제를 찾아보세요",
+  "games.analyzePrompt.action": "분석 시작 ({{count}})",
   "games.batch.completed": "{{games}} 분석 완료 · {{puzzles}}",
   "games.batch.gamesCount": {
     other: "{{count}}국"

@@ -76,6 +76,7 @@ export async function runFullGameReviewPipeline(
   }
 
   const timeControl = input.timeControl ?? report.parsedGame.timeControl;
+  const gameResult = report.parsedGame.result;
   const extractionOptions: ExtractGamePuzzlesOptions = {
     estimateDifficulty: true,
     ...(input.humanPolicy !== undefined ? { humanPolicy: input.humanPolicy } : {}),
@@ -87,7 +88,8 @@ export async function runFullGameReviewPipeline(
       ...(input.gameId !== undefined ? { gameId: input.gameId } : {}),
       userColor: input.userColor,
       plies: gameReviewReportToPlyEvalInputs(report),
-      ...(timeControl !== undefined ? { timeControl } : {})
+      ...(timeControl !== undefined ? { timeControl } : {}),
+      ...(gameResult !== undefined ? { gameResult } : {})
     },
     input.engine,
     extractionOptions
