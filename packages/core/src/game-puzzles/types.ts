@@ -125,6 +125,8 @@ export interface ExtractGamePuzzlesInput {
   plies: readonly GamePlyEvalInput[];
   /** Optional PGN TimeControl string (e.g. "300+3" or "600"). */
   timeControl?: string;
+  /** Optional PGN game result (e.g. "1-0", "0-1", "1/2-1/2", "*") used to distinguish opponent resignations from missed tactics. */
+  gameResult?: string;
   /** Evaluation before ply 1; defaults to +20 cp for White (matching worker/lichess). */
   initialEval?: AnalysisScore;
 }

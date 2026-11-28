@@ -34,6 +34,7 @@ export interface GamesBatchAnalysisState {
   generatedPuzzles: number;
   errorMessage: string | null;
   pausedByBackground: boolean;
+  pausedByInteractiveEngine?: boolean;
 }
 
 export const INITIAL_GAMES_BATCH_STATE: GamesBatchAnalysisState = {
@@ -46,7 +47,8 @@ export const INITIAL_GAMES_BATCH_STATE: GamesBatchAnalysisState = {
   completedGames: 0,
   generatedPuzzles: 0,
   errorMessage: null,
-  pausedByBackground: false
+  pausedByBackground: false,
+  pausedByInteractiveEngine: false
 };
 
 export interface UseGamesBatchAnalysisOptions {
@@ -58,6 +60,10 @@ export interface UseGamesBatchAnalysisOptions {
   pass1Options?: Omit<EvaluateGamePass1Options, "initialEvaluations" | "onPlyEvaluated" | "signal">;
   extractionOptions?: Omit<ExtractGamePuzzlesOptions, "signal">;
   initialState?: GamesBatchAnalysisState;
+  /** When true (e.g. interactive Stockfish analysis or single-game review is active), pauses batch and auto-resumes when false. */
+  suspended?: boolean;
+  /** When true, disables internal listeners (used when an external batch controller is injected). */
+  disabled?: boolean;
 }
 
 export interface GamesBatchAnalysisController {
@@ -79,7 +85,7 @@ const DEFAULT_MOBILE_BATCH_PASS2_DEEP_LIMIT = {
   nodes: 250_000
 } as const;
 
-type PauseReason = "none" | "user" | "background" | "cancel";
+type PauseReason = "none" | "user" | "background" | "interactive" | "cancel";
 
 export function useGamesBatchAnalysis({
   store,
@@ -89,7 +95,9 @@ export function useGamesBatchAnalysis({
   onGameUpdated,
   pass1Options,
   extractionOptions,
-  initialState = INITIAL_GAMES_BATCH_STATE
+  initialState = INITIAL_GAMES_BATCH_STATE,
+  suspended = false,
+  disabled = false
 }: UseGamesBatchAnalysisOptions): GamesBatchAnalysisController {
   const [state, setState] = useState<GamesBatchAnalysisState>(initialState);
 
@@ -100,6 +108,10 @@ export function useGamesBatchAnalysis({
   const runningRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pauseReasonRef = useRef<PauseReason>("none");
+  const pausedByBackgroundRef = useRef(Boolean(initialState.pausedByBackground));
+  const pausedByInteractiveRef = useRef(Boolean(initialState.pausedByInteractiveEngine));
+  const suspendedRef = useRef(suspended);
+  suspendedRef.current = suspended;
   const mountedRef = useRef(true);
   const runGenerationRef = useRef(0);
   const defaultHumanPolicyRef = useRef<ManagedHumanPolicyModel | null | undefined>(undefined);
@@ -343,23 +355,35 @@ export function useGamesBatchAnalysis({
       queueRef.current = [];
       nextIndexRef.current = 0;
       pauseReasonRef.current = "none";
+      pausedByBackgroundRef.current = false;
+      pausedByInteractiveRef.current = false;
       setState(INITIAL_GAMES_BATCH_STATE);
       return;
     }
 
-    if (pauseReasonRef.current === "user" || pauseReasonRef.current === "background") {
+    if (
+      pauseReasonRef.current === "user" ||
+      pauseReasonRef.current === "background" ||
+      pauseReasonRef.current === "interactive"
+    ) {
       const pausedByBackground = pauseReasonRef.current === "background";
+      const pausedByInteractiveEngine = pauseReasonRef.current === "interactive";
+      pausedByBackgroundRef.current = pausedByBackground;
+      pausedByInteractiveRef.current = pausedByInteractiveEngine;
       pauseReasonRef.current = "none";
       setState((current) => ({
         ...current,
         status: "paused",
         completedGames: completedGamesRef.current,
         generatedPuzzles: generatedPuzzlesRef.current,
-        pausedByBackground
+        pausedByBackground,
+        pausedByInteractiveEngine
       }));
       return;
     }
 
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     setState({
       status: "completed",
       currentIndex: queueRef.current.length,
@@ -370,11 +394,12 @@ export function useGamesBatchAnalysis({
       completedGames: completedGamesRef.current,
       generatedPuzzles: generatedPuzzlesRef.current,
       errorMessage: null,
-      pausedByBackground: false
+      pausedByBackground: false,
+      pausedByInteractiveEngine: false
     });
   }, [persistPartialCheckpoint, practiceService, resolveHumanPolicy, store]);
 
-  const requestPause = useCallback((reason: "user" | "background"): void => {
+  const requestPause = useCallback((reason: "user" | "background" | "interactive"): void => {
     if (!runningRef.current) {
       return;
     }
@@ -395,6 +420,8 @@ export function useGamesBatchAnalysis({
       completedGamesRef.current = 0;
       generatedPuzzlesRef.current = 0;
       pauseReasonRef.current = "none";
+      pausedByBackgroundRef.current = false;
+      pausedByInteractiveRef.current = false;
       runningRef.current = true;
       void runQueue(runGenerationRef.current);
     },
@@ -402,6 +429,8 @@ export function useGamesBatchAnalysis({
   );
 
   const pause = useCallback((): void => {
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     requestPause("user");
   }, [requestPause]);
 
@@ -411,11 +440,15 @@ export function useGamesBatchAnalysis({
     }
     runGenerationRef.current += 1;
     pauseReasonRef.current = "none";
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     runningRef.current = true;
     void runQueue(runGenerationRef.current);
   }, [runQueue]);
 
   const cancel = useCallback((): void => {
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     if (runningRef.current) {
       pauseReasonRef.current = "cancel";
       abortControllerRef.current?.abort();
@@ -433,20 +466,46 @@ export function useGamesBatchAnalysis({
     }
     queueRef.current = [];
     nextIndexRef.current = 0;
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     setState(INITIAL_GAMES_BATCH_STATE);
   }, []);
 
   useEffect(() => {
+    if (disabled) {
+      return;
+    }
+    if (suspended) {
+      if (runningRef.current) {
+        requestPause("interactive");
+      }
+      return;
+    }
+    if (pausedByInteractiveRef.current && !pausedByBackgroundRef.current) {
+      resume();
+    }
+  }, [disabled, requestPause, resume, suspended]);
+
+  useEffect(() => {
+    if (disabled) {
+      return;
+    }
     const handleAppStateChange = (nextAppState: AppStateStatus): void => {
       if (nextAppState === "background" && runningRef.current) {
         requestPause("background");
+      } else if (
+        nextAppState === "active" &&
+        pausedByBackgroundRef.current &&
+        !suspendedRef.current
+      ) {
+        resume();
       }
     };
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => {
       subscription.remove();
     };
-  }, [requestPause]);
+  }, [disabled, requestPause, resume]);
 
   useEffect(() => {
     mountedRef.current = true;

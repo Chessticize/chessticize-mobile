@@ -359,17 +359,20 @@ export function useGameReviewController({
         const humanPolicy = createNativeHumanPolicyModel();
         let extraction;
         try {
+          const resolvedGameResult = parsedGame.result;
           extraction = await extractGamePuzzles(
             {
               gameId: game.id,
               userColor: game.userColor,
               plies: gameReviewReportToPlyEvalInputs(report),
               ...(game.timeControl ? { timeControl: game.timeControl } : {}),
-              ...(userRating !== undefined && Number.isFinite(userRating) ? { userRating } : {})
+              ...(resolvedGameResult ? { gameResult: resolvedGameResult } : {})
             },
             engine,
             {
               deepLimit: DEFAULT_MOBILE_PASS2_DEEP_LIMIT,
+              estimateDifficulty: true,
+              ...(userRating !== undefined && Number.isFinite(userRating) ? { userRating } : {}),
               ...(humanPolicy ? { humanPolicy } : {}),
               signal: controller.signal
             }

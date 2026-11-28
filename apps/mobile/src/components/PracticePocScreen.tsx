@@ -336,6 +336,8 @@ import {
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
 import { GamesHubScreen, type MyGamePuzzlesLaunchOptions } from "./games/GamesHubScreen.tsx";
+import { BatchAnalysisBanner } from "./games/BatchAnalysisBanner.tsx";
+import { useGamesBatchAnalysis } from "./games/useGamesBatchAnalysis.ts";
 import { GameReviewScreen } from "./gameReview/index.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
@@ -1095,6 +1097,19 @@ export function PracticePocScreen({
   }
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
+  const interactiveStockfishActive =
+    reviewAnalysisOpen ||
+    (tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null) ||
+    tab === "analysis";
+  const gamesBatchAnalysis = useGamesBatchAnalysis({
+    store: service.gameReviewStore,
+    practiceService: service,
+    getEngine: getSharedGameReviewArbiter,
+    onGameUpdated: () => {
+      refreshState();
+    },
+    suspended: interactiveStockfishActive
+  });
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [seededHistoryStatus, setSeededHistoryStatus] = useState<string | null>(null);
@@ -5139,8 +5154,14 @@ export function PracticePocScreen({
                 setActiveGameReviewInitialPly(null);
                 refreshState();
               }}
-              onPracticeGamePuzzles={(gameId) => {
-                startMyGamePuzzlesSessionForOptions({ gameId });
+              onPracticeGamePuzzles={(gameId, options) => {
+                startMyGamePuzzlesSessionForOptions({
+                  gameId,
+                  ...(options?.puzzleIds ? { puzzleIds: options.puzzleIds } : {}),
+                  ...(options?.initialIndex !== undefined
+                    ? { initialIndex: options.initialIndex }
+                    : {})
+                });
               }}
             />
           ) : (
@@ -5190,6 +5211,24 @@ export function PracticePocScreen({
             ]}
           >
             {appHeaderScrolls ? appShellHeader : null}
+            {gamesBatchAnalysis.state.status !== "idle" &&
+            !isOpenSession &&
+            !(tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame === null) ? (
+              <BatchAnalysisBanner
+                compact
+                state={gamesBatchAnalysis.state}
+                testID="global-games-batch-strip"
+                onCancel={gamesBatchAnalysis.cancel}
+                onDismiss={gamesBatchAnalysis.dismiss}
+                onOpenGames={() => {
+                  setGamePracticeEntries([]);
+                  setActiveGameReviewId(null);
+                  setTab("games");
+                }}
+                onPause={gamesBatchAnalysis.pause}
+                onResume={gamesBatchAnalysis.resume}
+              />
+            ) : null}
             {reviewReminderPermissionPromptVisible ? (
               <ReviewReminderPermissionPrompt
                 onDismiss={dismissReviewReminderPermissionPrompt}
@@ -5779,6 +5818,8 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   analysisEngine={tab === "games" ? getSharedGameReviewArbiter() : null}
                   autoSyncOnMount
+                  batchController={gamesBatchAnalysis}
+                  getNowMs={currentTimeMs}
                   hubView={gamesHubView}
                   importModalVisible={gamesImportModalOpen}
                   nowMs={nowMs}

@@ -668,6 +668,19 @@ describe("GameReviewScreen (#767)", () => {
     });
     expect(onPractice).toHaveBeenCalledWith(game.id);
 
+    // Tapping a specific puzzle row in Game Summary opens that exact puzzle with all game puzzles ordered for prev/next navigation.
+    const storedPuzzles = store.listUserPuzzles({ gameId: game.id });
+    expect(storedPuzzles.length).toBeGreaterThanOrEqual(2);
+    const secondPuzzle = storedPuzzles[1]!;
+    onPractice.mockClear();
+    act(() => {
+      findByTestId(renderer, `summary-puzzle-open-${secondPuzzle.id}`).props.onPress();
+    });
+    expect(onPractice).toHaveBeenCalledWith(game.id, {
+      puzzleIds: storedPuzzles.map((p) => p.id),
+      initialIndex: 1
+    });
+
     // Ensure Pressable buttons exist cleanly
     expect(renderer.root.findAllByType(Pressable).length).toBeGreaterThan(4);
     act(() => renderer.unmount());

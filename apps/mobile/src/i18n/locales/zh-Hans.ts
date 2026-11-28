@@ -1453,6 +1453,11 @@ export const zhHansMessages = {
   "games.batch.analyzingWithMove": "正在分析第 {{current}}/{{total}} 局 · 第 {{ply}}/{{totalPlies}} 步",
   "games.batch.paused": "已暂停 ({{current}}/{{total}})",
   "games.batch.pausedBackground": "切到后台时已暂停并保存进度。",
+  "games.batch.runningHint": "你可以先去做题，使用 App 期间分析会在后台继续。",
+  "games.batch.pausedInteractive": "引擎分析中，已自动暂停，稍后继续。",
+  "games.import.startAnalyzing": "开始分析并找题 ({{count}})",
+  "games.analyzePrompt.title": "分析对局以提取实战题",
+  "games.analyzePrompt.action": "开始分析 ({{count}})",
   "games.batch.completed": "已分析 {{games}} · {{puzzles}}",
   "games.batch.gamesCount": {
     other: "{{count}} 局"

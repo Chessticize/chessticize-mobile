@@ -222,39 +222,49 @@ export function GameReviewSummaryCard({
                     accessibilityRole="button"
                     disabled={!onSelectPuzzle}
                     onPress={() => onSelectPuzzle?.(puzzle)}
-                    style={styles.puzzleMeta}
+                    style={({ pressed }) => [
+                      styles.puzzleMeta,
+                      pressed && onSelectPuzzle ? styles.pressed : null
+                    ]}
                     testID={`summary-puzzle-open-${puzzle.id}`}
                   >
-                    <View style={styles.puzzleBadges}>
-                      <Badge label={kindLabel} tone="accent" />
-                      {isRecommended ? (
-                        <Badge
-                          label={t("games.puzzles.recommendedBadge")}
-                          testID={`summary-puzzle-recommended-${puzzle.id}`}
-                          tone="positive"
-                        />
-                      ) : null}
-                      {hasEstimatedRating ? (
-                        <Badge
-                          label={`~${puzzle.rating}`}
-                          tone={overReviewBand ? "warning" : "neutral"}
-                        />
-                      ) : null}
-                      <Badge
-                        label={t("games.puzzles.moveOnly", { move: puzzle.gameMoveNumber })}
-                        tone="neutral"
-                      />
-                    </View>
-                    {curatedThemes.length > 0 ? (
-                      <View style={styles.themeTagsRow}>
-                        {curatedThemes.slice(0, 3).map((themeId) => (
+                    <View style={styles.puzzleMetaContent}>
+                      <View style={styles.puzzleBadges}>
+                        <Badge label={kindLabel} tone="accent" />
+                        {isRecommended ? (
                           <Badge
-                            key={themeId}
-                            label={customThemeLabel(themeId, locale)}
-                            tone="neutral"
+                            label={t("games.puzzles.recommendedBadge")}
+                            testID={`summary-puzzle-recommended-${puzzle.id}`}
+                            tone="positive"
                           />
-                        ))}
+                        ) : null}
+                        {hasEstimatedRating ? (
+                          <Badge
+                            label={`~${puzzle.rating}`}
+                            tone={overReviewBand ? "warning" : "neutral"}
+                          />
+                        ) : null}
+                        <Badge
+                          label={t("games.puzzles.moveOnly", { move: puzzle.gameMoveNumber })}
+                          tone="neutral"
+                        />
                       </View>
+                      {curatedThemes.length > 0 ? (
+                        <View style={styles.themeTagsRow}>
+                          {curatedThemes.slice(0, 3).map((themeId) => (
+                            <Badge
+                              key={themeId}
+                              label={customThemeLabel(themeId, locale)}
+                              tone="neutral"
+                            />
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+                    {onSelectPuzzle ? (
+                      <AppText style={styles.puzzleChevron} tone="secondary" variant="headline">
+                        ›
+                      </AppText>
                     ) : null}
                   </Pressable>
                   <Button
@@ -465,9 +475,18 @@ const useStyles = makeStyles((theme) => ({
     padding: 10
   },
   puzzleMeta: {
+    alignItems: "center",
     flex: 1,
+    flexDirection: "row",
     gap: 6,
     minWidth: 150
+  },
+  puzzleMetaContent: {
+    flex: 1,
+    gap: 6
+  },
+  puzzleChevron: {
+    paddingHorizontal: 2
   },
   puzzleBadges: {
     alignItems: "center",

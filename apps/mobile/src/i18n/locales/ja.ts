@@ -1454,6 +1454,11 @@ export const jaMessages = {
   "games.batch.analyzingWithMove": "解析中 {{current}}/{{total}} · {{ply}}/{{totalPlies}} 手目",
   "games.batch.paused": "一時停止中 ({{current}}/{{total}})",
   "games.batch.pausedBackground": "バックグラウンド移行で一時停止し、途中経過を保存しました。",
+  "games.batch.runningHint": "アプリ使用中はバックグラウンドで解析が続きます。そのまま練習を続けられます。",
+  "games.batch.pausedInteractive": "エンジン解析中のため一時停止中。終了後に自動再開します。",
+  "games.import.startAnalyzing": "対局を解析して問題を作成 ({{count}})",
+  "games.analyzePrompt.title": "対局を解析して実戦問題を見つけましょう",
+  "games.analyzePrompt.action": "解析を開始 ({{count}})",
   "games.batch.completed": "{{games}}を解析 · {{puzzles}}",
   "games.batch.gamesCount": {
     other: "{{count}} 局"

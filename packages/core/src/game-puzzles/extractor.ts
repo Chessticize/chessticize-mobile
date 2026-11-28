@@ -167,6 +167,11 @@ export function maintainsAdvantage(
   return false;
 }
 
+export function didWinnerWinByGameResult(winner: Color, gameResult?: string): boolean {
+  const trimmed = gameResult?.trim();
+  return (winner === "w" && trimmed === "1-0") || (winner === "b" && trimmed === "0-1");
+}
+
 /**
  * Checks whether the winning side followed the winning line in the real game,
  * tolerating equivalent winning deviations (<= 0.12 win-chance drop or <= 100 cp at depth 12)
@@ -178,6 +183,7 @@ export async function checkIfUserFoundLine(params: {
   startPlyIndex: number;
   solutionMoves: readonly string[];
   winner: Color;
+  gameResult?: string;
   depth?: number;
   thresholdCp?: number;
   maxWinChanceDrop?: number;
@@ -189,6 +195,7 @@ export async function checkIfUserFoundLine(params: {
     startPlyIndex,
     solutionMoves,
     winner,
+    gameResult,
     signal
   } = params;
   const depth = params.depth ?? CHECK_FOUND_LINE_DEPTH;
@@ -224,10 +231,14 @@ export async function checkIfUserFoundLine(params: {
   for (let index = 0; index < solutionMoves.length; index += 1) {
     const actualPly = plies[startPlyIndex + 1 + index];
     if (!actualPly) {
-      // If the winner never played move 0, or the game ended on the winner's turn,
-      // the winner did not find the continuation. If the game ended on the loser's turn
-      // (e.g. opponent resigned right after the winning move), evaluate the reached board.
-      if (index === 0 || index % 2 === 0) {
+      // If the winner never played move 0, we have no observed winning move.
+      // If the game ended on a later turn for the winner (index >= 2, even):
+      // when the winner won the game (e.g. opponent resigned/flagged mid-combination),
+      // evaluate the reached board instead of falsely marking it missed.
+      if (index === 0) {
+        return false;
+      }
+      if (index % 2 === 0 && !didWinnerWinByGameResult(winner, gameResult)) {
         return false;
       }
       exactMatch = false;
@@ -575,6 +586,18 @@ async function analyzePosition(params: {
   }
 
   const winner = nodeBoard.turn();
+
+  // If the opponent blundered on the final move of the game and immediately resigned/flagged
+  // (so the user won without ever getting a turn to reply), we have no evidence that the user
+  // missed the punishment — skip emitting a false `opponent_*_missed` puzzle or blindspot.
+  if (
+    winner === input.userColor &&
+    input.plies[plyIndex + 1] === undefined &&
+    didWinnerWinByGameResult(winner, input.gameResult)
+  ) {
+    return null;
+  }
+
   const prevCp = relativeScoreToCp(prevScore, ARROW_DUEL_MATE_SCORE);
   const isMateOpportunity = isForcedMateWithin(currentScore, MAX_MATE_SOON);
 
@@ -605,6 +628,7 @@ async function analyzePosition(params: {
       startPlyIndex: plyIndex,
       solutionMoves: mateSolution,
       winner,
+      ...(input.gameResult !== undefined ? { gameResult: input.gameResult } : {}),
       depth: foundLineDepth,
       ...(signal !== undefined ? { signal } : {})
     });
@@ -660,6 +684,7 @@ async function analyzePosition(params: {
         startPlyIndex: plyIndex,
         solutionMoves: [moves.best.move],
         winner,
+        ...(input.gameResult !== undefined ? { gameResult: input.gameResult } : {}),
         depth: foundLineDepth,
         ...(signal !== undefined ? { signal } : {})
       });
@@ -713,6 +738,7 @@ async function analyzePosition(params: {
         startPlyIndex: plyIndex,
         solutionMoves: winningMoves,
         winner,
+        ...(input.gameResult !== undefined ? { gameResult: input.gameResult } : {}),
         depth: foundLineDepth,
         ...(signal !== undefined ? { signal } : {})
       });
