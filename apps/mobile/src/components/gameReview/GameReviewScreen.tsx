@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Chessboard, { type MoveResult } from "react-native-chessboard";
 import {
   defaultOnboardingGuideProgress,
@@ -110,6 +111,7 @@ export function GameReviewScreen({
   const { t } = useTranslation();
   const { pieceSet } = useBoardAppearance();
   const viewport = usePracticeViewport();
+  const insets = useSafeAreaInsets();
   const [measuredStageWidth, setMeasuredStageWidth] = useState<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [guideSeen, setGuideSeen] = useState<boolean>(
@@ -121,10 +123,10 @@ export function GameReviewScreen({
       buildPracticeAdaptiveLayout({
         fontScale: viewport.fontScale ?? 1,
         height: viewport.height,
-        insets: { top: 0, bottom: 0, left: 0, right: 0 },
+        insets,
         width: viewport.width
       }),
-    [viewport.fontScale, viewport.height, viewport.width]
+    [insets, viewport.fontScale, viewport.height, viewport.width]
   );
 
   const controller = useGameReviewController({

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PieceSymbol, Square } from "chess.js";
 import Chessboard, { type ChessboardRef, type MoveResult } from "react-native-chessboard";
 import {
@@ -121,6 +122,7 @@ export function MaiaPlayGameView({
   const { t } = useTranslation();
   const { pieceSet } = useBoardAppearance();
   const viewport = usePracticeViewport();
+  const insets = useSafeAreaInsets();
 
   const [gameState, setGameState] = useState<MaiaGameState>(() =>
     resumeMaiaGameClock(initialState, Date.now())
@@ -531,10 +533,10 @@ export function MaiaPlayGameView({
       buildPracticeAdaptiveLayout({
         fontScale: viewport.fontScale ?? 1,
         height: viewport.height,
-        insets: { top: 0, bottom: 0, left: 0, right: 0 },
+        insets,
         width: viewport.width
       }),
-    [viewport.fontScale, viewport.height, viewport.width]
+    [insets, viewport.fontScale, viewport.height, viewport.width]
   );
 
   const railGap = layout.isRegularWidth ? 24 : 14;
@@ -796,6 +798,7 @@ export function MaiaPlayGameView({
               <View style={styles.flexButton}>
                 <Button
                   label={t("maiaPlay.action.rematch")}
+                  size={layout.isRegularWidth ? "regular" : "compact"}
                   stretch
                   testID="maia-result-rematch"
                   variant="secondary"
@@ -805,6 +808,7 @@ export function MaiaPlayGameView({
               <View style={styles.flexButton}>
                 <Button
                   label={t("maiaPlay.action.newSetup")}
+                  size={layout.isRegularWidth ? "regular" : "compact"}
                   stretch
                   testID="maia-result-new-setup"
                   variant="secondary"
