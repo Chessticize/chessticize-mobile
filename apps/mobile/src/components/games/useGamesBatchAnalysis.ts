@@ -715,10 +715,11 @@ export function useGamesBatchAnalysis({
     }
     const handleAppStateChange = (nextAppState: AppStateStatus): void => {
       if (nextAppState === "background" && runningRef.current) {
-        // When Android Foreground Service, iOS 26+ BGContinuedProcessingTask, or iOS Tier-1
-        // beginBackgroundTask is active, keep running in the OS-managed window and checkpoint
-        // cleanly if an expiration_warning arrives.
-        if (!backgroundSessionActiveRef.current) {
+        // Keep running out-of-app only when the platform explicitly supports continued
+        // background execution (Android Foreground Service). On iOS, proactively pause and
+        // flush the checkpoint inside the beginBackgroundTask safety window, then auto-resume
+        // cleanly when returning to the app.
+        if (!supportsContinuedBackgroundRef.current) {
           requestPause("background");
         }
       } else if (

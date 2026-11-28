@@ -285,7 +285,7 @@ describe("useGamesBatchAnalysis out-of-app background execution", () => {
     mounted.unmount();
   });
 
-  it("iOS Tier 1 beginBackgroundTask stays running on background until OS expiration_warning, then checkpoints and auto-resumes on foreground", async () => {
+  it("iOS Tier 1 beginBackgroundTask proactively pauses on background/lock, flushes checkpoint, and auto-resumes on foreground", async () => {
     const store = new MemoryStore();
     const service = new PracticeService(store);
     store.upsertImportedGames([makeSampleGame("lichess:ios-t1")]);
@@ -312,19 +312,13 @@ describe("useGamesBatchAnalysis out-of-app background execution", () => {
       await Promise.resolve();
     });
 
-    // Going to background under Tier 1 keeps running inside beginBackgroundTask runway
-    act(() => {
-      appStateListener?.("background");
-    });
-    expect(mounted.controller.state.status).toBe("running");
-
-    // Step 1 ply inside background runway
+    // Step 1 ply while foregrounded
     await deferred.stepOne();
     expect(mounted.controller.state.status).toBe("running");
 
-    // OS fires expiration_warning -> pauses cleanly with pausedByBackground = true & stops task
+    // Going to background / locking screen proactively pauses cleanly inside beginBackgroundTask
     await act(async () => {
-      bridge.emit({ type: "expiration_warning" });
+      appStateListener?.("background");
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -342,6 +336,58 @@ describe("useGamesBatchAnalysis out-of-app background execution", () => {
     });
     expect(mounted.controller.state.status).toBe("running");
     expect(bridge.startCalls).toHaveLength(2);
+
+    mounted.unmount();
+  });
+
+  it("handles OS expiration_warning on Android FGS timeout cleanly and auto-resumes on return", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    store.upsertImportedGames([makeSampleGame("lichess:fgs-timeout")]);
+    const games = store.listImportedGames();
+    const deferred = createDeferredEngine();
+    const bridge = new FakeBackgroundBatchAnalysisBridge({
+      active: true,
+      supportsContinuedBackground: true,
+      mode: "foreground_service"
+    });
+
+    const mounted = mountController({
+      store,
+      service,
+      engine: deferred.engine,
+      bridge
+    });
+
+    act(() => {
+      mounted.controller.startBatch(games);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      appStateListener?.("background");
+    });
+    expect(mounted.controller.state.status).toBe("running");
+
+    await act(async () => {
+      bridge.emit({ type: "expiration_warning" });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mounted.controller.state.status).toBe("paused");
+    expect(mounted.controller.state.pausedByBackground).toBe(true);
+
+    act(() => {
+      appStateListener?.("active");
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mounted.controller.state.status).toBe("running");
 
     mounted.unmount();
   });
