@@ -19,6 +19,8 @@ import {
   type MaiaGameEndReason,
   type MaiaGameMoveRecord,
   type MaiaGameState,
+  type MaiaRatedGameRecord,
+  type MaiaRatingAnchorRecord,
   type MaiaRatingRecord,
   type MaiaSetupPreferences,
   type MaiaThinkingPace,
@@ -217,6 +219,79 @@ export function applyMaiaGameRatingResult(
     updatedAt: nowIso
   };
   return { nextRecord, change };
+}
+
+/**
+ * Deterministic, commutative merge for two initial Maia rating anchors of the same time class.
+ * Earliest `setAt` wins (ties broken by lower `initialRating`), guaranteeing convergence across
+ * devices regardless of sync order.
+ */
+export function preferredMaiaRatingAnchor(
+  local: MaiaRatingAnchorRecord,
+  incoming: MaiaRatingAnchorRecord
+): MaiaRatingAnchorRecord {
+  const timeCmp = local.setAt.localeCompare(incoming.setAt);
+  if (timeCmp !== 0) {
+    return timeCmp < 0 ? { ...local } : { ...incoming };
+  }
+  return local.initialRating <= incoming.initialRating ? { ...local } : { ...incoming };
+}
+
+/**
+ * Deterministically recompute a time class's Maia Glicko-2 rating record by replaying all
+ * deduplicated rated games in canonical `(playedAt, gameId)` order. Two devices that play games
+ * offline and sync in any order always converge to the exact same rating, RD, volatility, and
+ * W/L/D counts.
+ */
+export function recomputeMaiaRatingFromGames(input: {
+  timeClass: MaiaTimeClass;
+  anchor?: MaiaRatingAnchorRecord;
+  ratedGames: readonly MaiaRatedGameRecord[];
+  fallbackInitialRating?: number;
+  fallbackUpdatedAt?: string;
+}): MaiaRatingRecord {
+  const deduped = new Map<string, MaiaRatedGameRecord>();
+  for (const game of input.ratedGames) {
+    if (game.timeClass !== input.timeClass) {
+      continue;
+    }
+    const existing = deduped.get(game.gameId);
+    if (!existing) {
+      deduped.set(game.gameId, game);
+    } else if (
+      existing.initialRatingAnchor === undefined &&
+      game.initialRatingAnchor !== undefined
+    ) {
+      deduped.set(game.gameId, { ...existing, initialRatingAnchor: game.initialRatingAnchor });
+    }
+  }
+
+  const ordered = [...deduped.values()].sort(
+    (left, right) =>
+      left.playedAt.localeCompare(right.playedAt) || left.gameId.localeCompare(right.gameId)
+  );
+
+  const initialRating =
+    input.anchor?.initialRating ??
+    ordered[0]?.initialRatingAnchor ??
+    input.fallbackInitialRating ??
+    MAIA_DEFAULT_RATING;
+  const initialUpdatedAt =
+    input.anchor?.setAt ??
+    ordered[0]?.playedAt ??
+    input.fallbackUpdatedAt ??
+    "1970-01-01T00:00:00.000Z";
+
+  let current = createDefaultMaiaRatingRecord(input.timeClass, initialRating, initialUpdatedAt);
+  for (const game of ordered) {
+    current = applyMaiaGameRatingResult(
+      current,
+      game.outcome,
+      game.playedAt,
+      game.opponentRating
+    ).nextRecord;
+  }
+  return current;
 }
 
 /**

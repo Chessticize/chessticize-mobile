@@ -67,7 +67,21 @@ RCT_EXPORT_METHOD(getAccountStatus:(RCTPromiseResolveBlock)resolve
 RCT_EXPORT_METHOD(ensureV2Zone:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
-  CKRecordZoneID *zoneID = [self progressV2ZoneID];
+  [self ensureZoneWithName:ChessticizeV2ZoneName resolver:resolve rejecter:reject];
+}
+
+RCT_EXPORT_METHOD(ensureZone:(NSString *)zoneName
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  [self ensureZoneWithName:zoneName resolver:resolve rejecter:reject];
+}
+
+- (void)ensureZoneWithName:(NSString *)zoneName
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject
+{
+  CKRecordZoneID *zoneID = [self zoneIDForName:zoneName];
   [[self privateDatabase] fetchRecordZoneWithID:zoneID completionHandler:^(CKRecordZone *zone, NSError *error) {
     if (zone != nil && error == nil) {
       resolve(@{ @"created": @NO });
@@ -75,7 +89,7 @@ RCT_EXPORT_METHOD(ensureV2Zone:(RCTPromiseResolveBlock)resolve
     }
     if (error != nil && ![self isZoneMissingError:error]) {
       reject(@"icloud_v2_zone_fetch_failed",
-             @"CloudKit could not inspect the Progress V2 zone.",
+             @"CloudKit could not inspect the custom zone.",
              [self diagnosticError:error]);
       return;
     }
@@ -83,7 +97,7 @@ RCT_EXPORT_METHOD(ensureV2Zone:(RCTPromiseResolveBlock)resolve
     [[self privateDatabase] saveRecordZone:newZone completionHandler:^(CKRecordZone *savedZone, NSError *saveError) {
       if (saveError != nil) {
         reject(@"icloud_v2_zone_create_failed",
-               @"CloudKit could not create the Progress V2 zone.",
+               @"CloudKit could not create the custom zone.",
                [self diagnosticError:saveError]);
         return;
       }
@@ -96,16 +110,38 @@ RCT_EXPORT_METHOD(fetchV2Changes:(NSString *)previousTokenBase64
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
+  [self fetchChangesForZoneName:ChessticizeV2ZoneName
+                  previousToken:previousTokenBase64
+                       resolver:resolve
+                       rejecter:reject];
+}
+
+RCT_EXPORT_METHOD(fetchZoneChanges:(NSString *)zoneName
+                  previousToken:(NSString *)previousTokenBase64
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  [self fetchChangesForZoneName:zoneName
+                  previousToken:previousTokenBase64
+                       resolver:resolve
+                       rejecter:reject];
+}
+
+- (void)fetchChangesForZoneName:(NSString *)zoneName
+                  previousToken:(NSString *)previousTokenBase64
+                       resolver:(RCTPromiseResolveBlock)resolve
+                       rejecter:(RCTPromiseRejectBlock)reject
+{
   NSError *tokenError = nil;
   CKServerChangeToken *previousToken = [self changeTokenFromBase64:previousTokenBase64 error:&tokenError];
   if (tokenError != nil) {
     reject(@"icloud_change_token_invalid",
-           @"The local Progress V2 change token is invalid.",
+           @"The local CloudKit zone change token is invalid.",
            [self diagnosticError:tokenError]);
     return;
   }
 
-  CKRecordZoneID *zoneID = [self progressV2ZoneID];
+  CKRecordZoneID *zoneID = [self zoneIDForName:zoneName];
   CKFetchRecordZoneChangesConfiguration *configuration = [CKFetchRecordZoneChangesConfiguration new];
   configuration.previousServerChangeToken = previousToken;
   configuration.desiredKeys = @[
@@ -168,7 +204,7 @@ RCT_EXPORT_METHOD(fetchV2Changes:(NSString *)previousTokenBase64
     NSString *nextToken = [self base64FromChangeToken:serverChangeToken error:&archiveError];
     if (archiveError != nil || nextToken == nil) {
       reject(@"icloud_change_token_archive_failed",
-             @"CloudKit returned a Progress V2 token that could not be stored.",
+             @"CloudKit returned a zone change token that could not be stored.",
              [self diagnosticError:archiveError]);
       return;
     }
@@ -438,10 +474,37 @@ RCT_EXPORT_METHOD(modifyV2Records:(NSArray<NSDictionary *> *)saving
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
+  [self modifyRecordsForZoneName:ChessticizeV2ZoneName
+                          saving:saving
+                        deleting:deleting
+                        resolver:resolve
+                        rejecter:reject];
+}
+
+RCT_EXPORT_METHOD(modifyZoneRecords:(NSString *)zoneName
+                  saving:(NSArray<NSDictionary *> *)saving
+                  deleting:(NSArray<NSString *> *)deleting
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  [self modifyRecordsForZoneName:zoneName
+                          saving:saving
+                        deleting:deleting
+                        resolver:resolve
+                        rejecter:reject];
+}
+
+- (void)modifyRecordsForZoneName:(NSString *)zoneName
+                          saving:(NSArray<NSDictionary *> *)saving
+                        deleting:(NSArray<NSString *> *)deleting
+                        resolver:(RCTPromiseResolveBlock)resolve
+                        rejecter:(RCTPromiseRejectBlock)reject
+{
+  CKRecordZoneID *zoneID = [self zoneIDForName:zoneName];
   NSMutableArray<CKRecord *> *recordsToSave = [NSMutableArray arrayWithCapacity:saving.count];
   for (NSDictionary *input in saving) {
     NSError *recordError = nil;
-    CKRecord *record = [self v2RecordFromDictionary:input error:&recordError];
+    CKRecord *record = [self v2RecordFromDictionary:input zoneID:zoneID error:&recordError];
     if (recordError != nil || record == nil) {
       reject(@"icloud_v2_record_invalid",
              @"A Progress V2 record is invalid.",
@@ -458,7 +521,7 @@ RCT_EXPORT_METHOD(modifyV2Records:(NSArray<NSDictionary *> *)saving
     }
     [recordIDsToDelete addObject:[[CKRecordID alloc]
       initWithRecordName:(NSString *)value
-      zoneID:[self progressV2ZoneID]]];
+      zoneID:zoneID]];
   }
 
   CKModifyRecordsOperation *operation = [[CKModifyRecordsOperation alloc]
@@ -572,11 +635,22 @@ RCT_EXPORT_METHOD(fetchV1Snapshot:(NSString *)expectedChangeTag
 
 - (CKRecordZoneID *)progressV2ZoneID
 {
-  return [[CKRecordZoneID alloc] initWithZoneName:ChessticizeV2ZoneName
+  return [self zoneIDForName:ChessticizeV2ZoneName];
+}
+
+- (CKRecordZoneID *)zoneIDForName:(NSString *)zoneName
+{
+  NSString *effectiveName =
+    ([zoneName isKindOfClass:[NSString class]] && zoneName.length > 0)
+      ? zoneName
+      : ChessticizeV2ZoneName;
+  return [[CKRecordZoneID alloc] initWithZoneName:effectiveName
                                         ownerName:CKCurrentUserDefaultName];
 }
 
-- (CKRecord *)v2RecordFromDictionary:(NSDictionary *)input error:(NSError **)error
+- (CKRecord *)v2RecordFromDictionary:(NSDictionary *)input
+                              zoneID:(CKRecordZoneID *)zoneID
+                               error:(NSError **)error
 {
   NSString *recordName = [input[@"recordName"] isKindOfClass:[NSString class]] ? input[@"recordName"] : nil;
   NSString *kind = [input[@"kind"] isKindOfClass:[NSString class]] ? input[@"kind"] : nil;
@@ -590,7 +664,7 @@ RCT_EXPORT_METHOD(fetchV1Snapshot:(NSString *)expectedChangeTag
     }
     return nil;
   }
-  CKRecordID *recordID = [[CKRecordID alloc] initWithRecordName:recordName zoneID:[self progressV2ZoneID]];
+  CKRecordID *recordID = [[CKRecordID alloc] initWithRecordName:recordName zoneID:zoneID];
   CKRecord *record = [[CKRecord alloc] initWithRecordType:ChessticizeV2RecordType recordID:recordID];
   record[ChessticizeV2KindField] = kind;
   record[ChessticizeV2SchemaVersionField] = schemaVersion;

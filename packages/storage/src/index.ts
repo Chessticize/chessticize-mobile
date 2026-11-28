@@ -5,6 +5,7 @@ export * from "./local-data-export-validation.ts";
 export * from "./progress-sync.ts";
 export * from "./progress-sync-v2.ts";
 export * from "./progress-v2-persistence.ts";
+export * from "./games-sync-v1.ts";
 export * from "./rating-history.ts";
 export * from "./review-today.ts";
 export * from "./query-types.ts";

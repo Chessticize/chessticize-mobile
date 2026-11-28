@@ -8,6 +8,10 @@ import {
   syncPracticeProgressV2
 } from "../../../../../../packages/storage/src/progress-sync-v2.ts";
 import {
+  GAMES_V1_ZONE_NAME,
+  syncGamesV1
+} from "../../../../../../packages/storage/src/games-sync-v1.ts";
+import {
   captureProgressForSupport,
   PROGRESS_V2_RELEASE_PHASE,
   resolveProgressV2ActivePhase,
@@ -478,8 +482,29 @@ export function useSettingsController({
           now: nowIso,
           isCurrent
         });
+        if (iCloudSyncClient.createZoneTransport && isCurrent()) {
+          await syncGamesV1(
+            service,
+            iCloudSyncClient.createZoneTransport(GAMES_V1_ZONE_NAME),
+            {
+              now: nowIso,
+              isCurrent
+            }
+          );
+        }
         refreshState();
-        setICloudSyncEnabled(service.getSettings().sync.iCloudEnabled);
+        const syncedSettings = service.getSettings();
+        setICloudSyncEnabled(syncedSettings.sync.iCloudEnabled);
+        setReviewReminderPreference(service.getReviewReminderPreference());
+        setMoveFeedbackPreferences(syncedSettings.moveFeedback);
+        setAppearancePreference(syncedSettings.appearance);
+        setAppearance(syncedSettings.appearance);
+        setLightBoardThemePreference(syncedSettings.lightBoardTheme);
+        setLightBoardTheme(syncedSettings.lightBoardTheme);
+        setDarkBoardThemePreference(syncedSettings.darkBoardTheme);
+        setDarkBoardTheme(syncedSettings.darkBoardTheme);
+        setPieceSetPreference(syncedSettings.pieceSet);
+        setPieceSet(syncedSettings.pieceSet);
         setSettingsRevision((current) => current + 1);
         const message = progressSyncStatusMessage(result, getActiveLocale());
         setICloudSyncStatus(message);

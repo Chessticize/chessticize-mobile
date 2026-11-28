@@ -123,6 +123,7 @@ import type {
   ProgressV2StatePatch,
   ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
+import type { GamesV1Persistence } from "./games-sync-v1.ts";
 import {
   indexSprintSessionsByRatingKey,
   reconcileRatingWithSprintSessions
@@ -315,6 +316,13 @@ export class PracticeService {
     return this.store.progressV2;
   }
 
+  get gamesV1(): GamesV1Persistence {
+    if (!this.store.gamesV1) {
+      throw new Error("Games V1 persistence is unavailable for this store");
+    }
+    return this.store.gamesV1;
+  }
+
   get gameReviewStore(): GameReviewStore {
     return this.store;
   }
@@ -462,6 +470,11 @@ export class PracticeService {
       return current;
     }
     const next = createDefaultMaiaRatingRecord(timeClass, rating, now);
+    this.store.saveMaiaRatingAnchor({
+      timeClass,
+      initialRating: next.rating,
+      setAt: now
+    });
     this.store.saveMaiaRating(next);
     return next;
   }
@@ -529,6 +542,17 @@ export class PracticeService {
 
       const draft = buildImportedGameDraftFromMaiaGame(nextState, userLabel);
       this.store.upsertImportedGames([draft], nowIso);
+      if (state.rated) {
+        const outcome = maiaGameOutcomeForUser(state);
+        this.store.upsertMaiaRatedGame({
+          gameId: draft.id,
+          timeClass: state.timeClass,
+          playedAt: draft.playedAt,
+          outcome,
+          opponentRating: state.maiaRating,
+          ...(currentRating.games === 0 ? { initialRatingAnchor: currentRating.rating } : {})
+        });
+      }
       this.store.clearActiveMaiaGame();
 
       nextState = {

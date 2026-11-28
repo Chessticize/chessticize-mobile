@@ -25,6 +25,7 @@ import type { SprintGuideProgress } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
+import type { GamesV1PersistenceHost } from "./games-sync-v1.ts";
 import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
 import type { GameReviewStore } from "./game-review-store.ts";
 import type { MaiaPlayStore } from "./maia-play-store.ts";
@@ -197,7 +198,8 @@ export interface PracticeRatingActivity {
   lastPlayedAt: string;
 }
 
-export interface PracticeStore extends ProgressV2PersistenceHost, GameReviewStore, MaiaPlayStore {
+export interface PracticeStore
+  extends ProgressV2PersistenceHost, GamesV1PersistenceHost, GameReviewStore, MaiaPlayStore {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;
