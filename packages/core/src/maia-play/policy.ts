@@ -1,5 +1,6 @@
-import { Chess } from "chess.js";
+import { Chess, type Move } from "chess.js";
 import type { HumanPolicyModel } from "../game-puzzles/difficulty.ts";
+import { lookupMaiaOpeningBook, openingPositionKey } from "./opening-book.ts";
 import type { MaiaThinkingPace, MaiaTimeClass } from "./types.ts";
 
 export interface MaiaMoveChoice {
@@ -9,12 +10,19 @@ export interface MaiaMoveChoice {
   entropy: number;
   legalMoveCount: number;
   usedFallbackPolicy: boolean;
+  usedOpeningBook?: boolean;
 }
 
 export interface SelectMaiaMoveOptions {
   fen: string;
   maiaRating: number;
   policyModel?: HumanPolicyModel | null;
+  /** Current ply count (0 = start). Helps handle Maia-2's ply < 10 training boundary. */
+  ply?: number;
+  /** Recent 4-field FEN keys played in this game, used to discourage pointless move loops. */
+  recentPositionKeys?: readonly string[];
+  /** Disable opening book lookup (useful in unit tests targeting raw policy calls). */
+  disableOpeningBook?: boolean;
   rng?: () => number;
 }
 
@@ -22,30 +30,30 @@ export interface SelectMaiaMoveOptions {
  * Calibrate sampling temperature & nucleus (top-p) by target rating so Maia:
  * - Never repeats identical deterministic lines every game
  * - Softens smoothly below Maia-2's lowest bucket (<1100) for beginners
- * - Plays sharper and more consistent lines at 1600–2000+
+ * - Plays sharper and more consistent lines at 1400–2000+
  */
 export function maiaSamplingParamsForRating(rating: number): {
   temperature: number;
   topP: number;
 } {
   if (rating <= 800) {
-    return { temperature: 1.25, topP: 0.96 };
+    return { temperature: 1.15, topP: 0.94 };
   }
   if (rating < 1100) {
     const t = (rating - 800) / 300;
     return {
-      temperature: 1.25 - t * 0.4,
-      topP: 0.96 - t * 0.06
+      temperature: 1.15 - t * 0.4,
+      topP: 0.94 - t * 0.08
     };
   }
   if (rating <= 1600) {
     const t = (rating - 1100) / 500;
     return {
-      temperature: 0.85 - t * 0.15,
-      topP: 0.9 - t * 0.04
+      temperature: 0.75 - t * 0.25,
+      topP: 0.86 - t * 0.1
     };
   }
-  return { temperature: 0.65, topP: 0.85 };
+  return { temperature: 0.45, topP: 0.72 };
 }
 
 /**
@@ -131,6 +139,152 @@ const FALLBACK_PIECE_SCORE: Readonly<Record<string, number>> = {
   k: 0
 };
 
+function countHomeRankPawns(chess: Chess, color: "w" | "b"): number {
+  const rankIdx = color === "w" ? 6 : 1; // chess.board()[0] = rank 8, [6] = rank 2, [1] = rank 7
+  const row = chess.board()[rankIdx];
+  if (!row) {
+    return 0;
+  }
+  let count = 0;
+  for (const sq of row) {
+    if (sq && sq.color === color && sq.type === "p") {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function estimateFullmoveFromFen(fen: string): number {
+  const num = Number(fen.trim().split(/\s+/)[5] ?? "1");
+  return Number.isFinite(num) && num >= 1 ? num : 1;
+}
+
+function materialBalance(chess: Chess, color: "w" | "b"): number {
+  let diff = 0;
+  for (const row of chess.board()) {
+    for (const sq of row) {
+      if (!sq) {
+        continue;
+      }
+      const val = FALLBACK_PIECE_SCORE[sq.type] ?? 0;
+      diff += sq.color === color ? val : -val;
+    }
+  }
+  return diff;
+}
+
+/**
+ * Maia-2 was trained on Lichess games starting at ply 11+ (first 10 plies excluded).
+ * When an offbeat user move takes the game out of our opening book while the board
+ * is still in an undeveloped opening phase (early fullmoves / untouched pawn front),
+ * gently guard against Maia-2's known out-of-distribution opening artifacts
+ * (retreating knights to b1/g1/b8/g8, Bongcloud Ke2/Ke7, or pointless loops)
+ * while preserving Maia-2's tactical awareness for captures/checks/mates.
+ */
+export function applyMaiaOpeningAndLoopGuard(
+  chess: Chess,
+  legalVerbose: readonly Move[],
+  rawProbs: Readonly<Record<string, number>>,
+  options: {
+    ply?: number;
+    recentPositionKeys?: readonly string[];
+  }
+): Record<string, number> {
+  const turn = chess.turn();
+  const fullmove = estimateFullmoveFromFen(chess.fen());
+  const effectivePly = options.ply ?? (fullmove - 1) * 2 + (turn === "b" ? 1 : 0);
+  const homePawns = countHomeRankPawns(chess, turn);
+  const inOpeningTransition = effectivePly < 10 || (effectivePly < 16 && homePawns >= 7);
+  const ownMaterialDiff = materialBalance(chess, turn);
+  const inCheck = chess.inCheck();
+
+  const recentCounts = new Map<string, number>();
+  if (options.recentPositionKeys) {
+    for (const key of options.recentPositionKeys) {
+      recentCounts.set(key, (recentCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const homeBackRank = turn === "w" ? "1" : "8";
+  const pawnStartRank = turn === "w" ? "2" : "7";
+  const centralFiles = new Set(["c", "d", "e", "f"]);
+  const innerCenterFiles = new Set(["d", "e"]);
+
+  const adjusted: Record<string, number> = {};
+  let total = 0;
+
+  for (const move of legalVerbose) {
+    const uci = `${move.from}${move.to}${move.promotion ?? ""}`.toLowerCase();
+    let prob = rawProbs[uci] ?? 1e-6;
+
+    // Immediate mate-in-1 is always untouched / boosted
+    if (move.san.endsWith("#")) {
+      prob *= 8;
+    }
+
+    if (inOpeningTransition && !move.captured && !move.san.endsWith("#")) {
+      const fromRank = move.from[1]!;
+      const toRank = move.to[1]!;
+      const toFile = move.to[0]!;
+
+      // Strongly penalize retreating a developed minor piece back to the back rank (Nb1/Ng1/Nb8/Ng8)
+      if ((move.piece === "n" || move.piece === "b") && fromRank !== homeBackRank && toRank === homeBackRank) {
+        prob *= 0.03;
+      }
+
+      // Strongly penalize moving the King (non-castling) in the opening when not in check (Bongcloud Ke2!)
+      const isCastle = move.san === "O-O" || move.san === "O-O-O";
+      if (move.piece === "k" && !isCastle && !inCheck) {
+        prob *= 0.04;
+      }
+
+      // Penalize rim knight jumps (Na3/Nh3/Na6/Nh6) on moves 1-5
+      if (move.piece === "n" && (toFile === "a" || toFile === "h")) {
+        prob *= 0.2;
+      }
+
+      // Encourage healthy opening development (center pawns, developing minor pieces, castling)
+      if (isCastle) {
+        prob *= 2.4;
+      } else if (move.piece === "p" && fromRank === pawnStartRank && innerCenterFiles.has(toFile)) {
+        prob *= homePawns >= 7 ? 3.5 : 1.8;
+      } else if (move.piece === "p" && fromRank === pawnStartRank && centralFiles.has(toFile)) {
+        prob *= 1.6;
+      } else if ((move.piece === "n" || move.piece === "b") && fromRank === homeBackRank && centralFiles.has(toFile)) {
+        prob *= 1.9;
+      }
+    }
+
+    // Damp pointless repetition loops (especially when not losing materially)
+    if (recentCounts.size > 0 && ownMaterialDiff >= -1.5 && !move.san.endsWith("#")) {
+      const probe = new Chess(chess.fen());
+      probe.move({
+        from: move.from,
+        to: move.to,
+        ...(move.promotion ? { promotion: move.promotion } : {})
+      });
+      const nextKey = openingPositionKey(probe.fen());
+      const seen = recentCounts.get(nextKey) ?? 0;
+      if (seen >= 2) {
+        prob *= 0.05;
+      } else if (seen === 1) {
+        prob *= inOpeningTransition ? 0.1 : 0.35;
+      }
+    }
+
+    adjusted[uci] = Math.max(1e-9, prob);
+    total += adjusted[uci]!;
+  }
+
+  if (total <= 0) {
+    return { ...rawProbs };
+  }
+  for (const key of Object.keys(adjusted)) {
+    adjusted[key] = adjusted[key]! / total;
+  }
+  return adjusted;
+}
+
 /**
  * Lightweight heuristic distribution used only when the native Maia-2 runtime
  * is absent (e.g., Web Interaction Lab or Jest without CoreML/ONNX).
@@ -168,7 +322,6 @@ export function buildFallbackMoveDistribution(fen: string): {
     if (move.san === "O-O" || move.san === "O-O-O") {
       score += 1.5;
     }
-    // Slight preference for central squares
     const file = move.to.charCodeAt(0) - 97;
     const rank = move.to.charCodeAt(1) - 49;
     if (file >= 2 && file <= 5 && rank >= 2 && rank <= 5) {
@@ -205,8 +358,10 @@ export function buildFallbackMoveDistribution(fen: string): {
 }
 
 /**
- * Choose Maia's next legal move for `fen` at `maiaRating` using the on-device
- * Maia-2 `HumanPolicyModel` (with clean fallback if the native runtime is absent).
+ * Choose Maia's next legal move for `fen` at `maiaRating` using:
+ * 1. Compact human opening book (plies 0–10, since Maia-2 was trained on ply 11+)
+ * 2. On-device Maia-2 `HumanPolicyModel` with opening-transition & loop guard
+ * 3. Clean fallback heuristic if the native runtime is absent
  */
 export async function selectMaiaMove(options: SelectMaiaMoveOptions): Promise<MaiaMoveChoice> {
   const chess = new Chess(options.fen);
@@ -215,8 +370,49 @@ export async function selectMaiaMove(options: SelectMaiaMoveOptions): Promise<Ma
     throw new Error(`No legal moves available in position ${options.fen}`);
   }
   const legalUcis = legalVerbose.map((m) => `${m.from}${m.to}${m.promotion ?? ""}`.toLowerCase());
+  const legalSet = new Set(legalUcis);
+
+  // 1. Opening book lookup (keeps plies 0–10 realistic before handing off to Maia-2)
+  if (!options.disableOpeningBook) {
+    const bookMoves = lookupMaiaOpeningBook(options.fen)?.filter((entry) => legalSet.has(entry.uci));
+    if (bookMoves && bookMoves.length > 0) {
+      let totalWeight = 0;
+      for (const entry of bookMoves) {
+        totalWeight += entry.weight;
+      }
+      const bookProbs: Record<string, number> = {};
+      let top1Prob = 0;
+      let entropy = 0;
+      for (const entry of bookMoves) {
+        const p = totalWeight > 0 ? entry.weight / totalWeight : 1 / bookMoves.length;
+        bookProbs[entry.uci] = p;
+        if (p > top1Prob) {
+          top1Prob = p;
+        }
+        if (p > 1e-12) {
+          entropy -= p * Math.log(p);
+        }
+      }
+      const picked = sampleMoveFromDistribution(bookProbs, {
+        temperature: 1.0,
+        topP: 0.95,
+        ...(options.rng ? { rng: options.rng } : {})
+      });
+      return {
+        uci: picked.uci,
+        probability: picked.probability,
+        top1Prob,
+        entropy,
+        legalMoveCount: legalUcis.length,
+        usedFallbackPolicy: false,
+        usedOpeningBook: true
+      };
+    }
+  }
+
   const sampling = maiaSamplingParamsForRating(options.maiaRating);
 
+  // 2. Real Maia-2 policy inference
   if (options.policyModel) {
     try {
       const results = await options.policyModel.scoreMoves([
@@ -228,7 +424,13 @@ export async function selectMaiaMove(options: SelectMaiaMoveOptions): Promise<Ma
       ]);
       const stats = results[0]?.byElo[options.maiaRating];
       if (stats && Object.keys(stats.probs).length > 0) {
-        const picked = sampleMoveFromDistribution(stats.probs, {
+        const guardedProbs = applyMaiaOpeningAndLoopGuard(chess, legalVerbose, stats.probs, {
+          ...(options.ply === undefined ? {} : { ply: options.ply }),
+          ...(options.recentPositionKeys === undefined
+            ? {}
+            : { recentPositionKeys: options.recentPositionKeys })
+        });
+        const picked = sampleMoveFromDistribution(guardedProbs, {
           temperature: sampling.temperature,
           topP: sampling.topP,
           ...(options.rng ? { rng: options.rng } : {})
@@ -239,7 +441,8 @@ export async function selectMaiaMove(options: SelectMaiaMoveOptions): Promise<Ma
           top1Prob: stats.top1Prob ?? picked.probability,
           entropy: stats.entropy ?? 0,
           legalMoveCount: legalUcis.length,
-          usedFallbackPolicy: false
+          usedFallbackPolicy: false,
+          usedOpeningBook: false
         };
       }
     } catch {
@@ -247,8 +450,15 @@ export async function selectMaiaMove(options: SelectMaiaMoveOptions): Promise<Ma
     }
   }
 
+  // 3. Lightweight fallback when native Maia-2 runtime is absent (Jest/Lab)
   const fallback = buildFallbackMoveDistribution(options.fen);
-  const picked = sampleMoveFromDistribution(fallback.probs, {
+  const guardedFallback = applyMaiaOpeningAndLoopGuard(chess, legalVerbose, fallback.probs, {
+    ...(options.ply === undefined ? {} : { ply: options.ply }),
+    ...(options.recentPositionKeys === undefined
+      ? {}
+      : { recentPositionKeys: options.recentPositionKeys })
+  });
+  const picked = sampleMoveFromDistribution(guardedFallback, {
     temperature: sampling.temperature,
     topP: sampling.topP,
     ...(options.rng ? { rng: options.rng } : {})
@@ -259,7 +469,8 @@ export async function selectMaiaMove(options: SelectMaiaMoveOptions): Promise<Ma
     top1Prob: fallback.top1Prob,
     entropy: fallback.entropy,
     legalMoveCount: legalUcis.length,
-    usedFallbackPolicy: true
+    usedFallbackPolicy: true,
+    usedOpeningBook: false
   };
 }
 
@@ -288,7 +499,6 @@ export function computeMaiaThinkTimeMs(input: {
         ? { minMs: 550, baseMs: 2600, capMs: 8000 }
         : { minMs: 650, baseMs: 3400, capMs: 10500 };
 
-  // Forced single legal move -> almost instant human reaction
   if (input.legalMoveCount <= 1) {
     return Math.round(profile.minMs * 0.8);
   }
@@ -298,24 +508,20 @@ export function computeMaiaThinkTimeMs(input: {
 
   let ms = profile.minMs + profile.baseMs * (0.35 + 1.15 * normalizedEntropy);
 
-  // Obvious recapture or overwhelmingly likely move -> quick
   if (input.top1Prob >= 0.85) {
     ms *= 0.4;
   } else if (input.top1Prob >= 0.65) {
     ms *= 0.65;
   }
 
-  // Opening phase (first 6 plies) -> snappy
   if (input.ply < 6) {
     ms *= 0.5;
   }
 
-  // Human-like jitter (0.78..1.22)
   const rng = input.rng ?? Math.random;
   const jitter = 0.78 + Math.max(0, Math.min(1, rng())) * 0.44;
   ms *= jitter;
 
-  // Respect clock so Maia speeds up in time scrambles and doesn't needlessly flag
   let cap = profile.capMs;
   if (input.maiaClockRemainingMs !== null) {
     if (input.maiaClockRemainingMs <= 10_000) {

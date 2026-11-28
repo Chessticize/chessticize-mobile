@@ -16,7 +16,7 @@ export interface MaiaPlayHomeCardProps {
   onOpen: () => void;
 }
 
-export function MaiaPlayHomeCard({
+export function MaiaPlayHomeRow({
   activeGame,
   preferences,
   rating,
@@ -37,21 +37,27 @@ export function MaiaPlayHomeCard({
     : `${classLabel} ${tcLabel} · ${rating.rating}`;
 
   return (
+    <ListRow
+      accessibilityHint={t("maiaPlay.homeCardHint")}
+      accessibilityLabel={t("maiaPlay.homeCardA11y")}
+      icon="tabGames"
+      subtitle={subtitle}
+      testID="maia-play-home-card"
+      title={t("maiaPlay.title")}
+      trailing={
+        hasResumable ? (
+          <Badge label={t("maiaPlay.action.resume")} tone="accent" />
+        ) : undefined
+      }
+      onPress={onOpen}
+    />
+  );
+}
+
+export function MaiaPlayHomeCard(props: MaiaPlayHomeCardProps): React.JSX.Element {
+  return (
     <Section rows>
-      <ListRow
-        accessibilityHint={t("maiaPlay.homeCardHint")}
-        accessibilityLabel={t("maiaPlay.homeCardA11y")}
-        icon="tabGames"
-        subtitle={subtitle}
-        testID="maia-play-home-card"
-        title={t("maiaPlay.title")}
-        trailing={
-          hasResumable ? (
-            <Badge label={t("maiaPlay.action.resume")} tone="accent" />
-          ) : undefined
-        }
-        onPress={onOpen}
-      />
+      <MaiaPlayHomeRow {...props} />
     </Section>
   );
 }
