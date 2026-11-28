@@ -5114,6 +5114,24 @@ export function PracticePocScreen({
                 setActiveGameReviewId(null);
                 setActiveGameReviewInitialPly(null);
               }}
+              onDeleteGame={(gameId) => {
+                const gamePuzzleIds = new Set(
+                  service.listUserPuzzles({ gameId }).map((puzzle) => puzzle.id)
+                );
+                for (const entry of service.listReviewQueue()) {
+                  if (gamePuzzleIds.has(entry.puzzleId)) {
+                    service.removeReview({
+                      puzzleId: entry.puzzleId,
+                      mode: entry.mode,
+                      ratingKey: entry.ratingKey
+                    });
+                  }
+                }
+                service.deleteImportedGame(gameId);
+                setActiveGameReviewId(null);
+                setActiveGameReviewInitialPly(null);
+                refreshState();
+              }}
               onPracticeGamePuzzles={(gameId) => {
                 startMyGamePuzzlesSessionForOptions({ gameId });
               }}

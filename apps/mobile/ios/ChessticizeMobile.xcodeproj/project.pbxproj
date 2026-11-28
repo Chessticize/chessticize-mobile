@@ -19,11 +19,11 @@
 		9D2E4F5A2D2C400100A00001 /* ICloudProgressSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D2E4F5C2D2C400100A00001 /* ICloudProgressSync.m */; };
 		9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D2E4F5E2D2C400100A00001 /* CloudKit.framework */; };
 		A24700012E70000100A00001 /* MoveFeedback.m in Sources */ = {isa = PBXBuildFile; fileRef = A24700022E70000100A00001 /* MoveFeedback.m */; };
-		A76900012E70000100A00001 /* NativeHumanPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = A76900022E70000100A00001 /* NativeHumanPolicy.m */; };
 		A24700032E70000100A00001 /* freesound-546119-piece-placement.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */; };
 		A24700052E70000100A00001 /* freesound-546120-piece-capture.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */; };
 		A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A24700082E70000100A00001 /* AVFoundation.framework */; };
 		A6090B012F00000100A00001 /* ChessticizeSymbolView.mm in Sources */ = {isa = PBXBuildFile; fileRef = A6090B022F00000100A00001 /* ChessticizeSymbolView.mm */; };
+		A76900012E70000100A00001 /* NativeHumanPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = A76900022E70000100A00001 /* NativeHumanPolicy.m */; };
 		B35300012E70000100A00001 /* ICloudSyncDiagnostics.m in Sources */ = {isa = PBXBuildFile; fileRef = B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */; };
 		B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B35300042E70000100A00001 /* libsqlite3.tbd */; };
 		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
@@ -54,11 +54,11 @@
 		A10000012E60000100A00001 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config/Debug.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
 		A10000022E60000100A00001 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config/Release.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
 		A24700022E70000100A00001 /* MoveFeedback.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MoveFeedback.m; path = ChessticizeMobile/MoveFeedback.m; sourceTree = "<group>"; };
-		A76900022E70000100A00001 /* NativeHumanPolicy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeHumanPolicy.m; path = ChessticizeMobile/NativeHumanPolicy.m; sourceTree = "<group>"; };
 		A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546119-piece-placement.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546120-piece-capture.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700082E70000100A00001 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		A6090B022F00000100A00001 /* ChessticizeSymbolView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = ChessticizeSymbolView.mm; path = ChessticizeMobile/ChessticizeSymbolView.mm; sourceTree = "<group>"; };
+		A76900022E70000100A00001 /* NativeHumanPolicy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeHumanPolicy.m; path = ChessticizeMobile/NativeHumanPolicy.m; sourceTree = "<group>"; };
 		B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ICloudSyncDiagnostics.m; path = ChessticizeMobile/ICloudSyncDiagnostics.m; sourceTree = "<group>"; };
 		B35300042E70000100A00001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };

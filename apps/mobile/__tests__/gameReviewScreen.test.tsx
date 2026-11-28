@@ -1095,4 +1095,39 @@ describe("GameReviewScreen (#767)", () => {
     release?.();
     act(() => renderer.unmount());
   });
+
+  it("requires inline confirmation before invoking onDeleteGame", () => {
+    const { store, service, game } = setupAnalyzedStore();
+    const onDeleteGame = jest.fn();
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+            <GameReviewScreen
+              BoardComponent={MockReviewBoard}
+              game={game}
+              onDeleteGame={onDeleteGame}
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    expect(queryByTestId(renderer, "game-review-delete-confirm")).toBeNull();
+    act(() => {
+      findByTestId(renderer, "game-review-delete-game").props.onPress();
+    });
+    expect(findByTestId(renderer, "game-review-delete-confirm")).toBeTruthy();
+    expect(onDeleteGame).not.toHaveBeenCalled();
+
+    act(() => {
+      findByTestId(renderer, "game-review-delete-confirm-submit").props.onPress();
+    });
+    expect(onDeleteGame).toHaveBeenCalledWith(game.id);
+    act(() => renderer.unmount());
+  });
 });

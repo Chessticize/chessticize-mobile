@@ -44,7 +44,11 @@ export interface GamesImportModalProps {
     maxGames: number;
   }) => Promise<void>;
   onImportOlderForAccount?: (account: LinkedGameAccount) => Promise<void>;
-  onRemoveAccount: (platform: LinkedGameAccountPlatform, username: string) => void;
+  onRemoveAccount: (
+    platform: LinkedGameAccountPlatform,
+    username: string,
+    options?: { deleteData?: boolean }
+  ) => void;
   onImportPgn: (input: { pgnText: string; defaultUserColor: GameColor }) => void;
   onClearFeedback?: () => void;
 }
@@ -75,11 +79,13 @@ export function GamesImportModal({
   const [maxGames, setMaxGames] = useState<number>(25);
   const [pgnText, setPgnText] = useState("");
   const [playerColor, setPlayerColor] = useState<GameColor>("w");
+  const [pendingUnlinkKey, setPendingUnlinkKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       setActiveTab(initialTab);
       setUsername("");
+      setPendingUnlinkKey(null);
     }
   }, [initialTab, visible]);
 
@@ -215,7 +221,6 @@ export function GamesImportModal({
                     testID="games-import-username-input"
                     value={username}
                     onChangeText={setUsername}
-                    onSubmitEditing={handleSubmitAccount}
                   />
                 </View>
 
@@ -252,44 +257,95 @@ export function GamesImportModal({
                     <View style={styles.linkedList}>
                       {linkedAccounts.map((account) => {
                         const platformLabel = gamePlatformLabel(account.platform, locale);
+                        const accountKey = `${account.platform}:${account.username}`;
+                        const confirmingUnlink = pendingUnlinkKey === accountKey;
                         return (
                           <View
-                            key={`${account.platform}:${account.username}`}
+                            key={accountKey}
                             style={styles.linkedRow}
                             testID={`games-linked-account-${account.platform}-${account.username}`}
                           >
                             <View style={styles.linkedRowCopy}>
-                              <AppText variant="headline">{account.username}</AppText>
+                              <AppText ellipsizeMode="tail" numberOfLines={1} variant="headline">
+                                {account.username}
+                              </AppText>
                               <AppText tone="secondary" variant="footnote">
                                 {platformLabel}
                               </AppText>
                             </View>
-                            <View style={styles.linkedRowActions}>
-                              {onImportOlderForAccount ? (
+                            {confirmingUnlink ? (
+                              <View
+                                style={styles.unlinkConfirmBox}
+                                testID={`games-unlink-confirm-${account.platform}-${account.username}`}
+                              >
+                                <AppText tone="secondary" variant="footnote">
+                                  {t("games.modal.unlinkConfirmBody")}
+                                </AppText>
+                                <View style={styles.linkedRowActions}>
+                                  <Button
+                                    disabled={busy}
+                                    label={t("games.modal.unlinkOnly")}
+                                    size="compact"
+                                    testID={`games-unlink-only-${account.platform}-${account.username}`}
+                                    variant="secondary"
+                                    onPress={() => {
+                                      setPendingUnlinkKey(null);
+                                      onRemoveAccount(account.platform, account.username, {
+                                        deleteData: false
+                                      });
+                                    }}
+                                  />
+                                  <Button
+                                    disabled={busy}
+                                    label={t("games.modal.unlinkAndDelete")}
+                                    size="compact"
+                                    testID={`games-unlink-delete-${account.platform}-${account.username}`}
+                                    variant="destructive"
+                                    onPress={() => {
+                                      setPendingUnlinkKey(null);
+                                      onRemoveAccount(account.platform, account.username, {
+                                        deleteData: true
+                                      });
+                                    }}
+                                  />
+                                  <Button
+                                    disabled={busy}
+                                    label={t("common.cancel")}
+                                    size="compact"
+                                    testID={`games-unlink-cancel-${account.platform}-${account.username}`}
+                                    variant="plain"
+                                    onPress={() => setPendingUnlinkKey(null)}
+                                  />
+                                </View>
+                              </View>
+                            ) : (
+                              <View style={styles.linkedRowActions}>
+                                {onImportOlderForAccount ? (
+                                  <Button
+                                    disabled={busy}
+                                    label={t("games.action.importOlderShort")}
+                                    size="compact"
+                                    testID={`games-import-older-${account.platform}-${account.username}`}
+                                    variant="secondary"
+                                    onPress={() => {
+                                      void onImportOlderForAccount(account);
+                                    }}
+                                  />
+                                ) : null}
                                 <Button
+                                  accessibilityLabel={t("games.modal.removeAccountA11y", {
+                                    platform: platformLabel,
+                                    username: account.username
+                                  })}
                                   disabled={busy}
-                                  label={t("games.action.importOlderShort")}
+                                  label={t("games.modal.unlink")}
                                   size="compact"
-                                  testID={`games-import-older-${account.platform}-${account.username}`}
-                                  variant="secondary"
-                                  onPress={() => {
-                                    void onImportOlderForAccount(account);
-                                  }}
+                                  testID={`games-remove-account-${account.platform}-${account.username}`}
+                                  variant="plain"
+                                  onPress={() => setPendingUnlinkKey(accountKey)}
                                 />
-                              ) : null}
-                              <Button
-                                accessibilityLabel={t("games.modal.removeAccountA11y", {
-                                  platform: platformLabel,
-                                  username: account.username
-                                })}
-                                disabled={busy}
-                                label={t("common.remove")}
-                                size="compact"
-                                testID={`games-remove-account-${account.platform}-${account.username}`}
-                                variant="destructive"
-                                onPress={() => onRemoveAccount(account.platform, account.username)}
-                              />
-                            </View>
+                              </View>
+                            )}
                           </View>
                         );
                       })}
@@ -432,25 +488,27 @@ const useStyles = makeStyles((theme) => ({
     gap: 8
   },
   linkedRow: {
-    alignItems: "center",
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.border.default,
     borderRadius: theme.shape.control,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
+    gap: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 10
   },
   linkedRowCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
+    gap: 2
   },
   linkedRowActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 6
+    flexWrap: "wrap",
+    gap: 8
+  },
+  unlinkConfirmBox: {
+    borderTopColor: theme.colors.border.default,
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 8
   }
 }));

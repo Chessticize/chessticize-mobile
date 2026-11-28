@@ -724,8 +724,38 @@ export function GamesHubScreen({
   }, [autoSyncOnMount, handleSyncAllLinked, snapshot.linkedAccounts.length]);
 
   const handleRemoveAccount = useCallback(
-    (platform: LinkedGameAccountPlatform, username: string): void => {
+    (
+      platform: LinkedGameAccountPlatform,
+      username: string,
+      options?: { deleteData?: boolean }
+    ): void => {
       service.removeLinkedAccount(platform, username);
+      if (options?.deleteData) {
+        const targetLower = username.trim().toLowerCase();
+        const matchingGames = service
+          .listImportedGames()
+          .filter(
+            (game) =>
+              game.platform === platform &&
+              (game.username ?? "").trim().toLowerCase() === targetLower
+          );
+        const reviewQueue = service.listReviewQueue();
+        for (const game of matchingGames) {
+          const gamePuzzleIds = new Set(
+            service.listUserPuzzles({ gameId: game.id }).map((puzzle) => puzzle.id)
+          );
+          for (const entry of reviewQueue) {
+            if (gamePuzzleIds.has(entry.puzzleId)) {
+              service.removeReview({
+                puzzleId: entry.puzzleId,
+                mode: entry.mode,
+                ratingKey: entry.ratingKey
+              });
+            }
+          }
+          service.deleteImportedGame(game.id);
+        }
+      }
       refreshHub();
     },
     [refreshHub, service]
