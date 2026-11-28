@@ -5,11 +5,17 @@ import type {
   LocalDataImportResult,
   PracticeSettings
 } from "./practice-store.ts";
-import type {
-  PracticeRunRecord,
-  RatingRecord,
-  ReviewScheduleRemoval
+import {
+  isUserGamePuzzleId,
+  type PracticeRunRecord,
+  type RatingRecord,
+  type ReviewScheduleRemoval
 } from "../../core/src/index.ts";
+import {
+  isUserGameProgressV2Identity,
+  isUserGameRatingKey,
+  isUserGameSprintSession
+} from "./game-review-store.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 import {
   isCanonicalLocalDataExport,
@@ -357,16 +363,24 @@ async function flushProgressV2Outbox(
     if (outbox.length === 0) {
       return pushed;
     }
-    const records = encodeOutbox(persistence, outbox, persistence.readState());
+    const localOnly = outbox.filter(isUserGameProgressV2Identity);
+    if (localOnly.length > 0) {
+      persistence.acknowledgeOutbox(localOnly, now());
+    }
+    const syncableOutbox = outbox.filter((entry) => !isUserGameProgressV2Identity(entry));
+    if (syncableOutbox.length === 0) {
+      continue;
+    }
+    const records = encodeOutbox(persistence, syncableOutbox, persistence.readState());
     const modified = await transport.modifyRecords({ saving: records, deleting: [] });
     assertCurrent(options);
     const confirmed = new Set(modified.savedRecordNames);
-    const acknowledged = outbox.filter((entry) => confirmed.has(progressV2RecordName(entry)));
+    const acknowledged = syncableOutbox.filter((entry) => confirmed.has(progressV2RecordName(entry)));
     if (acknowledged.length > 0) {
       persistence.acknowledgeOutbox(acknowledged, now());
       pushed += acknowledged.length;
     }
-    if (modified.errors.length > 0 || acknowledged.length !== outbox.length) {
+    if (modified.errors.length > 0 || acknowledged.length !== syncableOutbox.length) {
       throw new Error("CloudKit V2 only partially saved the progress outbox");
     }
   }
@@ -410,6 +424,9 @@ function incrementalImportForRecords(
   for (const record of records) {
     const payload = decodeProgressV2Record(record);
     if (payload.state === "deleted") {
+      if (isUserGameProgressV2Identity(payload)) {
+        continue;
+      }
       tombstones.push({
         kind: payload.kind,
         entityKey: payload.entityKey,
@@ -459,15 +476,27 @@ function incrementalImportForRecords(
         };
         break;
       }
-      case "rating":
-        data.ratings.push(payload.value as RatingRecord);
+      case "rating": {
+        const rating = payload.value as Partial<RatingRecord> | null | undefined;
+        if (!(typeof rating?.key === "string" && isUserGameRatingKey(rating.key))) {
+          data.ratings.push(payload.value as RatingRecord);
+        }
         break;
-      case "attempt":
-        data.attempts.push(payload.value as AttemptHistoryRow);
+      }
+      case "attempt": {
+        const attempt = payload.value as Partial<AttemptHistoryRow> | null | undefined;
+        if (!(typeof attempt?.puzzleId === "string" && isUserGamePuzzleId(attempt.puzzleId))) {
+          data.attempts.push(payload.value as AttemptHistoryRow);
+        }
         break;
-      case "sprint_session":
-        data.sprintSessions.push(payload.value as ExportedSprintSession);
+      }
+      case "sprint_session": {
+        const session = payload.value as Partial<ExportedSprintSession> | null | undefined;
+        if (!isUserGameSprintSession(session)) {
+          data.sprintSessions.push(payload.value as ExportedSprintSession);
+        }
         break;
+      }
       case "practice_run":
         data.practiceRuns?.push(payload.value as PracticeRunRecord);
         break;
@@ -476,9 +505,15 @@ function incrementalImportForRecords(
           throw new Error("Progress V2 review schedule payload is invalid");
         }
         if (payload.value.kind === "scheduled") {
-          data.reviewQueue.push(payload.value.review as ExportedReviewQueueState);
+          const review = payload.value.review as Partial<ExportedReviewQueueState> | null | undefined;
+          if (!(typeof review?.puzzleId === "string" && isUserGamePuzzleId(review.puzzleId))) {
+            data.reviewQueue.push(payload.value.review as ExportedReviewQueueState);
+          }
         } else {
-          data.reviewRemovals?.push(payload.value.removal as ReviewScheduleRemoval);
+          const removal = payload.value.removal as Partial<ReviewScheduleRemoval> | null | undefined;
+          if (!(typeof removal?.puzzleId === "string" && isUserGamePuzzleId(removal.puzzleId))) {
+            data.reviewRemovals?.push(payload.value.removal as ReviewScheduleRemoval);
+          }
         }
         break;
       }
@@ -510,6 +545,9 @@ function planPhysicalRecordDeletions(
     const identity = parseProgressV2RecordName(deletedRecord.recordName);
     if (!identity) {
       throw new Error(`CloudKit deleted an invalid Progress V2 record ${deletedRecord.recordName}`);
+    }
+    if (isUserGameProgressV2Identity(identity)) {
+      continue;
     }
     switch (identity.kind) {
       case "attempt":

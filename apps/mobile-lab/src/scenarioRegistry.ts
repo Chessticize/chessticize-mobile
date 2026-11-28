@@ -105,6 +105,7 @@ export type LabScenarioId =
   | "settings-board-appearance"
   | "release-notes-ios"
   | "release-notes-android"
+  | "welcome-onboarding-overview"
   | "system-loading"
   | "system-error"
   | "system-full-app"
@@ -123,11 +124,16 @@ export type LabScenarioId =
   | "sprint-result-redesign-zero-review"
   | "sprint-result-redesign-arrow-duel"
   | "sprint-result-redesign-focused-run"
-  | "sprint-result-redesign-largest-text";
+  | "sprint-result-redesign-largest-text"
+  | "games-hub"
+  | "games-import"
+  | "game-review-key-moment";
 
 export type LabScenarioGroup =
   | "Practice"
   | "Review"
+  | "Games"
+  | "Game Review"
   | "History"
   | "Settings"
   | "Release Notes"
@@ -383,8 +389,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "settings-sprint-guidance": defineScenario("settings-sprint-guidance", "Settings", "Guidance · replay Sprint and Arrow Duel guides", "settings--sprint-guide-reset", "Settings guidance action that makes the rules, active-session, and Arrow Duel guides available again without changing Runs, ratings, or History.", "settings", ["Direct Settings entry", "Guidance focused in the phone viewport", "Explicit Reset guides button", "Reset the full guidance set", "No confirmation for a reversible action", "Inline completed state", "Progress safety copy"], ["Production onboarding persistence", "Practice"], "contained"),
   "settings-whats-new": defineScenario("settings-whats-new", "Settings", "What’s New row", "settings--whats-new-row", "Settings > About gains a What’s New row that reopens the latest release notes at any time, without changing whether the notes count as seen.", "settings", ["About section", "What’s New row", "Reopened notes sheet", "Continue returns to Settings"], ["Release notes sheet content", "Native version metadata"]),
   "settings-board-appearance": defineScenario("settings-board-appearance", "Settings", "Appearance · board & pieces", "settings--board-appearance", "Settings > Appearance lets users pick independent Light and Dark board color schemes from 9 Lichess-inspired palettes and choose from 6 license-verified piece sets with a live 4x4 board preview.", "settings", ["Appearance segmented control", "Live 4x4 board preview with coordinates and last-move tint", "Independent Light/Dark board selection in System mode", "9 curated board color schemes", "6 license-verified piece sets"], ["Native Skia board rendering", "Native promotion dialog"]),
-  "release-notes-ios": defineScenario("release-notes-ios", "Release Notes", "iOS", "release-notes--ios-phone-light", "The one-time What’s New sheet on the first launch after an update to 1.6.0, over an idle Practice Home. iOS wording names the glass tab bar. Phone portrait, landscape and iPad, light and dark, and large text.", "practice", ["Update to 1.6.0 with existing progress", "Large title", "Three highlights with tinted icon tiles", "Glass tab bar wording", "Continue", "Bottom sheet on phones", "Centered sheet on iPad and landscape", "Large text scrolls", "Light and dark"], ["Practice Home behind the sheet", "Settings What’s New row"]),
-  "release-notes-android": defineScenario("release-notes-android", "Release Notes", "Android", "release-notes--android-phone-light", "The same What’s New sheet with Android wording for the bottom bar on phones and the side rail on tablets and foldables. Phone portrait, landscape and tablet, light and dark, and large text.", "practice", ["Update to 1.6.0 with existing progress", "Large title", "Three highlights with tinted icon tiles", "Bottom bar and side rail wording", "Continue", "Bottom sheet on phones", "Centered sheet on tablets and landscape", "Large text scrolls", "Light and dark"], ["Practice Home behind the sheet", "Settings What’s New row"]),
+  "release-notes-ios": defineScenario("release-notes-ios", "Release Notes", "iOS", "release-notes--ios-phone-light", "The one-time What’s New sheet on the first launch after an update to 2.0.0, over an idle Practice Home. Introduces the new Games tab (link accounts, review games offline, generate puzzles) and Play with Maia, with a Go to Games CTA.", "practice", ["Update to 2.0.0 with existing progress", "Large title", "Four highlights with tinted icon tiles", "Go to Games primary CTA", "Continue", "Bottom sheet on phones", "Centered sheet on iPad and landscape", "Large text scrolls", "Light and dark"], ["Practice Home behind the sheet", "Games Hub", "Settings What’s New row"]),
+  "release-notes-android": defineScenario("release-notes-android", "Release Notes", "Android", "release-notes--android-phone-light", "The same 2.0 What’s New sheet rendered on Android viewports: phone portrait, landscape, tablet, light and dark, and large text.", "practice", ["Update to 2.0.0 with existing progress", "Large title", "Four highlights with tinted icon tiles", "Go to Games primary CTA", "Continue", "Bottom sheet on phones", "Centered sheet on tablets and landscape", "Large text scrolls", "Light and dark"], ["Practice Home behind the sheet", "Games Hub", "Settings What’s New row"]),
+  "welcome-onboarding-overview": defineScenario("welcome-onboarding-overview", "Release Notes", "Welcome onboarding · overview", "release-notes--welcome-onboarding-overview", "First-launch Welcome Onboarding for brand-new 2.0 installs, introducing the new Games tab (account linking, offline Game Review, personal puzzles), offline tactics, and Maia play with Go to Games or Start Practicing actions.", "practice", ["Fresh 2.0 install", "Skip action", "Three value highlights", "Go to Games and Start Practicing actions"], ["Games Hub", "Practice Home"]),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup Settings keeps iCloud controls omitted and its local SQLite diagnostics export under Help & Feedback while sharing the same user-first global Arrow Duel reply control and On/Off explanation as iOS.", "settings", ["Android Progress Backup", "Global Arrow Duel reply control", "User-first On explanation", "Paused Sprint and puzzle timers", "Per-Run Edit Run handoff", "Straight-to-next-puzzle Off explanation", "Local SQLite support bundle", "Diagnostic manifest", "Android share handoff", "Notifications", "About"], ["Native SQLite snapshot and Android share options", "Global setting wiring"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),
@@ -409,6 +416,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "sprint-result-redesign-arrow-duel": defineScenario("sprint-result-redesign-arrow-duel", "Sprint Result redesign", "Arrow Duel", "sprint-result-redesign--arrow-duel", "A passed Arrow Duel Sprint with its own Rating, 2 to review and Replay mistakes.", "practice", ["Arrow Duel outcome", "Arrow Duel Rating", "Review row", "Replay mistakes"], ["Replay", "Practice Home", "History"], "contained"),
   "sprint-result-redesign-focused-run": defineScenario("sprint-result-redesign-focused-run", "Sprint Result redesign", "Focused Run", "sprint-result-redesign--focused-run", "An unrated Focused Run result: no trend action, Unrated with the unchanged Rating, elapsed time, and average solve against the usual pace (#616), returning to Practice.", "practice", ["Focused Run Result title", "No trend action", "Unrated", "Elapsed time", "Average solve against usual pace", "Back to Practice", "Replay mistakes"], ["Replay", "Practice Home", "History"], "contained"),
   "sprint-result-redesign-largest-text": defineScenario("sprint-result-redesign-largest-text", "Sprint Result redesign", "Largest accessibility text", "sprint-result-redesign--largest-text", "The items-to-review state at the largest accessibility text size (simulated AX5): stats become label and value rows and the actions scroll with the content.", "practice", ["Simulated AX5 text", "Stacked stats rows", "Wrapping rows", "Scrolling actions", "Capped hero numeral"], ["Replay", "Practice Home", "History"], "contained"),
+  "games-hub": defineScenario("games-hub", "Games", "Games Hub", "games--populated", "Games tab home showing linked public Chess.com/Lichess accounts, explicit Sync and Import PGN actions, foreground batch analysis, My Game Puzzles CTA, and recent games with Accuracy% and puzzle counts.", "games", ["Linked account strip and explicit Sync", "My Game Puzzles CTA", "Analyze recent foreground batch queue", "Status and time-class filters", "Game list with Accuracy% and puzzle badges"], ["Game Review", "My Game Puzzles practice"], "contained"),
+  "games-import": defineScenario("games-import", "Games", "Import Games Modal", "games--import-modal", "User-triggered modal to link public Chess.com/Lichess usernames or batch-import offline multi-game PGN text with deterministic deduplication.", "games", ["Chess.com / Lichess / Paste PGN switcher", "Username link without login", "Offline PGN color picker and batch import"], ["Games Hub"], "contained"),
+  "game-review-key-moment": defineScenario("game-review-key-moment", "Game Review", "Key Moment Retry (Arrow Duel)", "game-review--key-moment-arrow-duel", "Built-in offline Game Review showing interactive Eval Graph, Eval Bar, Key Moments Retry with Arrow Duel candidate arrows, punishment line playback, and live Stockfish MultiPV exploration.", "games", ["Interactive Eval Graph", "Eval Bar", "Hidden-answer Key Moments Retry", "Arrow Duel candidate comparison", "Auto-enroll into Review on Retry failure", "Live MultiPV engine lines"], ["Games Hub", "My Game Puzzles practice"], "contained"),
 };
 
 export const scenarioRegistry = Object.fromEntries(
@@ -429,6 +439,7 @@ export const navigationCoverage = {
   tabs: {
     practice: coveredBy("practice-home"),
     review: coveredBy("review-due"),
+    games: coveredBy("games-hub"),
     history: coveredBy("history-populated"),
     settings: coveredBy("settings-ios-sync"),
     analysis: coveredBy("settings-stockfish-diagnostics")
@@ -438,6 +449,7 @@ export const navigationCoverage = {
     "review-reminder-prompt": coveredBy("practice-reminder-prompt"),
     "history-filters": coveredBy("history-filters"),
     "review-filters": coveredBy("review-filters"),
+    "games-import": coveredBy("games-import"),
     "settings-advanced-ratings": notCataloged("Issue 253 moves name and current rating editing into each Run editor."),
     "custom-rating-editor": coveredBy("practice-custom-rating-editor"),
     "sprint-session-guide": coveredBy("practice-active-session-guide"),
@@ -452,6 +464,7 @@ export const navigationCoverage = {
   details: {
     "review-analysis": coveredBy("review-feedback-analysis"),
     "review-session": coveredBy("review-session"),
+    "game-review": coveredBy("game-review-key-moment"),
     "history-progress": coveredBy("history-progress"),
     "tactical-profile": coveredBy("practice-tactical-profile-ranked"),
     "practice-run-editor": coveredBy("practice-run-name-validation"),

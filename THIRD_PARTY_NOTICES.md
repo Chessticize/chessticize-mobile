@@ -134,6 +134,49 @@ upstream commit `47948db658a1678d14e97d41c1bcf82958e70ded` using
 - Notes: Chessticize Mobile uses this package for board rendering and applies a
   local patch from `patches/react-native-chessboard@0.2.0.patch`.
 
+## Puzzle extraction, win-chances, and tactical motif tagger
+
+The on-device game-puzzle extractor, Arrow Duel caliber verifier, and tactical
+motif tagger under `packages/core/src/game-puzzles/` are ported and adapted from
+MIT-licensed chess puzzle analysis and tagging projects, plus Lichess's
+published win-chances curve:
+
+- **lichess-org/puzzler**
+  - Copyright: Original work Copyright 2020 lichess.org
+  - License: MIT License
+  - Source: https://github.com/lichess-org/puzzler
+  - Notes: Original puzzle generator (`cook_mate`, `cook_advantage`, `is_valid_attack`) and tactical motif tagger (`cook`, `util`, `zugzwang`).
+
+- **lychee-org/retagger**
+  - Copyright: Forked work Copyright 2023 lychee-org
+  - License: MIT License
+  - Source: https://github.com/lychee-org/retagger
+  - Notes: Forked puzzle tagging pipeline upon which `chessticize-worker`'s tagger was built.
+
+- **lichess-org/lila**
+  - Source: https://github.com/lichess-org/lila/pull/11148
+  - Notes: Win-chances sigmoid formula (`2 / (1 + exp(-0.00368208 * cp)) - 1`) used for outcome-changing swing and Arrow Duel caliber thresholds.
+
+- **Chessticize/chessticize-worker**
+  - Copyright: Modified work Copyright 2024-2026 chessticize.com
+  - License: MIT License
+  - Source: https://github.com/Chessticize/chessticize-worker
+  - Notes: Adapted puzzle extraction, 8-case game-moment classification, Arrow Duel verification, clock-metric parsing, and PR #26/#27 tagger fixes ported to pure TypeScript in `packages/core/src/game-puzzles/`.
+
+## Maia-2 & ONNX Runtime (offline difficulty rating)
+
+- **Maia-2 Rapid**
+  - Authors: CSSLab (University of Toronto)
+  - License: MIT License (https://github.com/CSSLab/maia2/blob/main/LICENSE)
+  - Source: https://github.com/CSSLab/maia2
+  - Notes: Quantized INT8 human-move policy weights (`maia2-rapid-int8.onnx` on Android, compiled `maia2-rapid-int8.mlmodelc` on iOS) and canonical 1,880-move vocabulary used for on-device personal game puzzle difficulty estimation.
+
+- **ONNX Runtime Android** (`com.microsoft.onnxruntime:onnxruntime-android:1.20.0`)
+  - Authors: Microsoft Corporation
+  - License: MIT License (https://github.com/microsoft/onnxruntime/blob/main/LICENSE)
+  - Source: https://github.com/microsoft/onnxruntime
+  - Notes: Native Android inference runtime for executing offline quantized Maia-2 weights without network access.
+
 ## React Native and mobile runtime package inventory
 
 The app is built with React Native and related open-source packages. The

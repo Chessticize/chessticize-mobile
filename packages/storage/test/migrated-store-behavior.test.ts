@@ -94,6 +94,11 @@ for (const label of STORE_LABELS) {
           arrowDuelSeen: false,
           focusedRunSeen: true,
           arrowDuelReplyCueStage: 2
+        },
+        onboarding: {
+          welcomeSeen: false,
+          gamesGuideSeen: false,
+          gameReviewGuideSeen: false
         }
       });
 
@@ -105,6 +110,7 @@ for (const label of STORE_LABELS) {
         pieceSet: "cburnett",
         language: "system",
         arrowDuel: { opponentReplyEnabled: false },
+        gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 10 },
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
@@ -114,6 +120,11 @@ for (const label of STORE_LABELS) {
           arrowDuelSeen: false,
           focusedRunSeen: true,
           arrowDuelReplyCueStage: 2
+        },
+        onboarding: {
+          welcomeSeen: false,
+          gamesGuideSeen: false,
+          gameReviewGuideSeen: false
         }
       });
     } finally {

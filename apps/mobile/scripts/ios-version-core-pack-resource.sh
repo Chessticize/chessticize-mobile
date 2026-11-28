@@ -30,3 +30,10 @@ for obsolete_resource in "${resources_directory}"/bundled-core-pack-v*.sqlite; d
     /bin/rm -f "${obsolete_resource}"
   fi
 done
+
+maia2_source="${SRCROOT}/../../../fixtures/models/maia2-rapid-int8.mlmodelc"
+maia2_dest="${resources_directory}/maia2-rapid-int8.mlmodelc"
+if [[ -d "${maia2_source}" ]]; then
+  /bin/rm -rf "${maia2_dest}"
+  /bin/cp -R "${maia2_source}" "${maia2_dest}"
+fi

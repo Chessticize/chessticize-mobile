@@ -1,6 +1,7 @@
 import {
   acknowledgeArrowDuelReplyCue,
   appendSurvivalPuzzleBatch,
+  applyMaiaGameRatingResult,
   abandonSprint as abandonSprintCore,
   advanceArrowDuelReplyCueSprint,
   advanceSprintTime as advanceSprintTimeCore,
@@ -8,6 +9,7 @@ import {
   archivePracticeRun,
   assertValidManualRating,
   assertValidPracticeRunRating,
+  buildImportedGameDraftFromMaiaGame,
   buildSessionReplay,
   buildSprintConfig,
   sprintHasRunDeadline,
@@ -16,13 +18,19 @@ import {
   beginArrowDuelReply as beginArrowDuelReplyCore,
   clonePracticeRun,
   compactSurvivalPuzzleBuffer,
+  computeEffectiveReviewBenchmarkRating,
   createCustomPracticeRun,
+  createDefaultMaiaRatingRecord,
   createDefaultRating,
+  defaultSprintConfig,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
   evaluateAppReviewRequestEligibility,
   isAttemptMistake,
+  MAIA_TIME_CLASSES,
+  maiaGameOutcomeForUser,
   namedThemesForSelection,
+  normalizeGameRatingToPuzzleScale,
   normalizeThemeSelection,
   practiceRunSprintConfig,
   renamePracticeRun,
@@ -39,6 +47,7 @@ import {
   startSurvival as startSurvivalCore,
   startSprint,
   submitSprintMove,
+  suggestInitialMaiaRating,
   SURVIVAL_PUZZLE_BATCH_SIZE,
   SURVIVAL_RULE_VERSION,
   survivalLevelForRating,
@@ -52,8 +61,14 @@ import type {
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
+  ExtractedGamePuzzle,
   HistoryQuery,
   HistoryView,
+  ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   OpponentReplyConfig,
   Puzzle,
   PracticeRunRecord,
@@ -69,12 +84,27 @@ import type {
   SprintCommandResult,
   SprintMode,
   SprintResultSummary,
+  SprintRunClock,
   SprintState,
   SurvivalBestRecord,
   SurvivalChallengeType,
   SurvivalLevel,
   SurvivalPreferences
 } from "../../core/src/index.ts";
+import {
+  USER_GAME_RATING_KEY_PREFIX,
+  type GameListFilter,
+  type GameReviewStore,
+  type LinkedGameAccount,
+  type LinkedGameAccountPlatform,
+  type ReplaceGameUserPuzzlesMeta,
+  type SaveGamePlyEvaluationsStatusUpdate,
+  type StoredGamePlyEval,
+  type StoredImportedGame,
+  type StoredUserPuzzle,
+  type UpsertImportedGamesResult,
+  type UserPuzzleFilter
+} from "./game-review-store.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
 import type {
   ClearSyncedHistoryResult,
@@ -95,6 +125,7 @@ import type {
   ProgressV2StatePatch,
   ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
+import type { GamesV1Persistence } from "./games-sync-v1.ts";
 import {
   indexSprintSessionsByRatingKey,
   reconcileRatingWithSprintSessions
@@ -210,6 +241,36 @@ export interface RecordReviewAttemptCommand extends ReviewContext {
   arrowDuelCandidateOrder?: string[];
 }
 
+export interface RecordGameReviewRetryOutcomeCommand {
+  puzzleId: string;
+  mode: SprintMode;
+  ratingKey: string;
+  result: AttemptResult;
+  now?: string;
+  timeZone?: string;
+}
+
+export interface GameReviewRetryOutcomeResult {
+  enrolled: boolean;
+  review?: ReviewQueueState;
+}
+
+export interface StartMyGamePuzzlesSessionCommand {
+  mode?: "standard" | "arrow_duel" | "custom";
+  durationSeconds?: number;
+  perPuzzleSeconds?: number;
+  targetCorrect?: number;
+  maxMistakes?: number;
+  opponentReply?: OpponentReplyConfig;
+  timeClass?: string;
+  themes?: string[];
+  gameId?: string;
+  limit?: number;
+  ratingPolicy?: "unrated" | "rated";
+  runClock?: SprintRunClock;
+  puzzleSelectionSeed?: string | number;
+}
+
 export class PracticeService {
   private activeSprint: SprintState | undefined;
   private puzzleSelectionScopeIds: string[] | undefined;
@@ -255,6 +316,327 @@ export class PracticeService {
       throw new Error("Progress V2 persistence is unavailable for this store");
     }
     return this.store.progressV2;
+  }
+
+  get gamesV1(): GamesV1Persistence {
+    if (!this.store.gamesV1) {
+      throw new Error("Games V1 persistence is unavailable for this store");
+    }
+    return this.store.gamesV1;
+  }
+
+  get gameReviewStore(): GameReviewStore {
+    return this.store;
+  }
+
+  listLinkedAccounts(): LinkedGameAccount[] {
+    return this.store.listLinkedAccounts();
+  }
+
+  upsertLinkedAccount(
+    account: Omit<LinkedGameAccount, "createdAt"> & { createdAt?: string }
+  ): LinkedGameAccount {
+    return this.store.upsertLinkedAccount(account);
+  }
+
+  removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    this.store.removeLinkedAccount(platform, username);
+  }
+
+  upsertImportedGames(
+    games: readonly ImportedGameDraft[],
+    nowIso?: string
+  ): UpsertImportedGamesResult {
+    return this.store.upsertImportedGames(games, nowIso);
+  }
+
+  listImportedGames(filter?: GameListFilter): StoredImportedGame[] {
+    return this.store.listImportedGames(filter);
+  }
+
+  countImportedGames(filter?: Omit<GameListFilter, "limit" | "offset">): number {
+    return this.store.countImportedGames(filter);
+  }
+
+  getImportedGame(gameId: string): StoredImportedGame | undefined {
+    return this.store.getImportedGame(gameId);
+  }
+
+  deleteImportedGame(gameId: string): void {
+    this.store.deleteImportedGame(gameId);
+  }
+
+  saveGamePlyEvaluations(
+    gameId: string,
+    evals: readonly StoredGamePlyEval[],
+    statusUpdate: SaveGamePlyEvaluationsStatusUpdate
+  ): void {
+    this.store.saveGamePlyEvaluations(gameId, evals, statusUpdate);
+  }
+
+  listGamePlyEvaluations(gameId: string): StoredGamePlyEval[] {
+    return this.store.listGamePlyEvaluations(gameId);
+  }
+
+  replaceGameUserPuzzles(
+    gameId: string,
+    puzzles: readonly ExtractedGamePuzzle[],
+    gameMeta: ReplaceGameUserPuzzlesMeta
+  ): StoredUserPuzzle[] {
+    return this.store.replaceGameUserPuzzles(gameId, puzzles, gameMeta);
+  }
+
+  listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
+    return this.store.listUserPuzzles(filter);
+  }
+
+  countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
+    return this.store.countUserPuzzles(filter);
+  }
+
+  getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
+    return this.store.getUserPuzzle(puzzleId);
+  }
+
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: NonNullable<StoredUserPuzzle["ratingSource"]>
+  ): void {
+    this.store.updateUserPuzzleRating(puzzleId, rating, ratingSource);
+  }
+
+  archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
+    this.store.archiveUserPuzzle(puzzleId, archived);
+  }
+
+  /**
+   * Computes the player's effective Lichess/puzzle-scale reference rating across their latest
+   * imported game ratings (calibrated for Chess.com vs Lichess), Play with Maia ratings, and
+   * Chessticize puzzle ratings, taking the maximum so established ratings are never dragged down
+   * and older stretch puzzles unlock automatically as the player improves.
+   */
+  getEffectiveReviewBenchmarkRating(sourceGame?: StoredImportedGame): number | undefined {
+    const recentGames = this.store.listImportedGames({ limit: 50 });
+    const latestByPlatformTimeClass = new Map<string, { rating: number; platform: StoredImportedGame["platform"]; timeClass?: string }>();
+    for (const game of recentGames) {
+      if (game.platform === "maia") {
+        continue;
+      }
+      const rawUserRating = game.userColor === "w" ? game.white.rating : game.black.rating;
+      if (typeof rawUserRating !== "number" || !Number.isFinite(rawUserRating) || rawUserRating < 400) {
+        continue;
+      }
+      const key = `${game.platform}:${game.timeClass ?? "unknown"}`;
+      if (!latestByPlatformTimeClass.has(key)) {
+        latestByPlatformTimeClass.set(key, {
+          rating: rawUserRating,
+          platform: game.platform,
+          timeClass: game.timeClass
+        });
+      }
+    }
+
+    const sourceRating =
+      sourceGame &&
+      typeof (sourceGame.userColor === "w" ? sourceGame.white.rating : sourceGame.black.rating) === "number"
+        ? {
+            rating: (sourceGame.userColor === "w" ? sourceGame.white.rating : sourceGame.black.rating)!,
+            platform: sourceGame.platform,
+            timeClass: sourceGame.timeClass
+          }
+        : undefined;
+
+    const puzzleRatings = this.store
+      .listRatings()
+      .filter((record) => !record.key.startsWith("ug_"))
+      .map((record) => ({ rating: record.rating, games: record.games }));
+
+    const maiaRatings = MAIA_TIME_CLASSES.map((tc) => this.store.getMaiaRating(tc))
+      .filter((record): record is MaiaRatingRecord => record !== undefined)
+      .map((record) => ({ rating: record.rating, games: record.games }));
+
+    return computeEffectiveReviewBenchmarkRating({
+      ...(sourceRating ? { gameRating: sourceRating } : {}),
+      recentGameRatings: [...latestByPlatformTimeClass.values()],
+      puzzleRatings,
+      maiaRatings
+    });
+  }
+
+  listReviewRemovals(): ReviewScheduleRemoval[] {
+    return this.store.listReviewRemovals();
+  }
+
+  listRemovedReviewPuzzleIds(): Set<string> {
+    return new Set(this.store.listReviewRemovals().map((removal) => removal.puzzleId));
+  }
+
+  private suggestSeedMaiaRating(timeClass: MaiaTimeClass): number {
+    const recentGames = this.store.listImportedGames({ limit: 50 });
+    const importedGameRatings: Partial<Record<MaiaTimeClass, number>> = {};
+    let fallbackImportedRating: number | undefined;
+
+    for (const game of recentGames) {
+      if (game.platform === "maia") {
+        continue;
+      }
+      const rawUserRating = game.userColor === "w" ? game.white.rating : game.black.rating;
+      if (typeof rawUserRating !== "number" || !Number.isFinite(rawUserRating) || rawUserRating < 400) {
+        continue;
+      }
+      // Maia-2 is trained on Lichess Rapid games, so calibrate Chess.com / fast-control ratings
+      // onto the canonical Lichess scale before seeding initial Maia opponent strength.
+      const userRating = normalizeGameRatingToPuzzleScale(
+        rawUserRating,
+        game.platform,
+        game.timeClass
+      );
+      if (fallbackImportedRating === undefined) {
+        fallbackImportedRating = userRating;
+      }
+      if (
+        (game.timeClass === "blitz" || game.timeClass === "rapid" || game.timeClass === "classical") &&
+        importedGameRatings[game.timeClass] === undefined
+      ) {
+        importedGameRatings[game.timeClass] = userRating;
+      }
+    }
+
+    const standardKey = defaultSprintConfig("standard").ratingKey;
+    const standardRecord = this.store.listRatings().find((record) => record.key === standardKey);
+    const sprintRating = standardRecord && standardRecord.games > 0 ? standardRecord.rating : undefined;
+
+    return suggestInitialMaiaRating({
+      timeClass,
+      importedGameRatings,
+      ...(fallbackImportedRating === undefined ? {} : { fallbackImportedRating }),
+      ...(sprintRating === undefined ? {} : { sprintRating })
+    });
+  }
+
+  getMaiaRating(timeClass: MaiaTimeClass, now = new Date().toISOString()): MaiaRatingRecord {
+    const existing = this.store.getMaiaRating(timeClass);
+    if (existing) {
+      return existing;
+    }
+    return createDefaultMaiaRatingRecord(
+      timeClass,
+      this.suggestSeedMaiaRating(timeClass),
+      now
+    );
+  }
+
+  listMaiaRatings(now = new Date().toISOString()): MaiaRatingRecord[] {
+    return MAIA_TIME_CLASSES.map((tc) => this.getMaiaRating(tc, now));
+  }
+
+  setInitialMaiaRating(
+    timeClass: MaiaTimeClass,
+    rating: number,
+    now = new Date().toISOString()
+  ): MaiaRatingRecord {
+    const current = this.getMaiaRating(timeClass, now);
+    if (current.games > 0) {
+      return current;
+    }
+    const next = createDefaultMaiaRatingRecord(timeClass, rating, now);
+    this.store.saveMaiaRatingAnchor({
+      timeClass,
+      initialRating: next.rating,
+      setAt: now
+    });
+    this.store.saveMaiaRating(next);
+    return next;
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    return this.store.getMaiaSetupPreferences();
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    this.store.saveMaiaSetupPreferences(preferences);
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    return this.store.getActiveMaiaGame();
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.store.saveActiveMaiaGame(state);
+  }
+
+  clearActiveMaiaGame(): void {
+    this.store.clearActiveMaiaGame();
+  }
+
+  completeMaiaGame(
+    state: MaiaGameState,
+    userLabel = "You",
+    now = new Date().toISOString()
+  ): {
+    state: MaiaGameState;
+    savedGameId?: string;
+    ratingRecord: MaiaRatingRecord;
+  } {
+    return this.store.transaction(() => {
+      const nowIso = state.endedAt ?? now;
+      const currentRating = this.getMaiaRating(state.timeClass, nowIso);
+
+      if (state.status === "aborted") {
+        this.store.clearActiveMaiaGame();
+        return { state, ratingRecord: currentRating };
+      }
+
+      let nextRatingRecord = currentRating;
+      let nextState: MaiaGameState = {
+        ...state,
+        endedAt: nowIso
+      };
+
+      if (state.rated) {
+        const outcome = maiaGameOutcomeForUser(state);
+        const applied = applyMaiaGameRatingResult(
+          currentRating,
+          outcome,
+          nowIso,
+          state.maiaRating
+        );
+        nextRatingRecord = applied.nextRecord;
+        this.store.saveMaiaRating(nextRatingRecord);
+        nextState = {
+          ...nextState,
+          userRatingAfter: applied.change.ratingAfter,
+          userRatingChange: applied.change.ratingChange
+        };
+      }
+
+      const draft = buildImportedGameDraftFromMaiaGame(nextState, userLabel);
+      this.store.upsertImportedGames([draft], nowIso);
+      if (state.rated) {
+        const outcome = maiaGameOutcomeForUser(state);
+        this.store.upsertMaiaRatedGame({
+          gameId: draft.id,
+          timeClass: state.timeClass,
+          playedAt: draft.playedAt,
+          outcome,
+          opponentRating: state.maiaRating,
+          ...(currentRating.games === 0 ? { initialRatingAnchor: currentRating.rating } : {})
+        });
+      }
+      this.store.clearActiveMaiaGame();
+
+      nextState = {
+        ...nextState,
+        savedGameId: draft.id
+      };
+
+      return {
+        state: nextState,
+        savedGameId: draft.id,
+        ratingRecord: nextRatingRecord
+      };
+    });
   }
 
   getProgressV2Diagnostics(): ProgressV2Diagnostics {
@@ -966,9 +1348,117 @@ export class PracticeService {
   enrollReview(
     context: ReviewContext,
     now = new Date().toISOString(),
-    initiatingAttemptId?: string
+    initiatingAttemptId?: string,
+    timeZone?: string
   ): ReviewQueueState {
-    return this.store.transaction(() => this.store.enrollReview(context, now, initiatingAttemptId));
+    return this.store.transaction(() => {
+      const puzzle = this.store.getPuzzle(context.puzzleId);
+      if (puzzle?.source === "user_game") {
+        this.store.seedPuzzles([puzzle]);
+      }
+      return this.store.enrollReview(context, now, initiatingAttemptId, timeZone);
+    });
+  }
+
+  recordGameReviewRetryOutcome(
+    command: RecordGameReviewRetryOutcomeCommand
+  ): GameReviewRetryOutcomeResult {
+    const puzzle = this.store.getPuzzle(command.puzzleId);
+    if (!puzzle) {
+      throw new Error(`User game puzzle ${command.puzzleId} was not found`);
+    }
+    if (command.result !== "wrong") {
+      return { enrolled: false };
+    }
+    const now = command.now ?? new Date().toISOString();
+    const context: ReviewContext = {
+      puzzleId: command.puzzleId,
+      mode: command.mode,
+      ratingKey: command.ratingKey
+    };
+    const review = this.store.transaction(() => {
+      this.store.seedPuzzles([puzzle]);
+      return this.store.enrollReview(context, now, undefined, command.timeZone);
+    });
+    return { enrolled: true, review };
+  }
+
+  startMyGamePuzzlesSession(
+    command: StartMyGamePuzzlesSessionCommand = {},
+    now = new Date().toISOString()
+  ): SprintState {
+    if (
+      this.activeSprint &&
+      (this.activeSprint.status === "active" || this.activeSprint.status === "paused")
+    ) {
+      throw new ActiveSprintConflictError();
+    }
+    const mode = command.mode ?? "standard";
+    const ratingPolicy = command.ratingPolicy ?? "unrated";
+    const maxMistakes = command.maxMistakes ?? 3;
+    const normalizedThemes = normalizeThemeSelection(command.themes ?? []);
+    const requestedLimit =
+      command.limit ??
+      (command.targetCorrect === undefined
+        ? 10 + maxMistakes
+        : Math.max(command.targetCorrect + maxMistakes, command.targetCorrect));
+    const puzzles = this.store.selectPuzzles({
+      mode,
+      source: "user_game",
+      limit: requestedLimit,
+      ...(command.timeClass === undefined ? {} : { timeClass: command.timeClass }),
+      ...(normalizedThemes.length === 0 ? {} : { themes: normalizedThemes }),
+      ...(command.gameId === undefined ? {} : { gameId: command.gameId }),
+      ...(command.puzzleSelectionSeed === undefined
+        ? {}
+        : { randomSeed: command.puzzleSelectionSeed })
+    });
+    if (puzzles.length === 0) {
+      throw new Error("No eligible user game puzzles are available for this session");
+    }
+
+    const targetCorrect = Math.max(
+      1,
+      Math.min(command.targetCorrect ?? puzzles.length, puzzles.length)
+    );
+    const baseConfig = buildSprintConfig({
+      mode,
+      durationSeconds: command.durationSeconds ?? 5 * 60,
+      perPuzzleSeconds: command.perPuzzleSeconds ?? defaultPerPuzzleSeconds(mode),
+      targetCorrect,
+      maxMistakes,
+      ...(command.opponentReply === undefined ? {} : { opponentReply: command.opponentReply }),
+      ...(normalizedThemes.length === 0 ? {} : { themes: normalizedThemes })
+    });
+    const ratingKey = `${USER_GAME_RATING_KEY_PREFIX}my_game_puzzles:${mode}`;
+    const config: SprintConfig = this.effectiveSprintConfig({
+      ...baseConfig,
+      ratingKey,
+      ratingPolicy,
+      ...(command.runClock === undefined ? {} : { runClock: command.runClock }),
+      userGamePuzzles: {
+        ...(command.timeClass === undefined ? {} : { timeClass: command.timeClass }),
+        ...(command.gameId === undefined ? {} : { gameId: command.gameId })
+      }
+    });
+    const rating =
+      ratingPolicy === "unrated"
+        ? createDefaultRating(ratingKey)
+        : this.store.getRating(ratingKey);
+    const sprint = startSprint({
+      config,
+      puzzles,
+      ratingBefore: rating.rating,
+      ratingBeforeRecord: rating,
+      now
+    });
+    this.activeSprint = sprint;
+    this.store.transaction(() => {
+      this.store.seedPuzzles(puzzles);
+      this.advanceReplyCueForStartedSprint(config);
+      this.store.createSprintSession(sprint);
+    });
+    return sprint;
   }
 
   removeReview(context: ReviewContext, now = new Date().toISOString()): ReviewScheduleRemoval {
@@ -1577,7 +2067,8 @@ export class PracticeService {
     if (
       !this.tacticalProfile ||
       state.completedAt === undefined ||
-      state.config.survival !== undefined
+      state.config.survival !== undefined ||
+      state.config.userGamePuzzles !== undefined
     ) {
       return;
     }

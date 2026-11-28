@@ -1,26 +1,42 @@
 import {
+  defaultOnboardingGuideProgress,
   defaultSprintGuideProgress,
   normalizeLanguagePreference,
   parseReleaseVersion,
   type ArrowDuelReplyCueStage,
   type LanguagePreference,
+  type OnboardingGuideProgress,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
 import {
   BOARD_THEME_IDS,
   CHESS_PIECE_SET_IDS,
   DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
   DEFAULT_LIGHT_BOARD_THEME,
   DEFAULT_PIECE_SET,
+  GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS,
   type AppearancePreference,
   type BoardThemeId,
   type ChessPieceSetId,
+  type GameReviewAutoSyncCooldownMinutes,
   type PracticeSettings,
   type ReviewReminderPreference
 } from "./practice-store.ts";
 
 const BOARD_THEME_ID_SET: ReadonlySet<string> = new Set(BOARD_THEME_IDS);
 const CHESS_PIECE_SET_ID_SET: ReadonlySet<string> = new Set(CHESS_PIECE_SET_IDS);
+const GAME_REVIEW_AUTO_SYNC_COOLDOWN_SET: ReadonlySet<number> = new Set(
+  GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS
+);
+
+export function normalizeGameReviewAutoSyncCooldownMinutes(
+  value: unknown
+): GameReviewAutoSyncCooldownMinutes {
+  return typeof value === "number" && GAME_REVIEW_AUTO_SYNC_COOLDOWN_SET.has(value)
+    ? (value as GameReviewAutoSyncCooldownMinutes)
+    : DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES;
+}
 
 export function defaultPracticeSettings(): PracticeSettings {
   return {
@@ -35,6 +51,10 @@ export function defaultPracticeSettings(): PracticeSettings {
     arrowDuel: {
       opponentReplyEnabled: true
     },
+    gameReview: {
+      autoAddRecommendedToReview: false,
+      autoSyncCooldownMinutes: DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+    },
     notifications: {
       reviewReminder: {
         mode: "smart"
@@ -44,7 +64,8 @@ export function defaultPracticeSettings(): PracticeSettings {
       soundEnabled: false,
       hapticsEnabled: true
     },
-    sprintGuides: defaultSprintGuideProgress()
+    sprintGuides: defaultSprintGuideProgress(),
+    onboarding: defaultOnboardingGuideProgress()
   };
 }
 
@@ -62,6 +83,12 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
     arrowDuel: {
       opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
     },
+    gameReview: {
+      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false),
+      autoSyncCooldownMinutes: normalizeGameReviewAutoSyncCooldownMinutes(
+        settings.gameReview?.autoSyncCooldownMinutes
+      )
+    },
     notifications: {
       reviewReminder: settings.notifications.reviewReminder
     },
@@ -77,7 +104,8 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
       arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
         settings.sprintGuides?.arrowDuelReplyCueStage
       )
-    }
+    },
+    onboarding: normalizeOnboardingGuideProgress(settings.onboarding)
   });
 }
 
@@ -95,6 +123,12 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
     arrowDuel: {
       opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
     },
+    gameReview: {
+      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false),
+      autoSyncCooldownMinutes: normalizeGameReviewAutoSyncCooldownMinutes(
+        settings.gameReview?.autoSyncCooldownMinutes
+      )
+    },
     notifications: {
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)
     },
@@ -110,7 +144,18 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
       arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
         settings.sprintGuides?.arrowDuelReplyCueStage
       )
-    }
+    },
+    onboarding: normalizeOnboardingGuideProgress(settings.onboarding)
+  };
+}
+
+export function normalizeOnboardingGuideProgress(
+  value: Partial<OnboardingGuideProgress> | undefined
+): OnboardingGuideProgress {
+  return {
+    welcomeSeen: Boolean(value?.welcomeSeen ?? false),
+    gamesGuideSeen: Boolean(value?.gamesGuideSeen ?? false),
+    gameReviewGuideSeen: Boolean(value?.gameReviewGuideSeen ?? false)
   };
 }
 

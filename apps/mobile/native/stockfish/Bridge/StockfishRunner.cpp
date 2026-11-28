@@ -1,8 +1,10 @@
 #include "StockfishRunner.h"
 
+#include <algorithm>
 #include <mutex>
 #include <sstream>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -55,7 +57,9 @@ class StockfishRunner::Impl {
     configureCallbacks();
     setOption("EvalFile", bigNetworkPath);
     setOption("EvalFileSmall", smallNetworkPath);
-    setOption("Threads", "1");
+    const unsigned int hwThreads = std::thread::hardware_concurrency();
+    const unsigned int defaultThreads = hwThreads >= 2 ? 2 : 1;
+    setOption("Threads", std::to_string(defaultThreads));
     setOption("Hash", "32");
   }
 

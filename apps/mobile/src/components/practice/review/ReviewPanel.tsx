@@ -17,11 +17,17 @@ import {
   translate,
   useTranslation
 } from "../../../i18n/index.ts";
-import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import {
+  isUserGamePuzzleOrigin,
+  modeLabel,
+  puzzleOriginLabel,
+  safeTestId
+} from "../shared/practiceUtils.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 import {
   type CompletedReviewItem,
   filterReviewTodayPresentation,
+  type ReviewPuzzleOriginFilter,
   type ReviewTodayDueItemPresentation,
   type ReviewTodayFilter,
   type ReviewTodayHistoryPresentation
@@ -71,15 +77,38 @@ function reviewItemSourceSprintLabel(
 }
 
 function reviewItemCompactSourceLabel(
-  review: Pick<ReviewQueueState, "mode" | "ratingKey">,
+  review: Pick<ReviewQueueState, "puzzleId" | "mode" | "ratingKey">,
   locale: SupportedLocale
 ): string {
+  const origin = puzzleOriginLabel(
+    isUserGamePuzzleOrigin(review.puzzleId, review.ratingKey),
+    locale
+  );
   const speed = reviewItemSpeedSeconds(review);
   const speedSuffix = speed === null
     ? ""
     : translate(locale, "review.paceSuffix", { seconds: speed });
-  return `${modeLabel(review.mode, locale)}${speedSuffix}`;
+  return `${origin} · ${modeLabel(review.mode, locale)}${speedSuffix}`;
 }
+
+function reviewOriginFilterLabel(
+  filter: ReviewPuzzleOriginFilter,
+  locale: SupportedLocale
+): string {
+  if (filter === "pack") {
+    return translate(locale, "common.originPuzzlePack");
+  }
+  if (filter === "user_game") {
+    return translate(locale, "common.originGames");
+  }
+  return translate(locale, "history.origin.all");
+}
+
+const REVIEW_ORIGIN_FILTERS: readonly ReviewPuzzleOriginFilter[] = [
+  "all",
+  "pack",
+  "user_game"
+];
 
 function reviewQueueFilterLabel(
   filter: ReviewTodayFilter,
@@ -238,6 +267,7 @@ export function ReviewPanel({
   const activeReviewGenerationRef = useRef(0);
   const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewTodayFilter>("all");
+  const [originFilter, setOriginFilter] = useState<ReviewPuzzleOriginFilter>("all");
   const [todayReviewsExpanded, setTodayReviewsExpanded] = useState(false);
   const [completedReviewsExpanded, setCompletedReviewsExpanded] = useState(true);
   const [devStatus, setDevStatus] = useState<string | null>(null);
@@ -247,7 +277,7 @@ export function ReviewPanel({
     void reviewQueue;
     return service.getReviewTodayPresentation(new Date(nowMs).toISOString());
   }, [dueReviewItems, nowMs, reviewQueue, service]);
-  const filteredReviewToday = filterReviewTodayPresentation(reviewToday, queueFilter);
+  const filteredReviewToday = filterReviewTodayPresentation(reviewToday, queueFilter, originFilter);
   const completedReviews = reviewToday.completedItems.map((entry) => entry.item);
   const completedReviewEntries = completedReviews.map((item): ReviewEntry => buildServiceReviewEntry(service, {
     puzzle: item.puzzle,
@@ -269,7 +299,12 @@ export function ReviewPanel({
     source: "due"
   }));
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs, locale);
-  const selectedReviewFilterLabel = reviewQueueFilterLabel(queueFilter, locale);
+  const selectedReviewFilterLabel =
+    originFilter === "all"
+      ? reviewQueueFilterLabel(queueFilter, locale)
+      : queueFilter === "all"
+        ? reviewOriginFilterLabel(originFilter, locale)
+        : `${reviewQueueFilterLabel(queueFilter, locale)} · ${reviewOriginFilterLabel(originFilter, locale)}`;
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : reviewToday.dueItems.length === 0
@@ -279,7 +314,7 @@ export function ReviewPanel({
     ? `${selectedReviewFilterLabel} · ${queueSummary.dueStatusLabel}`
     : t("review.dueStatusEmpty");
   const reviewDueSubline = queueSummary.oldestDueSubline;
-  const reviewFilterControlActive = filtersExpanded || queueFilter !== "all";
+  const reviewFilterControlActive = filtersExpanded || queueFilter !== "all" || originFilter !== "all";
   // Three side-by-side counts break their labels mid-word at large text sizes.
   const forecastStacked = usePracticeViewport().fontScale >= REVIEW_FORECAST_STACK_FONT_SCALE;
 
@@ -396,23 +431,42 @@ export function ReviewPanel({
   }
 
   const reviewFilterOptions = (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.reviewFilterScroller}
-      contentContainerStyle={styles.reviewFilterContent}
-      testID="review-queue-filters"
-    >
-      {REVIEW_TODAY_FILTERS.map((filter) => (
-        <FilterButton
-          key={filter}
-          active={queueFilter === filter}
-          label={reviewQueueFilterLabel(filter, locale)}
-          testID={reviewQuickFilterTestID(filter)}
-          onPress={() => setQueueFilter(filter)}
-        />
-      ))}
-    </ScrollView>
+    <View style={styles.reviewFilterStack}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.reviewFilterScroller}
+        contentContainerStyle={styles.reviewFilterContent}
+        testID="review-queue-filters"
+      >
+        {REVIEW_TODAY_FILTERS.map((filter) => (
+          <FilterButton
+            key={filter}
+            active={queueFilter === filter}
+            label={reviewQueueFilterLabel(filter, locale)}
+            testID={reviewQuickFilterTestID(filter)}
+            onPress={() => setQueueFilter(filter)}
+          />
+        ))}
+      </ScrollView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.reviewFilterScroller}
+        contentContainerStyle={styles.reviewFilterContent}
+        testID="review-origin-filters"
+      >
+        {REVIEW_ORIGIN_FILTERS.map((origin) => (
+          <FilterButton
+            key={origin}
+            active={originFilter === origin}
+            label={reviewOriginFilterLabel(origin, locale)}
+            testID={`review-origin-${origin === "user_game" ? "user-game" : origin}`}
+            onPress={() => setOriginFilter(origin)}
+          />
+        ))}
+      </ScrollView>
+    </View>
   );
   const reviewFilterOptionsRegion = (
     <CollapsibleRegion
@@ -842,7 +896,7 @@ function TodayReviewAttemptRow({
           </AppText>
         </View>
         <AppText tone="secondary" variant="footnote">
-          {t("common.puzzleNumber", { id: item.puzzle.id })} · {t("common.secondsCompact", { count: elapsedSeconds })}
+          {puzzleOriginLabel(isUserGamePuzzleOrigin(item.puzzle.id, item.attempt.ratingKey), locale)} · {t("common.puzzleNumber", { id: item.puzzle.id })} · {t("common.secondsCompact", { count: elapsedSeconds })}
         </AppText>
         <AppText tone="secondary" variant="footnote">
           {t("review.todayRowDetail", { date: formatLocalDateForLocale(item.attempt.completedAt, locale) })}
@@ -918,6 +972,9 @@ const useStyles = makeStyles((theme) => ({
   },
   reviewDueCountBlockStacked: {
     alignItems: "flex-start"
+  },
+  reviewFilterStack: {
+    gap: 8
   },
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING

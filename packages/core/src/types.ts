@@ -1,3 +1,5 @@
+import type { GamePuzzleMomentKind } from "./game-puzzles/types.ts";
+
 export type SprintMode = "standard" | "blitz" | "arrow_duel" | "custom";
 
 export type SprintStatus = "active" | "paused" | "won" | "failed" | "abandoned";
@@ -70,21 +72,65 @@ export interface SurvivalPreferences {
   guideSeen: boolean;
 }
 
+export const USER_GAME_PUZZLE_ID_PREFIX = "ug_";
+
+export function isUserGamePuzzleId(id: string): boolean {
+  return id.startsWith(USER_GAME_PUZZLE_ID_PREFIX);
+}
+
+export type UserGamePuzzleRatingSource =
+  | "maia2_sf_v1"
+  | "sf_heuristic_v1"
+  | "game_anchor";
+
+export interface UserGamePuzzleMeta {
+  gameId: string;
+  gamePly: number;
+  gameMoveNumber: number;
+  puzzleKind: "line" | "arrow_duel";
+  momentKind: GamePuzzleMomentKind;
+  opponentName?: string;
+  playedAt?: string;
+  timeClass?: string;
+  clockRemainingSec?: number;
+  timeSpentSec?: number;
+  punishmentLine?: string[];
+  caliberScore?: number;
+  ratingSource?: UserGamePuzzleRatingSource;
+}
+
 export interface Puzzle {
   id: string;
   initialFen: string;
   solutionMoves: string[];
   rating: number;
+  /** Optional dedicated Arrow Duel difficulty rating (600–2200) when available. */
+  arrowDuelRating?: number;
   ratingDeviation?: number;
   popularity?: number;
   nbPlays?: number;
   themes: string[];
   gameUrl?: string;
   openingTags?: string[];
-  source: "lichess" | "synthetic";
+  source: "lichess" | "synthetic" | "user_game";
   stockfishEval?: number;
   stockfishBestMove?: string;
   stockfishEvalAfterFirstMove?: number;
+  userGameMeta?: UserGamePuzzleMeta;
+}
+
+export function effectivePuzzleRating(
+  puzzle: Pick<Puzzle, "rating" | "arrowDuelRating">,
+  mode: SprintMode | "line" | "puzzle"
+): number {
+  if (
+    mode === "arrow_duel" &&
+    puzzle.arrowDuelRating !== undefined &&
+    Number.isFinite(puzzle.arrowDuelRating)
+  ) {
+    return puzzle.arrowDuelRating;
+  }
+  return puzzle.rating;
 }
 
 export interface SprintConfig {
@@ -114,6 +160,11 @@ export interface SprintConfig {
   };
   /** Fixed-level, locally resumable Survival challenge identity. */
   survival?: SurvivalSprintConfig;
+  /** Personal "My Game Puzzles" session identity (local-only, unrated by default). */
+  userGamePuzzles?: {
+    timeClass?: string;
+    gameId?: string;
+  };
   /**
    * How the overall Run clock behaves. Absent means "countdown": the Run
    * fails with time_expired at `durationSeconds`. "untimed" (Focused Runs

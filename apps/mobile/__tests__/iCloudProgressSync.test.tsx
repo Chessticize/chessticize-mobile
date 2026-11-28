@@ -254,6 +254,54 @@ describe("iCloud progress V2 bridge", () => {
     expect(capture.v2.finalTokenFingerprint).toBeUndefined();
     expect(capture.v1.status).toBe("missing");
   });
+
+  it("bridges custom GamesV1 zone operations without touching ProgressV2 zone", async () => {
+    const ensureZone = jest.fn(async () => ({ created: true }));
+    const fetchZoneChanges = jest.fn(async () => ({
+      records: [
+        {
+          recordName: "g1|linked_account|lichess%3Aalice",
+          kind: "linked_account",
+          schemaVersion: 2,
+          payload: JSON.stringify({
+            formatVersion: 1,
+            kind: "linked_account",
+            entityKey: "lichess:alice",
+            state: "present",
+            value: { platform: "lichess", username: "alice", createdAt: "2026-11-27T00:00:00.000Z" }
+          })
+        }
+      ],
+      deletedRecords: [],
+      nextToken: "g1-token-1",
+      moreComing: false
+    }));
+    const modifyZoneRecords = jest.fn(async () => ({
+      savedRecordNames: ["g1|linked_account|lichess%3Aalice"],
+      deletedRecordNames: [],
+      errors: []
+    }));
+
+    (NativeModules as Record<string, unknown>).ICloudProgressSync = completeNativeModule({
+      ensureZone,
+      fetchZoneChanges,
+      modifyZoneRecords
+    });
+
+    const client = createNativeICloudProgressSyncClient();
+    const gamesZone = client?.createZoneTransport?.("GamesV1");
+    expect(gamesZone).toBeDefined();
+
+    await gamesZone!.ensureZone();
+    expect(ensureZone).toHaveBeenCalledWith("GamesV1");
+
+    const page = await gamesZone!.fetchZoneChanges("prev-token");
+    expect(fetchZoneChanges).toHaveBeenCalledWith("GamesV1", "prev-token");
+    expect(page.nextToken).toBe("g1-token-1");
+
+    await gamesZone!.modifyRecords({ saving: [], deleting: [] });
+    expect(modifyZoneRecords).toHaveBeenCalledWith("GamesV1", [], []);
+  });
 });
 
 function completeNativeModule(overrides: Record<string, unknown> = {}): Record<string, unknown> {

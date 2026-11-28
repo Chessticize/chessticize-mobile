@@ -6,6 +6,8 @@ import {
   type SprintMode,
   type SprintState
 } from "../../../../packages/core/src/index.ts";
+import { CompositePuzzleSource } from "../../../../packages/storage/src/composite-puzzle-source.ts";
+import type { GameReviewStore } from "../../../../packages/storage/src/game-review-store.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
@@ -285,7 +287,8 @@ export function composePackBackedMobilePracticeService(
   tacticalProfileRepository: TacticalProfileRepository,
   simulation?: { controls: DevSimulationProfileControls; active: boolean }
 ): PracticeService {
-  const store = new PackBackedPracticeStore(userStore, packSource);
+  const compositeSource = new CompositePuzzleSource(packSource, userStore);
+  const store = new PackBackedPracticeStore(userStore, compositeSource);
   const service = new PracticeService(
     store,
     createTacticalProfileService(store, packSource, tacticalProfileRepository),
@@ -297,6 +300,10 @@ export function composePackBackedMobilePracticeService(
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   return service;
+}
+
+export function getPracticeStoreForGameReview(service: PracticeService): GameReviewStore {
+  return service.gameReviewStore;
 }
 
 function survivalPracticeServiceOptions(): {

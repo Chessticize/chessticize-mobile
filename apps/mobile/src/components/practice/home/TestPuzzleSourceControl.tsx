@@ -27,7 +27,9 @@ export function TestPuzzleSourceControl({
   onToggleSimulation,
   onClearSimulation,
   onShowWhatsNew,
-  onSimulateWhatsNewUpdate
+  onSimulateWhatsNewUpdate,
+  onShowWelcomeOnboarding,
+  onSimulateFreshInstall
 }: {
   source: MobilePuzzleSource;
   onChange: (next: MobilePuzzleSource) => void;
@@ -39,6 +41,8 @@ export function TestPuzzleSourceControl({
   onClearSimulation?: () => void;
   onShowWhatsNew?: () => void;
   onSimulateWhatsNewUpdate?: () => void;
+  onShowWelcomeOnboarding?: () => void;
+  onSimulateFreshInstall?: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
   return (
@@ -104,9 +108,9 @@ export function TestPuzzleSourceControl({
           </View>
         </>
       ) : null}
-      {onShowWhatsNew || onSimulateWhatsNewUpdate ? (
+      {onShowWhatsNew || onSimulateWhatsNewUpdate || onShowWelcomeOnboarding || onSimulateFreshInstall ? (
         <>
-          <Text style={styles.helperText}>What’s New (Dev only)</Text>
+          <Text style={styles.helperText}>What’s New & Onboarding (Dev only)</Text>
           <View style={styles.optionRow}>
             {onShowWhatsNew ? (
               <OptionButton
@@ -119,9 +123,25 @@ export function TestPuzzleSourceControl({
             {onSimulateWhatsNewUpdate ? (
               <OptionButton
                 active={false}
-                label="Simulate update to 1.6.0"
+                label="Simulate update to 2.0.0"
                 testID="test-whats-new-simulate-update"
                 onPress={onSimulateWhatsNewUpdate}
+              />
+            ) : null}
+            {onShowWelcomeOnboarding ? (
+              <OptionButton
+                active={false}
+                label="Show Welcome Guide"
+                testID="test-onboarding-show"
+                onPress={onShowWelcomeOnboarding}
+              />
+            ) : null}
+            {onSimulateFreshInstall ? (
+              <OptionButton
+                active={false}
+                label="Simulate fresh 2.0 install"
+                testID="test-onboarding-simulate-fresh"
+                onPress={onSimulateFreshInstall}
               />
             ) : null}
           </View>

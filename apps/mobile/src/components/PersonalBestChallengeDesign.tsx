@@ -114,7 +114,7 @@ export type PersonalBestChallengeDesignPreview = {
   recentScores?: readonly PersonalBestRecentScorePresentation[];
 };
 
-export function PersonalBestHomeCard({
+export function PersonalBestHomeRow({
   presentation,
   onOpenHub
 }: {
@@ -124,16 +124,25 @@ export function PersonalBestHomeCard({
   const { t } = useTranslation();
   const latestPaused = presentation.pausedRuns?.[0];
   return (
+    <ListRow
+      accessibilityHint={t("survival.homeCardHint")}
+      accessibilityLabel={t("survival.homeCardA11y")}
+      icon="survival"
+      subtitle={t("survival.homeCardSubtitle")}
+      testID="personal-best-home-card"
+      title={t("survival.homeCardTitle")}
+      onPress={() => onOpenHub(latestPaused)}
+    />
+  );
+}
+
+export function PersonalBestHomeCard(props: {
+  presentation: PersonalBestChallengeDesignPreview;
+  onOpenHub: (run?: PersonalBestPausedRunPresentation) => void;
+}): React.JSX.Element {
+  return (
     <Section rows>
-      <ListRow
-        accessibilityHint={t("survival.homeCardHint")}
-        accessibilityLabel={t("survival.homeCardA11y")}
-        icon="survival"
-        subtitle={t("survival.homeCardSubtitle")}
-        testID="personal-best-home-card"
-        title={t("survival.homeCardTitle")}
-        onPress={() => onOpenHub(latestPaused)}
-      />
+      <PersonalBestHomeRow {...props} />
     </Section>
   );
 }

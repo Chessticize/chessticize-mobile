@@ -447,7 +447,8 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-start-conflict",
     "practice-runs-empty",
     "release-notes-ios",
-    "release-notes-android"
+    "release-notes-android",
+    "welcome-onboarding-overview"
   ].includes(scenarioId);
 }
 
@@ -1766,16 +1767,26 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     };
   }
   if (isWhatsNewScenario(scenarioId)) {
-    // The first launch of 1.6.0 after an update from 1.5.3, or a launch where the notes were
+    // The first launch of 2.0.0 after an update from 1.7.0, or a launch where the notes were
     // already seen and only the Settings row reopens them.
     capabilityOverrides.applicationMetadata = {
-      versionName: "1.6.0",
+      versionName: "2.0.0",
       buildNumber: "1"
     };
     service.saveSettings({
       ...service.getSettings(),
-      whatsNewSeenVersion: scenarioId === "settings-whats-new" ? "1.6.0" : "1.5.3"
+      whatsNewSeenVersion: scenarioId === "settings-whats-new" ? "2.0.0" : "1.7.0"
     });
+  }
+  if (isWelcomeOnboardingScenario(scenarioId)) {
+    // Fresh 2.0.0 install: empty history and no recorded What's New version triggers Welcome Onboarding.
+    service = new PracticeService(new MemoryStore());
+    configureMobilePracticePuzzleSource(service, "familiar15");
+    capabilityOverrides.practiceService = service;
+    capabilityOverrides.applicationMetadata = {
+      versionName: "2.0.0",
+      buildNumber: "1"
+    };
   }
   if (configurePuzzleSource) {
     capabilityOverrides.configurePuzzleSource = (
@@ -1795,6 +1806,10 @@ function isWhatsNewScenario(scenarioId: LabScenarioId): boolean {
   return scenarioId === "release-notes-ios"
     || scenarioId === "release-notes-android"
     || scenarioId === "settings-whats-new";
+}
+
+function isWelcomeOnboardingScenario(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "welcome-onboarding-overview";
 }
 
 function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number | null {

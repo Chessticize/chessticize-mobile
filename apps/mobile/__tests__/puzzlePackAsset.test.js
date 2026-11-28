@@ -43,7 +43,7 @@ describe("bundled puzzle pack native asset", () => {
     expect(androidBuild).toContain(
       'def puzzlePackAssetFileName = "bundled-core-pack-v${puzzlePackManifest.packVersion}.sqlite"'
     );
-    expect(manifest.packVersion).toBe(5);
+    expect(manifest.packVersion).toBe(6);
   });
 
   it("versions the copied iOS resource and removes an obsolete version", () => {

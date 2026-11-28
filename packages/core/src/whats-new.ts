@@ -109,3 +109,100 @@ export function canPresentWhatsNew(context: WhatsNewPresentationContext): boolea
     && !context.resumableRun
     && !context.otherSurfaceActive;
 }
+
+export interface OnboardingGuideProgress {
+  /** Whether the user has completed or skipped the first-launch Welcome Onboarding. */
+  welcomeSeen: boolean;
+  /** Whether the user has dismissed the Games Hub first-use tip. */
+  gamesGuideSeen: boolean;
+  /** Whether the user has dismissed the Game Review first-use tip. */
+  gameReviewGuideSeen: boolean;
+}
+
+export function defaultOnboardingGuideProgress(): OnboardingGuideProgress {
+  return {
+    welcomeSeen: false,
+    gamesGuideSeen: false,
+    gameReviewGuideSeen: false
+  };
+}
+
+/**
+ * Re-arms contextual in-app 2.0 guides (Games Hub & Game Review) when the user
+ * chooses "Reset guides" in Settings, without forcing an existing user back
+ * through the fresh-install Welcome Onboarding sheet.
+ */
+export function resetContextualOnboardingGuides(
+  progress: OnboardingGuideProgress
+): OnboardingGuideProgress {
+  return {
+    ...progress,
+    gamesGuideSeen: false,
+    gameReviewGuideSeen: false
+  };
+}
+
+export type LaunchGuideSurface = "none" | "whats_new" | "welcome_onboarding";
+
+export interface LaunchGuideInput {
+  /** The release the What's New notes describe (for example `2.0.0`). */
+  releaseVersion: string;
+  /** The first release version that offers the Welcome Onboarding flow (for example `2.0.0`). */
+  onboardingMinVersion: string;
+  /** The running app version. */
+  appVersion: string;
+  /** The version whose What's New notes were last seen, or absent when never recorded. */
+  lastSeenVersion?: string | undefined;
+  /** Whether the device already holds attempts, rated practice, or dismissed Sprint guides. */
+  hasExistingProgress: boolean;
+  /** Whether the device already has linked chess accounts or imported games. */
+  hasLinkedOrImportedGames?: boolean;
+  /** Whether the user already completed or skipped Welcome Onboarding on this device. */
+  welcomeSeen: boolean;
+}
+
+export interface LaunchGuideDecision {
+  surface: LaunchGuideSurface;
+  /**
+   * Store this as the last-seen What's New version right away when no modal is
+   * shown, so future updates can still distinguish an update from a fresh install.
+   */
+  recordSeenVersion?: string;
+}
+
+const NO_LAUNCH_GUIDE: LaunchGuideDecision = { surface: "none" };
+
+/**
+ * Decides once per launch whether to present What's New (upgrading users),
+ * Welcome Onboarding (fresh 2.0+ installs), or nothing.
+ */
+export function decideLaunchGuideOnLaunch(input: LaunchGuideInput): LaunchGuideDecision {
+  const app = parseReleaseVersion(input.appVersion);
+  if (!app) {
+    return NO_LAUNCH_GUIDE;
+  }
+  const hasHistory = input.hasExistingProgress || input.hasLinkedOrImportedGames === true;
+  const whatsNew = decideWhatsNewOnLaunch({
+    releaseVersion: input.releaseVersion,
+    appVersion: input.appVersion,
+    lastSeenVersion: input.lastSeenVersion,
+    hasExistingProgress: hasHistory
+  });
+  if (whatsNew.show) {
+    return { surface: "whats_new" };
+  }
+  const onboardingMin = parseReleaseVersion(input.onboardingMinVersion);
+  if (
+    input.lastSeenVersion === undefined &&
+    !hasHistory &&
+    !input.welcomeSeen &&
+    onboardingMin !== undefined &&
+    compareReleaseVersions(app, onboardingMin) >= 0
+  ) {
+    return { surface: "welcome_onboarding" };
+  }
+  if (whatsNew.recordSeenVersion !== undefined) {
+    return { surface: "none", recordSeenVersion: whatsNew.recordSeenVersion };
+  }
+  return NO_LAUNCH_GUIDE;
+}

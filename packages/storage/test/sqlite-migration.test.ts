@@ -32,6 +32,17 @@ const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 const SNAPSHOT_TABLES = [
   "app_review_request_state",
   "app_settings",
+  "game_ply_evals",
+  "games_v1_sync_state",
+  "games_v1_synced_hashes",
+  "games_v1_tombstones",
+  "imported_games",
+  "linked_accounts",
+  "maia_active_game",
+  "maia_preferences",
+  "maia_rated_games",
+  "maia_rating_anchors",
+  "maia_ratings",
   "puzzles",
   "ratings",
   "sprint_sessions",
@@ -46,7 +57,8 @@ const SNAPSHOT_TABLES = [
   "review_events",
   "survival_bests",
   "survival_preferences",
-  "tactical_profile_source_state"
+  "tactical_profile_source_state",
+  "user_puzzles"
 ] as const;
 
 test("SQLite migrates an empty database to the current schema version", async () => {
@@ -341,6 +353,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
         language: "system",
         sync: { iCloudEnabled: true },
         arrowDuel: { opponentReplyEnabled: true },
+        gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 10 },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
         sprintGuides: {
@@ -349,6 +362,11 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           arrowDuelSeen: false,
           focusedRunSeen: false,
           arrowDuelReplyCueStage: 0
+        },
+        onboarding: {
+          welcomeSeen: false,
+          gamesGuideSeen: false,
+          gameReviewGuideSeen: false
         }
       });
       assert.deepEqual(
@@ -600,6 +618,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
         language: "system",
         sync: { iCloudEnabled: false },
         arrowDuel: { opponentReplyEnabled: true },
+        gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 10 },
         notifications: {
           reviewReminder: { mode: "fixed", fixedLocalTime: "07:35" }
         },
@@ -610,6 +629,11 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
           arrowDuelSeen: false,
           focusedRunSeen: false,
           arrowDuelReplyCueStage: 0
+        },
+        onboarding: {
+          welcomeSeen: false,
+          gamesGuideSeen: false,
+          gameReviewGuideSeen: false
         }
       });
       assert.deepEqual(service.getRating("standard 5/20"), {
@@ -1930,6 +1954,66 @@ test("SQLite v26 adds device-local language preference without touching Progress
     try {
       assert.equal(schemaVersionForStore(reopenedStore), CURRENT_SCHEMA_VERSION);
       assert.equal(new PracticeService(reopenedStore).getSettings().language, "de");
+    } finally {
+      reopenedStore.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v33 adds device-local 2.0 onboarding guide columns without touching ProgressV2 outbox", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-onboarding-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    const setupService = new PracticeService(setupStore);
+    setupService.saveSettings({
+      ...setupService.getSettings(),
+      whatsNewSeenVersion: "1.7.0",
+      appearance: "dark"
+    });
+    setupStore.db.exec("DELETE FROM progress_v2_outbox");
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN onboarding_welcome_seen");
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN onboarding_games_guide_seen");
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN onboarding_game_review_guide_seen");
+    setupStore.db.exec("PRAGMA user_version = 32");
+    setupStore.close();
+
+    const migratedStore = new SQLiteStore(databasePath);
+    migratedStore.migrate();
+    const migratedService = new PracticeService(migratedStore);
+    try {
+      const settings = migratedService.getSettings();
+      assert.equal(settings.whatsNewSeenVersion, "1.7.0");
+      assert.equal(settings.appearance, "dark");
+      assert.deepEqual(settings.onboarding, {
+        welcomeSeen: false,
+        gamesGuideSeen: false,
+        gameReviewGuideSeen: false
+      });
+      migratedService.saveSettings({
+        ...settings,
+        onboarding: { welcomeSeen: true, gamesGuideSeen: true, gameReviewGuideSeen: false }
+      });
+      const outbox = migratedStore.db
+        .prepare("SELECT kind FROM progress_v2_outbox WHERE kind = 'preferences'")
+        .all();
+      assert.deepEqual(outbox, []);
+    } finally {
+      migratedStore.close();
+    }
+
+    const reopenedStore = new SQLiteStore(databasePath);
+    reopenedStore.migrate();
+    try {
+      assert.equal(schemaVersionForStore(reopenedStore), CURRENT_SCHEMA_VERSION);
+      assert.deepEqual(new PracticeService(reopenedStore).getSettings().onboarding, {
+        welcomeSeen: true,
+        gamesGuideSeen: true,
+        gameReviewGuideSeen: false
+      });
     } finally {
       reopenedStore.close();
     }

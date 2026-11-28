@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import {
   canPresentWhatsNew,
   compareReleaseVersions,
+  decideLaunchGuideOnLaunch,
   decideWhatsNewOnLaunch,
+  defaultOnboardingGuideProgress,
   parseReleaseVersion,
+  resetContextualOnboardingGuides,
   whatsNewVersionToRecord,
+  type LaunchGuideInput,
   type WhatsNewLaunchInput,
   type WhatsNewPresentationContext
 } from "../src/index.ts";
@@ -116,4 +120,83 @@ test("the notes never interrupt an active, paused or resumable Run", () => {
 test("the notes wait while another tab or a first-run surface owns the screen", () => {
   assert.equal(presentation({ practiceTabSelected: false }), false);
   assert.equal(presentation({ otherSurfaceActive: true }), false);
+});
+
+function launchGuide(overrides: Partial<LaunchGuideInput> = {}): ReturnType<typeof decideLaunchGuideOnLaunch> {
+  return decideLaunchGuideOnLaunch({
+    releaseVersion: "2.0.0",
+    onboardingMinVersion: "2.0.0",
+    appVersion: "2.0.0",
+    hasExistingProgress: false,
+    hasLinkedOrImportedGames: false,
+    welcomeSeen: false,
+    ...overrides
+  });
+}
+
+test("fresh 2.0 install routes to Welcome Onboarding without prematurely recording What's New", () => {
+  assert.deepEqual(launchGuide(), { surface: "welcome_onboarding" });
+  assert.deepEqual(launchGuide({ appVersion: "2.0.0-dev" }), { surface: "welcome_onboarding" });
+  assert.deepEqual(launchGuide({ appVersion: "2.1.0" }), { surface: "welcome_onboarding" });
+});
+
+test("upgrading user from 1.x routes to What's New and never Welcome Onboarding", () => {
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: "1.7.0", hasExistingProgress: true }),
+    { surface: "whats_new" }
+  );
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: "1.7.0", hasExistingProgress: false }),
+    { surface: "whats_new" }
+  );
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: undefined, hasExistingProgress: true }),
+    { surface: "whats_new" }
+  );
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: undefined, hasLinkedOrImportedGames: true }),
+    { surface: "whats_new" }
+  );
+});
+
+test("once Welcome Onboarding or What's New is completed, subsequent launches show nothing", () => {
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: "2.0.0", welcomeSeen: true }),
+    { surface: "none" }
+  );
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: "2.0.0", hasExistingProgress: true, welcomeSeen: false }),
+    { surface: "none" }
+  );
+  // If welcome was already seen without recording a version, record the running version silently.
+  assert.deepEqual(
+    launchGuide({ lastSeenVersion: undefined, welcomeSeen: true }),
+    { surface: "none", recordSeenVersion: "2.0.0" }
+  );
+});
+
+test("older or unreadable versions never trigger 2.0 launch guides", () => {
+  assert.deepEqual(launchGuide({ appVersion: "1.7.1" }), { surface: "none" });
+  assert.deepEqual(launchGuide({ appVersion: "test-version" }), { surface: "none" });
+});
+
+test("resetContextualOnboardingGuides re-arms Games & Game Review tips while keeping welcomeSeen", () => {
+  const initial = defaultOnboardingGuideProgress();
+  assert.deepEqual(initial, {
+    welcomeSeen: false,
+    gamesGuideSeen: false,
+    gameReviewGuideSeen: false
+  });
+  assert.deepEqual(
+    resetContextualOnboardingGuides({
+      welcomeSeen: true,
+      gamesGuideSeen: true,
+      gameReviewGuideSeen: true
+    }),
+    {
+      welcomeSeen: true,
+      gamesGuideSeen: false,
+      gameReviewGuideSeen: false
+    }
+  );
 });

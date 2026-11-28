@@ -43,3 +43,35 @@ test("importing local data never overwrites this device's What's New seen versio
 
   assert.equal(target.getSettings().whatsNewSeenVersion, "1.6.0");
 });
+
+test("device-local 2.0 onboarding flags default to false, persist across settings saves, and are not overwritten by import", () => {
+  const source = new PracticeService(new MemoryStore());
+  assert.deepEqual(source.getSettings().onboarding, {
+    welcomeSeen: false,
+    gamesGuideSeen: false,
+    gameReviewGuideSeen: false
+  });
+  source.saveSettings({
+    ...source.getSettings(),
+    onboarding: { welcomeSeen: true, gamesGuideSeen: true, gameReviewGuideSeen: false }
+  });
+  source.saveSettings({ ...source.getSettings(), appearance: "dark" });
+  assert.deepEqual(source.getSettings().onboarding, {
+    welcomeSeen: true,
+    gamesGuideSeen: true,
+    gameReviewGuideSeen: false
+  });
+
+  const exported = source.exportLocalData();
+  const target = new PracticeService(new MemoryStore());
+  target.saveSettings({
+    ...target.getSettings(),
+    onboarding: { welcomeSeen: false, gamesGuideSeen: false, gameReviewGuideSeen: true }
+  });
+  target.importLocalData(exported);
+  assert.deepEqual(target.getSettings().onboarding, {
+    welcomeSeen: false,
+    gamesGuideSeen: false,
+    gameReviewGuideSeen: true
+  });
+});

@@ -23,6 +23,7 @@ export type PuzzleSide = "white" | "black";
 export type HistoryReviewStatus = "queued" | "clear";
 export type HistoryResult = AttemptResult | "incomplete";
 export type HistoryAttentionReason = "unclear" | "in_review" | "incomplete";
+export type HistoryPuzzleOriginFilter = "all" | "pack" | "user_game";
 
 export interface HistoryPageQuery {
   limit: number;
@@ -36,6 +37,7 @@ export interface HistoryQuery {
   minRating?: number;
   maxRating?: number;
   source?: AttemptSource;
+  puzzleOrigin?: HistoryPuzzleOriginFilter;
   result?: HistoryResult;
   side?: PuzzleSide;
   themes?: string[];
@@ -341,6 +343,7 @@ export interface HistoryFilterSelection {
   ratingKey?: string | null;
   ratingRange: HistoryRatingRangeFilter;
   source: "all" | AttemptSource;
+  puzzleOrigin?: HistoryPuzzleOriginFilter;
   result: HistoryResultFilter;
   side: "all" | PuzzleSide;
   themes: readonly string[];
@@ -374,6 +377,9 @@ export function historyQueryForSelection(
     ...(selection.ratingKey ? { ratingKey: selection.ratingKey } : {}),
     ...historyRatingRangeQuery(selection.ratingRange),
     ...(selection.source === "all" ? {} : { source: selection.source }),
+    ...(selection.puzzleOrigin && selection.puzzleOrigin !== "all"
+      ? { puzzleOrigin: selection.puzzleOrigin }
+      : {}),
     ...(selection.result === "all" ? {} : { result: selection.result }),
     ...(selection.side === "all" ? {} : { side: selection.side }),
     ...(selection.themes.length === 0 ? {} : { themes: [...selection.themes] }),
@@ -500,7 +506,7 @@ export function buildHistoryView(input: {
 
 export function filterHistoryAttemptsForQuery(input: {
   attempts: HistoryAttemptView[];
-  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear" | "attentionOnly" | "attentionReasons">;
+  query: Pick<HistoryQuery, "result" | "source" | "puzzleOrigin" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear" | "attentionOnly" | "attentionReasons">;
   reviews: ReviewQueueState[];
 }): HistoryAttemptView[] {
   const selectedThemes = historyThemesForQuery(input.query);
@@ -518,6 +524,14 @@ export function filterHistoryAttemptsForQuery(input: {
   return input.attempts
     .filter((attempt) => !input.query.result || historyResultForFilterSemantics(attempt.result) === input.query.result)
     .filter((attempt) => !input.query.source || normalizeHistorySource(attempt.source) === input.query.source)
+    .filter((attempt) => {
+      if (!input.query.puzzleOrigin || input.query.puzzleOrigin === "all") {
+        return true;
+      }
+      const isUserGame =
+        attempt.puzzleId.startsWith("ug_") || attempt.ratingKey.startsWith("ug_");
+      return input.query.puzzleOrigin === "user_game" ? isUserGame : !isUserGame;
+    })
     .filter((attempt) => !input.query.mode || normalizeHistoryMode(attempt.mode) === input.query.mode)
     .filter((attempt) => !input.query.side || attempt.side === input.query.side)
     .filter((attempt) => input.query.minRating === undefined || attempt.puzzleRating >= input.query.minRating)

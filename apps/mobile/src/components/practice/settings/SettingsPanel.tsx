@@ -16,6 +16,10 @@ import {
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduleResult
 } from "../../../platform/reviewReminderScheduler.ts";
+import {
+  GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS,
+  type GameReviewAutoSyncCooldownMinutes
+} from "../../../../../../packages/storage/src/practice-store.ts";
 import type { ProgressV2SyncResult } from "../../../../../../packages/storage/src/progress-sync-v2.ts";
 import type { ICloudAccountStatus } from "../../../platform/iCloudProgressSync.ts";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
@@ -89,6 +93,7 @@ import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
+const MAIA2_SOURCE_URL = "https://github.com/CSSLab/maia2";
 
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
@@ -164,6 +169,8 @@ export function SettingsPanel({
   appearance,
   applicationMetadata,
   arrowDuelOpponentReplyGlobalSetting,
+  gameReviewAutoAddRecommendedSetting,
+  gameReviewAutoSyncCooldownSetting,
   captureBottomInset,
   darkBoardTheme,
   feedbackIssuesOpener,
@@ -171,6 +178,7 @@ export function SettingsPanel({
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
+  onOpenWelcomeOnboarding,
   onOpenWhatsNew,
   onAdjustRating,
   onAdvancedRatingsOpenChange,
@@ -210,11 +218,20 @@ export function SettingsPanel({
     enabled: boolean;
     onChange: (enabled: boolean) => void;
   };
+  gameReviewAutoAddRecommendedSetting?: {
+    enabled: boolean;
+    onChange: (enabled: boolean) => void;
+  };
+  gameReviewAutoSyncCooldownSetting?: {
+    minutes: GameReviewAutoSyncCooldownMinutes;
+    onChange: (minutes: GameReviewAutoSyncCooldownMinutes) => void;
+  };
   captureBottomInset?: number;
   feedbackIssuesOpener: (url: string) => Promise<void>;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => Promise<void>;
+  onOpenWelcomeOnboarding?: () => void;
   onOpenWhatsNew: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onAdvancedRatingsOpenChange: (open: boolean) => void;
@@ -494,6 +511,74 @@ export function SettingsPanel({
         </SettingsSection>
       ) : null}
 
+      {gameReviewAutoAddRecommendedSetting || gameReviewAutoSyncCooldownSetting ? (
+        <SettingsSection
+          title={t("settings.gameReview.section")}
+          testID="settings-game-review-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          {gameReviewAutoAddRecommendedSetting ? (
+            <>
+              <SettingsRow
+                label={t("settings.gameReview.autoAddRecommendedTitle")}
+                value={gameReviewAutoAddRecommendedSetting.enabled ? t("common.on") : t("common.off")}
+                detail={gameReviewAutoAddRecommendedSetting.enabled
+                  ? t("settings.gameReview.autoAddRecommendedDetailOn")
+                  : t("settings.gameReview.autoAddRecommendedDetailOff")}
+                testID="settings-game-review-auto-add-recommended"
+              />
+              <SettingsSegmentedRow
+                accessibilityLabel={t("settings.gameReview.autoAddRecommendedTitle")}
+                options={[
+                  { value: "on", label: t("common.on"), testID: "settings-game-review-auto-add-on" },
+                  { value: "off", label: t("common.off"), testID: "settings-game-review-auto-add-off" }
+                ]}
+                testID="settings-game-review-auto-add-controls"
+                value={gameReviewAutoAddRecommendedSetting.enabled ? "on" : "off"}
+                onChange={(next) => {
+                  gameReviewAutoAddRecommendedSetting.onChange(next === "on");
+                  setStatusMessage(next === "on"
+                    ? t("settings.gameReview.statusOn")
+                    : t("settings.gameReview.statusOff"));
+                }}
+              />
+            </>
+          ) : null}
+          {gameReviewAutoSyncCooldownSetting ? (
+            <>
+              <SettingsRow
+                label={t("settings.gameReview.autoSyncCooldownTitle")}
+                value={gameReviewAutoSyncCooldownSetting.minutes === 0
+                  ? t("common.off")
+                  : t("settings.gameReview.autoSyncCooldownMinutes", {
+                      minutes: gameReviewAutoSyncCooldownSetting.minutes
+                    })}
+                testID="settings-game-review-auto-sync-cooldown"
+              />
+              <SettingsSegmentedRow
+                accessibilityLabel={t("settings.gameReview.autoSyncCooldownTitle")}
+                options={GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS.map((minutes) => ({
+                  value: String(minutes),
+                  label: minutes === 0
+                    ? t("common.off")
+                    : t("settings.gameReview.autoSyncCooldownOptionMinutes", { minutes }),
+                  testID: `settings-game-review-auto-sync-${minutes}`
+                }))}
+                testID="settings-game-review-auto-sync-controls"
+                value={String(gameReviewAutoSyncCooldownSetting.minutes)}
+                onChange={(next) => {
+                  const parsed = Number(next) as GameReviewAutoSyncCooldownMinutes;
+                  gameReviewAutoSyncCooldownSetting.onChange(parsed);
+                  setStatusMessage(parsed === 0
+                    ? t("settings.gameReview.autoSyncCooldownStatusOff")
+                    : t("settings.gameReview.autoSyncCooldownStatus", { minutes: parsed }));
+                }}
+              />
+            </>
+          ) : null}
+        </SettingsSection>
+      ) : null}
+
       {progressProtection.kind === "icloud_sync" ? (
         <SettingsSection title={t("settings.sync.section")} testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
@@ -577,6 +662,13 @@ export function SettingsPanel({
 
       {showSprintGuideReset ? (
         <SettingsSection title={t("settings.guides.section")} testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+          {onOpenWelcomeOnboarding ? (
+            <SettingsRow
+              label={t("settings.guides.welcomeGuide")}
+              testID="settings-welcome-guide"
+              onPress={onOpenWelcomeOnboarding}
+            />
+          ) : null}
           <View style={styles.settingsBlock} testID="settings-guidance-reset-card">
             <View style={styles.settingsRowCopy}>
               <AppText variant="body">{t("settings.guides.replayTitle")}</AppText>
@@ -678,6 +770,16 @@ export function SettingsPanel({
           testID="settings-stockfish-source"
           onPress={() => {
             void Linking.openURL(applicationMetadata.stockfishSourceUrl);
+          }}
+        />
+        <SettingsExternalLinkRow
+          label={t("settings.about.maia")}
+          value={t("settings.about.maiaValue")}
+          detail={t("settings.about.maiaDetail")}
+          linkLabel="github.com/CSSLab/maia2"
+          testID="settings-maia-source"
+          onPress={() => {
+            void Linking.openURL(MAIA2_SOURCE_URL);
           }}
         />
         <SettingsExternalLinkRow
@@ -1219,16 +1321,17 @@ export function ratingLabelFromKey(
   ratingKey: string,
   locale: SupportedLocale = getActiveLocale()
 ): string {
-  if (/\barrow[_ ]duel\b/.test(ratingKey)) {
-    return translate(locale, "common.arrowDuel");
+  const baseLabel = /\barrow[_ ]duel\b/.test(ratingKey)
+    ? translate(locale, "common.arrowDuel")
+    : /\bblitz\b/.test(ratingKey)
+      ? translate(locale, "common.blitz")
+      : /\bcustom\b/.test(ratingKey)
+        ? translate(locale, "common.custom")
+        : translate(locale, "common.standard");
+  if (ratingKey.startsWith("ug_")) {
+    return `${translate(locale, "common.originGames")} · ${baseLabel}`;
   }
-  if (/\bblitz\b/.test(ratingKey)) {
-    return translate(locale, "common.blitz");
-  }
-  if (/\bcustom\b/.test(ratingKey)) {
-    return translate(locale, "common.custom");
-  }
-  return translate(locale, "common.standard");
+  return baseLabel;
 }
 
 function advancedRatingBucketLabel(label: string, ratingKey: string, t: TranslateFn): string {

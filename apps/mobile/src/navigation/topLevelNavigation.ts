@@ -26,6 +26,7 @@ export type TopLevelTabItem = {
 export const TOP_LEVEL_TABS: ReadonlyArray<TopLevelTabItem> = [
   { tab: "practice", label: "Practice", testID: "practice-tab", icon: "tabPractice", sfSymbol: ICONS.tabPractice.sf, androidDrawable: "ic_tab_practice" },
   { tab: "review", label: "Review", testID: "review-tab", icon: "tabReview", sfSymbol: ICONS.tabReview.sf, androidDrawable: "ic_tab_review" },
+  { tab: "games", label: "Games", testID: "games-tab", icon: "tabGames", sfSymbol: ICONS.tabGames.sf, androidDrawable: "ic_tab_games" },
   { tab: "history", label: "History", testID: "history-tab", icon: "tabHistory", sfSymbol: ICONS.tabHistory.sf, androidDrawable: "ic_tab_history" },
   { tab: "settings", label: "Settings", testID: "settings-tab", icon: "tabSettings", sfSymbol: ICONS.tabSettings.sf, androidDrawable: "ic_tab_settings" }
 ];
@@ -121,6 +122,8 @@ export function topLevelTabIntent(tab: TopLevelTab): TopLevelTabIntent {
 // the full-screen Sprint Result (#609), and an open review session.
 export type TopLevelChromeInputs = {
   feedbackSnapshotVisible: boolean;
+  gameReviewOpen?: boolean;
+  maiaPlayOpen?: boolean;
   openSession: boolean;
   personalBestGuideVisible: boolean;
   personalBestHubVisible: boolean;
@@ -133,6 +136,8 @@ export type TopLevelChromeInputs = {
 export function isTopLevelChromeVisible(inputs: TopLevelChromeInputs): boolean {
   return !inputs.openSession
     && !inputs.feedbackSnapshotVisible
+    && !inputs.gameReviewOpen
+    && !inputs.maiaPlayOpen
     && !inputs.sessionGuideVisible
     && !inputs.personalBestGuideVisible
     && !inputs.personalBestHubVisible
@@ -156,6 +161,8 @@ export function topLevelTabLabel(
       return translate(locale, "tabs.practice");
     case "review":
       return translate(locale, "tabs.review");
+    case "games":
+      return translate(locale, "tabs.games");
     case "history":
       return translate(locale, "tabs.history");
     case "settings":

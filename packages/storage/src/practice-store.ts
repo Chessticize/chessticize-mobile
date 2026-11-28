@@ -21,11 +21,14 @@ import type {
 } from "../../core/src/index.ts";
 import { isReviewDay, reviewDayFor } from "../../core/src/index.ts";
 import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../core/src/index.ts";
-import type { SprintGuideProgress } from "../../core/src/index.ts";
+import type { OnboardingGuideProgress, SprintGuideProgress } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
+import type { GamesV1PersistenceHost } from "./games-sync-v1.ts";
 import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
+import type { GameReviewStore } from "./game-review-store.ts";
+import type { MaiaPlayStore } from "./maia-play-store.ts";
 
 export interface ClearSyncedHistoryResult {
   attempts: number;
@@ -130,6 +133,13 @@ export const DEFAULT_LIGHT_BOARD_THEME: BoardThemeId = "slate";
 export const DEFAULT_DARK_BOARD_THEME: BoardThemeId = "graphite";
 export const DEFAULT_PIECE_SET: ChessPieceSetId = "default";
 
+export const GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS = [0, 5, 10, 30] as const;
+
+export type GameReviewAutoSyncCooldownMinutes =
+  (typeof GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS)[number];
+
+export const DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES: GameReviewAutoSyncCooldownMinutes = 10;
+
 export interface PracticeSettings {
   appearance: AppearancePreference;
   lightBoardTheme: BoardThemeId;
@@ -143,15 +153,29 @@ export interface PracticeSettings {
   language?: LanguagePreference;
   /**
    * Release version whose What's New notes were last seen or skipped on this
-   * device (for example "1.6.0"). Absent until recorded. Device-local: iCloud
+   * device (for example "2.0.0"). Absent until recorded. Device-local: iCloud
    * progress sync and local-data import never carry it.
    */
   whatsNewSeenVersion?: string;
+  /**
+   * Device-local 2.0 onboarding and contextual guide progress. Excluded from
+   * CloudKit ProgressV2 sync and local-data import.
+   */
+  onboarding?: OnboardingGuideProgress;
   sync: {
     iCloudEnabled: boolean;
   };
   arrowDuel: {
     opponentReplyEnabled: boolean;
+  };
+  /**
+   * Device-local Game Review preferences. Excluded from CloudKit ProgressV2 sync
+   * because imported games and user_puzzles stay local to each device.
+   */
+  gameReview?: {
+    autoAddRecommendedToReview: boolean;
+    /** Minimum minutes between automatic Games tab / foreground refreshes; 0 disables auto-sync. */
+    autoSyncCooldownMinutes?: GameReviewAutoSyncCooldownMinutes;
   };
   notifications: {
     reviewReminder: ReviewReminderPreference;
@@ -179,7 +203,8 @@ export interface PracticeRatingActivity {
   lastPlayedAt: string;
 }
 
-export interface PracticeStore extends ProgressV2PersistenceHost {
+export interface PracticeStore
+  extends ProgressV2PersistenceHost, GamesV1PersistenceHost, GameReviewStore, MaiaPlayStore {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;
@@ -235,11 +260,12 @@ export interface PracticeStore extends ProgressV2PersistenceHost {
   clearSyncedHistory(now: string): ClearSyncedHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
-  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState;
+  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string, timeZone?: string): ReviewQueueState;
   removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval;
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   listReviewQueue(): ReviewQueueState[];
+  listReviewRemovals(): ReviewScheduleRemoval[];
   pruneOrphanedReviewQueue(): number;
   promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult;
   getDueReviews(now: string): ReviewQueueState[];

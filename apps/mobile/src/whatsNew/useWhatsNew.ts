@@ -1,39 +1,51 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  decideWhatsNewOnLaunch,
-  whatsNewVersionToRecord
+  decideLaunchGuideOnLaunch,
+  defaultOnboardingGuideProgress,
+  whatsNewVersionToRecord,
+  type LaunchGuideSurface
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import {
+  ONBOARDING_MIN_VERSION,
   WHATS_NEW_RELEASE_VERSION,
+  welcomeOnboardingContentFor,
   whatsNewContentFor,
+  type WelcomeOnboardingContent,
   type WhatsNewContent,
   type WhatsNewPlatform
 } from "./whatsNewContent.ts";
 import { useTranslation } from "../i18n/index.ts";
 
-// Wires the What's New decision (packages/core) to the screen. The launch
-// decision is made once, from stored state, when the screen mounts:
+// Wires the What's New & Welcome Onboarding launch decisions (packages/core) to
+// the screen. The launch decision is made once, from stored state, on mount:
 //
-// - After an update the notes are pending and appear only while `presentable`
-//   (an idle Practice home), so they never interrupt a Run.
-// - A fresh install records the running version at once and never sees them.
-// - Finishing the notes records the version, so they show once per release.
-// - `open` shows them on request (Settings) without changing what is recorded.
+// - Upgrading users (1.x -> 2.0) see What's New once idle on Practice Home.
+// - Brand-new 2.0 installs see Welcome Onboarding once idle on Practice Home.
+// - Finishing or skipping records the seen state so neither repeats on relaunch.
+// - `open` reopens What's New from Settings/Dev without changing recorded state.
 
-/** Dev-only simulation of an update: what the last-seen version and the running app become. */
-const SIMULATED_PREVIOUS_VERSION = "1.5.3";
+/** Dev-only simulation of an update from the prior 1.x release. */
+const SIMULATED_PREVIOUS_VERSION = "1.7.0";
 const SIMULATED_APP_VERSION = WHATS_NEW_RELEASE_VERSION;
 
 export interface WhatsNewControls {
   content: WhatsNewContent;
   visible: boolean;
-  /** Show the notes now, for the Settings row and the Dev control. */
+  /** Show the What's New sheet now (Settings row and Dev control). */
   open: () => void;
-  /** Finish the notes: hide them and, after an update, record the release as seen. */
+  /** Finish What's New: hide it and, after an update, record the release as seen. */
   dismiss: () => void;
   /** Dev only: act as if this launch followed an update from the previous release. */
   simulateUpdate: () => void;
+  onboardingContent: WelcomeOnboardingContent;
+  onboardingVisible: boolean;
+  /** Show the Welcome Onboarding sheet on demand (Dev control / replay). */
+  openOnboarding: () => void;
+  /** Finish or skip Welcome Onboarding and record it as seen. */
+  dismissOnboarding: () => void;
+  /** Dev only: simulate a brand-new 2.0 install launch. */
+  simulateFreshInstall: () => void;
 }
 
 export function useWhatsNew({
@@ -51,8 +63,11 @@ export function useWhatsNew({
   const { locale } = useTranslation();
   const [effectiveAppVersion, setEffectiveAppVersion] = useState(appVersion);
   const [launchDecision] = useState(() => decideForLaunch(service, appVersion));
-  const [pending, setPending] = useState(launchDecision.show);
-  const [requested, setRequested] = useState(false);
+  const [pendingSurface, setPendingSurface] = useState<LaunchGuideSurface>(
+    launchDecision.surface
+  );
+  const [requestedWhatsNew, setRequestedWhatsNew] = useState(false);
+  const [requestedOnboarding, setRequestedOnboarding] = useState(false);
 
   useEffect(() => {
     if (launchDecision.recordSeenVersion !== undefined) {
@@ -60,40 +75,107 @@ export function useWhatsNew({
     }
   }, [launchDecision.recordSeenVersion, service]);
 
-  const open = useCallback(() => setRequested(true), []);
+  const open = useCallback(() => {
+    setRequestedOnboarding(false);
+    setRequestedWhatsNew(true);
+  }, []);
 
   const dismiss = useCallback(() => {
-    setRequested(false);
-    if (pending) {
-      setPending(false);
+    setRequestedWhatsNew(false);
+    if (pendingSurface === "whats_new") {
+      setPendingSurface("none");
       recordSeenVersion(
         service,
         whatsNewVersionToRecord(WHATS_NEW_RELEASE_VERSION, effectiveAppVersion)
       );
     }
-  }, [effectiveAppVersion, pending, service]);
+  }, [effectiveAppVersion, pendingSurface, service]);
+
+  const openOnboarding = useCallback(() => {
+    setRequestedWhatsNew(false);
+    setRequestedOnboarding(true);
+  }, []);
+
+  const dismissOnboarding = useCallback(() => {
+    setRequestedOnboarding(false);
+    const settings = service.getSettings();
+    const currentOnboarding = settings.onboarding ?? defaultOnboardingGuideProgress();
+    const shouldRecordSeenVersion =
+      pendingSurface === "welcome_onboarding" || settings.whatsNewSeenVersion === undefined;
+    if (pendingSurface === "welcome_onboarding") {
+      setPendingSurface("none");
+    }
+    service.saveSettings({
+      ...settings,
+      ...(shouldRecordSeenVersion
+        ? {
+            whatsNewSeenVersion: whatsNewVersionToRecord(
+              WHATS_NEW_RELEASE_VERSION,
+              effectiveAppVersion
+            )
+          }
+        : {}),
+      onboarding: {
+        ...currentOnboarding,
+        welcomeSeen: true
+      }
+    });
+  }, [effectiveAppVersion, pendingSurface, service]);
 
   const simulateUpdate = useCallback(() => {
+    setRequestedOnboarding(false);
+    setRequestedWhatsNew(false);
     recordSeenVersion(service, SIMULATED_PREVIOUS_VERSION);
     setEffectiveAppVersion(SIMULATED_APP_VERSION);
-    setPending(decideForLaunch(service, SIMULATED_APP_VERSION).show);
+    setPendingSurface(decideForLaunch(service, SIMULATED_APP_VERSION).surface);
   }, [service]);
+
+  const simulateFreshInstall = useCallback(() => {
+    setRequestedWhatsNew(false);
+    const nextSettings = {
+      ...service.getSettings(),
+      onboarding: defaultOnboardingGuideProgress()
+    };
+    delete nextSettings.whatsNewSeenVersion;
+    service.saveSettings(nextSettings);
+    setEffectiveAppVersion(SIMULATED_APP_VERSION);
+    setPendingSurface("welcome_onboarding");
+    setRequestedOnboarding(true);
+  }, [service]);
+
+  const whatsNewVisible =
+    requestedWhatsNew || (pendingSurface === "whats_new" && presentable);
+  const onboardingVisible =
+    !whatsNewVisible &&
+    (requestedOnboarding || (pendingSurface === "welcome_onboarding" && presentable));
 
   return {
     content: whatsNewContentFor(platform, locale),
-    visible: requested || (pending && presentable),
+    visible: whatsNewVisible,
     open,
     dismiss,
-    simulateUpdate
+    simulateUpdate,
+    onboardingContent: welcomeOnboardingContentFor(locale),
+    onboardingVisible,
+    openOnboarding,
+    dismissOnboarding,
+    simulateFreshInstall
   };
 }
 
 function decideForLaunch(service: PracticeService, appVersion: string) {
-  return decideWhatsNewOnLaunch({
+  const settings = service.getSettings();
+  const hasLinkedOrImportedGames =
+    service.listLinkedAccounts().length > 0 ||
+    service.listImportedGames({ limit: 1 }).length > 0;
+  return decideLaunchGuideOnLaunch({
     releaseVersion: WHATS_NEW_RELEASE_VERSION,
+    onboardingMinVersion: ONBOARDING_MIN_VERSION,
     appVersion,
-    lastSeenVersion: service.getSettings().whatsNewSeenVersion,
-    hasExistingProgress: service.hasPracticeActivity()
+    lastSeenVersion: settings.whatsNewSeenVersion,
+    hasExistingProgress: service.hasPracticeActivity(),
+    hasLinkedOrImportedGames,
+    welcomeSeen: settings.onboarding?.welcomeSeen ?? false
   });
 }
 

@@ -19,6 +19,7 @@ export interface EngineAnalysisLine {
   pv: string[];
   multipv: number;
   depth: number;
+  nodes?: number;
   score: AnalysisScore;
 }
 
@@ -241,8 +242,10 @@ export function parseStockfishInfoLine(line: string, fen: string): EngineAnalysi
   }
 
   const multipvMatch = /\bmultipv\s+(\d+)/.exec(line);
+  const nodesMatch = /\bnodes\s+(\d+)/.exec(line);
   const multipv = multipvMatch ? Number(multipvMatch[1]) : 1;
   const depth = Number(depthMatch[1]);
+  const nodes = nodesMatch ? Number(nodesMatch[1]) : undefined;
   const rawScore = Number(scoreMatch[2]);
   const activeColor = sideToMove(fen);
   const score: AnalysisScore =
@@ -263,6 +266,7 @@ export function parseStockfishInfoLine(line: string, fen: string): EngineAnalysi
     pv: pv.map(normalizeUci),
     multipv,
     depth,
+    ...(nodes !== undefined ? { nodes } : {}),
     score
   };
 }
@@ -614,7 +618,7 @@ function guidedSortValue(fen: string, puzzle: Puzzle, move: string, score?: Anal
   return 998_000;
 }
 
-function sortEngineLines(lines: EngineAnalysisLine[]): EngineAnalysisLine[] {
+export function sortEngineLines(lines: EngineAnalysisLine[]): EngineAnalysisLine[] {
   return [...lines].sort((a, b) => {
     if (a.multipv !== b.multipv) {
       return a.multipv - b.multipv;

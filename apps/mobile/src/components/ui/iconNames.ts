@@ -49,9 +49,10 @@ export const ICONS = {
   trend: { sf: "chart.line.uptrend.xyaxis", material: "trending_up", codepoint: 0xe8e5 },
   warning: { sf: "exclamationmark.triangle", material: "warning", codepoint: 0xf083 },
   whatsNew: { sf: "sparkles", material: "auto_awesome", codepoint: 0xe65f },
-  // Top-level tabs (#612). The native Android bottom navigation draws these from
-  // vector drawables (res/drawable/ic_tab_*.xml) that the subset script writes
-  // from the same font instance; see TAB_DRAWABLES there.
+  // Top-level tabs (#612, #766). The native Android bottom navigation draws
+  // these from vector drawables (res/drawable/ic_tab_*.xml) that the subset
+  // script writes from the same font instance; see TAB_DRAWABLES there.
+  tabGames: { sf: "checkerboard.rectangle", material: "bar_chart", codepoint: 0xe26b },
   tabHistory: { sf: "clock.arrow.circlepath", material: "history", codepoint: 0xe8b3 },
   tabPractice: { sf: "target", material: "target", codepoint: 0xe719 },
   tabReview: { sf: "arrow.counterclockwise", material: "replay", codepoint: 0xe042 },

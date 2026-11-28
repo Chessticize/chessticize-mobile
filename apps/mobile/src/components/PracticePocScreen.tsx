@@ -4,6 +4,7 @@ import {
   AppState,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -19,10 +20,12 @@ import {
 } from "react-native-gesture-handler";
 import {
   canPresentWhatsNew,
+  classifyMaiaTimeControl,
   arrowDuelReplyCuePresentationFor,
   buildSprintConfig,
   collectHistoryRatingKeys,
   DEFAULT_OPPONENT_REPLY_SECONDS,
+  defaultOnboardingGuideProgress,
   defaultSprintConfig,
   historyAttemptReplayAvailability,
   selectMistakeReplayItems,
@@ -34,12 +37,15 @@ import {
   OPPONENT_REPLY_MIN_SECONDS,
   pauseSprint as pauseSprintState,
   RATING_FLOOR,
+  resetContextualOnboardingGuides,
   resetSprintGuideProgress,
   resolvePuzzleTimingPolicy,
   resumeSprint as resumeSprintState,
   SERVER_CURATED_THEME_PRESENTATION,
   sprintHasRunDeadline,
-  sprintSessionGuidePlanFor
+  sprintSessionGuidePlanFor,
+  supportsArrowDuelOpponentReply,
+  UciEngineArbiter
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
@@ -64,8 +70,14 @@ import {
   FocusedRunUnavailableError,
   type PracticeService
 } from "../../../../packages/storage/src/practice-service.ts";
-import type {
-  ReviewQueueDuePromotionResult
+import {
+  storedUserPuzzleToPuzzle,
+  USER_GAME_RATING_KEY_PREFIX
+} from "../../../../packages/storage/src/game-review-store.ts";
+import {
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
+  type GameReviewAutoSyncCooldownMinutes,
+  type ReviewQueueDuePromotionResult
 } from "../../../../packages/storage/src/practice-store.ts";
 import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import {
@@ -143,6 +155,7 @@ import {
 } from "../navigation/topLevelNavigation.ts";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
 import { WhatsNewSheet } from "./WhatsNewSheet.tsx";
+import { WelcomeOnboardingSheet } from "./WelcomeOnboardingSheet.tsx";
 import { useWhatsNew } from "../whatsNew/useWhatsNew.ts";
 import {
   sessionGuideContainerTestID,
@@ -329,6 +342,11 @@ import {
   withAttemptClarity
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
+import { GamesHubScreen, type MyGamePuzzlesLaunchOptions } from "./games/GamesHubScreen.tsx";
+import { BatchAnalysisBanner } from "./games/BatchAnalysisBanner.tsx";
+import { useGamesBatchAnalysis } from "./games/useGamesBatchAnalysis.ts";
+import { GameReviewScreen } from "./gameReview/index.tsx";
+import { MaiaPlayScreen } from "./maiaPlay/index.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
 interface Props {
@@ -357,6 +375,7 @@ interface Props {
   runEloEditingMovedToHome?: boolean;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
+  onOpenGameReview?: (gameId: string) => void;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
@@ -610,6 +629,7 @@ export function PracticePocScreen({
   runEloEditingMovedToHome = false,
   settingsCaptureBottomInset,
   initialTab = "practice",
+  onOpenGameReview,
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
@@ -778,6 +798,16 @@ export function PracticePocScreen({
       () => sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting?.enabled
         ?? service.getSettings().arrowDuel.opponentReplyEnabled
     );
+  const [gameReviewAutoAddRecommendedEnabled, setGameReviewAutoAddRecommendedEnabled] =
+    useState(
+      () => service.getSettings().gameReview?.autoAddRecommendedToReview ?? false
+    );
+  const [gameReviewAutoSyncCooldownMinutes, setGameReviewAutoSyncCooldownMinutes] =
+    useState<GameReviewAutoSyncCooldownMinutes>(
+      () =>
+        service.getSettings().gameReview?.autoSyncCooldownMinutes ??
+        DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+    );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
       ?? DEFAULT_OPPONENT_REPLY_SECONDS;
@@ -816,6 +846,7 @@ export function PracticePocScreen({
     start: () => void;
   } | null>(null);
   const [personalBestGuideIntent, setPersonalBestGuideIntent] = useState<PersonalBestGuideIntent | null>(null);
+  const [maiaPlayOpen, setMaiaPlayOpen] = useState(false);
   const [personalBestFirstEntryGuideAcknowledged, setPersonalBestFirstEntryGuideAcknowledged] =
     useState(false);
   const [personalBestGuideOpponentReplyEnabled, setPersonalBestGuideOpponentReplyEnabled] =
@@ -921,6 +952,7 @@ export function PracticePocScreen({
   const {
     applyHistoryThemeIntent,
     changeHistoryAttentionOnly,
+    changeHistoryPuzzleOriginFilter,
     changeHistoryRatingKey,
     changeHistoryRatingRangeFilter,
     changeHistoryResultFilter,
@@ -931,6 +963,7 @@ export function PracticePocScreen({
     historyFiltersExpanded,
     historyPageOffset,
     historyProgressOpen,
+    historyPuzzleOriginFilter,
     historyQuery,
     historyRatingKey,
     historyRatingRangeFilter,
@@ -977,8 +1010,121 @@ export function PracticePocScreen({
     left: number; top: number; width: number; maxHeight: number;
   } | null>(null);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
+  const [gamesImportModalOpen, setGamesImportModalOpen] = useState(false);
+  const gamesHubViewRef = useRef<"games" | "puzzles">("games");
+  const [activeGameReviewId, setActiveGameReviewId] = useState<string | null>(null);
+  const [activeGameReviewInitialPly, setActiveGameReviewInitialPly] = useState<number | null>(null);
+  const [gamePracticeEntries, setGamePracticeEntries] = useState<ReviewEntry[]>([]);
+  const [gamePracticeInitialIndex, setGamePracticeInitialIndex] = useState<number>(0);
+  const gamePracticeReturnTabRef = useRef<Tab>("games");
+  const gameReviewArbiterRef = useRef<UciEngineArbiter | null>(null);
+  useEffect(() => {
+    return () => {
+      gameReviewArbiterRef.current?.terminate();
+      gameReviewArbiterRef.current = null;
+    };
+  }, []);
+  const getSharedGameReviewArbiter = useCallback((): UciEngineArbiter | null => {
+    if (gameReviewArbiterRef.current) {
+      return gameReviewArbiterRef.current;
+    }
+    const transport = stockfish.createTransport();
+    if (!transport) {
+      return null;
+    }
+    gameReviewArbiterRef.current = new UciEngineArbiter(transport);
+    return gameReviewArbiterRef.current;
+  }, [stockfish]);
+  const activeReviewGame = useMemo(
+    () => (tab === "games" && activeGameReviewId !== null
+      ? service.getImportedGame(activeGameReviewId) ?? null
+      : null),
+    [activeGameReviewId, service, tab]
+  );
+  function startMyGamePuzzlesSessionForOptions(
+    options?: MyGamePuzzlesLaunchOptions
+  ): void {
+    setError(null);
+    const kindFilter =
+      options?.mode === "arrow_duel"
+        ? "arrow_duel"
+        : options?.mode === "standard"
+          ? "line"
+          : undefined;
+    const rawStoredPuzzles = service.listUserPuzzles({
+      ...(kindFilter ? { puzzleKind: kindFilter } : {}),
+      ...(options?.gameId ? { gameId: options.gameId } : {}),
+      ...(options?.timeClass ? { timeClass: options.timeClass } : {}),
+      ...(options?.themes && options.themes.length > 0 ? { themes: options.themes } : {})
+    });
+    let orderedPuzzles = rawStoredPuzzles;
+    if (options?.puzzleIds && options.puzzleIds.length > 0) {
+      const byId = new Map(rawStoredPuzzles.map((puzzle) => [puzzle.id, puzzle]));
+      orderedPuzzles = options.puzzleIds
+        .map((id) => byId.get(id))
+        .filter((item): item is (typeof rawStoredPuzzles)[number] => item !== undefined);
+    } else {
+      const gameOrder = new Map<string, number>();
+      service.listImportedGames().forEach((g, idx) => gameOrder.set(g.id, idx));
+      orderedPuzzles = [...rawStoredPuzzles].sort((left, right) => {
+        const lOrder = gameOrder.get(left.gameId) ?? Number.MAX_SAFE_INTEGER;
+        const rOrder = gameOrder.get(right.gameId) ?? Number.MAX_SAFE_INTEGER;
+        if (lOrder !== rOrder) {
+          return lOrder - rOrder;
+        }
+        return left.gamePly - right.gamePly || left.id.localeCompare(right.id);
+      });
+    }
+    if (orderedPuzzles.length === 0) {
+      return;
+    }
+    const entries = orderedPuzzles.map((stored) => {
+      const mode: "standard" | "arrow_duel" =
+        stored.puzzleKind === "arrow_duel" ? "arrow_duel" : "standard";
+      const puzzle = storedUserPuzzleToPuzzle(stored);
+      return buildServiceReviewEntry(service, {
+        puzzle,
+        mode,
+        ratingKey: `${USER_GAME_RATING_KEY_PREFIX}my_game_puzzles:${mode}`,
+        source: "history"
+      });
+    });
+    const clampedIndex = Math.max(
+      0,
+      Math.min(options?.initialIndex ?? 0, entries.length - 1)
+    );
+    gamePracticeReturnTabRef.current = tab;
+    setGamePracticeInitialIndex(clampedIndex);
+    setGamePracticeEntries(entries);
+    setTab("games");
+  }
+  function openUserGameSourceInReview(gameId: string): void {
+    if (state?.status === "active") {
+      try {
+        service.pauseSprint(captureLiveNowIso());
+      } catch {
+        // Allow navigating back to the source game even if pause is unavailable.
+      }
+    }
+    setState(null);
+    setTab("games");
+    setActiveGameReviewId(gameId);
+  }
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
+  const interactiveStockfishActive =
+    reviewAnalysisOpen ||
+    (tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null) ||
+    tab === "analysis";
+  const gamesBatchAnalysis = useGamesBatchAnalysis({
+    store: service.gameReviewStore,
+    practiceService: service,
+    getEngine: getSharedGameReviewArbiter,
+    onGameUpdated: () => {
+      refreshState();
+    },
+    suspended: interactiveStockfishActive
+  });
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [seededHistoryStatus, setSeededHistoryStatus] = useState<string | null>(null);
@@ -1035,9 +1181,12 @@ export function PracticePocScreen({
   // Android rail).
   const reviewSurfaceOpen = reviewSessionSource !== null
     || historyReviewEntries.length > 0
-    || historyUnavailableAttempt !== null;
+    || historyUnavailableAttempt !== null
+    || gamePracticeEntries.length > 0;
   const topLevelChromeVisible = isTopLevelChromeVisible({
     feedbackSnapshotVisible: feedbackSnapshot !== null,
+    gameReviewOpen: activeGameReviewId !== null,
+    maiaPlayOpen,
     openSession: state?.status === "active" || state?.status === "paused",
     personalBestGuideVisible,
     personalBestHubVisible,
@@ -1483,6 +1632,10 @@ export function PracticePocScreen({
     if (nextTab !== "review") {
       setReviewFiltersExpanded(false);
     }
+    if (nextTab !== "games") {
+      setGamesImportModalOpen(false);
+      setActiveGameReviewId(null);
+    }
     if (nextTab !== "settings") {
       setSettingsAdvancedRatingsOpen(false);
     }
@@ -1505,7 +1658,18 @@ export function PracticePocScreen({
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     internalRunManagement.refresh();
     setAggregateRevision((current) => current + 1);
+    const refreshedSettings = service.getSettings();
     setReviewReminderPreference(service.getReviewReminderPreference());
+    if (!sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting) {
+      setArrowDuelOpponentReplyGlobalEnabled(refreshedSettings.arrowDuel.opponentReplyEnabled);
+    }
+    setGameReviewAutoAddRecommendedEnabled(
+      refreshedSettings.gameReview?.autoAddRecommendedToReview ?? false
+    );
+    setGameReviewAutoSyncCooldownMinutes(
+      refreshedSettings.gameReview?.autoSyncCooldownMinutes ??
+        DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+    );
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
       activeSprint && (activeSprint.status === "active" || activeSprint.status === "paused") && stateRef.current?.id !== activeSprint.id
@@ -1706,6 +1870,34 @@ export function PracticePocScreen({
     service.saveSettings({
       ...settings,
       arrowDuel: { opponentReplyEnabled: enabled }
+    });
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function saveGameReviewAutoAddRecommendedEnabled(enabled: boolean): void {
+    setGameReviewAutoAddRecommendedEnabled(enabled);
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      gameReview: {
+        autoAddRecommendedToReview: enabled,
+        autoSyncCooldownMinutes:
+          settings.gameReview?.autoSyncCooldownMinutes ??
+          DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+      }
+    });
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function saveGameReviewAutoSyncCooldownMinutes(minutes: GameReviewAutoSyncCooldownMinutes): void {
+    setGameReviewAutoSyncCooldownMinutes(minutes);
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      gameReview: {
+        autoAddRecommendedToReview: settings.gameReview?.autoAddRecommendedToReview ?? false,
+        autoSyncCooldownMinutes: minutes
+      }
     });
     setSettingsRevision((current) => current + 1);
   }
@@ -3648,7 +3840,8 @@ export function PracticePocScreen({
   const arrowDuelReplyChallengeProductionVisible = Boolean(
     !arrowDuelReplyChallengePreviewVisible &&
       state?.config.opponentReply?.enabled &&
-      currentPuzzle?.kind === "arrow_duel"
+      currentPuzzle?.kind === "arrow_duel" &&
+      supportsArrowDuelOpponentReply(currentPuzzle.puzzle)
   );
   const displayedArrowDuelPuzzle =
     feedbackSnapshot?.currentPuzzle.kind === "arrow_duel"
@@ -3825,7 +4018,8 @@ export function PracticePocScreen({
   // they freeze the page only while a touch that started on the board is active.
   // Edit Runs stays scrollable until a held card actually claims its drag, then
   // freezes through drop so the card moves without also panning the page.
-  const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
+  const reviewBoardVisible =
+    reviewSessionSource !== null || historyReviewEntries.length > 0 || gamePracticeEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
     || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
     || reviewBoardTouchActive;
@@ -3896,7 +4090,7 @@ export function PracticePocScreen({
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
   const visibleHistoryPage = historyView?.page;
-  const contentOwnsHeader = tab === "review" || tab === "history";
+  const contentOwnsHeader = tab === "review" || tab === "history" || tab === "games";
   const survivalBackTransient: MobileBackTransient | null = personalBestRecordsVisible
     ? "survival-records"
     : personalBestGuideVisible
@@ -3924,7 +4118,9 @@ export function PracticePocScreen({
               ? "history-filters"
               : tab === "review" && !reviewSurfaceOpen && reviewFiltersExpanded
                 ? "review-filters"
-                : tab === "settings" && settingsAdvancedRatingsOpen
+                : tab === "games" && gamesImportModalOpen
+                  ? "games-import"
+                  : tab === "settings" && settingsAdvancedRatingsOpen
                   ? "settings-advanced-ratings"
                   : tab === "practice" && mode === "custom" && customRatingEditorOpen
                     ? "custom-rating-editor"
@@ -3938,7 +4134,9 @@ export function PracticePocScreen({
             kind: "review-session",
             owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
           }
-        : tab === "history" && historyProgressOpen
+        : tab === "games" && activeGameReviewId !== null
+          ? { kind: "game-review", owner: "games" }
+          : tab === "history" && historyProgressOpen
           ? { kind: "history-progress", owner: "history" }
           : tab === "analysis"
             ? { kind: "stockfish-diagnostics", owner: "settings" }
@@ -3955,6 +4153,7 @@ export function PracticePocScreen({
                 ? { kind: "custom-practice", owner: "practice" }
                 : null,
     [
+      activeGameReviewId,
       activeRunManagementScreen,
       historyProgressOpen,
       isFinished,
@@ -4122,6 +4321,8 @@ export function PracticePocScreen({
           setHistoryFiltersExpanded(false);
         } else if (intent.transient === "review-filters") {
           setReviewFiltersExpanded(false);
+        } else if (intent.transient === "games-import") {
+          setGamesImportModalOpen(false);
         } else if (intent.transient === "settings-advanced-ratings") {
           setSettingsAdvancedRatingsOpen(false);
         } else if (intent.transient === "custom-rating-editor") {
@@ -4159,6 +4360,8 @@ export function PracticePocScreen({
           }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "game-review") {
+          setActiveGameReviewId(null);
         } else if (resolvedState.detail?.kind === "history-progress") {
           setHistoryProgressOpen(false);
         } else if (resolvedState.detail?.kind === "practice-run-editor") {
@@ -4308,6 +4511,7 @@ export function PracticePocScreen({
       tab === "history"
       && (historyReviewEntries.length > 0 || historyUnavailableAttempt !== null)
     )
+    || (tab === "games" && gamePracticeEntries.length > 0)
   )
     ? t("common.replay")
     : screenTitleFor(tab, locale);
@@ -4348,6 +4552,10 @@ export function PracticePocScreen({
     void aggregateRevision;
     return service.getPracticeProgressSummary(practiceProgressNowMs, practiceProgressRatingKey);
   }, [aggregateRevision, practiceProgressNowMs, practiceProgressRatingKey, service]);
+  const userPuzzleCount = useMemo(() => {
+    void aggregateRevision;
+    return service.countUserPuzzles();
+  }, [aggregateRevision, service]);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customEligiblePuzzleCount = useMemo(() => {
@@ -4668,6 +4876,34 @@ export function PracticePocScreen({
           mode={mode}
         />
       )}
+      {displayedPuzzle?.puzzle.userGameMeta ? (
+        <Pressable
+          accessibilityRole="button"
+          style={{
+            alignSelf: "center",
+            borderColor: appTheme.colors.border.default,
+            borderRadius: appTheme.shape.capsule,
+            borderWidth: 1,
+            backgroundColor: appTheme.colors.surfaceSunken,
+            marginTop: 4,
+            paddingHorizontal: 10,
+            paddingVertical: 3
+          }}
+          testID="practice-user-game-provenance"
+          onPress={() => openUserGameSourceInReview(displayedPuzzle.puzzle.userGameMeta!.gameId)}
+        >
+          <Text style={{ color: appTheme.colors.text.secondary, fontSize: 12, fontWeight: "600" }}>
+            {displayedPuzzle.puzzle.userGameMeta.opponentName
+              ? t("games.puzzles.vsMove", {
+                  opponent: displayedPuzzle.puzzle.userGameMeta.opponentName,
+                  move: displayedPuzzle.puzzle.userGameMeta.gameMoveNumber
+                })
+              : t("games.puzzles.fromGameMove", {
+                  move: displayedPuzzle.puzzle.userGameMeta.gameMoveNumber
+                })}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   ) : null;
   const sessionBottomFeedbackNode = shouldShowSessionBoard
@@ -4950,6 +5186,53 @@ export function PracticePocScreen({
               onReplay={() => showSessionReplay()}
               onReplayMistakes={() => showSessionReplay("mistakes")}
             />
+          ) : maiaPlayOpen ? (
+            <MaiaPlayScreen
+              moveFeedbackClient={moveFeedbackClient}
+              service={service}
+              onBack={() => {
+                setMaiaPlayOpen(false);
+                refreshState();
+              }}
+              onOpenGameReview={(savedGameId) => {
+                setMaiaPlayOpen(false);
+                setActiveGameReviewInitialPly(null);
+                setActiveGameReviewId(savedGameId);
+                setTab("games");
+                refreshState();
+              }}
+              onStoreMutated={() => {
+                refreshState();
+              }}
+            />
+          ) : tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null ? (
+            <GameReviewScreen
+              engine={getSharedGameReviewArbiter()}
+              game={activeReviewGame}
+              initialPly={activeGameReviewInitialPly ?? undefined}
+              moveFeedbackClient={moveFeedbackClient}
+              practiceService={service}
+              store={service.gameReviewStore}
+              onBack={() => {
+                setActiveGameReviewId(null);
+                setActiveGameReviewInitialPly(null);
+              }}
+              onDeleteGame={(gameId) => {
+                service.deleteImportedGame(gameId);
+                setActiveGameReviewId(null);
+                setActiveGameReviewInitialPly(null);
+                refreshState();
+              }}
+              onPracticeGamePuzzles={(gameId, options) => {
+                startMyGamePuzzlesSessionForOptions({
+                  gameId,
+                  ...(options?.puzzleIds ? { puzzleIds: options.puzzleIds } : {}),
+                  ...(options?.initialIndex !== undefined
+                    ? { initialIndex: options.initialIndex }
+                    : {})
+                });
+              }}
+            />
           ) : (
           <>
           {!appHeaderScrolls ? appShellHeader : null}
@@ -4997,6 +5280,24 @@ export function PracticePocScreen({
             ]}
           >
             {appHeaderScrolls ? appShellHeader : null}
+            {gamesBatchAnalysis.state.status !== "idle" &&
+            !isOpenSession &&
+            !(tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame === null) ? (
+              <BatchAnalysisBanner
+                compact
+                state={gamesBatchAnalysis.state}
+                testID="global-games-batch-strip"
+                onCancel={gamesBatchAnalysis.cancel}
+                onDismiss={gamesBatchAnalysis.dismiss}
+                onOpenGames={() => {
+                  setGamePracticeEntries([]);
+                  setActiveGameReviewId(null);
+                  setTab("games");
+                }}
+                onPause={gamesBatchAnalysis.pause}
+                onResume={gamesBatchAnalysis.resume}
+              />
+            ) : null}
             {reviewReminderPermissionPromptVisible ? (
               <ReviewReminderPermissionPrompt
                 onDismiss={dismissReviewReminderPermissionPrompt}
@@ -5192,52 +5493,90 @@ export function PracticePocScreen({
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
-                  <PracticeHome
-                    adaptiveLayout={adaptiveLayout}
-                    mode={mode}
-                    modes={practiceModeSummaries}
-                    currentRating={activeRunManagementPresentation
-                      ? selectedManagedRun?.elo ?? RATING_FLOOR
-                      : currentRating}
-                    progress={practiceProgress}
-                    personalBestChallenge={personalBestPresentation}
-                    runManagement={activeRunManagementPresentation}
-                    sprintRulesGuide={sprintRulesGuidePresentation}
-                    sprintRulesGuideVisible={sprintRulesGuideVisible}
-                    tacticalProfile={resolvedTacticalProfilePresentation}
-                    resumableSprint={resumableSprint}
-                    onDismissSprintRulesGuide={() => {
-                      setSprintRulesGuideVisible(false);
-                      if (sprintGuidanceEnabled) {
-                        saveSprintGuideSeen("rules");
-                      }
-                    }}
-                    onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
-                    onOpenPersonalBestHub={(run) => {
-                      if (run) {
-                        selectPersonalBestPausedRun(run);
-                      }
-                      const showFirstEntryGuide = personalBestChallengeDesignPreview
-                        ? personalBestChallengeDesignPreview.homeGuideOnFirstEntry === true
-                          && !personalBestFirstEntryGuideAcknowledged
-                        : !service.getSurvivalPreferences().guideSeen;
-                      if (showFirstEntryGuide) {
-                        setPersonalBestGuideOpponentReplyEnabled(
-                          run?.opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
-                        );
-                        setPersonalBestHubVisible(false);
-                        setPersonalBestGuideIntent("first-entry");
-                        return;
-                      }
-                      setPersonalBestHubVisible(true);
-                    }}
-                    onSelectMode={setMode}
-                    onStartMode={(nextMode) => startSprint(nextMode)}
-                    onResumeSprint={resumeSprint}
-                    nativeRunReorderScrollController={nativeRunReorderScrollController}
-                    runReorderDesignPreview={runReorderDesignPreview}
-                    onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
-                  />
+                  <>
+                    <PracticeHome
+                      adaptiveLayout={adaptiveLayout}
+                      mode={mode}
+                      modes={practiceModeSummaries}
+                      currentRating={activeRunManagementPresentation
+                        ? selectedManagedRun?.elo ?? RATING_FLOOR
+                        : currentRating}
+                      maiaPlay={(() => {
+                        const maiaPrefs = service.getMaiaSetupPreferences();
+                        const maiaTimeClass = classifyMaiaTimeControl(maiaPrefs.timeControl);
+                        return {
+                          activeGame: service.getActiveMaiaGame() ?? null,
+                          preferences: maiaPrefs,
+                          rating: service.getMaiaRating(maiaTimeClass)
+                        };
+                      })()}
+                      progress={practiceProgress}
+                      personalBestChallenge={personalBestPresentation}
+                      runManagement={activeRunManagementPresentation}
+                      sprintRulesGuide={sprintRulesGuidePresentation}
+                      sprintRulesGuideVisible={sprintRulesGuideVisible}
+                      tacticalProfile={resolvedTacticalProfilePresentation}
+                      onOpenMaiaPlay={() => setMaiaPlayOpen(true)}
+                      resumableSprint={resumableSprint}
+                      onDismissSprintRulesGuide={() => {
+                        setSprintRulesGuideVisible(false);
+                        if (sprintGuidanceEnabled) {
+                          saveSprintGuideSeen("rules");
+                        }
+                      }}
+                      onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
+                      onOpenPersonalBestHub={(run) => {
+                        if (run) {
+                          selectPersonalBestPausedRun(run);
+                        }
+                        const showFirstEntryGuide = personalBestChallengeDesignPreview
+                          ? personalBestChallengeDesignPreview.homeGuideOnFirstEntry === true
+                            && !personalBestFirstEntryGuideAcknowledged
+                          : !service.getSurvivalPreferences().guideSeen;
+                        if (showFirstEntryGuide) {
+                          setPersonalBestGuideOpponentReplyEnabled(
+                            run?.opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
+                          );
+                          setPersonalBestHubVisible(false);
+                          setPersonalBestGuideIntent("first-entry");
+                          return;
+                        }
+                        setPersonalBestHubVisible(true);
+                      }}
+                      onSelectMode={setMode}
+                      onStartMode={(nextMode) => startSprint(nextMode)}
+                      onResumeSprint={resumeSprint}
+                      nativeRunReorderScrollController={nativeRunReorderScrollController}
+                      runReorderDesignPreview={runReorderDesignPreview}
+                      onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
+                    />
+                    {userPuzzleCount > 0 ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={{
+                          alignItems: "center",
+                          backgroundColor: appTheme.colors.surface,
+                          borderColor: appTheme.colors.border.default,
+                          borderRadius: appTheme.shape.control,
+                          borderWidth: 1,
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          marginTop: 10,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10
+                        }}
+                        testID="practice-home-my-game-puzzles"
+                        onPress={() => startMyGamePuzzlesSessionForOptions()}
+                      >
+                        <Text style={{ color: appTheme.colors.text.primary, fontSize: 14, fontWeight: "700" }}>
+                          {t("games.action.practicePuzzles", { count: userPuzzleCount })}
+                        </Text>
+                        <Text style={{ color: appTheme.colors.accent.s500, fontSize: 13, fontWeight: "600" }}>
+                          {t("tabs.games")}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </>
                 ) : null}
 
                 {practiceRunEditorVisible && activeRunManagementPresentation ? (
@@ -5363,6 +5702,8 @@ export function PracticePocScreen({
                     seededHistoryStatus={seededHistoryStatus}
                     onShowWhatsNew={whatsNew.open}
                     onSimulateWhatsNewUpdate={whatsNew.simulateUpdate}
+                    onShowWelcomeOnboarding={whatsNew.openOnboarding}
+                    onSimulateFreshInstall={whatsNew.simulateFreshInstall}
                     {...(simulationProfile
                       ? {
                           simulationActive: simulationProfile.active,
@@ -5439,6 +5780,7 @@ export function PracticePocScreen({
                   selectedRatingKey={activeHistoryRatingKey}
                   timeRange={historyTimeRange}
                   sourceFilter={historySourceFilter}
+                  puzzleOriginFilter={historyPuzzleOriginFilter}
                   resultFilter={historyResultFilter}
                   ratingRangeFilter={historyRatingRangeFilter}
                   sideFilter={historySideFilter}
@@ -5453,6 +5795,7 @@ export function PracticePocScreen({
                   onRatingKeyChange={changeHistoryRatingKey}
                   onTimeRangeChange={changeHistoryTimeRange}
                   onSourceFilterChange={changeHistorySourceFilter}
+                  onPuzzleOriginFilterChange={changeHistoryPuzzleOriginFilter}
                   onResultFilterChange={changeHistoryResultFilter}
                   onRatingRangeFilterChange={changeHistoryRatingRangeFilter}
                   onSideFilterChange={changeHistorySideFilter}
@@ -5512,6 +5855,76 @@ export function PracticePocScreen({
                 systemBackCommand={reviewBackCommand}
               />
             ) : null}
+            {tab === "games" ? (
+              gamePracticeEntries.length > 0 ? (
+                <ReviewSession
+                  key={`games-replay:${gamePracticeInitialIndex}:${gamePracticeEntries.map((entry) => entry.puzzle.id).join("|")}`}
+                  adaptiveLayout={adaptiveLayout}
+                  boardBlocksExternalGesture={practiceScrollGestureRef}
+                  boardSize={boardSize}
+                  currentTimeMs={currentTimeMs}
+                  deferBackRelevantTransition={deferBackRelevantTransition}
+                  entries={gamePracticeEntries}
+                  explicitReplySideCopy={explicitReplySideCopy}
+                  opponentReplySettingsHint={opponentReplySettingsHint}
+                  initialIndex={gamePracticeInitialIndex}
+                  moveFeedbackClient={moveFeedbackClient}
+                  service={service}
+                  systemBackCommand={reviewBackCommand}
+                  onAnalysisActiveChange={setReviewAnalysisOpen}
+                  onBoardTouchActiveChange={setReviewBoardTouchActive}
+                  onComplete={() => {
+                    setGamePracticeEntries([]);
+                    setTab(gamePracticeReturnTabRef.current);
+                    refreshState();
+                  }}
+                  onOpenSourceGame={(gameId, gamePly) => {
+                    setGamePracticeEntries([]);
+                    setActiveGameReviewInitialPly(gamePly ?? null);
+                    setActiveGameReviewId(gameId);
+                    setTab("games");
+                  }}
+                  onReviewEnrollmentChanged={reviewScheduleChanged}
+                  onReturnToOwner={() => {
+                    setGamePracticeEntries([]);
+                    setTab(gamePracticeReturnTabRef.current);
+                    refreshState();
+                  }}
+                  replayTerminology
+                  reviewScheduleControlVisible
+                  stockfish={stockfish}
+                />
+              ) : (
+                <GamesHubScreen
+                  adaptiveLayout={adaptiveLayout}
+                  analysisEngine={tab === "games" ? getSharedGameReviewArbiter() : null}
+                  autoSyncOnMount
+                  batchController={gamesBatchAnalysis}
+                  getNowMs={currentTimeMs}
+                  initialHubView={gamesHubViewRef.current}
+                  importModalVisible={gamesImportModalOpen}
+                  nowMs={nowMs}
+                  service={service}
+                  stockfish={stockfish}
+                  onHubViewChange={(view) => {
+                    gamesHubViewRef.current = view;
+                  }}
+                  onImportModalVisibleChange={setGamesImportModalOpen}
+                  onOpenGameReview={(gameId) => {
+                    if (onOpenGameReview) {
+                      onOpenGameReview(gameId);
+                    } else {
+                      setActiveGameReviewInitialPly(null);
+                      setActiveGameReviewId(gameId);
+                    }
+                  }}
+                  onPracticeMyGamePuzzles={(options) => {
+                    startMyGamePuzzlesSessionForOptions(options);
+                  }}
+                  onPlayWithMaia={() => setMaiaPlayOpen(true)}
+                />
+              )
+            ) : null}
             {tab === "settings" ? (
               <SettingsPanel
                 adaptiveLayout={adaptiveLayout}
@@ -5520,6 +5933,18 @@ export function PracticePocScreen({
                   {
                     enabled: arrowDuelOpponentReplyGlobalEnabled,
                     onChange: saveArrowDuelOpponentReplyGlobalEnabled
+                  }
+                }
+                gameReviewAutoAddRecommendedSetting={
+                  {
+                    enabled: gameReviewAutoAddRecommendedEnabled,
+                    onChange: saveGameReviewAutoAddRecommendedEnabled
+                  }
+                }
+                gameReviewAutoSyncCooldownSetting={
+                  {
+                    minutes: gameReviewAutoSyncCooldownMinutes,
+                    onChange: saveGameReviewAutoSyncCooldownMinutes
                   }
                 }
                 feedbackIssuesOpener={feedbackIssuesOpener}
@@ -5567,6 +5992,7 @@ export function PracticePocScreen({
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onPieceSetChange={savePieceSet}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
+                onOpenWelcomeOnboarding={whatsNew.openOnboarding}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
                 onSaveICloudSyncEnabled={saveICloudSyncEnabled}
@@ -5574,7 +6000,10 @@ export function PracticePocScreen({
                   const settings = service.getSettings();
                   service.saveSettings({
                     ...settings,
-                    sprintGuides: resetSprintGuideProgress()
+                    sprintGuides: resetSprintGuideProgress(),
+                    onboarding: resetContextualOnboardingGuides(
+                      settings.onboarding ?? defaultOnboardingGuideProgress()
+                    )
                   });
                   setSprintRulesGuideVisible(true);
                   setSettingsRevision((current) => current + 1);
@@ -5669,6 +6098,19 @@ export function PracticePocScreen({
         content={whatsNew.content}
         visible={whatsNew.visible}
         onContinue={whatsNew.dismiss}
+        onOpenGames={() => {
+          whatsNew.dismiss();
+          setTab("games");
+        }}
+      />
+      <WelcomeOnboardingSheet
+        content={whatsNew.onboardingContent}
+        visible={whatsNew.onboardingVisible}
+        onComplete={whatsNew.dismissOnboarding}
+        onOpenGames={() => {
+          whatsNew.dismissOnboarding();
+          setTab("games");
+        }}
       />
       </View>
   );
@@ -6054,6 +6496,9 @@ function screenTitleFor(tab: Tab, locale: SupportedLocale): string {
   if (tab === "review") {
     return translate(locale, "tabs.review");
   }
+  if (tab === "games") {
+    return translate(locale, "tabs.games");
+  }
   if (tab === "history") {
     return translate(locale, "tabs.history");
   }
@@ -6066,6 +6511,9 @@ function screenTitleFor(tab: Tab, locale: SupportedLocale): string {
 function screenSubtitleFor(tab: Tab, locale: SupportedLocale): string | null {
   if (tab === "review") {
     return translate(locale, "screen.subtitle.review");
+  }
+  if (tab === "games") {
+    return translate(locale, "screen.subtitle.games");
   }
   if (tab === "history") {
     return translate(locale, "screen.subtitle.history");

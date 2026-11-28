@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH,
   APPROVED_RUNTIME_DEPENDENCIES,
   auditMobileDataEgress
 } from "./lib/mobile-data-egress-audit.mjs";
@@ -117,6 +118,92 @@ test("required Core CI runs the tooling regressions and live data-egress audit",
   assert.match(workflow, /- name: Tooling and audit regressions\s+run: pnpm test:tooling/u);
   assert.match(workflow, /- "scripts\/\*\*"/u);
   assert.match(workflow, /- "apps\/mobile\/\*\*"/u);
+});
+
+test("mobile data-egress audit passes on the live repository with the narrow allowlisted game import client", () => {
+  const repoRoot = join(import.meta.dirname, "..");
+  const result = auditMobileDataEgress({ repoRoot });
+
+  assert.equal(result.status, "pass", JSON.stringify(result.findings, null, 2));
+  assert.deepEqual(result.findings, []);
+});
+
+test("mobile data-egress audit allows fetch only in publicGameImportClient.ts and still rejects fetch elsewhere", () => {
+  const repoRoot = buildAuditFixture();
+  const realClientSource = readFileSync(
+    join(import.meta.dirname, "..", ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH),
+    "utf8"
+  );
+  writeFixtureFile(repoRoot, ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH, realClientSource);
+
+  const passing = auditMobileDataEgress({ repoRoot });
+  assert.equal(passing.status, "pass", JSON.stringify(passing.findings, null, 2));
+
+  writeFixtureFile(
+    repoRoot,
+    "apps/mobile/src/platform/otherClient.ts",
+    "export async function sneaky() { return fetch('https://api.chess.com/pub/player/x/games/archives'); }\n"
+  );
+
+  const failing = auditMobileDataEgress({ repoRoot });
+  assert.equal(failing.status, "fail");
+  assert.ok(failing.findings.some((finding) =>
+    finding.path === "apps/mobile/src/platform/otherClient.ts" && finding.kind === "network-primitive"
+  ));
+});
+
+test("mobile data-egress audit fails if publicGameImportClient.ts weakens its host allowlist, credentials omit, or uses another transport", () => {
+  const realClientSource = readFileSync(
+    join(import.meta.dirname, "..", ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH),
+    "utf8"
+  );
+
+  const tamperedVariants = [
+    {
+      name: "removes api.chess.com from allowlist",
+      source: realClientSource.replaceAll("api.chess.com", "example.invalid"),
+      expectedKind: "egress-allowlist"
+    },
+    {
+      name: "removes lichess.org from allowlist",
+      source: realClientSource.replaceAll("lichess.org", "example.invalid"),
+      expectedKind: "egress-allowlist"
+    },
+    {
+      name: "adds an unapproved host to allowlist",
+      source: realClientSource.replace(
+        '{ hostname: "lichess.org", pathPrefix: "/api/" }',
+        '{ hostname: "lichess.org", pathPrefix: "/api/" }, { hostname: "telemetry.example", pathPrefix: "/api/" }'
+      ),
+      expectedKind: "egress-allowlist"
+    },
+    {
+      name: "removes credentials omit",
+      source: realClientSource.replace('credentials: "omit"', 'credentials: "include"'),
+      expectedKind: "egress-allowlist"
+    },
+    {
+      name: "adds non-fetch network transport inside allowlisted file",
+      source: `${realClientSource}\nexport function badSocket() { return new WebSocket("wss://example.invalid"); }\n`,
+      expectedKind: "network-primitive"
+    }
+  ];
+
+  for (const variant of tamperedVariants) {
+    const repoRoot = buildAuditFixture();
+    writeFixtureFile(repoRoot, ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH, variant.source);
+    const result = auditMobileDataEgress({ repoRoot });
+
+    assert.equal(result.status, "fail", `Expected audit failure when client ${variant.name}`);
+    assert.ok(
+      result.findings.some(
+        (finding) =>
+          finding.path === ALLOWLISTED_PUBLIC_GAME_IMPORT_CLIENT_PATH &&
+          finding.kind === variant.expectedKind
+      ),
+      `Expected ${variant.expectedKind} finding when client ${variant.name}: ${JSON.stringify(result.findings, null, 2)}`
+    );
+  }
 });
 
 function buildAuditFixture({ extraMobileDependency } = {}) {

@@ -130,6 +130,21 @@ function validateArrowDuelCandidateOrder(input: {
   return input.candidateOrder;
 }
 
+export function supportsArrowDuelOpponentReply(puzzle: Puzzle): boolean {
+  if (!puzzle.solutionMoves[1]) {
+    return false;
+  }
+  const momentKind = puzzle.userGameMeta?.momentKind;
+  if (
+    momentKind === "own_blunder_punished" ||
+    momentKind === "own_blunder_escaped" ||
+    momentKind === "opponent_blunder_missed"
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function submitArrowDuelChoice(
   state: ArrowDuelState,
   move: string,
@@ -152,7 +167,7 @@ export function submitArrowDuelChoice(
     throw new Error(`Move ${move} is not one of the Arrow Duel candidates`);
   }
 
-  if (isCorrect && options.opponentReply) {
+  if (isCorrect && options.opponentReply && supportsArrowDuelOpponentReply(state.puzzle)) {
     const replyFen = appendMove(state.currentFen, [], state.wrongMove).currentFen;
     if (!new Chess(replyFen).isStalemate()) {
       return {

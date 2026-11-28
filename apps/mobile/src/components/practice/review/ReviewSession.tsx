@@ -31,7 +31,8 @@ import {
   submitArrowDuelChoice,
   submitArrowDuelFollowUpMove,
   submitArrowDuelReply,
-  submitLineMove
+  submitLineMove,
+  supportsArrowDuelOpponentReply
 } from "../../../../../../packages/core/src/index.ts";
 import {
   formatReviewDueLabelForLocale,
@@ -223,6 +224,7 @@ export function ReviewSession({
   onAttemptClearUnclear,
   onBoardTouchActiveChange,
   onComplete,
+  onOpenSourceGame,
   onReviewEnrollmentChanged,
   onReturnToOwner,
   replayControlsOnly = false,
@@ -249,6 +251,7 @@ export function ReviewSession({
   onAttemptClearUnclear?: (attemptId: string) => void;
   onBoardTouchActiveChange?: (active: boolean) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
+  onOpenSourceGame?: (gameId: string, gamePly?: number) => void;
   onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
   replayControlsOnly?: boolean;
@@ -355,7 +358,9 @@ export function ReviewSession({
   const reviewOpponentReply = currentEntry.mode === "arrow_duel"
     ? currentEntry.opponentReply
     : undefined;
-  const reviewReplyChallengeEnabled = reviewOpponentReply?.enabled === true;
+  const reviewReplyChallengeEnabled =
+    reviewOpponentReply?.enabled === true &&
+    supportsArrowDuelOpponentReply(currentEntry.puzzle);
   const hasNextScheduledReview = entryIndex + 1 < entries.length;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -449,6 +454,11 @@ export function ReviewSession({
       ? currentExpectedMove(reviewState.line)
       : undefined;
   const isArrowDuelFollowUpReview = isArrowDuelPunishmentLine;
+  const hasArrowDuelPunishmentFollowUp = isArrowDuelFollowUpReview && (
+    reviewState.kind === "line"
+      ? !reviewState.line.solved
+      : currentEntry.puzzle.solutionMoves.length > 2
+  );
   const reviewBoardLocked = boardLocked || reviewEntryPreview.locked;
   const boardGestureEnabled = !reviewBoardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
@@ -1257,7 +1267,7 @@ export function ReviewSession({
               : undefined
           }
           promptHint={
-            isArrowDuelFollowUpReview
+            hasArrowDuelPunishmentFollowUp
               ? t("review.session.followBlueLine")
               : undefined
           }
@@ -1364,6 +1374,43 @@ export function ReviewSession({
       <View style={styles.reviewContextStrip} testID="review-context-strip">
         {currentEntry.source === "session" && !isReplay ? (
           <Badge label={t("review.session.sprintReviewBadge")} testID="review-source-pill" tone="neutral" />
+        ) : null}
+        {currentEntry.puzzle.userGameMeta ? (
+          <Pressable
+            accessibilityRole={onOpenSourceGame ? "button" : undefined}
+            disabled={!onOpenSourceGame}
+            onPress={() => {
+              const meta = currentEntry.puzzle.userGameMeta;
+              if (meta && onOpenSourceGame) {
+                onOpenSourceGame(meta.gameId, meta.gamePly);
+              }
+            }}
+            style={({ pressed }) => [
+              styles.sourceGameChip,
+              pressed && onOpenSourceGame ? styles.sourceGameChipPressed : null
+            ]}
+            testID="review-open-source-game"
+          >
+            <AppText tone="accent" variant="caption">
+              {currentEntry.puzzle.userGameMeta.opponentName
+                ? onOpenSourceGame
+                  ? t("games.puzzles.provenanceWithOpponent", {
+                      opponent: currentEntry.puzzle.userGameMeta.opponentName,
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })
+                  : t("games.puzzles.vsMove", {
+                      opponent: currentEntry.puzzle.userGameMeta.opponentName,
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })
+                : onOpenSourceGame
+                  ? t("games.puzzles.provenanceMoveOnly", {
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })
+                  : t("games.puzzles.moveOnly", {
+                      move: currentEntry.puzzle.userGameMeta.gameMoveNumber
+                    })}
+            </AppText>
+          </Pressable>
         ) : null}
         {reviewRemainingSeconds !== null && !reviewReplyPromptActive ? (
           <View style={styles.reviewTimerSlot} testID="review-timer-slot">
@@ -2474,6 +2521,17 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     gap: theme.spacing.group,
     justifyContent: "center"
+  },
+  sourceGameChip: {
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  sourceGameChipPressed: {
+    opacity: 0.72
   },
   // The countdown keeps one width as its digits change, so the strip and
   // the board below never shift.

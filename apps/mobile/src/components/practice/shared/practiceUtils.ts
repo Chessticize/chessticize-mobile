@@ -29,6 +29,40 @@ export function modeLabel(mode: SprintMode, locale: SupportedLocale = getActiveL
   return translate(locale, "common.standard");
 }
 
+export function localizeBuiltInRunName(
+  name: string | undefined,
+  locale: SupportedLocale = getActiveLocale()
+): string | undefined {
+  if (name === "Standard") {
+    return translate(locale, "common.standard");
+  }
+  if (name === "Arrow Duel") {
+    return translate(locale, "common.arrowDuel");
+  }
+  if (name === "Blitz") {
+    return translate(locale, "common.blitz");
+  }
+  return name;
+}
+
+export function isUserGamePuzzleOrigin(
+  puzzleId: string | undefined,
+  ratingKey?: string | undefined
+): boolean {
+  return Boolean(
+    puzzleId?.startsWith("ug_") || ratingKey?.startsWith("ug_")
+  );
+}
+
+export function puzzleOriginLabel(
+  isUserGame: boolean,
+  locale: SupportedLocale = getActiveLocale()
+): string {
+  return isUserGame
+    ? translate(locale, "common.originGames")
+    : translate(locale, "common.originPuzzlePack");
+}
+
 export const CUSTOM_INITIAL_RATING_MIN = 600;
 
 export const CUSTOM_INITIAL_RATING_MAX = 2200;

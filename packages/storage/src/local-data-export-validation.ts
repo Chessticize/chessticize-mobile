@@ -105,10 +105,12 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     !isOptional(value.pieceSet, isChessPieceSetId) ||
     !isOptional(value.language, isLanguagePreference) ||
     !isOptional(value.whatsNewSeenVersion, isReleaseVersionText) ||
+    !isOptional(value.onboarding, isOnboardingGuideProgress) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
     !isRecord(arrowDuel) ||
     typeof arrowDuel.opponentReplyEnabled !== "boolean" ||
+    !isOptional(value.gameReview, isGameReviewSettings) ||
     !isRecord(notifications) ||
     !isReviewReminder(notifications.reviewReminder) ||
     !isRecord(moveFeedback) ||
@@ -131,6 +133,22 @@ function isReleaseVersionText(value: unknown): boolean {
 
 function isAppearancePreference(value: unknown): boolean {
   return value === "system" || value === "light" || value === "dark";
+}
+
+function isGameReviewSettings(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.autoAddRecommendedToReview === "boolean" &&
+    isOptional(
+      value.autoSyncCooldownMinutes,
+      (v): v is number => v === 0 || v === 5 || v === 10 || v === 30
+    );
+}
+
+function isOnboardingGuideProgress(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.welcomeSeen === "boolean" &&
+    typeof value.gamesGuideSeen === "boolean" &&
+    typeof value.gameReviewGuideSeen === "boolean";
 }
 
 function isLanguagePreference(value: unknown): boolean {
@@ -276,9 +294,16 @@ function isSprintConfig(value: unknown): value is SprintConfig {
       candidate === "rated" || candidate === "unrated"
     ) &&
     isOptional(value.tacticalFocus, isTacticalFocus) &&
+    isOptional(value.userGamePuzzles, isUserGamePuzzlesConfig) &&
     isOptional(value.runClock, (candidate) =>
       candidate === "countdown" || candidate === "untimed"
     );
+}
+
+function isUserGamePuzzlesConfig(value: unknown): boolean {
+  return isRecord(value) &&
+    isOptional(value.timeClass, isNonEmptyString) &&
+    isOptional(value.gameId, isNonEmptyString);
 }
 
 function isTacticalFocus(value: unknown): boolean {

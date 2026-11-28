@@ -3,10 +3,14 @@ import {
   curatedPuzzleThemes,
   clonePracticeRun,
   createDefaultRating,
+  DEFAULT_MAIA_SETUP_PREFERENCES,
   defaultPracticeRuns,
   defaultSprintConfig,
+  effectivePuzzleRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
+  isUserGamePuzzleId,
+  normalizeMaiaSetupPreferences,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
   namedThemesForSelection,
@@ -30,10 +34,16 @@ import type {
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
+  ExtractedGamePuzzle,
   HistoryAttemptView,
   HistoryEloPoint,
   HistoryQuery,
   HistoryView,
+  ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   Puzzle,
   PracticeRunRecord,
   RatingRecord,
@@ -47,6 +57,27 @@ import type {
   SurvivalBestRecord,
   SurvivalPreferences
 } from "../../core/src/index.ts";
+import { selectUserGamePuzzlesFromStore } from "./composite-puzzle-source.ts";
+import {
+  extractedGamePuzzleToStoredUserPuzzle,
+  filterOutUserGameProgressV2Data,
+  inferUserGameMetaFromStoredGame,
+  isUserGameSprintSession,
+  matchesGameAnalysisStatusFilter,
+  matchesUserPuzzleFilter,
+  sameImportedGameDraft,
+  storedUserPuzzleToPuzzle,
+  type GameListFilter,
+  type LinkedGameAccount,
+  type LinkedGameAccountPlatform,
+  type ReplaceGameUserPuzzlesMeta,
+  type SaveGamePlyEvaluationsStatusUpdate,
+  type StoredGamePlyEval,
+  type StoredImportedGame,
+  type StoredUserPuzzle,
+  type UpsertImportedGamesResult,
+  type UserPuzzleFilter
+} from "./game-review-store.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
   ClearSyncedHistoryResult,
@@ -75,6 +106,22 @@ import {
   type ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
 import {
+  applyGamesV1BatchToTarget,
+  gamesV1IdentityMapKey,
+  linkedAccountEntityKey,
+  type GamesV1ApplyResult,
+  type GamesV1ImportedGameBundle,
+  type GamesV1LocalSnapshot,
+  type GamesV1LocalState,
+  type GamesV1Persistence,
+  type GamesV1RecordIdentity,
+  type GamesV1RemoteMergeBatch,
+  type GamesV1StatePatch,
+  type GamesV1Tombstone
+} from "./games-sync-v1.ts";
+import { isUserGameRatingKey } from "./game-review-store.ts";
+import type { MaiaRatedGameRecord, MaiaRatingAnchorRecord } from "../../core/src/index.ts";
+import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
 } from "./puzzle-selection.ts";
@@ -102,13 +149,54 @@ export class MemoryStore implements PracticeStore {
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
   private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
+  private readonly linkedAccounts = new Map<string, LinkedGameAccount>();
+  private readonly importedGames = new Map<string, StoredImportedGame>();
+  private readonly gamePlyEvals = new Map<string, Map<number, StoredGamePlyEval>>();
+  private readonly userPuzzles = new Map<string, StoredUserPuzzle>();
+  private readonly maiaRatings = new Map<MaiaTimeClass, MaiaRatingRecord>();
+  private readonly maiaRatedGames = new Map<string, MaiaRatedGameRecord>();
+  private readonly maiaRatingAnchors = new Map<MaiaTimeClass, MaiaRatingAnchorRecord>();
+  private maiaSetupPreferences: MaiaSetupPreferences = normalizeMaiaSetupPreferences(
+    DEFAULT_MAIA_SETUP_PREFERENCES
+  );
+  private activeMaiaGame: MaiaGameState | undefined;
   private settings = defaultPracticeSettings();
   private appReviewRequestAttempt: AppReviewRequestAttempt | undefined;
   private tacticalProfileSourceRevision = 0;
+  private gamesV1State: GamesV1LocalState = { zoneInitialized: false };
+  private readonly gamesV1SyncedHashes = new Map<string, string>();
+  private readonly gamesV1Tombstones = new Map<string, GamesV1Tombstone>();
   readonly progressV2 = new InMemoryProgressV2Persistence(
     () => this.exportProgressV2Data(),
     (tombstones) => this.applyProgressV2MemoryTombstones(tombstones)
   );
+  readonly gamesV1: GamesV1Persistence = {
+    readState: () => ({ ...this.gamesV1State }),
+    writeState: (patch) => {
+      this.applyGamesV1StatePatch(patch);
+    },
+    readSyncedHashes: () => new Map(this.gamesV1SyncedHashes),
+    writeSyncedHashes: (updates, deletes) => {
+      for (const [k, v] of updates) {
+        this.gamesV1SyncedHashes.set(k, v);
+      }
+      if (deletes) {
+        for (const k of deletes) {
+          this.gamesV1SyncedHashes.delete(k);
+        }
+      }
+    },
+    listTombstones: () => [...this.gamesV1Tombstones.values()].map((t) => ({ ...t })),
+    recordTombstones: (tombstones) => {
+      this.recordGamesV1Tombstones(tombstones);
+    },
+    clearTombstone: (identity) => {
+      this.gamesV1Tombstones.delete(gamesV1IdentityMapKey(identity));
+    },
+    exportGamesV1Snapshot: () => this.exportGamesV1Snapshot(),
+    applyGamesV1RemoteBatch: (batch, statePatch, syncedHashUpdates) =>
+      this.applyGamesV1RemoteBatchInternal(batch, statePatch, syncedHashUpdates)
+  };
 
   seedPuzzles(puzzles: Puzzle[]): void {
     for (const puzzle of puzzles) {
@@ -117,27 +205,70 @@ export class MemoryStore implements PracticeStore {
   }
 
   countPuzzles(filter?: PuzzleSelectionFilter): number {
-    return filter === undefined
-      ? this.puzzles.size
-      : this.selectPuzzles(filter).length;
+    if (filter === undefined) {
+      return [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game").length;
+    }
+    return this.selectPuzzles(filter).length;
   }
 
   getPuzzle(id: string): Puzzle | undefined {
+    if (isUserGamePuzzleId(id)) {
+      const stored = this.userPuzzles.get(id);
+      if (stored) {
+        return storedUserPuzzleToPuzzle(stored);
+      }
+    }
     return this.puzzles.get(id);
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
+    const source = filter.source ?? "pack";
+    if (source === "user_game") {
+      return selectUserGamePuzzlesFromStore(this, filter);
+    }
+
+    const explicitUserIds =
+      source === "pack" && filter.includeIds !== undefined
+        ? new Set(filter.includeIds.filter(isUserGamePuzzleId))
+        : undefined;
+    const packPool = [...this.puzzles.values()].filter(
+      (puzzle) =>
+        puzzle.source !== "user_game" ||
+        (explicitUserIds !== undefined && explicitUserIds.has(puzzle.id))
+    );
+
+    if (source === "pack") {
+      return selectUniquePuzzles({
+        puzzles: packPool.sort((left, right) =>
+          filter.preferredRating === undefined
+            ? left.rating - right.rating || left.id.localeCompare(right.id)
+            : Math.abs(left.rating - filter.preferredRating) -
+                Math.abs(right.rating - filter.preferredRating) ||
+              left.id.localeCompare(right.id)
+        ),
+        mode: filter.mode,
+        limit: filter.limit,
+        ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+        ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+        ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        ...(filter.themes === undefined ? {} : { themes: filter.themes }),
+        ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
+        ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
+        ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+      });
+    }
+
+    // source === "all"
+    const userPuzzles = selectUserGamePuzzlesFromStore(this, filter);
+    if (filter.timeClass !== undefined || filter.gameId !== undefined) {
+      return userPuzzles;
+    }
+    const packSelected = this.selectPuzzles({ ...filter, source: "pack" });
     return selectUniquePuzzles({
-      puzzles: [...this.puzzles.values()].sort((left, right) =>
-        filter.preferredRating === undefined
-          ? left.rating - right.rating || left.id.localeCompare(right.id)
-          : Math.abs(left.rating - filter.preferredRating) -
-              Math.abs(right.rating - filter.preferredRating) ||
-            left.id.localeCompare(right.id)
-      ),
+      puzzles: [...userPuzzles, ...packSelected],
       mode: filter.mode,
       limit: filter.limit,
-      ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+      allPuzzlesArrowDuelEligible: filter.mode === "arrow_duel",
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
@@ -150,20 +281,33 @@ export class MemoryStore implements PracticeStore {
   countSurvivalPuzzles(
     input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
   ): number {
-    return eligibleSurvivalPuzzles([...this.puzzles.values()], input).length;
+    return eligibleSurvivalPuzzles(
+      [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game"),
+      input
+    ).length;
   }
 
   selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
-    return selectSurvivalPuzzleBatchFromPuzzles([...this.puzzles.values()], input);
+    return selectSurvivalPuzzleBatchFromPuzzles(
+      [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game"),
+      input
+    );
   }
 
   selectPuzzlesForRatingBands(
     input: RatingBandPuzzleSelectionInput
   ): RatingBandPuzzleSelection[] {
-    return selectUniquePuzzlesForRatingBands(
-      [...this.puzzles.values()],
-      input
-    );
+    const source = input.filter.source ?? "pack";
+    const pool =
+      source === "user_game"
+        ? this.listUserPuzzles({ includeArchived: false }).map(storedUserPuzzleToPuzzle)
+        : source === "all"
+          ? [
+              ...[...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game"),
+              ...this.listUserPuzzles({ includeArchived: false }).map(storedUserPuzzleToPuzzle)
+            ]
+          : [...this.puzzles.values()].filter((puzzle) => puzzle.source !== "user_game");
+    return selectUniquePuzzlesForRatingBands(pool, input);
   }
 
   getRating(key: string): RatingRecord {
@@ -454,14 +598,14 @@ export class MemoryStore implements PracticeStore {
   }
 
   private exportProgressV2Data(): LocalDataExport {
-    return {
+    return filterOutUserGameProgressV2Data({
       ...this.exportLocalData(),
       ratings: [...this.ratings.values()]
         .map((rating) => normalizeRatingRecord(rating))
         .sort((left, right) =>
           left.key.localeCompare(right.key) || left.generation - right.generation
         )
-    };
+    });
   }
 
   listSprintSessions(): ExportedSprintSession[] {
@@ -700,13 +844,15 @@ export class MemoryStore implements PracticeStore {
       sprintSessions: [...this.sessions.values()].filter((session) => !isOpenSprint(session)).length
     };
     this.progressV2.stageLocalTombstones([
-      ...this.attempts.map((attempt) => ({
-        kind: "attempt" as const,
-        entityKey: attempt.id,
-        deletedAt: now
-      })),
+      ...this.attempts
+        .filter((attempt) => !isUserGamePuzzleId(attempt.puzzleId))
+        .map((attempt) => ({
+          kind: "attempt" as const,
+          entityKey: attempt.id,
+          deletedAt: now
+        })),
       ...[...this.sessions.values()]
-        .filter((session) => !isOpenSprint(session))
+        .filter((session) => !isOpenSprint(session) && !isUserGameSprintSession(exportedSprintSessionFromState(session)))
         .map((session) => ({
           kind: "sprint_session" as const,
           entityKey: session.id,
@@ -779,9 +925,14 @@ export class MemoryStore implements PracticeStore {
     return next;
   }
 
-  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
+  enrollReview(
+    context: ReviewContext,
+    now: string,
+    initiatingAttemptId?: string,
+    timeZone?: string
+  ): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
-    const next = enrollReviewContext(context, now, previous);
+    const next = enrollReviewContext(context, now, previous, timeZone);
     let initiatingAttempt: { index: number; next: AttemptHistoryRow } | undefined;
     if (initiatingAttemptId) {
       const index = this.attempts.findIndex((attempt) => attempt.id === initiatingAttemptId);
@@ -929,7 +1080,579 @@ export class MemoryStore implements PracticeStore {
     return work();
   }
 
-  private listReviewRemovals(): ReviewScheduleRemoval[] {
+  listLinkedAccounts(): LinkedGameAccount[] {
+    return [...this.linkedAccounts.values()]
+      .map((account) => ({ ...account }))
+      .sort(
+        (left, right) =>
+          left.platform.localeCompare(right.platform) ||
+          left.username.toLowerCase().localeCompare(right.username.toLowerCase())
+      );
+  }
+
+  upsertLinkedAccount(
+    account: Omit<LinkedGameAccount, "createdAt"> & { createdAt?: string }
+  ): LinkedGameAccount {
+    const username = account.username.trim();
+    if (!username) {
+      throw new Error("Linked account username must not be empty");
+    }
+    const key = linkedAccountMapKey(account.platform, username);
+    const existing = this.linkedAccounts.get(key);
+    const stored: LinkedGameAccount = {
+      platform: account.platform,
+      username,
+      ...(account.lastSyncedAt === undefined
+        ? existing?.lastSyncedAt === undefined
+          ? {}
+          : { lastSyncedAt: existing.lastSyncedAt }
+        : { lastSyncedAt: account.lastSyncedAt }),
+      createdAt: existing?.createdAt ?? account.createdAt ?? new Date().toISOString()
+    };
+    this.linkedAccounts.set(key, stored);
+    this.gamesV1Tombstones.delete(
+      gamesV1IdentityMapKey({
+        kind: "linked_account",
+        entityKey: linkedAccountEntityKey(account.platform, username)
+      })
+    );
+    return { ...stored };
+  }
+
+  removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    const trimmed = username.trim();
+    const key = linkedAccountMapKey(platform, trimmed);
+    if (this.linkedAccounts.delete(key)) {
+      this.recordGamesV1Tombstones([
+        {
+          kind: "linked_account",
+          entityKey: linkedAccountEntityKey(platform, trimmed),
+          deletedAt: new Date().toISOString()
+        }
+      ]);
+    }
+  }
+
+  upsertImportedGames(
+    games: readonly ImportedGameDraft[],
+    nowIso = new Date().toISOString()
+  ): UpsertImportedGamesResult {
+    let inserted = 0;
+    let skipped = 0;
+    let updated = 0;
+    const seenInBatch = new Set<string>();
+
+    for (const draft of games) {
+      if (seenInBatch.has(draft.id)) {
+        skipped += 1;
+        continue;
+      }
+      seenInBatch.add(draft.id);
+      const existing = this.importedGames.get(draft.id);
+      if (!existing) {
+        this.importedGames.set(draft.id, {
+          ...cloneImportedGameDraft(draft),
+          analysisStatus: "none",
+          analysisCheckpointPly: 0,
+          puzzleCount: 0,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        });
+        this.gamesV1Tombstones.delete(
+          gamesV1IdentityMapKey({ kind: "imported_game", entityKey: draft.id })
+        );
+        inserted += 1;
+        continue;
+      }
+      if (sameImportedGameDraft(existing, draft)) {
+        skipped += 1;
+        continue;
+      }
+      this.importedGames.set(draft.id, {
+        ...cloneImportedGameDraft(draft),
+        analysisStatus: existing.analysisStatus,
+        analysisCheckpointPly: existing.analysisCheckpointPly,
+        ...(existing.whiteAccuracy === undefined ? {} : { whiteAccuracy: existing.whiteAccuracy }),
+        ...(existing.blackAccuracy === undefined ? {} : { blackAccuracy: existing.blackAccuracy }),
+        puzzleCount: existing.puzzleCount,
+        createdAt: existing.createdAt,
+        updatedAt: nowIso
+      });
+      updated += 1;
+    }
+
+    return { inserted, skipped, updated };
+  }
+
+  listImportedGames(filter?: GameListFilter): StoredImportedGame[] {
+    const filtered = [...this.importedGames.values()]
+      .filter((game) => {
+        if (filter?.platform !== undefined && game.platform !== filter.platform) {
+          return false;
+        }
+        if (filter?.timeClass !== undefined && game.timeClass !== filter.timeClass) {
+          return false;
+        }
+        return matchesGameAnalysisStatusFilter(game.analysisStatus, filter?.analysisStatus);
+      })
+      .sort((left, right) => right.playedAt.localeCompare(left.playedAt) || right.id.localeCompare(left.id));
+
+    const offset = Math.max(0, Math.trunc(filter?.offset ?? 0));
+    const sliced =
+      filter?.limit === undefined
+        ? filtered.slice(offset)
+        : filtered.slice(offset, offset + Math.max(0, Math.trunc(filter.limit)));
+    return sliced.map(cloneStoredImportedGame);
+  }
+
+  countImportedGames(filter?: Omit<GameListFilter, "limit" | "offset">): number {
+    return this.listImportedGames(filter).length;
+  }
+
+  getImportedGame(gameId: string): StoredImportedGame | undefined {
+    const game = this.importedGames.get(gameId);
+    return game ? cloneStoredImportedGame(game) : undefined;
+  }
+
+  deleteImportedGame(gameId: string): void {
+    const existed = this.importedGames.has(gameId);
+    const deletedPuzzleIds = this.deleteImportedGameRecords(gameId);
+    if (existed) {
+      const deletedAt = new Date().toISOString();
+      const tombstones: GamesV1Tombstone[] = [
+        { kind: "imported_game", entityKey: gameId, deletedAt },
+        ...[...deletedPuzzleIds].map((puzzleId) => ({
+          kind: "user_puzzle" as const,
+          entityKey: puzzleId,
+          deletedAt
+        }))
+      ];
+      this.recordGamesV1Tombstones(tombstones);
+    }
+  }
+
+  private deleteImportedGameRecords(gameId: string): Set<string> {
+    this.importedGames.delete(gameId);
+    this.gamePlyEvals.delete(gameId);
+    const deletedPuzzleIds = new Set<string>();
+    for (const [puzzleId, puzzle] of this.userPuzzles) {
+      if (puzzle.gameId === gameId) {
+        this.userPuzzles.delete(puzzleId);
+        deletedPuzzleIds.add(puzzleId);
+      }
+    }
+    if (deletedPuzzleIds.size > 0) {
+      let removedAttempts = false;
+      for (let index = this.attempts.length - 1; index >= 0; index -= 1) {
+        if (deletedPuzzleIds.has(this.attempts[index]!.puzzleId)) {
+          this.attempts.splice(index, 1);
+          removedAttempts = true;
+        }
+      }
+      if (removedAttempts) {
+        this.tacticalProfileSourceRevision += 1;
+      }
+      for (const [key, item] of this.reviewQueue) {
+        if (deletedPuzzleIds.has(item.puzzleId)) {
+          this.reviewQueue.delete(key);
+        }
+      }
+      for (const [key, removal] of this.reviewRemovals) {
+        if (deletedPuzzleIds.has(removal.puzzleId)) {
+          this.reviewRemovals.delete(key);
+        }
+      }
+      for (const puzzleId of deletedPuzzleIds) {
+        if (!this.isPuzzleReferencedByHistoryOrReview(puzzleId)) {
+          this.puzzles.delete(puzzleId);
+        }
+      }
+    }
+    return deletedPuzzleIds;
+  }
+
+  saveGamePlyEvaluations(
+    gameId: string,
+    evals: readonly StoredGamePlyEval[],
+    statusUpdate: SaveGamePlyEvaluationsStatusUpdate
+  ): void {
+    const game = this.importedGames.get(gameId);
+    if (!game) {
+      throw new Error(`Imported game ${gameId} was not found`);
+    }
+    let gameEvals = this.gamePlyEvals.get(gameId);
+    if (!gameEvals) {
+      gameEvals = new Map<number, StoredGamePlyEval>();
+      this.gamePlyEvals.set(gameId, gameEvals);
+    }
+    for (const item of evals) {
+      gameEvals.set(item.ply, { ...item, gameId });
+    }
+    const nextGame: StoredImportedGame = {
+      ...game,
+      analysisStatus: statusUpdate.analysisStatus,
+      analysisCheckpointPly: statusUpdate.analysisCheckpointPly,
+      ...(statusUpdate.whiteAccuracy === undefined
+        ? game.whiteAccuracy === undefined
+          ? {}
+          : { whiteAccuracy: game.whiteAccuracy }
+        : { whiteAccuracy: statusUpdate.whiteAccuracy }),
+      ...(statusUpdate.blackAccuracy === undefined
+        ? game.blackAccuracy === undefined
+          ? {}
+          : { blackAccuracy: game.blackAccuracy }
+        : { blackAccuracy: statusUpdate.blackAccuracy }),
+      updatedAt: statusUpdate.updatedAt ?? new Date().toISOString()
+    };
+    this.importedGames.set(gameId, nextGame);
+  }
+
+  listGamePlyEvaluations(gameId: string): StoredGamePlyEval[] {
+    const gameEvals = this.gamePlyEvals.get(gameId);
+    if (!gameEvals) {
+      return [];
+    }
+    return [...gameEvals.values()]
+      .sort((left, right) => left.ply - right.ply)
+      .map((item) => ({ ...item }));
+  }
+
+  replaceGameUserPuzzles(
+    gameId: string,
+    puzzles: readonly ExtractedGamePuzzle[],
+    gameMeta: ReplaceGameUserPuzzlesMeta
+  ): StoredUserPuzzle[] {
+    const game = this.importedGames.get(gameId);
+    if (!game) {
+      throw new Error(`Imported game ${gameId} was not found`);
+    }
+    const effectiveMeta = inferUserGameMetaFromStoredGame(game, gameMeta);
+    const nowIso = effectiveMeta.nowIso ?? new Date().toISOString();
+    const existingById = new Map<string, StoredUserPuzzle>();
+    for (const stored of this.userPuzzles.values()) {
+      if (stored.gameId === gameId) {
+        existingById.set(stored.id, stored);
+      }
+    }
+
+    const nextStored: StoredUserPuzzle[] = [];
+    const nextIds = new Set<string>();
+    for (const extracted of puzzles) {
+      const candidate = extractedGamePuzzleToStoredUserPuzzle(
+        gameId,
+        extracted,
+        { ...effectiveMeta, nowIso }
+      );
+      if (nextIds.has(candidate.id)) {
+        continue;
+      }
+      nextIds.add(candidate.id);
+      const prior = existingById.get(candidate.id);
+      const stored = prior
+        ? extractedGamePuzzleToStoredUserPuzzle(
+            gameId,
+            extracted,
+            { ...effectiveMeta, nowIso },
+            { createdAt: prior.createdAt, archived: prior.archived }
+          )
+        : candidate;
+      nextStored.push(stored);
+    }
+
+    for (const priorId of existingById.keys()) {
+      if (!nextIds.has(priorId)) {
+        this.userPuzzles.delete(priorId);
+        if (!this.isPuzzleReferencedByHistoryOrReview(priorId)) {
+          this.puzzles.delete(priorId);
+        }
+      }
+    }
+
+    for (const stored of nextStored) {
+      this.userPuzzles.set(stored.id, cloneStoredUserPuzzle(stored));
+      this.puzzles.set(stored.id, storedUserPuzzleToPuzzle(stored));
+    }
+
+    this.importedGames.set(gameId, {
+      ...game,
+      puzzleCount: nextStored.length,
+      updatedAt: nowIso
+    });
+
+    return nextStored.map(cloneStoredUserPuzzle);
+  }
+
+  listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
+    const filtered = [...this.userPuzzles.values()]
+      .filter((puzzle) => matchesUserPuzzleFilter(puzzle, filter))
+      .sort(compareStoredUserPuzzles);
+    const sliced =
+      filter?.limit === undefined
+        ? filtered
+        : filtered.slice(0, Math.max(0, Math.trunc(filter.limit)));
+    return sliced.map(cloneStoredUserPuzzle);
+  }
+
+  countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
+    return this.listUserPuzzles(filter).length;
+  }
+
+  getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
+    const stored = this.userPuzzles.get(puzzleId);
+    return stored ? cloneStoredUserPuzzle(stored) : undefined;
+  }
+
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: StoredUserPuzzle["ratingSource"]
+  ): void {
+    const existing = this.userPuzzles.get(puzzleId);
+    if (!existing) {
+      return;
+    }
+    const rounded = Math.round(rating);
+    const updated: StoredUserPuzzle = {
+      ...existing,
+      rating: rounded,
+      ...(ratingSource === undefined ? {} : { ratingSource })
+    };
+    this.userPuzzles.set(puzzleId, updated);
+    const cached = this.puzzles.get(puzzleId);
+    if (cached && cached.source === "user_game") {
+      this.puzzles.set(puzzleId, {
+        ...cached,
+        rating: rounded,
+        ...(existing.puzzleKind === "arrow_duel" ? { arrowDuelRating: rounded } : {}),
+        ...(cached.userGameMeta
+          ? {
+              userGameMeta: {
+                ...cached.userGameMeta,
+                ...(ratingSource === undefined ? {} : { ratingSource })
+              }
+            }
+          : {})
+      });
+    }
+  }
+
+  archiveUserPuzzle(puzzleId: string, archived = true): void {
+    const existing = this.userPuzzles.get(puzzleId);
+    if (!existing) {
+      return;
+    }
+    this.userPuzzles.set(puzzleId, { ...existing, archived });
+  }
+
+  getMaiaRating(timeClass: MaiaTimeClass): MaiaRatingRecord | undefined {
+    const existing = this.maiaRatings.get(timeClass);
+    return existing ? { ...existing } : undefined;
+  }
+
+  listMaiaRatings(): MaiaRatingRecord[] {
+    return [...this.maiaRatings.values()].map((record) => ({ ...record }));
+  }
+
+  saveMaiaRating(record: MaiaRatingRecord): void {
+    this.maiaRatings.set(record.timeClass, { ...record });
+  }
+
+  listMaiaRatedGames(timeClass?: MaiaTimeClass): MaiaRatedGameRecord[] {
+    return [...this.maiaRatedGames.values()]
+      .filter((game) => timeClass === undefined || game.timeClass === timeClass)
+      .sort(
+        (left, right) =>
+          left.playedAt.localeCompare(right.playedAt) || left.gameId.localeCompare(right.gameId)
+      )
+      .map((game) => ({ ...game }));
+  }
+
+  upsertMaiaRatedGame(record: MaiaRatedGameRecord): void {
+    const existing = this.maiaRatedGames.get(record.gameId);
+    if (!existing) {
+      this.maiaRatedGames.set(record.gameId, { ...record });
+      return;
+    }
+    if (existing.initialRatingAnchor === undefined && record.initialRatingAnchor !== undefined) {
+      this.maiaRatedGames.set(record.gameId, {
+        ...existing,
+        initialRatingAnchor: record.initialRatingAnchor
+      });
+    }
+  }
+
+  getMaiaRatingAnchor(timeClass: MaiaTimeClass): MaiaRatingAnchorRecord | undefined {
+    const existing = this.maiaRatingAnchors.get(timeClass);
+    return existing ? { ...existing } : undefined;
+  }
+
+  listMaiaRatingAnchors(): MaiaRatingAnchorRecord[] {
+    return [...this.maiaRatingAnchors.values()].map((anchor) => ({ ...anchor }));
+  }
+
+  saveMaiaRatingAnchor(anchor: MaiaRatingAnchorRecord): void {
+    this.maiaRatingAnchors.set(anchor.timeClass, { ...anchor });
+  }
+
+  private applyGamesV1StatePatch(patch: GamesV1StatePatch): void {
+    const next: Record<string, unknown> = { ...this.gamesV1State };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) {
+        delete next[key];
+      } else if (value !== undefined) {
+        next[key] = value;
+      }
+    }
+    this.gamesV1State = next as unknown as GamesV1LocalState;
+  }
+
+  private recordGamesV1Tombstones(tombstones: readonly GamesV1Tombstone[]): void {
+    for (const tombstone of tombstones) {
+      const key = gamesV1IdentityMapKey(tombstone);
+      const prev = this.gamesV1Tombstones.get(key);
+      if (!prev || tombstone.deletedAt > prev.deletedAt) {
+        this.gamesV1Tombstones.set(key, { ...tombstone });
+      }
+    }
+  }
+
+  private exportGamesV1Snapshot(): GamesV1LocalSnapshot {
+    const allExported = this.exportLocalData();
+    return {
+      settings: this.getSettings(),
+      maiaSetup: this.getMaiaSetupPreferences(),
+      linkedAccounts: this.listLinkedAccounts(),
+      importedGames: this.listImportedGames().map((game) => ({
+        game,
+        plyEvals: this.listGamePlyEvaluations(game.id)
+      })),
+      userPuzzles: this.listUserPuzzles({ includeArchived: true }),
+      ugAttempts: allExported.attempts.filter((a) => isUserGamePuzzleId(a.puzzleId)),
+      ugReviewQueue: allExported.reviewQueue.filter((r) => isUserGamePuzzleId(r.puzzleId)),
+      ugReviewRemovals: (allExported.reviewRemovals ?? []).filter((r) =>
+        isUserGamePuzzleId(r.puzzleId)
+      ),
+      ugRatings: allExported.ratings.filter((r) => isUserGameRatingKey(r.key)),
+      maiaRatedGames: this.listMaiaRatedGames(),
+      maiaRatingAnchors: this.listMaiaRatingAnchors()
+    };
+  }
+
+  private applyGamesV1RemoteBatchInternal(
+    batch: GamesV1RemoteMergeBatch,
+    statePatch: GamesV1StatePatch,
+    syncedHashUpdates: ReadonlyMap<string, string>
+  ): GamesV1ApplyResult {
+    const applied = applyGamesV1BatchToTarget(
+      {
+        getSettings: () => this.getSettings(),
+        saveSettings: (settings) => this.saveSettings(settings),
+        getMaiaSetupPreferences: () => this.getMaiaSetupPreferences(),
+        saveMaiaSetupPreferences: (prefs) => this.saveMaiaSetupPreferences(prefs),
+        listLinkedAccounts: () => this.listLinkedAccounts(),
+        upsertSyncedLinkedAccount: (account) => {
+          const key = linkedAccountMapKey(account.platform, account.username.trim());
+          this.linkedAccounts.set(key, { ...account });
+        },
+        removeLinkedAccountWithoutTombstone: (platform, username) => {
+          this.linkedAccounts.delete(linkedAccountMapKey(platform, username.trim()));
+        },
+        getImportedGame: (gameId) => this.getImportedGame(gameId),
+        listGamePlyEvaluations: (gameId) => this.listGamePlyEvaluations(gameId),
+        upsertSyncedImportedGameBundle: (bundle: GamesV1ImportedGameBundle) => {
+          this.importedGames.set(bundle.game.id, cloneStoredImportedGame(bundle.game));
+          if (bundle.plyEvals.length > 0) {
+            const evalMap = new Map<number, StoredGamePlyEval>();
+            for (const item of bundle.plyEvals) {
+              evalMap.set(item.ply, { ...item, gameId: bundle.game.id });
+            }
+            this.gamePlyEvals.set(bundle.game.id, evalMap);
+          }
+        },
+        deleteImportedGameWithoutTombstone: (gameId) => {
+          this.deleteImportedGameRecords(gameId);
+        },
+        getUserPuzzle: (puzzleId) => this.getUserPuzzle(puzzleId),
+        upsertSyncedUserPuzzle: (puzzle) => {
+          this.userPuzzles.set(puzzle.id, cloneStoredUserPuzzle(puzzle));
+          this.puzzles.set(puzzle.id, storedUserPuzzleToPuzzle(puzzle));
+        },
+        deleteSyncedUserPuzzle: (puzzleId) => {
+          this.userPuzzles.delete(puzzleId);
+          if (!this.isPuzzleReferencedByHistoryOrReview(puzzleId)) {
+            this.puzzles.delete(puzzleId);
+          }
+        },
+        importSyncedUserGameProgress: ({ attempts, reviewQueue, reviewRemovals, ratings }) => {
+          const res = this.importLocalData({
+            schemaVersion: 1,
+            settings: this.getSettings(),
+            ratings,
+            attempts,
+            reviewQueue,
+            reviewRemovals,
+            sprintSessions: [],
+            practiceRuns: []
+          });
+          return { attempts: res.attempts, reviewQueue: res.reviewQueue };
+        },
+        listMaiaRatedGames: (tc) => this.listMaiaRatedGames(tc),
+        upsertMaiaRatedGame: (record) => this.upsertMaiaRatedGame(record),
+        getMaiaRatingAnchor: (tc) => this.getMaiaRatingAnchor(tc),
+        saveMaiaRatingAnchor: (anchor) => this.saveMaiaRatingAnchor(anchor),
+        getMaiaRating: (tc) => this.getMaiaRating(tc),
+        saveMaiaRating: (record) => this.saveMaiaRating(record),
+        recordTombstones: (tombstones) => this.recordGamesV1Tombstones(tombstones),
+        clearTombstone: (identity: GamesV1RecordIdentity) => {
+          this.gamesV1Tombstones.delete(gamesV1IdentityMapKey(identity));
+        },
+        listTombstones: () => [...this.gamesV1Tombstones.values()].map((t) => ({ ...t }))
+      },
+      batch
+    );
+    for (const [k, v] of syncedHashUpdates) {
+      this.gamesV1SyncedHashes.set(k, v);
+    }
+    this.applyGamesV1StatePatch(statePatch);
+    return applied;
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    return {
+      ...this.maiaSetupPreferences,
+      timeControl: { ...this.maiaSetupPreferences.timeControl }
+    };
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    const normalized = normalizeMaiaSetupPreferences(preferences);
+    this.maiaSetupPreferences = {
+      ...normalized,
+      timeControl: { ...normalized.timeControl }
+    };
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    return this.activeMaiaGame ? JSON.parse(JSON.stringify(this.activeMaiaGame)) as MaiaGameState : undefined;
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.activeMaiaGame = JSON.parse(JSON.stringify(state)) as MaiaGameState;
+  }
+
+  clearActiveMaiaGame(): void {
+    this.activeMaiaGame = undefined;
+  }
+
+  private isPuzzleReferencedByHistoryOrReview(puzzleId: string): boolean {
+    return (
+      this.attempts.some((attempt) => attempt.puzzleId === puzzleId) ||
+      [...this.reviewQueue.values()].some((review) => review.puzzleId === puzzleId) ||
+      [...this.reviewRemovals.values()].some((removal) => removal.puzzleId === puzzleId)
+    );
+  }
+
+  listReviewRemovals(): ReviewScheduleRemoval[] {
     return [...this.reviewRemovals.values()]
       .map((removal) => ({ ...removal }))
       .sort((left, right) => reviewQueueKey(left).localeCompare(reviewQueueKey(right)));
@@ -1034,7 +1757,7 @@ export class MemoryStore implements PracticeStore {
       ...(session?.config.perPuzzleSeconds === undefined
         ? {}
         : { perPuzzleSeconds: session.config.perPuzzleSeconds }),
-      puzzleRating: puzzle.rating,
+      puzzleRating: effectivePuzzleRating(puzzle, attempt.mode),
       side: sideToMoveForHistoryPuzzle({ puzzle, mode: attempt.mode }),
       themes: puzzle.themes,
       curatedThemes: curatedPuzzleThemes(puzzle.themes)
@@ -1101,7 +1824,48 @@ function isTacticalProfileEvidenceSession(
     session.config &&
     session.config.tacticalFocus === undefined &&
     session.config.survival === undefined &&
+    session.config.userGamePuzzles === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
+  );
+}
+
+function linkedAccountMapKey(platform: LinkedGameAccountPlatform, username: string): string {
+  return `${platform}\u0000${username.toLowerCase()}`;
+}
+
+function cloneImportedGameDraft(draft: ImportedGameDraft): ImportedGameDraft {
+  return {
+    ...draft,
+    white: { ...draft.white },
+    black: { ...draft.black }
+  };
+}
+
+function cloneStoredImportedGame(game: StoredImportedGame): StoredImportedGame {
+  return {
+    ...game,
+    white: { ...game.white },
+    black: { ...game.black }
+  };
+}
+
+function cloneStoredUserPuzzle(puzzle: StoredUserPuzzle): StoredUserPuzzle {
+  return {
+    ...puzzle,
+    solutionMoves: [...puzzle.solutionMoves],
+    themes: [...puzzle.themes],
+    ...(puzzle.punishmentLine === undefined ? {} : { punishmentLine: [...puzzle.punishmentLine] })
+  };
+}
+
+function compareStoredUserPuzzles(left: StoredUserPuzzle, right: StoredUserPuzzle): number {
+  const leftPlayedAt = left.playedAt ?? "";
+  const rightPlayedAt = right.playedAt ?? "";
+  return (
+    rightPlayedAt.localeCompare(leftPlayedAt) ||
+    right.createdAt.localeCompare(left.createdAt) ||
+    (right.caliberScore ?? 0) - (left.caliberScore ?? 0) ||
+    left.id.localeCompare(right.id)
   );
 }
 

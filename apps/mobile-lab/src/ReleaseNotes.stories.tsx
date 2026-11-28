@@ -4,10 +4,10 @@ import { LabScenario, type LabStoryPresentation } from "./LabScenario.tsx";
 import type { LabScenarioId } from "./scenarioRegistry.ts";
 import { clickTestId, waitForAbsentTestId, waitForTestId, waitForText } from "./storyPlay.ts";
 
-// Issue #651: the one-time What’s New sheet shown on the first launch after an update to 1.6.0.
-// Each platform's copy is shown on a phone in portrait and landscape and on an iPad or tablet in
-// portrait and landscape, in light and dark, plus large text. The real app wires the same sheet
-// to the stored last-seen version, so these stories only seed "updated from 1.5.3" state.
+// What’s New & Welcome Onboarding for 2.0.0.
+// Shown on a phone in portrait and landscape and on an iPad or tablet in
+// portrait and landscape, in light and dark, plus large text. The real app
+// wires the same sheets to the stored last-seen version and onboarding state.
 
 const meta = {
   title: "Release Notes",
@@ -22,11 +22,6 @@ type Viewport = "phonePortrait" | "phoneLandscape" | "tabletPortrait" | "regular
 type Theme = "light" | "dark";
 
 const LARGE_TEXT_SCALE = 1.5;
-
-const NAVIGATION_COPY: Record<Platform, string> = {
-  ios: "A glass tab bar that fits iPhone, iPad, and iPhone Duo.",
-  android: "A bottom bar on phones and a side rail on tablets and foldables."
-};
 
 const PLATFORM_SCENARIO: Record<Platform, LabScenarioId> = {
   ios: "release-notes-ios",
@@ -55,25 +50,26 @@ function sheetStory({
     ...(textScale === undefined ? {} : { parameters: { labTextScale: textScale } }),
     play: async ({ canvasElement }) => {
       await waitForTestId(canvasElement, "whats-new-sheet");
-      await waitForText(canvasElement, "What’s New in Chessticize");
-      await waitForText(canvasElement, "A fresh new look");
-      await waitForText(canvasElement, "A cleaner design with clearer type and more room for the board.");
-      await waitForText(canvasElement, "New navigation");
-      await waitForText(canvasElement, NAVIGATION_COPY[platform]);
-      await waitForText(canvasElement, "Dark mode");
-      await waitForText(canvasElement, "Follows your system, or choose in Settings → Appearance.");
-      await expectSheetFitsWindow(canvasElement);
+      await waitForText(canvasElement, "What’s New in Chessticize 2.0");
+      await waitForText(canvasElement, "New Games tab");
+      await waitForText(canvasElement, "Free offline Game Review");
+      await waitForText(canvasElement, "Generate puzzles from your games");
+      await waitForText(canvasElement, "Play offline against Maia");
+      await expectSheetFitsWindow(canvasElement, ["whats-new-sheet", "whats-new-open-games", "whats-new-continue"]);
     }
   };
 }
 
-// The sheet and its Continue button stay inside the window, including under large text
-// and in landscape, where the highlights scroll instead of pushing Continue away.
-async function expectSheetFitsWindow(canvasElement: HTMLElement): Promise<void> {
+// The sheet and its footer actions stay inside the window, including under large text
+// and in landscape, where the highlights scroll instead of pushing actions away.
+async function expectSheetFitsWindow(
+  canvasElement: HTMLElement,
+  testIds: readonly string[] = ["whats-new-sheet", "whats-new-continue"]
+): Promise<void> {
   const body = within(canvasElement.ownerDocument.body);
   const view = canvasElement.ownerDocument.defaultView!;
   await waitFor(() => {
-    for (const testID of ["whats-new-sheet", "whats-new-continue"]) {
+    for (const testID of testIds) {
       const rect = body.getByTestId(testID).getBoundingClientRect();
       if (rect.top < -0.5 || rect.bottom > view.innerHeight + 0.5) {
         throw new Error(`${testID} must stay inside the window (${rect.top} to ${rect.bottom} of ${view.innerHeight})`);
@@ -317,5 +313,41 @@ export const IosContinue: Story = {
     await clickTestId(canvasElement, "whats-new-continue");
     await waitForAbsentTestId(canvasElement, "whats-new-sheet");
     await waitForTestId(canvasElement, "practice-home");
+  }
+};
+
+export const IosOpenGames: Story = {
+  name: "iOS · Go to Games",
+  args: {
+    scenarioId: "release-notes-ios",
+    storyPresentation: { storyId: "release-notes--ios-open-games", title: "iOS · Go to Games" }
+  },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "whats-new-sheet");
+    await clickTestId(canvasElement, "whats-new-open-games");
+    await waitForAbsentTestId(canvasElement, "whats-new-sheet");
+    await waitForTestId(canvasElement, "games-hub-screen");
+  }
+};
+
+export const WelcomeOnboardingOverview: Story = {
+  name: "Welcome Onboarding · Overview",
+  args: {
+    scenarioId: "welcome-onboarding-overview",
+    storyPresentation: {
+      storyId: "release-notes--welcome-onboarding-overview",
+      title: "Welcome Onboarding · Overview"
+    }
+  },
+  globals: { theme: "light", viewport: { value: "phonePortrait", isRotated: false } },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "welcome-onboarding-sheet");
+    await waitForText(canvasElement, "Welcome to Chessticize");
+    await waitForText(canvasElement, "New Games tab");
+    await expectSheetFitsWindow(canvasElement, [
+      "welcome-onboarding-sheet",
+      "welcome-onboarding-open-games",
+      "welcome-onboarding-start-practicing"
+    ]);
   }
 };
