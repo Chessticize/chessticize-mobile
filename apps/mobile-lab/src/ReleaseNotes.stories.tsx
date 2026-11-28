@@ -51,11 +51,11 @@ function sheetStory({
     play: async ({ canvasElement }) => {
       await waitForTestId(canvasElement, "whats-new-sheet");
       await waitForText(canvasElement, "What’s New in Chessticize 2.0");
-      await waitForText(canvasElement, "Import your online games");
+      await waitForText(canvasElement, "New Games tab");
       await waitForText(canvasElement, "Free offline Game Review");
-      await waitForText(canvasElement, "Puzzles from your own games");
+      await waitForText(canvasElement, "Generate puzzles from your games");
       await waitForText(canvasElement, "Play offline against Maia");
-      await expectSheetFitsWindow(canvasElement, ["whats-new-sheet", "whats-new-link-account", "whats-new-continue"]);
+      await expectSheetFitsWindow(canvasElement, ["whats-new-sheet", "whats-new-open-games", "whats-new-continue"]);
     }
   };
 }
@@ -316,17 +316,17 @@ export const IosContinue: Story = {
   }
 };
 
-export const IosLinkAccount: Story = {
-  name: "iOS · Link Chess Account",
+export const IosOpenGames: Story = {
+  name: "iOS · Go to Games",
   args: {
     scenarioId: "release-notes-ios",
-    storyPresentation: { storyId: "release-notes--ios-link-account", title: "iOS · Link Chess Account" }
+    storyPresentation: { storyId: "release-notes--ios-open-games", title: "iOS · Go to Games" }
   },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "whats-new-sheet");
-    await clickTestId(canvasElement, "whats-new-link-account");
+    await clickTestId(canvasElement, "whats-new-open-games");
     await waitForAbsentTestId(canvasElement, "whats-new-sheet");
-    await waitForTestId(canvasElement, "games-import-modal");
+    await waitForTestId(canvasElement, "games-hub-screen");
   }
 };
 
@@ -343,33 +343,11 @@ export const WelcomeOnboardingOverview: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "welcome-onboarding-sheet");
     await waitForText(canvasElement, "Welcome to Chessticize");
-    await waitForText(canvasElement, "Learn from your online games");
+    await waitForText(canvasElement, "New Games tab");
     await expectSheetFitsWindow(canvasElement, [
       "welcome-onboarding-sheet",
-      "welcome-onboarding-next",
+      "welcome-onboarding-open-games",
       "welcome-onboarding-start-practicing"
-    ]);
-  }
-};
-
-export const WelcomeOnboardingLinkAccount: Story = {
-  name: "Welcome Onboarding · Link Account",
-  args: {
-    scenarioId: "welcome-onboarding-link-account",
-    storyPresentation: {
-      storyId: "release-notes--welcome-onboarding-link-account",
-      title: "Welcome Onboarding · Link Account"
-    }
-  },
-  globals: { theme: "dark", viewport: { value: "phonePortrait", isRotated: false } },
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "welcome-onboarding-sheet");
-    await waitForText(canvasElement, "Import your online games");
-    await waitForTestId(canvasElement, "welcome-onboarding-username");
-    await expectSheetFitsWindow(canvasElement, [
-      "welcome-onboarding-sheet",
-      "welcome-onboarding-import-submit",
-      "welcome-onboarding-skip-account"
     ]);
   }
 };
