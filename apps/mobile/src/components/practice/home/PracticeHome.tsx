@@ -20,13 +20,13 @@ import {
   type SprintMode,
   type SprintState
 } from "../../../../../../packages/core/src/index.ts";
-import { MaiaPlayHomeCard } from "../../maiaPlay/MaiaPlayHomeCard.tsx";
+import { MaiaPlayHomeRow } from "../../maiaPlay/MaiaPlayHomeCard.tsx";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import { TITLE_MAX_FONT_SCALE } from "../../../theme/scales.ts";
 import {
   type PersonalBestChallengeDesignPreview,
-  PersonalBestHomeCard,
+  PersonalBestHomeRow,
   type PersonalBestPausedRunPresentation
 } from "../../PersonalBestChallengeDesign.tsx";
 import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
@@ -212,20 +212,23 @@ export function PracticeHome({
             />
           )}
 
-          {runManagement && personalBestChallenge ? (
-            <PersonalBestHomeCard
-              presentation={personalBestChallenge}
-              onOpenHub={onOpenPersonalBestHub}
-            />
-          ) : null}
-
-          {maiaPlay && onOpenMaiaPlay ? (
-            <MaiaPlayHomeCard
-              activeGame={maiaPlay.activeGame}
-              preferences={maiaPlay.preferences}
-              rating={maiaPlay.rating}
-              onOpen={onOpenMaiaPlay}
-            />
+          {(runManagement && personalBestChallenge) || (maiaPlay && onOpenMaiaPlay) ? (
+            <Section rows>
+              {runManagement && personalBestChallenge ? (
+                <PersonalBestHomeRow
+                  presentation={personalBestChallenge}
+                  onOpenHub={onOpenPersonalBestHub}
+                />
+              ) : null}
+              {maiaPlay && onOpenMaiaPlay ? (
+                <MaiaPlayHomeRow
+                  activeGame={maiaPlay.activeGame}
+                  preferences={maiaPlay.preferences}
+                  rating={maiaPlay.rating}
+                  onOpen={onOpenMaiaPlay}
+                />
+              ) : null}
+            </Section>
           ) : null}
 
           {tacticalProfile ? (
