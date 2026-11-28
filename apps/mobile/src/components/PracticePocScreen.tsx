@@ -1019,7 +1019,7 @@ export function PracticePocScreen({
   } | null>(null);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [gamesImportModalOpen, setGamesImportModalOpen] = useState(false);
-  const [gamesHubView, setGamesHubView] = useState<"games" | "puzzles">("games");
+  const gamesHubViewRef = useRef<"games" | "puzzles">("games");
   const [activeGameReviewId, setActiveGameReviewId] = useState<string | null>(null);
   const [activeGameReviewInitialPly, setActiveGameReviewInitialPly] = useState<number | null>(null);
   const [gamePracticeEntries, setGamePracticeEntries] = useState<ReviewEntry[]>([]);
@@ -4560,6 +4560,10 @@ export function PracticePocScreen({
     void aggregateRevision;
     return service.getPracticeProgressSummary(practiceProgressNowMs, practiceProgressRatingKey);
   }, [aggregateRevision, practiceProgressNowMs, practiceProgressRatingKey, service]);
+  const userPuzzleCount = useMemo(() => {
+    void aggregateRevision;
+    return service.countUserPuzzles();
+  }, [aggregateRevision, service]);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customEligiblePuzzleCount = useMemo(() => {
@@ -5554,7 +5558,7 @@ export function PracticePocScreen({
                       runReorderDesignPreview={runReorderDesignPreview}
                       onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
                     />
-                    {service.countUserPuzzles() > 0 ? (
+                    {userPuzzleCount > 0 ? (
                       <Pressable
                         accessibilityRole="button"
                         style={{
@@ -5573,7 +5577,7 @@ export function PracticePocScreen({
                         onPress={() => startMyGamePuzzlesSessionForOptions()}
                       >
                         <Text style={{ color: appTheme.colors.text.primary, fontSize: 14, fontWeight: "700" }}>
-                          {t("games.action.practicePuzzles", { count: service.countUserPuzzles() })}
+                          {t("games.action.practicePuzzles", { count: userPuzzleCount })}
                         </Text>
                         <Text style={{ color: appTheme.colors.accent.s500, fontSize: 13, fontWeight: "600" }}>
                           {t("tabs.games")}
@@ -5905,12 +5909,14 @@ export function PracticePocScreen({
                   autoSyncOnMount
                   batchController={gamesBatchAnalysis}
                   getNowMs={currentTimeMs}
-                  hubView={gamesHubView}
+                  initialHubView={gamesHubViewRef.current}
                   importModalVisible={gamesImportModalOpen}
                   nowMs={nowMs}
                   service={service}
                   stockfish={stockfish}
-                  onHubViewChange={setGamesHubView}
+                  onHubViewChange={(view) => {
+                    gamesHubViewRef.current = view;
+                  }}
                   onImportModalVisibleChange={setGamesImportModalOpen}
                   onOpenGameReview={(gameId) => {
                     if (onOpenGameReview) {

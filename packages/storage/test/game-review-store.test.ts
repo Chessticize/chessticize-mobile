@@ -1221,3 +1221,65 @@ test("Upgrading an existing pre-2.0 SQLite database to v27 preserves data and pe
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("SQLite v34 indexes eliminate temp B-tree sorts on hot Games/Puzzles queries and countUserPuzzles uses SQL COUNT(*)", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v33-indexes-"));
+  const dbPath = join(directory, "practice.sqlite");
+  try {
+    const store = new SQLiteStore(dbPath);
+    store.migrate();
+    try {
+      const g1 = makeImportedGame({ id: "chess_com:idx1", platform: "chess_com", playedAt: "2026-10-01T10:00:00.000Z" });
+      const g2 = makeImportedGame({ id: "lichess:idx2", platform: "lichess", playedAt: "2026-10-02T10:00:00.000Z" });
+      store.upsertImportedGames([g1, g2], "2026-10-02T12:00:00.000Z");
+      store.replaceGameUserPuzzles(
+        g1.id,
+        [
+          makeExtractedLinePuzzle(g1.id, { idSeed: "idx-p1", themes: ["fork", "middlegame"], ply: 3 }),
+          makeExtractedArrowDuelPuzzle(g1.id, { idSeed: "idx-p2", themes: ["pin", "endgame"], ply: 5 })
+        ],
+        { nowIso: "2026-10-02T12:00:00.000Z" }
+      );
+      store.replaceGameUserPuzzles(
+        g2.id,
+        [makeExtractedLinePuzzle(g2.id, { idSeed: "idx-p3", themes: ["fork", "opening"], ply: 7 })],
+        { nowIso: "2026-10-02T12:05:00.000Z" }
+      );
+
+      assert.equal(store.countUserPuzzles(), 3);
+      assert.equal(store.countUserPuzzles({ puzzleKind: "arrow_duel" }), 1);
+      assert.equal(store.countUserPuzzles({ themes: ["fork"] }), 2);
+      assert.equal(store.listUserPuzzles({ limit: 2 }).length, 2);
+
+      const explain = (sql: string): string =>
+        (store.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as Array<{ detail: string }>)
+          .map((row) => row.detail)
+          .join(" | ");
+
+      const countPlan = explain("SELECT COUNT(*) FROM user_puzzles WHERE archived = 0");
+      assert.match(countPlan, /COVERING INDEX/i);
+
+      const listPuzzlesPlan = explain(
+        "SELECT * FROM user_puzzles WHERE archived = 0 ORDER BY played_at DESC, created_at DESC, caliber_score DESC, id ASC"
+      );
+      assert.match(listPuzzlesPlan, /user_puzzles_archived_order_idx/);
+      assert.doesNotMatch(listPuzzlesPlan, /TEMP B-TREE/i);
+
+      const platformPlan = explain(
+        "SELECT * FROM imported_games WHERE platform = 'chess_com' ORDER BY played_at DESC, id DESC"
+      );
+      assert.match(platformPlan, /imported_games_platform_played_at_idx/);
+      assert.doesNotMatch(platformPlan, /TEMP B-TREE/i);
+
+      const statusPlan = explain(
+        "SELECT * FROM imported_games WHERE analysis_status = 'none' ORDER BY played_at DESC, id DESC"
+      );
+      assert.match(statusPlan, /imported_games_analysis_status_played_at_idx/);
+      assert.doesNotMatch(statusPlan, /TEMP B-TREE/i);
+    } finally {
+      store.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

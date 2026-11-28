@@ -22,6 +22,7 @@ import {
   orderReviewQueue,
   practiceRunsFromLegacyCustomConfigs,
   preferredReviewScheduleChange,
+  puzzleMatchesAnyTheme,
   removeReviewContext,
   resetRating as resetRatingRecord,
   resolveOpponentReplyConfig,
@@ -532,7 +533,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 33;
+export const CURRENT_SCHEMA_VERSION = 34;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -574,7 +575,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 29, to: 30, apply: migrateV29ToV30 },
   { from: 30, to: 31, apply: migrateV30ToV31 },
   { from: 31, to: 32, apply: migrateV31ToV32 },
-  { from: 32, to: 33, apply: migrateV32ToV33 }
+  { from: 32, to: 33, apply: migrateV32ToV33 },
+  { from: 33, to: 34, apply: migrateV33ToV34 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -2878,51 +2880,52 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[] {
-    const clauses: string[] = [];
-    const params: SyncSqliteValue[] = [];
-    if (!filter?.includeArchived) {
-      clauses.push("archived = 0");
-    }
-    if (filter?.puzzleKind !== undefined) {
-      clauses.push("puzzle_kind = ?");
-      params.push(filter.puzzleKind);
-    }
-    if (filter?.gameId !== undefined) {
-      clauses.push("game_id = ?");
-      params.push(filter.gameId);
-    }
-    if (filter?.timeClass !== undefined) {
-      clauses.push("time_class = ?");
-      params.push(filter.timeClass);
-    }
-    if (filter?.minRating !== undefined) {
-      clauses.push("rating >= ?");
-      params.push(filter.minRating);
-    }
-    if (filter?.maxRating !== undefined) {
-      clauses.push("rating <= ?");
-      params.push(filter.maxRating);
-    }
-    const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+    const { whereSql, params } = buildUserPuzzleFilterSql(filter);
+    const selectedThemes = namedThemesForSelection(filter?.themes);
+    const canPushLimitToSql = selectedThemes.length === 0 && filter?.limit !== undefined;
+    const limitClause = canPushLimitToSql ? " LIMIT ?" : "";
+    const queryParams = canPushLimitToSql
+      ? [...params, Math.max(0, Math.trunc(filter.limit!))]
+      : params;
     const rows = this.db
       .prepare(
         `SELECT *
          FROM user_puzzles
          ${whereSql}
-         ORDER BY COALESCE(played_at, '') DESC, created_at DESC, COALESCE(caliber_score, 0) DESC, id ASC`
+         ORDER BY played_at DESC, created_at DESC, caliber_score DESC, id ASC${limitClause}`
       )
-      .all(...params) as UserPuzzleRow[];
+      .all(...queryParams) as UserPuzzleRow[];
 
-    const matched = rows
-      .map(userPuzzleFromRow)
-      .filter((puzzle) => matchesUserPuzzleFilter(puzzle, filter));
-    return filter?.limit === undefined
+    const parsed = rows.map(userPuzzleFromRow);
+    const matched =
+      selectedThemes.length === 0
+        ? parsed
+        : parsed.filter((puzzle) => matchesUserPuzzleFilter(puzzle, filter));
+    return filter?.limit === undefined || canPushLimitToSql
       ? matched
       : matched.slice(0, Math.max(0, Math.trunc(filter.limit)));
   }
 
   countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number {
-    return this.listUserPuzzles(filter).length;
+    const { whereSql, params } = buildUserPuzzleFilterSql(filter);
+    const selectedThemes = namedThemesForSelection(filter?.themes);
+    if (selectedThemes.length === 0) {
+      const row = this.db
+        .prepare(`SELECT COUNT(*) AS count FROM user_puzzles ${whereSql}`)
+        .get(...params) as { count: number };
+      return row.count;
+    }
+    const rows = this.db
+      .prepare(`SELECT themes_json FROM user_puzzles ${whereSql}`)
+      .all(...params) as Array<{ themes_json: string }>;
+    let count = 0;
+    for (const row of rows) {
+      const themes = JSON.parse(row.themes_json) as string[];
+      if (puzzleMatchesAnyTheme(themes, selectedThemes)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined {
@@ -4551,6 +4554,15 @@ function hasTrigger(db: SyncSqliteDatabase, trigger: string): boolean {
   return row?.name === trigger;
 }
 
+function hasIndex(db: SyncSqliteDatabase, indexName: string): boolean {
+  const row = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?"
+    )
+    .get(indexName) as { name?: unknown } | undefined;
+  return row?.name === indexName;
+}
+
 function migrateV4ToV5(db: SyncSqliteDatabase): void {
   db.exec(`
     ALTER TABLE attempts
@@ -4754,6 +4766,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV30ToV31(db);
   migrateV31ToV32(db);
   migrateV32ToV33(db);
+  migrateV33ToV34(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -4806,7 +4819,10 @@ function hasGameReviewSchema(db: SyncSqliteDatabase): boolean {
     hasTable(db, "imported_games") &&
     hasTable(db, "game_ply_evals") &&
     hasTable(db, "user_puzzles") &&
-    hasColumn(db, "user_puzzles", "rating_source");
+    hasColumn(db, "user_puzzles", "rating_source") &&
+    hasIndex(db, "imported_games_platform_played_at_idx") &&
+    hasIndex(db, "imported_games_analysis_status_played_at_idx") &&
+    hasIndex(db, "user_puzzles_archived_order_idx");
 }
 
 function importedGamesAllowsMaiaPlatform(db: SyncSqliteDatabase): boolean {
@@ -6150,6 +6166,19 @@ function migrateV32ToV33(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV33ToV34(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS imported_games_platform_played_at_idx
+      ON imported_games(platform, played_at DESC, id DESC);
+
+    CREATE INDEX IF NOT EXISTS imported_games_analysis_status_played_at_idx
+      ON imported_games(analysis_status, played_at DESC, id DESC);
+
+    CREATE INDEX IF NOT EXISTS user_puzzles_archived_order_idx
+      ON user_puzzles(archived, played_at DESC, created_at DESC, caliber_score DESC, id ASC);
+  `);
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -6666,6 +6695,40 @@ function isTacticalProfileEvidenceSession(
     session.config.userGamePuzzles === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
   );
+}
+
+function buildUserPuzzleFilterSql(
+  filter?: Omit<UserPuzzleFilter, "limit">
+): { whereSql: string; params: SyncSqliteValue[] } {
+  const clauses: string[] = [];
+  const params: SyncSqliteValue[] = [];
+  if (!filter?.includeArchived) {
+    clauses.push("archived = 0");
+  }
+  if (filter?.puzzleKind !== undefined) {
+    clauses.push("puzzle_kind = ?");
+    params.push(filter.puzzleKind);
+  }
+  if (filter?.gameId !== undefined) {
+    clauses.push("game_id = ?");
+    params.push(filter.gameId);
+  }
+  if (filter?.timeClass !== undefined) {
+    clauses.push("time_class = ?");
+    params.push(filter.timeClass);
+  }
+  if (filter?.minRating !== undefined) {
+    clauses.push("rating >= ?");
+    params.push(filter.minRating);
+  }
+  if (filter?.maxRating !== undefined) {
+    clauses.push("rating <= ?");
+    params.push(filter.maxRating);
+  }
+  return {
+    whereSql: clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "",
+    params
+  };
 }
 
 function buildImportedGameFilterSql(
