@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Chessboard, { type MoveResult } from "react-native-chessboard";
-import type {
-  GameHighlightMoment,
-  GamePlyEvaluation
+import {
+  defaultOnboardingGuideProgress,
+  type GameHighlightMoment,
+  type GamePlyEvaluation
 } from "../../../../../packages/core/src/index.ts";
 import type {
   GameReviewStore,
@@ -28,6 +29,7 @@ import { arrowFromTo, formatUci } from "../practice/shared/boardMove.ts";
 import { chessboardColorsFor } from "../practice/shared/chessboardColors.ts";
 import { chessPieceSpriteFor } from "../practice/shared/chessPieceSprite.ts";
 import { AppText, Badge, Button, Icon } from "../ui/index.tsx";
+import { ContextualGuideCard } from "../ContextualGuideCard.tsx";
 import { EvalBar } from "./EvalBar.tsx";
 import { EvalGraph } from "./EvalGraph.tsx";
 import {
@@ -107,6 +109,9 @@ export function GameReviewScreen({
   const viewport = usePracticeViewport();
   const [measuredStageWidth, setMeasuredStageWidth] = useState<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [guideSeen, setGuideSeen] = useState<boolean>(
+    () => practiceService.getSettings().onboarding?.gameReviewGuideSeen === true
+  );
 
   const layout = useMemo(
     () =>
@@ -335,6 +340,29 @@ export function GameReviewScreen({
         plies={controller.parsedGame?.plies ?? []}
         suppressAutoScroll={controller.isFastForwarding}
       />
+
+      {!guideSeen ? (
+        <ContextualGuideCard
+          body={t("onboarding.gameReviewTip.body")}
+          dismissLabel={t("onboarding.gotIt")}
+          dismissTestID="game-review-guide-dismiss"
+          icon="whatsNew"
+          testID="game-review-first-use-guide"
+          title={t("onboarding.gameReviewTip.title")}
+          tone="accent"
+          onDismiss={() => {
+            const settings = practiceService.getSettings();
+            practiceService.saveSettings({
+              ...settings,
+              onboarding: {
+                ...(settings.onboarding ?? defaultOnboardingGuideProgress()),
+                gameReviewGuideSeen: true
+              }
+            });
+            setGuideSeen(true);
+          }}
+        />
+      ) : null}
 
       {controller.freeAnalysisOpen ? (
         <LiveEngineLinesPanel

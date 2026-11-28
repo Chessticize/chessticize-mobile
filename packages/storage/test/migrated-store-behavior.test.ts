@@ -94,6 +94,11 @@ for (const label of STORE_LABELS) {
           arrowDuelSeen: false,
           focusedRunSeen: true,
           arrowDuelReplyCueStage: 2
+        },
+        onboarding: {
+          welcomeSeen: false,
+          gamesGuideSeen: false,
+          gameReviewGuideSeen: false
         }
       });
 
@@ -115,6 +120,11 @@ for (const label of STORE_LABELS) {
           arrowDuelSeen: false,
           focusedRunSeen: true,
           arrowDuelReplyCueStage: 2
+        },
+        onboarding: {
+          welcomeSeen: false,
+          gamesGuideSeen: false,
+          gameReviewGuideSeen: false
         }
       });
     } finally {

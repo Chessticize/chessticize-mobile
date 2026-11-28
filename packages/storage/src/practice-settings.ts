@@ -1,9 +1,11 @@
 import {
+  defaultOnboardingGuideProgress,
   defaultSprintGuideProgress,
   normalizeLanguagePreference,
   parseReleaseVersion,
   type ArrowDuelReplyCueStage,
   type LanguagePreference,
+  type OnboardingGuideProgress,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
 import {
@@ -62,7 +64,8 @@ export function defaultPracticeSettings(): PracticeSettings {
       soundEnabled: false,
       hapticsEnabled: true
     },
-    sprintGuides: defaultSprintGuideProgress()
+    sprintGuides: defaultSprintGuideProgress(),
+    onboarding: defaultOnboardingGuideProgress()
   };
 }
 
@@ -101,7 +104,8 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
       arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
         settings.sprintGuides?.arrowDuelReplyCueStage
       )
-    }
+    },
+    onboarding: normalizeOnboardingGuideProgress(settings.onboarding)
   });
 }
 
@@ -140,7 +144,18 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
       arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
         settings.sprintGuides?.arrowDuelReplyCueStage
       )
-    }
+    },
+    onboarding: normalizeOnboardingGuideProgress(settings.onboarding)
+  };
+}
+
+export function normalizeOnboardingGuideProgress(
+  value: Partial<OnboardingGuideProgress> | undefined
+): OnboardingGuideProgress {
+  return {
+    welcomeSeen: Boolean(value?.welcomeSeen ?? false),
+    gamesGuideSeen: Boolean(value?.gamesGuideSeen ?? false),
+    gameReviewGuideSeen: Boolean(value?.gameReviewGuideSeen ?? false)
   };
 }
 

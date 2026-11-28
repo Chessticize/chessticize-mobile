@@ -384,6 +384,11 @@ test("PracticeService persists settings through the store boundary", () => {
       arrowDuelSeen: false,
       focusedRunSeen: false,
       arrowDuelReplyCueStage: 0
+    },
+    onboarding: {
+      welcomeSeen: false,
+      gamesGuideSeen: false,
+      gameReviewGuideSeen: false
     }
   });
 
@@ -454,6 +459,11 @@ test("PracticeService persists settings through the store boundary", () => {
       arrowDuelSeen: false,
       focusedRunSeen: true,
       arrowDuelReplyCueStage: 2
+    },
+    onboarding: {
+      welcomeSeen: false,
+      gamesGuideSeen: false,
+      gameReviewGuideSeen: false
     }
   });
 });

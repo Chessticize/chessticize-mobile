@@ -284,7 +284,7 @@ export const WhatsNewRowReopened: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "settings-whats-new");
     await waitForTestId(canvasElement, "whats-new-sheet");
-    await waitForText(canvasElement, "What’s New in Chessticize");
+    await waitForText(canvasElement, "What’s New in Chessticize 2.0");
     await clickTestId(canvasElement, "whats-new-continue");
     await waitForAbsentTestId(canvasElement, "whats-new-sheet");
     await waitForTestId(canvasElement, "settings-panel");

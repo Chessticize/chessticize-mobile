@@ -178,6 +178,7 @@ export function SettingsPanel({
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
+  onOpenWelcomeOnboarding,
   onOpenWhatsNew,
   onAdjustRating,
   onAdvancedRatingsOpenChange,
@@ -230,6 +231,7 @@ export function SettingsPanel({
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => Promise<void>;
+  onOpenWelcomeOnboarding?: () => void;
   onOpenWhatsNew: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onAdvancedRatingsOpenChange: (open: boolean) => void;
@@ -660,6 +662,13 @@ export function SettingsPanel({
 
       {showSprintGuideReset ? (
         <SettingsSection title={t("settings.guides.section")} testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+          {onOpenWelcomeOnboarding ? (
+            <SettingsRow
+              label={t("settings.guides.welcomeGuide")}
+              testID="settings-welcome-guide"
+              onPress={onOpenWelcomeOnboarding}
+            />
+          ) : null}
           <View style={styles.settingsBlock} testID="settings-guidance-reset-card">
             <View style={styles.settingsRowCopy}>
               <AppText variant="body">{t("settings.guides.replayTitle")}</AppText>

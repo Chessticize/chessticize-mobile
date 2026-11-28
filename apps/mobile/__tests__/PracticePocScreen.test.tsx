@@ -4148,7 +4148,7 @@ describe("PracticePocScreen", () => {
       "Runs, ratings, and History stay unchanged."
     );
     expect(collectText(findByTestId(renderer, "settings-guidance-reset-card"))).toContain(
-      "rules, active-session, and Arrow Duel guides"
+      "Sprint, Arrow Duel, Games, and Game Review guides"
     );
     expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toBe(
       "Reset guides"

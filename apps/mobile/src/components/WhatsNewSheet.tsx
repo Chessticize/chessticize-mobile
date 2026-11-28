@@ -8,14 +8,15 @@ import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { AppModal } from "./AppModal.tsx";
 import { AppText, Button, IconTile } from "./ui/index.tsx";
 
-// The one-time What's New sheet (#651). A large title, three highlights with a
-// tinted icon tile, and a primary Continue button. Compact windows anchor it to
-// the bottom like a system sheet; regular and landscape windows center it with a
-// readable maximum width. The highlights scroll under large text; the Continue
-// button stays in view.
+// The one-time What's New sheet (#651, updated for 2.0). A large title,
+// highlights with tinted icon tiles, and footer actions (optional primary
+// Link Chess Account CTA + Continue button). Compact windows anchor it to the
+// bottom like a system sheet; regular and landscape windows center it with a
+// readable maximum width. The highlights scroll under large text; the footer
+// actions stay in view.
 
 const REGULAR_WIDTH = 600;
-// A phone in landscape: tighten the spacing so the three highlights fit without scrolling.
+// A phone in landscape: tighten the spacing so the highlights and footer fit comfortably.
 const SHORT_HEIGHT = 500;
 const SHEET_MAX_WIDTH = 540;
 const WINDOW_MARGIN = 8;
@@ -30,10 +31,14 @@ const SHORT_MARGIN = 12;
 export function WhatsNewSheet({
   content,
   onContinue,
+  onLinkAccount,
+  showLinkAccountAction = Boolean(onLinkAccount),
   visible
 }: {
   content: WhatsNewContent;
   onContinue: () => void;
+  onLinkAccount?: () => void;
+  showLinkAccountAction?: boolean;
   visible: boolean;
 }): React.JSX.Element | null {
   const styles = useStyles();
@@ -52,6 +57,7 @@ export function WhatsNewSheet({
   const maxHeight = Math.max(240, height - insets.top - insets.bottom - margin * 2);
   // Under large text the first headline line grows taller than the 30-pt tile; keep the tile on that line.
   const tileOffset = Math.max(0, Math.round((HEADLINE_LINE_HEIGHT * (fontScale ?? 1) - TILE_SIZE) / 2));
+  const showPrimaryLinkAction = Boolean(onLinkAccount) && showLinkAccountAction;
 
   return (
     <AppModal
@@ -114,12 +120,29 @@ export function WhatsNewSheet({
                 </View>
               ))}
             </View>
+            <AppText
+              style={styles.feedbackNote}
+              testID="whats-new-feedback-note"
+              tone="secondary"
+              variant="footnote"
+            >
+              {content.feedbackNote}
+            </AppText>
           </ScrollView>
           <View style={[styles.footer, short ? styles.footerShort : null]}>
+            {showPrimaryLinkAction && onLinkAccount ? (
+              <Button
+                label={content.linkAccountLabel}
+                stretch
+                testID="whats-new-link-account"
+                onPress={onLinkAccount}
+              />
+            ) : null}
             <Button
               label={content.continueLabel}
               stretch
               testID="whats-new-continue"
+              variant={showPrimaryLinkAction ? "plain" : "primary"}
               onPress={onContinue}
             />
           </View>
@@ -146,23 +169,23 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1
   },
   scrollContent: {
-    gap: 28,
+    gap: 18,
     paddingBottom: 8,
     paddingHorizontal: 28,
-    paddingTop: 36
+    paddingTop: 26
   },
   scrollContentShort: {
-    gap: 16,
-    paddingTop: 20
+    gap: 12,
+    paddingTop: 16
   },
   title: {
     textAlign: "center"
   },
   highlights: {
-    gap: 20
+    gap: 14
   },
   highlightsShort: {
-    gap: 14
+    gap: 10
   },
   highlight: {
     alignItems: "flex-start",
@@ -175,13 +198,18 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
+  feedbackNote: {
+    textAlign: "center"
+  },
   footer: {
-    paddingBottom: 24,
+    gap: 8,
+    paddingBottom: 18,
     paddingHorizontal: 28,
-    paddingTop: 20
+    paddingTop: 12
   },
   footerShort: {
-    paddingBottom: 16,
-    paddingTop: 12
+    gap: 4,
+    paddingBottom: 14,
+    paddingTop: 10
   }
 }));

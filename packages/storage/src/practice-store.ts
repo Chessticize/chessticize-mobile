@@ -21,7 +21,7 @@ import type {
 } from "../../core/src/index.ts";
 import { isReviewDay, reviewDayFor } from "../../core/src/index.ts";
 import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../core/src/index.ts";
-import type { SprintGuideProgress } from "../../core/src/index.ts";
+import type { OnboardingGuideProgress, SprintGuideProgress } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
@@ -153,10 +153,15 @@ export interface PracticeSettings {
   language?: LanguagePreference;
   /**
    * Release version whose What's New notes were last seen or skipped on this
-   * device (for example "1.6.0"). Absent until recorded. Device-local: iCloud
+   * device (for example "2.0.0"). Absent until recorded. Device-local: iCloud
    * progress sync and local-data import never carry it.
    */
   whatsNewSeenVersion?: string;
+  /**
+   * Device-local 2.0 onboarding and contextual guide progress. Excluded from
+   * CloudKit ProgressV2 sync and local-data import.
+   */
+  onboarding?: OnboardingGuideProgress;
   sync: {
     iCloudEnabled: boolean;
   };

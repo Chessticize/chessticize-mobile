@@ -105,6 +105,7 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     !isOptional(value.pieceSet, isChessPieceSetId) ||
     !isOptional(value.language, isLanguagePreference) ||
     !isOptional(value.whatsNewSeenVersion, isReleaseVersionText) ||
+    !isOptional(value.onboarding, isOnboardingGuideProgress) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
     !isRecord(arrowDuel) ||
@@ -141,6 +142,13 @@ function isGameReviewSettings(value: unknown): boolean {
       value.autoSyncCooldownMinutes,
       (v): v is number => v === 0 || v === 5 || v === 10 || v === 30
     );
+}
+
+function isOnboardingGuideProgress(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.welcomeSeen === "boolean" &&
+    typeof value.gamesGuideSeen === "boolean" &&
+    typeof value.gameReviewGuideSeen === "boolean";
 }
 
 function isLanguagePreference(value: unknown): boolean {

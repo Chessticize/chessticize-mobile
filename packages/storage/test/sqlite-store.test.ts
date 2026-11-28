@@ -225,6 +225,11 @@ test("SQLite migration preserves legacy settings while adding current safety and
         arrowDuelSeen: false,
         focusedRunSeen: false,
         arrowDuelReplyCueStage: 0
+      },
+      onboarding: {
+        welcomeSeen: false,
+        gamesGuideSeen: false,
+        gameReviewGuideSeen: false
       }
     });
 
@@ -293,7 +298,10 @@ test("SQLite migration preserves legacy settings while adding current safety and
       sprint_active_session_guide_seen: 1,
       sprint_arrow_duel_guide_seen: 0,
       sprint_focused_run_guide_seen: 1,
-      sprint_arrow_duel_reply_cue_stage: 2
+      sprint_arrow_duel_reply_cue_stage: 2,
+      onboarding_welcome_seen: 0,
+      onboarding_games_guide_seen: 0,
+      onboarding_game_review_guide_seen: 0
     });
     assert.equal(integrity.integrity_check, "ok");
   } finally {
@@ -917,6 +925,11 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             arrowDuelSeen: false,
             focusedRunSeen: false,
             arrowDuelReplyCueStage: 0
+          },
+          onboarding: {
+            welcomeSeen: false,
+            gamesGuideSeen: false,
+            gameReviewGuideSeen: false
           }
         });
 
@@ -947,6 +960,11 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             arrowDuelSeen: false,
             focusedRunSeen: true,
             arrowDuelReplyCueStage: 2
+          },
+          onboarding: {
+            welcomeSeen: false,
+            gamesGuideSeen: false,
+            gameReviewGuideSeen: false
           }
         });
 
@@ -997,6 +1015,11 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             arrowDuelSeen: false,
             focusedRunSeen: true,
             arrowDuelReplyCueStage: 2
+          },
+          onboarding: {
+            welcomeSeen: false,
+            gamesGuideSeen: false,
+            gameReviewGuideSeen: false
           }
         });
         assert.deepEqual(service.getReviewReminderPreference(), { mode: "fixed", fixedLocalTime: "08:15" });
