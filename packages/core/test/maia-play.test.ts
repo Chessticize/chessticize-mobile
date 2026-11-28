@@ -76,14 +76,14 @@ test("Glicko-2 rating updates start with large RD swings, support draws, and con
   assert.ok(lateWin.nextRecord.ratingDeviation < 120);
 });
 
-test("Rated locks Maia to player rating; Unrated uses custom opponent rating", () => {
+test("both Rated and Unrated honor custom opponent rating and scale Glicko-2 delta by rating gap", () => {
   const rated = createMaiaGameState({
     id: "g1",
     preferences: { ...DEFAULT_MAIA_SETUP_PREFERENCES, rated: true, opponentRating: 1900, colorPreference: "w" },
     userRating: 1350,
     nowMs: 1_000
   });
-  assert.equal(rated.maiaRating, 1350);
+  assert.equal(rated.maiaRating, 1900);
   assert.equal(rated.userColor, "w");
 
   const unrated = createMaiaGameState({
@@ -94,6 +94,14 @@ test("Rated locks Maia to player rating; Unrated uses custom opponent rating", (
   });
   assert.equal(unrated.maiaRating, 1800);
   assert.equal(unrated.userColor, "b");
+
+  const base = createDefaultMaiaRatingRecord("rapid", 1400, "2026-11-27T00:00:00.000Z");
+  const winVsStronger = applyMaiaGameRatingResult(base, "win", "2026-11-27T00:10:00.000Z", 1800);
+  const winVsWeaker = applyMaiaGameRatingResult(base, "win", "2026-11-27T00:10:00.000Z", 1000);
+  assert.ok(
+    winVsStronger.change.ratingChange > winVsWeaker.change.ratingChange,
+    `Expected larger gain vs stronger Maia (${winVsStronger.change.ratingChange}) than weaker Maia (${winVsWeaker.change.ratingChange})`
+  );
 });
 
 test("handles pawn promotion (queen and knight underpromotion) and checkmate", () => {
@@ -275,6 +283,7 @@ test("abort, resign, draw offer anti-farming, pause/resume clocks, and PGN round
     preferences: {
       ...DEFAULT_MAIA_SETUP_PREFERENCES,
       timeControl: { initialMinutes: 5, incrementSeconds: 3, unlimited: false },
+      opponentRating: 1500,
       colorPreference: "w"
     },
     userRating: 1450,
@@ -314,8 +323,9 @@ test("abort, resign, draw offer anti-farming, pause/resume clocks, and PGN round
   assert.equal(draft.platform, "maia");
   assert.equal(draft.timeClass, "blitz");
   assert.equal(draft.timeControl, "300+3");
+  assert.equal(draft.white.rating, 1450);
   assert.equal(draft.black.isAi, true);
-  assert.equal(draft.black.rating, 1450);
+  assert.equal(draft.black.rating, 1500);
 
   const parsed = parsePgnGame(draft.pgn);
   assert.equal(parsed.plies.length, 2);

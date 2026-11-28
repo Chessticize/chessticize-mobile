@@ -4,8 +4,6 @@ import {
   MAIA_MAX_OPPONENT_RATING,
   MAIA_MIN_RATING,
   MAIA_OPPONENT_RATING_STEP,
-  MAIA_STARTING_RATING_PRESETS,
-  MAIA_TIME_CLASSES,
   classifyMaiaTimeControl,
   type MaiaColorPreference,
   type MaiaGameState,
@@ -17,7 +15,8 @@ import {
 } from "../../../../../packages/core/src/index.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
-import { AppText, Badge, Button, Icon, Section, SegmentedControl } from "../ui/index.tsx";
+import { usePracticeViewport } from "../PracticeViewport.tsx";
+import { AppText, Button, Icon, Section, SegmentedControl } from "../ui/index.tsx";
 import { formatMaiaTimeControlDisplay, maiaTimeClassLabel } from "./maiaPlayPresentation.ts";
 import { MaiaTimeControlPickerModal } from "./MaiaTimeControlPickerModal.tsx";
 
@@ -26,7 +25,7 @@ export interface MaiaPlaySetupViewProps {
   ratingsByClass: Readonly<Record<MaiaTimeClass, MaiaRatingRecord>>;
   activeGame?: MaiaGameState | null;
   onPatchPreferences: (patch: Partial<MaiaSetupPreferences>) => void;
-  onChangeInitialRating: (timeClass: MaiaTimeClass, rating: number) => void;
+  onChangeInitialRating?: (timeClass: MaiaTimeClass, rating: number) => void;
   onStartGame: () => void;
   onResumeGame: () => void;
   onBack: () => void;
@@ -37,7 +36,6 @@ export function MaiaPlaySetupView({
   ratingsByClass,
   activeGame,
   onPatchPreferences,
-  onChangeInitialRating,
   onStartGame,
   onResumeGame,
   onBack
@@ -45,19 +43,170 @@ export function MaiaPlaySetupView({
   const styles = useStyles();
   const theme = useTheme();
   const { t } = useTranslation();
+  const viewport = usePracticeViewport();
   const [timePickerOpen, setTimePickerOpen] = useState(false);
 
   const selectedTimeClass = classifyMaiaTimeControl(preferences.timeControl);
   const currentRating = ratingsByClass[selectedTimeClass];
   const hasResumable = activeGame != null && activeGame.status === "playing";
+  const isCompactLandscape = viewport.width > viewport.height && viewport.height < 520;
 
   const updateTimeControl = (timeControl: MaiaTimeControl) => {
     onPatchPreferences({ timeControl });
   };
 
+  const timeControlField = (
+    <View style={styles.field}>
+      <AppText tone="secondary" variant="caption">
+        {t("maiaPlay.setup.timeControl")}
+      </AppText>
+      <Pressable
+        accessibilityRole="button"
+        style={[styles.pickerPill, isCompactLandscape ? styles.controlCompact : null]}
+        testID="maia-setup-time-control"
+        onPress={() => setTimePickerOpen(true)}
+      >
+        <View style={styles.pickerPillLeft}>
+          <Icon color={theme.colors.accent.s600} name="clock" size={18} />
+          <AppText variant="headline">
+            {`${maiaTimeClassLabel(selectedTimeClass, t)} · ${formatMaiaTimeControlDisplay(preferences.timeControl, t)}`}
+          </AppText>
+        </View>
+        <View style={styles.pickerPillRight}>
+          <AppText tone="secondary" variant="footnote" testID="maia-setup-current-rating">
+            {currentRating.rating}
+          </AppText>
+          <Icon color={theme.colors.text.secondary} name="chevronDown" size={18} />
+        </View>
+      </Pressable>
+    </View>
+  );
+
+  const modeField = (
+    <View style={styles.field}>
+      <AppText tone="secondary" variant="caption">
+        {t("maiaPlay.setup.mode")}
+      </AppText>
+      <SegmentedControl<"rated" | "unrated">
+        accessibilityLabel={t("maiaPlay.setup.mode")}
+        options={[
+          { value: "rated", label: t("maiaPlay.mode.rated"), testID: "maia-mode-rated" },
+          { value: "unrated", label: t("maiaPlay.mode.unrated"), testID: "maia-mode-unrated" }
+        ]}
+        semantics="radio"
+        testID="maia-setup-mode"
+        value={preferences.rated ? "rated" : "unrated"}
+        onChange={(next) =>
+          onPatchPreferences({
+            rated: next === "rated"
+          })
+        }
+      />
+    </View>
+  );
+
+  const opponentRatingField = (
+    <View style={styles.field}>
+      <AppText tone="secondary" variant="caption">
+        {t("maiaPlay.setup.opponentRating")}
+      </AppText>
+      <View
+        style={[styles.opponentStepper, isCompactLandscape ? styles.controlCompact : null]}
+        testID="maia-opponent-rating-stepper"
+      >
+        <Pressable
+          accessibilityLabel={t("maiaPlay.setup.decreaseOpponentRating")}
+          accessibilityRole="button"
+          disabled={preferences.opponentRating <= MAIA_MIN_RATING}
+          style={styles.stepButton}
+          testID="maia-opponent-rating-dec"
+          onPress={() =>
+            onPatchPreferences({
+              opponentRating: Math.max(
+                MAIA_MIN_RATING,
+                preferences.opponentRating - MAIA_OPPONENT_RATING_STEP
+              )
+            })
+          }
+        >
+          <Icon color={theme.colors.text.primary} name="remove" size={18} />
+        </Pressable>
+        <AppText testID="maia-opponent-rating-value" variant="numeral">
+          {preferences.opponentRating}
+        </AppText>
+        <Pressable
+          accessibilityLabel={t("maiaPlay.setup.increaseOpponentRating")}
+          accessibilityRole="button"
+          disabled={preferences.opponentRating >= MAIA_MAX_OPPONENT_RATING}
+          style={styles.stepButton}
+          testID="maia-opponent-rating-inc"
+          onPress={() =>
+            onPatchPreferences({
+              opponentRating: Math.min(
+                MAIA_MAX_OPPONENT_RATING,
+                preferences.opponentRating + MAIA_OPPONENT_RATING_STEP
+              )
+            })
+          }
+        >
+          <Icon color={theme.colors.text.primary} name="add" size={18} />
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const colorField = (
+    <View style={styles.field}>
+      <AppText tone="secondary" variant="caption">
+        {t("maiaPlay.setup.playAs")}
+      </AppText>
+      <SegmentedControl<MaiaColorPreference>
+        accessibilityLabel={t("maiaPlay.setup.playAs")}
+        options={[
+          { value: "random", label: t("maiaPlay.color.random"), testID: "maia-color-random" },
+          { value: "w", label: t("maiaPlay.color.white"), testID: "maia-color-w" },
+          { value: "b", label: t("maiaPlay.color.black"), testID: "maia-color-b" }
+        ]}
+        semantics="radio"
+        testID="maia-setup-color"
+        value={preferences.colorPreference}
+        onChange={(colorPreference) => onPatchPreferences({ colorPreference })}
+      />
+    </View>
+  );
+
+  const paceField = (
+    <View style={styles.field}>
+      <AppText tone="secondary" variant="caption">
+        {t("maiaPlay.setup.thinkingPace")}
+      </AppText>
+      <SegmentedControl<MaiaThinkingPace>
+        accessibilityLabel={t("maiaPlay.setup.thinkingPace")}
+        options={[
+          { value: "human", label: t("maiaPlay.pace.human"), testID: "maia-pace-human" },
+          { value: "instant", label: t("maiaPlay.pace.instant"), testID: "maia-pace-instant" }
+        ]}
+        semantics="radio"
+        testID="maia-setup-pace"
+        value={preferences.thinkingPace}
+        onChange={(thinkingPace) => onPatchPreferences({ thinkingPace })}
+      />
+    </View>
+  );
+
+  const startButton = (
+    <Button
+      label={t("maiaPlay.action.startGame")}
+      size={isCompactLandscape ? "compact" : "regular"}
+      stretch
+      testID="maia-start-game"
+      onPress={onStartGame}
+    />
+  );
+
   return (
     <View style={styles.root} testID="maia-play-setup">
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, isCompactLandscape ? styles.topBarCompactLandscape : null]}>
         <Pressable
           accessibilityLabel={t("common.back")}
           accessibilityRole="button"
@@ -76,7 +225,10 @@ export function MaiaPlaySetupView({
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          isCompactLandscape ? styles.contentCompactLandscape : null
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {hasResumable ? (
@@ -98,201 +250,35 @@ export function MaiaPlaySetupView({
           </Section>
         ) : null}
 
-        <View style={styles.ratingStrip} testID="maia-rating-strip">
-          {MAIA_TIME_CLASSES.map((tc) => {
-            const rec = ratingsByClass[tc];
-            const active = tc === selectedTimeClass;
-            return (
-              <View
-                key={tc}
-                style={[styles.ratingTile, active ? styles.ratingTileActive : null]}
-                testID={`maia-rating-tile-${tc}`}
-              >
-                <AppText
-                  tone={active ? "accent" : "secondary"}
-                  variant="caption"
-                >
-                  {maiaTimeClassLabel(tc, t)}
-                </AppText>
-                <AppText variant="numeral">{rec.rating}</AppText>
-                <AppText tone="secondary" variant="caption">
-                  {rec.games > 0
-                    ? `${rec.wins}-${rec.losses}-${rec.draws}`
-                    : t("maiaPlay.provisional")}
-                </AppText>
+        {isCompactLandscape ? (
+          <Section style={styles.formCardCompactLandscape}>
+            <View style={styles.compactColumnsRow}>
+              <View style={styles.compactColumn}>
+                {timeControlField}
+                {modeField}
+                {opponentRatingField}
               </View>
-            );
-          })}
-        </View>
-
-        <Section style={styles.formCard}>
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="caption">
-              {t("maiaPlay.setup.timeControl")}
-            </AppText>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.pickerPill}
-              testID="maia-setup-time-control"
-              onPress={() => setTimePickerOpen(true)}
-            >
-              <View style={styles.pickerPillLeft}>
-                <Icon color={theme.colors.accent.s600} name="clock" size={18} />
-                <AppText variant="headline">
-                  {`${maiaTimeClassLabel(selectedTimeClass, t)} · ${formatMaiaTimeControlDisplay(preferences.timeControl, t)}`}
-                </AppText>
-              </View>
-              <Icon color={theme.colors.text.secondary} name="chevronDown" size={18} />
-            </Pressable>
-          </View>
-
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="caption">
-              {t("maiaPlay.setup.mode")}
-            </AppText>
-            <SegmentedControl<"rated" | "unrated">
-              accessibilityLabel={t("maiaPlay.setup.mode")}
-              options={[
-                { value: "rated", label: t("maiaPlay.mode.rated"), testID: "maia-mode-rated" },
-                { value: "unrated", label: t("maiaPlay.mode.unrated"), testID: "maia-mode-unrated" }
-              ]}
-              semantics="radio"
-              testID="maia-setup-mode"
-              value={preferences.rated ? "rated" : "unrated"}
-              onChange={(next) =>
-                onPatchPreferences({
-                  rated: next === "rated"
-                })
-              }
-            />
-          </View>
-
-          <View style={styles.field}>
-            <View style={styles.fieldHeader}>
-              <AppText tone="secondary" variant="caption">
-                {t("maiaPlay.setup.opponentRating")}
-              </AppText>
-              {preferences.rated ? (
-                <Badge
-                  label={t("maiaPlay.setup.matchesYours", { rating: currentRating.rating })}
-                  tone="accent"
-                />
-              ) : null}
-            </View>
-
-            {preferences.rated ? (
-              currentRating.games === 0 ? (
-                <View style={styles.initialRatingRow} testID="maia-initial-rating-presets">
-                  {MAIA_STARTING_RATING_PRESETS.map((presetRating) => {
-                    const selected = currentRating.rating === presetRating;
-                    return (
-                      <Pressable
-                        key={presetRating}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        style={[
-                          styles.ratingChip,
-                          selected ? styles.ratingChipSelected : null
-                        ]}
-                        testID={`maia-start-rating-${presetRating}`}
-                        onPress={() => onChangeInitialRating(selectedTimeClass, presetRating)}
-                      >
-                        <AppText
-                          style={selected ? styles.ratingChipTextSelected : undefined}
-                          variant="footnote"
-                        >
-                          {presetRating}
-                        </AppText>
-                      </Pressable>
-                    );
-                  })}
+              <View style={[styles.compactColumn, styles.compactColumnRight]}>
+                <View style={styles.compactColumnFields}>
+                  {colorField}
+                  {paceField}
                 </View>
-              ) : null
-            ) : (
-              <View style={styles.opponentStepper} testID="maia-opponent-rating-stepper">
-                <Pressable
-                  accessibilityLabel={t("maiaPlay.setup.decreaseOpponentRating")}
-                  accessibilityRole="button"
-                  disabled={preferences.opponentRating <= MAIA_MIN_RATING}
-                  style={styles.stepButton}
-                  testID="maia-opponent-rating-dec"
-                  onPress={() =>
-                    onPatchPreferences({
-                      opponentRating: Math.max(
-                        MAIA_MIN_RATING,
-                        preferences.opponentRating - MAIA_OPPONENT_RATING_STEP
-                      )
-                    })
-                  }
-                >
-                  <Icon color={theme.colors.text.primary} name="remove" size={18} />
-                </Pressable>
-                <AppText testID="maia-opponent-rating-value" variant="numeral">
-                  {preferences.opponentRating}
-                </AppText>
-                <Pressable
-                  accessibilityLabel={t("maiaPlay.setup.increaseOpponentRating")}
-                  accessibilityRole="button"
-                  disabled={preferences.opponentRating >= MAIA_MAX_OPPONENT_RATING}
-                  style={styles.stepButton}
-                  testID="maia-opponent-rating-inc"
-                  onPress={() =>
-                    onPatchPreferences({
-                      opponentRating: Math.min(
-                        MAIA_MAX_OPPONENT_RATING,
-                        preferences.opponentRating + MAIA_OPPONENT_RATING_STEP
-                      )
-                    })
-                  }
-                >
-                  <Icon color={theme.colors.text.primary} name="add" size={18} />
-                </Pressable>
+                {startButton}
               </View>
-            )}
-          </View>
-
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="caption">
-              {t("maiaPlay.setup.playAs")}
-            </AppText>
-            <SegmentedControl<MaiaColorPreference>
-              accessibilityLabel={t("maiaPlay.setup.playAs")}
-              options={[
-                { value: "random", label: t("maiaPlay.color.random"), testID: "maia-color-random" },
-                { value: "w", label: t("maiaPlay.color.white"), testID: "maia-color-w" },
-                { value: "b", label: t("maiaPlay.color.black"), testID: "maia-color-b" }
-              ]}
-              semantics="radio"
-              testID="maia-setup-color"
-              value={preferences.colorPreference}
-              onChange={(colorPreference) => onPatchPreferences({ colorPreference })}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="caption">
-              {t("maiaPlay.setup.thinkingPace")}
-            </AppText>
-            <SegmentedControl<MaiaThinkingPace>
-              accessibilityLabel={t("maiaPlay.setup.thinkingPace")}
-              options={[
-                { value: "human", label: t("maiaPlay.pace.human"), testID: "maia-pace-human" },
-                { value: "instant", label: t("maiaPlay.pace.instant"), testID: "maia-pace-instant" }
-              ]}
-              semantics="radio"
-              testID="maia-setup-pace"
-              value={preferences.thinkingPace}
-              onChange={(thinkingPace) => onPatchPreferences({ thinkingPace })}
-            />
-          </View>
-        </Section>
-
-        <Button
-          label={t("maiaPlay.action.startGame")}
-          stretch
-          testID="maia-start-game"
-          onPress={onStartGame}
-        />
+            </View>
+          </Section>
+        ) : (
+          <>
+            <Section style={styles.formCard}>
+              {timeControlField}
+              {modeField}
+              {opponentRatingField}
+              {colorField}
+              {paceField}
+            </Section>
+            {startButton}
+          </>
+        )}
       </ScrollView>
 
       <MaiaTimeControlPickerModal
@@ -321,6 +307,10 @@ const useStyles = makeStyles((theme) => ({
     width: "100%",
     alignSelf: "center"
   },
+  topBarCompactLandscape: {
+    maxWidth: 740,
+    paddingVertical: 6
+  },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -333,11 +323,16 @@ const useStyles = makeStyles((theme) => ({
   },
   content: {
     paddingHorizontal: theme.spacing.screen,
-    paddingBottom: 32,
+    paddingBottom: 24,
     gap: theme.spacing.section,
     maxWidth: 560,
     width: "100%",
     alignSelf: "center"
+  },
+  contentCompactLandscape: {
+    maxWidth: 740,
+    paddingBottom: 12,
+    gap: 10
   },
   resumeCard: {
     padding: theme.spacing.screen
@@ -352,42 +347,37 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     gap: 2
   },
-  ratingStrip: {
-    flexDirection: "row",
-    gap: theme.spacing.inline
-  },
-  ratingTile: {
-    flex: 1,
-    alignItems: "center",
-    gap: 2,
-    paddingVertical: theme.spacing.row,
-    paddingHorizontal: theme.spacing.inline,
-    borderRadius: theme.shape.card,
-    backgroundColor: theme.colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default
-  },
-  ratingTileActive: {
-    borderColor: theme.colors.accent.s600,
-    backgroundColor: theme.colors.accent.s100
-  },
   formCard: {
     padding: theme.spacing.screen,
     gap: theme.spacing.section
   },
-  field: {
-    gap: theme.spacing.inline
+  formCardCompactLandscape: {
+    padding: 14
   },
-  fieldHeader: {
+  compactColumnsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "stretch",
+    gap: 16
+  },
+  compactColumn: {
+    flex: 1,
+    minWidth: 0,
+    gap: 10
+  },
+  compactColumnRight: {
+    justifyContent: "space-between"
+  },
+  compactColumnFields: {
+    gap: 10
+  },
+  field: {
     gap: theme.spacing.inline
   },
   pickerPill: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
     minHeight: 48,
     paddingHorizontal: theme.spacing.screen,
     borderRadius: theme.shape.control,
@@ -395,32 +385,19 @@ const useStyles = makeStyles((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border.default
   },
+  controlCompact: {
+    minHeight: 42
+  },
   pickerPillLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing.inline
+    gap: theme.spacing.inline,
+    flexShrink: 1
   },
-  initialRatingRow: {
+  pickerPillRight: {
     flexDirection: "row",
-    gap: theme.spacing.inline
-  },
-  ratingChip: {
-    flex: 1,
-    minHeight: 36,
-    borderRadius: theme.shape.capsule,
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.surfaceSunken,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default
-  },
-  ratingChipSelected: {
-    backgroundColor: theme.colors.accent.s100,
-    borderColor: theme.colors.accent.s600
-  },
-  ratingChipTextSelected: {
-    color: theme.colors.accent.s600,
-    fontWeight: "700"
+    gap: 6
   },
   opponentStepper: {
     flexDirection: "row",

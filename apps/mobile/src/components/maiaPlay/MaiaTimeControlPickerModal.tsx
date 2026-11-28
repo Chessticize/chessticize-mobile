@@ -107,7 +107,9 @@ export function MaiaTimeControlPickerModal({
                     <View style={styles.groupHeader}>
                       <AppText variant="headline">{maiaTimeClassLabel(tc, t)}</AppText>
                       <AppText tone="secondary" variant="footnote">
-                        {rating.rating}
+                        {rating.games > 0
+                          ? `${rating.rating} · ${rating.wins}-${rating.losses}-${rating.draws}`
+                          : `${rating.rating}`}
                       </AppText>
                     </View>
                     <View style={styles.pillRow}>
