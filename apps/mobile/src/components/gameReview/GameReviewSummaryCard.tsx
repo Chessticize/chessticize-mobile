@@ -1,6 +1,9 @@
 import React from "react";
 import { Pressable, View } from "react-native";
-import { curatedPuzzleThemes } from "../../../../../packages/core/src/index.ts";
+import {
+  curatedPuzzleThemes,
+  isWithinReviewDifficultyBand
+} from "../../../../../packages/core/src/index.ts";
 import type { StoredUserPuzzle } from "../../../../../packages/storage/src/game-review-store.ts";
 import { makeStyles } from "../../theme/index.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -12,6 +15,7 @@ export interface GameReviewSummaryCardProps {
   summary: GameReviewSummaryData;
   whitePlayerName: string;
   blackPlayerName: string;
+  userRating?: number;
   enrolledPuzzleIds: ReadonlySet<string>;
   onSelectPuzzle?: (puzzle: StoredUserPuzzle) => void;
   onToggleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
@@ -24,6 +28,7 @@ export function GameReviewSummaryCard({
   summary,
   whitePlayerName,
   blackPlayerName,
+  userRating,
   enrolledPuzzleIds,
   onSelectPuzzle,
   onToggleReviewEnrollment,
@@ -131,6 +136,10 @@ export function GameReviewSummaryCard({
                 puzzle.puzzleKind === "arrow_duel"
                   ? t("common.arrowDuel")
                   : t("gameReview.summary.kindLine");
+              const hasEstimatedRating =
+                puzzle.ratingSource !== undefined && puzzle.ratingSource !== "game_anchor";
+              const overReviewBand =
+                hasEstimatedRating && !isWithinReviewDifficultyBand(puzzle.rating, userRating);
 
               return (
                 <View
@@ -147,6 +156,12 @@ export function GameReviewSummaryCard({
                   >
                     <View style={styles.puzzleBadges}>
                       <Badge label={kindLabel} tone="accent" />
+                      {hasEstimatedRating ? (
+                        <Badge
+                          label={`~${puzzle.rating}`}
+                          tone={overReviewBand ? "warning" : "neutral"}
+                        />
+                      ) : null}
                       <Badge
                         label={t("games.puzzles.moveOnly", { move: puzzle.gameMoveNumber })}
                         tone="neutral"

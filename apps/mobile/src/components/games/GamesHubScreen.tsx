@@ -66,6 +66,7 @@ import {
   useGamesBatchAnalysis,
   type GamesBatchAnalysisState
 } from "./useGamesBatchAnalysis.ts";
+import { useUserPuzzleDifficultyBackfill } from "./useUserPuzzleDifficultyBackfill.ts";
 
 export interface MyGamePuzzlesLaunchOptions {
   mode?: "standard" | "arrow_duel";
@@ -826,6 +827,14 @@ export function GamesHubScreen({
 
   const isEmpty = snapshot.allGames.length === 0;
   const batchBusy = batch.state.status === "running";
+
+  useUserPuzzleDifficultyBackfill({
+    store: service.gameReviewStore,
+    puzzles: snapshot.orderedUserPuzzles,
+    getEngine: resolveAnalysisEngine,
+    paused: batchBusy,
+    onPuzzleRated: refreshHub
+  });
   const effectiveHubView: "games" | "puzzles" =
     snapshot.userPuzzleCount > 0 ? hubView : "games";
   const reviewBandVisiblePuzzles = filteredOrderedUserPuzzles.filter(isPuzzleWithinReviewBand);

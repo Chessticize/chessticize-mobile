@@ -367,7 +367,7 @@ export function useGamesBatchAnalysis({
       errorMessage: null,
       pausedByBackground: false
     });
-  }, [persistPartialCheckpoint, store]);
+  }, [persistPartialCheckpoint, resolveHumanPolicy, store]);
 
   const requestPause = useCallback((reason: "user" | "background"): void => {
     if (!runningRef.current) {

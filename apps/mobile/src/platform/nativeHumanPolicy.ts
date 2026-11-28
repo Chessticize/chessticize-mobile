@@ -26,6 +26,7 @@ for (let i = 0; i < BASE64_CHARS.length; i += 1) {
   BASE64_LOOKUP[BASE64_CHARS.charCodeAt(i)] = i;
 }
 
+/* eslint-disable no-bitwise */
 /** Encode a Float32Array's little-endian IEEE-754 bytes as Base64 without requiring Node Buffer. */
 export function float32ArrayToBase64(values: Float32Array): string {
   const bytes = new Uint8Array(values.buffer, values.byteOffset, values.byteLength);
@@ -71,6 +72,7 @@ export function base64ToFloat32Array(base64: string): Float32Array {
   }
   return new Float32Array(bytes.buffer, 0, Math.floor(byteLen / 4));
 }
+/* eslint-enable no-bitwise */
 
 export function expectedMaia2Sha256ForPlatform(os: string = Platform.OS): string {
   if (os === "ios") {

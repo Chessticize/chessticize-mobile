@@ -2809,6 +2809,33 @@ export class SyncSQLiteStore implements PracticeStore {
     return row ? userPuzzleFromRow(row) : undefined;
   }
 
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: UserGamePuzzleRatingSource
+  ): void {
+    const rounded = Math.round(rating);
+    this.db
+      .prepare("UPDATE user_puzzles SET rating = ?, rating_source = ? WHERE id = ?")
+      .run(rounded, ratingSource, puzzleId);
+    const row = this.db
+      .prepare("SELECT puzzle_kind FROM user_puzzles WHERE id = ?")
+      .get(puzzleId) as { puzzle_kind: string } | undefined;
+    if (row) {
+      if (row.puzzle_kind === "arrow_duel") {
+        this.db
+          .prepare(
+            "UPDATE puzzles SET rating = ?, arrow_duel_rating = ? WHERE id = ? AND source = 'user_game'"
+          )
+          .run(rounded, rounded, puzzleId);
+      } else {
+        this.db
+          .prepare("UPDATE puzzles SET rating = ? WHERE id = ? AND source = 'user_game'")
+          .run(rounded, puzzleId);
+      }
+    }
+  }
+
   archiveUserPuzzle(puzzleId: string, archived = true): void {
     this.db
       .prepare("UPDATE user_puzzles SET archived = ? WHERE id = ?")
