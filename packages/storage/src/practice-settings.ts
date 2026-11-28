@@ -10,17 +10,31 @@ import {
   BOARD_THEME_IDS,
   CHESS_PIECE_SET_IDS,
   DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
   DEFAULT_LIGHT_BOARD_THEME,
   DEFAULT_PIECE_SET,
+  GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS,
   type AppearancePreference,
   type BoardThemeId,
   type ChessPieceSetId,
+  type GameReviewAutoSyncCooldownMinutes,
   type PracticeSettings,
   type ReviewReminderPreference
 } from "./practice-store.ts";
 
 const BOARD_THEME_ID_SET: ReadonlySet<string> = new Set(BOARD_THEME_IDS);
 const CHESS_PIECE_SET_ID_SET: ReadonlySet<string> = new Set(CHESS_PIECE_SET_IDS);
+const GAME_REVIEW_AUTO_SYNC_COOLDOWN_SET: ReadonlySet<number> = new Set(
+  GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS
+);
+
+export function normalizeGameReviewAutoSyncCooldownMinutes(
+  value: unknown
+): GameReviewAutoSyncCooldownMinutes {
+  return typeof value === "number" && GAME_REVIEW_AUTO_SYNC_COOLDOWN_SET.has(value)
+    ? (value as GameReviewAutoSyncCooldownMinutes)
+    : DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES;
+}
 
 export function defaultPracticeSettings(): PracticeSettings {
   return {
@@ -36,7 +50,8 @@ export function defaultPracticeSettings(): PracticeSettings {
       opponentReplyEnabled: true
     },
     gameReview: {
-      autoAddRecommendedToReview: false
+      autoAddRecommendedToReview: false,
+      autoSyncCooldownMinutes: DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
     },
     notifications: {
       reviewReminder: {
@@ -66,7 +81,10 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
       opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
     },
     gameReview: {
-      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false)
+      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false),
+      autoSyncCooldownMinutes: normalizeGameReviewAutoSyncCooldownMinutes(
+        settings.gameReview?.autoSyncCooldownMinutes
+      )
     },
     notifications: {
       reviewReminder: settings.notifications.reviewReminder
@@ -102,7 +120,10 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
       opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
     },
     gameReview: {
-      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false)
+      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false),
+      autoSyncCooldownMinutes: normalizeGameReviewAutoSyncCooldownMinutes(
+        settings.gameReview?.autoSyncCooldownMinutes
+      )
     },
     notifications: {
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)

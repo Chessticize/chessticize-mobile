@@ -611,14 +611,16 @@ function runStoreContractSuite(
     try {
       let store = ctx.store;
       assert.equal(store.getSettings().gameReview?.autoAddRecommendedToReview, false);
+      assert.equal(store.getSettings().gameReview?.autoSyncCooldownMinutes, 10);
       store.saveSettings({
         ...store.getSettings(),
-        gameReview: { autoAddRecommendedToReview: true }
+        gameReview: { autoAddRecommendedToReview: true, autoSyncCooldownMinutes: 30 }
       });
       if (ctx.reopen) {
         store = await ctx.reopen();
       }
       assert.equal(store.getSettings().gameReview?.autoAddRecommendedToReview, true);
+      assert.equal(store.getSettings().gameReview?.autoSyncCooldownMinutes, 30);
 
       const g1 = makeImportedGame({ id: "chess_com:live:cascade1" });
       const g2 = makeImportedGame({ id: "chess_com:live:cascade2" });

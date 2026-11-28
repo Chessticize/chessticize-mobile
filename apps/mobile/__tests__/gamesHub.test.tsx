@@ -1503,8 +1503,8 @@ describe("GamesHubScreen", () => {
     expect(hasTestID(renderer, "games-analyze-prompt-card")).toBe(true);
     expect(hasTestID(renderer, "games-analyze-recent")).toBe(true);
 
-    // Advance time by 6 minutes and simulate app returning from background -> triggers stale auto-sync!
-    currentNow = NOW_MS + 6 * 60 * 1000;
+    // Advance time by 11 minutes (> 10 min default cooldown) and simulate app returning from background -> triggers stale auto-sync!
+    currentNow = NOW_MS + 11 * 60 * 1000;
     await act(async () => {
       appStateMock.__emit("background");
       appStateMock.__emit("active");
@@ -1514,7 +1514,22 @@ describe("GamesHubScreen", () => {
     });
     expect(requests.length).toBe(1);
 
-    // Manual sync button still forces immediate sync even right after a fresh sync.
+    // Turning auto-sync cooldown to 0 (Off) suppresses automatic foreground sync even when stale.
+    service.saveSettings({
+      ...service.getSettings(),
+      gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 0 }
+    });
+    currentNow = NOW_MS + 60 * 60 * 1000;
+    await act(async () => {
+      appStateMock.__emit("background");
+      appStateMock.__emit("active");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(requests.length).toBe(1);
+
+    // Manual sync button still forces immediate sync even when auto-sync is Off.
     await act(async () => {
       press(renderer, "games-sync-button");
       await Promise.resolve();

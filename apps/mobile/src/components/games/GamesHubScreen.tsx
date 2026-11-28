@@ -22,6 +22,9 @@ import {
   type GameReviewEngine,
   type PuzzleExtractionEngine
 } from "../../../../../packages/core/src/index.ts";
+import {
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+} from "../../../../../packages/storage/src/practice-store.ts";
 import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import {
   USER_GAME_RATING_KEY_PREFIX,
@@ -89,7 +92,7 @@ export interface MyGamePuzzlesLaunchOptions {
 
 const GAMES_PAGE_SIZE = 50;
 const PUZZLES_PAGE_SIZE = 50;
-export const AUTO_SYNC_STALE_MS = 5 * 60 * 1000;
+export const AUTO_SYNC_STALE_MS = DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES * 60 * 1000;
 
 export function linkedAccountsNeedingAutoSync(
   accounts: readonly LinkedGameAccount[],
@@ -153,7 +156,7 @@ export function GamesHubScreen({
   initialBatchState,
   batchController,
   autoSyncOnMount = false,
-  autoSyncStaleMs = AUTO_SYNC_STALE_MS,
+  autoSyncStaleMs,
   onStoreMutated
 }: GamesHubScreenProps): React.JSX.Element {
   const nowMs = nowMsProp ?? Date.now();
@@ -706,10 +709,22 @@ export function GamesHubScreen({
   }, [snapshot.linkedAccounts, syncLinkedAccountsList]);
 
   const handleAutoSyncStaleLinked = useCallback(async (): Promise<void> => {
+    const effectiveStaleMs =
+      autoSyncStaleMs !== undefined
+        ? autoSyncStaleMs
+        : (() => {
+            const configuredMinutes =
+              service.getSettings().gameReview?.autoSyncCooldownMinutes ??
+              DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES;
+            return configuredMinutes <= 0 ? null : configuredMinutes * 60 * 1000;
+          })();
+    if (effectiveStaleMs === null) {
+      return;
+    }
     const staleAccounts = linkedAccountsNeedingAutoSync(
       service.listLinkedAccounts(),
       resolveNowMs(),
-      autoSyncStaleMs
+      effectiveStaleMs
     );
     if (staleAccounts.length === 0) {
       return;
