@@ -15,6 +15,7 @@ class MainApplication : Application(), ReactApplication {
         add(AndroidSupportDiagnosticsPackage())
         add(AppStoreReviewRequestPackage())
         add(ApplicationMetadataPackage())
+        add(BackgroundBatchAnalysisPackage())
         add(BundledPuzzlePackInstallerPackage())
         add(ChessticizeTestLaunchConfigPackage())
         add(MobilePredictiveBackPackage())
