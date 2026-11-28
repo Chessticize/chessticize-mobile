@@ -31,14 +31,14 @@ const SHORT_MARGIN = 12;
 export function WhatsNewSheet({
   content,
   onContinue,
-  onLinkAccount,
-  showLinkAccountAction = Boolean(onLinkAccount),
+  onOpenGames,
+  showOpenGamesAction = Boolean(onOpenGames),
   visible
 }: {
   content: WhatsNewContent;
   onContinue: () => void;
-  onLinkAccount?: () => void;
-  showLinkAccountAction?: boolean;
+  onOpenGames?: () => void;
+  showOpenGamesAction?: boolean;
   visible: boolean;
 }): React.JSX.Element | null {
   const styles = useStyles();
@@ -57,7 +57,7 @@ export function WhatsNewSheet({
   const maxHeight = Math.max(240, height - insets.top - insets.bottom - margin * 2);
   // Under large text the first headline line grows taller than the 30-pt tile; keep the tile on that line.
   const tileOffset = Math.max(0, Math.round((HEADLINE_LINE_HEIGHT * (fontScale ?? 1) - TILE_SIZE) / 2));
-  const showPrimaryLinkAction = Boolean(onLinkAccount) && showLinkAccountAction;
+  const showPrimaryGamesAction = Boolean(onOpenGames) && showOpenGamesAction;
 
   return (
     <AppModal
@@ -130,19 +130,19 @@ export function WhatsNewSheet({
             </AppText>
           </ScrollView>
           <View style={[styles.footer, short ? styles.footerShort : null]}>
-            {showPrimaryLinkAction && onLinkAccount ? (
+            {showPrimaryGamesAction && onOpenGames ? (
               <Button
-                label={content.linkAccountLabel}
+                label={content.openGamesLabel}
                 stretch
-                testID="whats-new-link-account"
-                onPress={onLinkAccount}
+                testID="whats-new-open-games"
+                onPress={onOpenGames}
               />
             ) : null}
             <Button
               label={content.continueLabel}
               stretch
               testID="whats-new-continue"
-              variant={showPrimaryLinkAction ? "plain" : "primary"}
+              variant={showPrimaryGamesAction ? "plain" : "primary"}
               onPress={onContinue}
             />
           </View>

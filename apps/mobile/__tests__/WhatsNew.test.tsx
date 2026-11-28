@@ -6,7 +6,7 @@ import { GamesHubScreen } from "../src/components/games/GamesHubScreen";
 import { GameReviewScreen } from "../src/components/gameReview/GameReviewScreen";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { PracticeService } from "../../../packages/storage/src/practice-service";
-import type { GameImportHttpClient, Puzzle } from "../../../packages/core/src/index";
+import type { Puzzle } from "../../../packages/core/src/index";
 import { createMobilePracticeService } from "../src/platform/mobilePractice";
 import {
   WHATS_NEW_RELEASE_VERSION,
@@ -37,10 +37,10 @@ describe("WhatsNewSheet (2.0)", () => {
     );
 
     expect(text(renderer, "whats-new-title")).toBe("What’s New in Chessticize 2.0");
-    expect(text(renderer, "whats-new-highlight-games-import")).toContain("Import your online games");
+    expect(text(renderer, "whats-new-highlight-games-import")).toContain("New Games tab");
     expect(text(renderer, "whats-new-highlight-games-import")).toContain("Chess.com or Lichess");
     expect(text(renderer, "whats-new-highlight-game-review")).toContain("Free offline Game Review");
-    expect(text(renderer, "whats-new-highlight-personal-puzzles")).toContain("Puzzles from your own games");
+    expect(text(renderer, "whats-new-highlight-personal-puzzles")).toContain("Generate puzzles from your games");
     expect(text(renderer, "whats-new-highlight-play-maia")).toContain("Play offline against Maia");
     expect(text(renderer, "whats-new-feedback-note")).toContain("Help & Feedback");
 
@@ -51,21 +51,21 @@ describe("WhatsNewSheet (2.0)", () => {
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the Link Chess Account CTA when provided and triggers it", () => {
+  it("shows the Go to Games CTA when provided and triggers it", () => {
     const onContinue = jest.fn();
-    const onLinkAccount = jest.fn();
+    const onOpenGames = jest.fn();
     const renderer = create(
       <WhatsNewSheet
         content={whatsNewContentFor("android")}
         visible
         onContinue={onContinue}
-        onLinkAccount={onLinkAccount}
+        onOpenGames={onOpenGames}
       />
     );
 
-    expect(find(renderer, "whats-new-link-account")).toBeTruthy();
-    press(renderer, "whats-new-link-account");
-    expect(onLinkAccount).toHaveBeenCalledTimes(1);
+    expect(find(renderer, "whats-new-open-games")).toBeTruthy();
+    press(renderer, "whats-new-open-games");
+    expect(onOpenGames).toHaveBeenCalledTimes(1);
     expect(onContinue).not.toHaveBeenCalled();
   });
 
@@ -98,17 +98,17 @@ describe("What’s New on launch (upgrading users)", () => {
     expect(isOnboardingShown(relaunched)).toBe(false);
   });
 
-  it("tapping Link Chess Account records 2.0 seen, opens Games tab, and shows the Import modal", () => {
+  it("tapping Go to Games records 2.0 seen and switches straight to the Games tab without popping a separate modal", () => {
     const service = serviceWith({ lastSeen: "1.7.0", withProgress: true });
     const renderer = renderScreen(service);
 
     expect(isShown(renderer)).toBe(true);
-    press(renderer, "whats-new-link-account");
+    press(renderer, "whats-new-open-games");
 
     expect(isShown(renderer)).toBe(false);
     expect(service.getSettings().whatsNewSeenVersion).toBe(WHATS_NEW_RELEASE_VERSION);
     expect(find(renderer, "games-hub-screen")).toBeTruthy();
-    expect(find(renderer, "games-import-modal")).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: "games-import-modal" })).toEqual([]);
   });
 
   it("shows again on the next launch if the user left without finishing", () => {
@@ -197,7 +197,9 @@ describe("Welcome Onboarding on fresh 2.0 install", () => {
     expect(isShown(renderer)).toBe(false);
     expect(isOnboardingShown(renderer)).toBe(true);
     expect(text(renderer, "welcome-onboarding-title")).toBe("Welcome to Chessticize");
-    expect(text(renderer, "welcome-onboarding-highlight-import-review")).toContain("Learn from your online games");
+    expect(text(renderer, "welcome-onboarding-highlight-import-review")).toContain("New Games tab");
+    expect(text(renderer, "welcome-onboarding-highlight-import-review")).toContain("review your games offline");
+    expect(text(renderer, "welcome-onboarding-highlight-import-review")).toContain("generate puzzles");
     expect(text(renderer, "welcome-onboarding-highlight-offline-tactics")).toContain("Sharpen tactics anywhere");
     expect(text(renderer, "welcome-onboarding-highlight-maia-play")).toContain("Practice against Maia offline");
     expect(text(renderer, "welcome-onboarding-feedback-note")).toContain("Help & Feedback");
@@ -213,63 +215,17 @@ describe("Welcome Onboarding on fresh 2.0 install", () => {
     expect(isOnboardingShown(relaunched)).toBe(false);
   });
 
-  it("allows linking a Chess.com account inline in Step 2 and jumping straight into Games", async () => {
+  it("tapping Go to Games finishes onboarding and takes the user directly to the Games tab", () => {
     const service = serviceWith({});
-    const fakeHttpClient: GameImportHttpClient = {
-      getText: async (url) => {
-        if (url.endsWith("/games/archives")) {
-          return {
-            status: 200,
-            text: JSON.stringify({
-              archives: ["https://api.chess.com/pub/player/hikaru/games/2026/11"]
-            })
-          };
-        }
-        return {
-          status: 200,
-          text: JSON.stringify({
-            games: [
-              {
-                url: "https://www.chess.com/game/live/1001",
-                rules: "chess",
-                pgn:
-                  '[Event "Live Chess"]\n[White "hikaru"]\n[Black "opponent"]\n[Result "1-0"]\n[TimeControl "180"]\n\n1. e4 e5 2. Nf3 Nc6 1-0',
-                time_class: "blitz",
-                time_control: "180",
-                end_time: 1_760_000_000,
-                rated: true,
-                white: { username: "hikaru", rating: 2900, result: "win" },
-                black: { username: "opponent", rating: 2800, result: "resigned" }
-              }
-            ]
-          })
-        };
-      }
-    };
-
-    const renderer = renderScreen(service, { welcomeOnboardingHttpClient: fakeHttpClient });
+    const renderer = renderScreen(service);
     expect(isOnboardingShown(renderer)).toBe(true);
-
-    press(renderer, "welcome-onboarding-next");
-    expect(text(renderer, "welcome-onboarding-link-title")).toBe("Import your online games");
-
-    act(() => {
-      find(renderer, "welcome-onboarding-username").props.onChangeText("hikaru");
-    });
-
-    await act(async () => {
-      await find(renderer, "welcome-onboarding-import-submit").props.onPress();
-    });
-
-    expect(text(renderer, "welcome-onboarding-success")).toContain("Imported 1 game");
-    expect(service.listLinkedAccounts()).toHaveLength(1);
-    expect(service.listImportedGames()).toHaveLength(1);
 
     press(renderer, "welcome-onboarding-open-games");
     expect(isOnboardingShown(renderer)).toBe(false);
     expect(service.getSettings().onboarding?.welcomeSeen).toBe(true);
     expect(service.getSettings().whatsNewSeenVersion).toBe("2.0.0");
     expect(find(renderer, "games-hub-screen")).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: "games-import-modal" })).toEqual([]);
   });
 });
 
@@ -449,14 +405,12 @@ function renderScreen(
     version?: string;
     devControls?: boolean;
     sprintGuidanceEnabled?: boolean;
-    welcomeOnboardingHttpClient?: GameImportHttpClient;
   } = {}
 ): TestRenderer.ReactTestRenderer {
   return create(
     <PracticePocScreen
       initialTab={options.initialTab}
       sprintGuidanceEnabled={options.sprintGuidanceEnabled}
-      welcomeOnboardingHttpClient={options.welcomeOnboardingHttpClient}
       platformCapabilities={createTestMobilePlatformCapabilities({
         practiceService: service,
         reminderPlatform: options.platform ?? "ios",

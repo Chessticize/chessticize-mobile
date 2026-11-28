@@ -448,8 +448,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-runs-empty",
     "release-notes-ios",
     "release-notes-android",
-    "welcome-onboarding-overview",
-    "welcome-onboarding-link-account"
+    "welcome-onboarding-overview"
   ].includes(scenarioId);
 }
 
@@ -1788,9 +1787,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       versionName: "2.0.0",
       buildNumber: "1"
     };
-    if (scenarioId === "welcome-onboarding-link-account") {
-      screenProps.welcomeOnboardingInitialStep = "link_account";
-    }
   }
   if (configurePuzzleSource) {
     capabilityOverrides.configurePuzzleSource = (
@@ -1813,8 +1809,7 @@ function isWhatsNewScenario(scenarioId: LabScenarioId): boolean {
 }
 
 function isWelcomeOnboardingScenario(scenarioId: LabScenarioId): boolean {
-  return scenarioId === "welcome-onboarding-overview"
-    || scenarioId === "welcome-onboarding-link-account";
+  return scenarioId === "welcome-onboarding-overview";
 }
 
 function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number | null {

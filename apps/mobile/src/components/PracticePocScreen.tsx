@@ -51,7 +51,6 @@ import type {
   AttemptEvent,
   ArrowDuelState,
   CurrentPuzzleState,
-  GameImportHttpClient,
   PuzzleFeedback,
   PracticeRunRecord,
   ReviewQueueItem,
@@ -156,10 +155,7 @@ import {
 } from "../navigation/topLevelNavigation.ts";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
 import { WhatsNewSheet } from "./WhatsNewSheet.tsx";
-import {
-  WelcomeOnboardingSheet,
-  type WelcomeOnboardingStep
-} from "./WelcomeOnboardingSheet.tsx";
+import { WelcomeOnboardingSheet } from "./WelcomeOnboardingSheet.tsx";
 import { useWhatsNew } from "../whatsNew/useWhatsNew.ts";
 import {
   sessionGuideContainerTestID,
@@ -385,8 +381,6 @@ interface Props {
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
   tacticalProfilePresentation?: TacticalProfilePresentation;
-  welcomeOnboardingHttpClient?: GameImportHttpClient;
-  welcomeOnboardingInitialStep?: WelcomeOnboardingStep;
 }
 
 type PersonalBestGuideIntent = "first-entry" | "learn-hub";
@@ -640,9 +634,7 @@ export function PracticePocScreen({
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack,
-  tacticalProfilePresentation,
-  welcomeOnboardingHttpClient,
-  welcomeOnboardingInitialStep
+  tacticalProfilePresentation
 }: Props): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
@@ -6104,28 +6096,21 @@ export function PracticePocScreen({
       ) : null}
       <WhatsNewSheet
         content={whatsNew.content}
-        showLinkAccountAction={service.listLinkedAccounts().length === 0}
         visible={whatsNew.visible}
         onContinue={whatsNew.dismiss}
-        onLinkAccount={() => {
+        onOpenGames={() => {
           whatsNew.dismiss();
           setTab("games");
-          setGamesImportModalOpen(true);
         }}
       />
       <WelcomeOnboardingSheet
         content={whatsNew.onboardingContent}
-        httpClient={welcomeOnboardingHttpClient}
-        initialStep={welcomeOnboardingInitialStep}
-        service={service}
         visible={whatsNew.onboardingVisible}
         onComplete={whatsNew.dismissOnboarding}
-        onCompleteAndOpenGames={() => {
+        onOpenGames={() => {
           whatsNew.dismissOnboarding();
           setTab("games");
-          refreshState();
         }}
-        onStoreMutated={refreshState}
       />
       </View>
   );

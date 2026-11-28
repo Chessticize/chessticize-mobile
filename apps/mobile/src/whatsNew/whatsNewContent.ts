@@ -25,7 +25,7 @@ export interface WhatsNewContent {
   releaseVersion: string;
   title: string;
   feedbackNote: string;
-  linkAccountLabel: string;
+  openGamesLabel: string;
   continueLabel: string;
   highlights: readonly WhatsNewHighlight[];
 }
@@ -41,7 +41,7 @@ export interface WelcomeOnboardingHighlight {
 export interface WelcomeOnboardingContent {
   title: string;
   feedbackNote: string;
-  linkAccountActionLabel: string;
+  openGamesActionLabel: string;
   startPracticingLabel: string;
   highlights: readonly WelcomeOnboardingHighlight[];
 }
@@ -54,7 +54,7 @@ export function whatsNewContentFor(
     releaseVersion: WHATS_NEW_RELEASE_VERSION,
     title: translate(locale, "whatsNew.title"),
     feedbackNote: translate(locale, "whatsNew.feedbackNote"),
-    linkAccountLabel: translate(locale, "whatsNew.linkAccount"),
+    openGamesLabel: translate(locale, "whatsNew.openGames"),
     continueLabel: translate(locale, "whatsNew.continue"),
     highlights: [
       {
@@ -95,7 +95,7 @@ export function welcomeOnboardingContentFor(
   return {
     title: translate(locale, "onboarding.welcome.title"),
     feedbackNote: translate(locale, "onboarding.welcome.feedbackNote"),
-    linkAccountActionLabel: translate(locale, "onboarding.welcome.linkAccountAction"),
+    openGamesActionLabel: translate(locale, "onboarding.welcome.openGamesAction"),
     startPracticingLabel: translate(locale, "onboarding.welcome.startPracticing"),
     highlights: [
       {
