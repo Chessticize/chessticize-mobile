@@ -20,6 +20,7 @@ import {
 } from "react-native-gesture-handler";
 import {
   canPresentWhatsNew,
+  classifyMaiaTimeControl,
   arrowDuelReplyCuePresentationFor,
   buildSprintConfig,
   collectHistoryRatingKeys,
@@ -339,6 +340,7 @@ import { GamesHubScreen, type MyGamePuzzlesLaunchOptions } from "./games/GamesHu
 import { BatchAnalysisBanner } from "./games/BatchAnalysisBanner.tsx";
 import { useGamesBatchAnalysis } from "./games/useGamesBatchAnalysis.ts";
 import { GameReviewScreen } from "./gameReview/index.tsx";
+import { MaiaPlayScreen } from "./maiaPlay/index.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
 interface Props {
@@ -832,6 +834,7 @@ export function PracticePocScreen({
     start: () => void;
   } | null>(null);
   const [personalBestGuideIntent, setPersonalBestGuideIntent] = useState<PersonalBestGuideIntent | null>(null);
+  const [maiaPlayOpen, setMaiaPlayOpen] = useState(false);
   const [personalBestFirstEntryGuideAcknowledged, setPersonalBestFirstEntryGuideAcknowledged] =
     useState(false);
   const [personalBestGuideOpponentReplyEnabled, setPersonalBestGuideOpponentReplyEnabled] =
@@ -1171,6 +1174,7 @@ export function PracticePocScreen({
   const topLevelChromeVisible = isTopLevelChromeVisible({
     feedbackSnapshotVisible: feedbackSnapshot !== null,
     gameReviewOpen: activeGameReviewId !== null,
+    maiaPlayOpen,
     openSession: state?.status === "active" || state?.status === "paused",
     personalBestGuideVisible,
     personalBestHubVisible,
@@ -5136,6 +5140,25 @@ export function PracticePocScreen({
               onReplay={() => showSessionReplay()}
               onReplayMistakes={() => showSessionReplay("mistakes")}
             />
+          ) : maiaPlayOpen ? (
+            <MaiaPlayScreen
+              moveFeedbackClient={moveFeedbackClient}
+              service={service}
+              onBack={() => {
+                setMaiaPlayOpen(false);
+                refreshState();
+              }}
+              onOpenGameReview={(savedGameId) => {
+                setMaiaPlayOpen(false);
+                setActiveGameReviewInitialPly(null);
+                setActiveGameReviewId(savedGameId);
+                setTab("games");
+                refreshState();
+              }}
+              onStoreMutated={() => {
+                refreshState();
+              }}
+            />
           ) : tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null ? (
             <GameReviewScreen
               engine={getSharedGameReviewArbiter()}
@@ -5432,12 +5455,22 @@ export function PracticePocScreen({
                       currentRating={activeRunManagementPresentation
                         ? selectedManagedRun?.elo ?? RATING_FLOOR
                         : currentRating}
+                      maiaPlay={(() => {
+                        const maiaPrefs = service.getMaiaSetupPreferences();
+                        const maiaTimeClass = classifyMaiaTimeControl(maiaPrefs.timeControl);
+                        return {
+                          activeGame: service.getActiveMaiaGame() ?? null,
+                          preferences: maiaPrefs,
+                          rating: service.getMaiaRating(maiaTimeClass)
+                        };
+                      })()}
                       progress={practiceProgress}
                       personalBestChallenge={personalBestPresentation}
                       runManagement={activeRunManagementPresentation}
                       sprintRulesGuide={sprintRulesGuidePresentation}
                       sprintRulesGuideVisible={sprintRulesGuideVisible}
                       tacticalProfile={resolvedTacticalProfilePresentation}
+                      onOpenMaiaPlay={() => setMaiaPlayOpen(true)}
                       resumableSprint={resumableSprint}
                       onDismissSprintRulesGuide={() => {
                         setSprintRulesGuideVisible(false);
@@ -5838,6 +5871,7 @@ export function PracticePocScreen({
                   onPracticeMyGamePuzzles={(options) => {
                     startMyGamePuzzlesSessionForOptions(options);
                   }}
+                  onPlayWithMaia={() => setMaiaPlayOpen(true)}
                 />
               )
             ) : null}

@@ -27,6 +27,7 @@ import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
 import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
 import type { GameReviewStore } from "./game-review-store.ts";
+import type { MaiaPlayStore } from "./maia-play-store.ts";
 
 export interface ClearSyncedHistoryResult {
   attempts: number;
@@ -187,7 +188,7 @@ export interface PracticeRatingActivity {
   lastPlayedAt: string;
 }
 
-export interface PracticeStore extends ProgressV2PersistenceHost, GameReviewStore {
+export interface PracticeStore extends ProgressV2PersistenceHost, GameReviewStore, MaiaPlayStore {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;

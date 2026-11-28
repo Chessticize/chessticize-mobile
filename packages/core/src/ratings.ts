@@ -69,27 +69,30 @@ export function normalizeRatingRecord(record: RatingRecord): RatingRecord {
   };
 }
 
-export function calculateSprintRatingChange(input: {
+export function calculateGlicko2RatingChange(input: {
   rating: SprintRatingInput;
-  won: boolean;
+  score: 0 | 0.5 | 1;
+  opponentRating?: number | undefined;
+  opponentRatingDeviation?: number | undefined;
   floor?: number | undefined;
 }): SprintRatingChange {
   const ratingBefore = input.rating.rating;
   const ratingDeviationBefore = input.rating.ratingDeviation ?? DEFAULT_RATING_DEVIATION;
   const volatilityBefore = input.rating.volatility ?? DEFAULT_VOLATILITY;
   const floor = input.floor ?? RATING_FLOOR;
+  const opponentRating = input.opponentRating ?? ratingBefore;
+  const opponentRatingDeviation =
+    input.opponentRatingDeviation ?? DEFAULT_OPPONENT_RATING_DEVIATION;
 
   const mu = (ratingBefore - DEFAULT_RATING) / GLICKO_SCALE;
   const phi = ratingDeviationBefore / GLICKO_SCALE;
   const sigma = volatilityBefore;
 
-  // Match the server: a sprint is one game against a system opponent at the
-  // user's current rating with a stable, low opponent RD.
-  const opponentMu = (ratingBefore - DEFAULT_RATING) / GLICKO_SCALE;
-  const opponentPhi = DEFAULT_OPPONENT_RATING_DEVIATION / GLICKO_SCALE;
+  const opponentMu = (opponentRating - DEFAULT_RATING) / GLICKO_SCALE;
+  const opponentPhi = opponentRatingDeviation / GLICKO_SCALE;
   const g = 1 / Math.sqrt(1 + (3 * opponentPhi * opponentPhi) / (Math.PI * Math.PI));
   const expected = 1 / (1 + Math.exp(-g * (mu - opponentMu)));
-  const score = input.won ? 1 : 0;
+  const score = input.score;
   const variance = 1 / (g * g * expected * (1 - expected));
   const delta = variance * g * (score - expected);
 
@@ -150,6 +153,20 @@ export function calculateSprintRatingChange(input: {
     volatilityBefore,
     volatilityAfter
   };
+}
+
+export function calculateSprintRatingChange(input: {
+  rating: SprintRatingInput;
+  won: boolean;
+  floor?: number | undefined;
+}): SprintRatingChange {
+  // Match the server: a sprint is one game against a system opponent at the
+  // user's current rating with a stable, low opponent RD.
+  return calculateGlicko2RatingChange({
+    rating: input.rating,
+    score: input.won ? 1 : 0,
+    floor: input.floor
+  });
 }
 
 export function applySprintRatingChange(record: RatingRecord, change: SprintRatingChange): RatingRecord {

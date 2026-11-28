@@ -123,6 +123,7 @@ export function topLevelTabIntent(tab: TopLevelTab): TopLevelTabIntent {
 export type TopLevelChromeInputs = {
   feedbackSnapshotVisible: boolean;
   gameReviewOpen?: boolean;
+  maiaPlayOpen?: boolean;
   openSession: boolean;
   personalBestGuideVisible: boolean;
   personalBestHubVisible: boolean;
@@ -136,6 +137,7 @@ export function isTopLevelChromeVisible(inputs: TopLevelChromeInputs): boolean {
   return !inputs.openSession
     && !inputs.feedbackSnapshotVisible
     && !inputs.gameReviewOpen
+    && !inputs.maiaPlayOpen
     && !inputs.sessionGuideVisible
     && !inputs.personalBestGuideVisible
     && !inputs.personalBestHubVisible

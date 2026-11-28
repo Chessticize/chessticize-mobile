@@ -9,6 +9,7 @@ export * from "./rating-history.ts";
 export * from "./review-today.ts";
 export * from "./query-types.ts";
 export * from "./game-review-store.ts";
+export * from "./maia-play-store.ts";
 export * from "./puzzle-source.ts";
 export * from "./composite-puzzle-source.ts";
 export * from "./pack-backed-practice-store.ts";

@@ -119,6 +119,7 @@ export interface GamesHubScreenProps {
   getNowMs?: () => number;
   onOpenGameReview: (gameId: string) => void;
   onPracticeMyGamePuzzles?: (options?: MyGamePuzzlesLaunchOptions) => void;
+  onPlayWithMaia?: () => void;
   hubView?: "games" | "puzzles";
   onHubViewChange?: (view: "games" | "puzzles") => void;
   importModalVisible?: boolean;
@@ -142,6 +143,7 @@ export function GamesHubScreen({
   getNowMs,
   onOpenGameReview,
   onPracticeMyGamePuzzles,
+  onPlayWithMaia,
   hubView: controlledHubView,
   onHubViewChange,
   importModalVisible,
@@ -330,6 +332,10 @@ export function GamesHubScreen({
         if (!byKey.has("pgn")) {
           byKey.set("pgn", { key: "pgn", label: "PGN" });
         }
+      } else if (game.platform === "maia") {
+        if (!byKey.has("maia")) {
+          byKey.set("maia", { key: "maia", label: "Maia" });
+        }
       } else if (game.username) {
         const key = `${game.platform}:${game.username.toLowerCase()}`;
         if (!byKey.has(key)) {
@@ -376,6 +382,9 @@ export function GamesHubScreen({
       }
       if (effectiveAccountFilter === "pgn") {
         return game.platform === "pgn";
+      }
+      if (effectiveAccountFilter === "maia") {
+        return game.platform === "maia";
       }
       const key = `${game.platform}:${(game.username ?? "").toLowerCase()}`;
       return key === effectiveAccountFilter;
@@ -1168,6 +1177,15 @@ export function GamesHubScreen({
                 variant="secondary"
                 onPress={() => openModal("pgn")}
               />
+              {onPlayWithMaia ? (
+                <Button
+                  label={t("maiaPlay.title")}
+                  stretch
+                  testID="games-empty-play-maia"
+                  variant="secondary"
+                  onPress={onPlayWithMaia}
+                />
+              ) : null}
             </View>
           </View>
         </Section>
