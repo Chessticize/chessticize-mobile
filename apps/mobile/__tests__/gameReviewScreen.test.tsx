@@ -1130,4 +1130,38 @@ describe("GameReviewScreen (#767)", () => {
     expect(onDeleteGame).toHaveBeenCalledWith(game.id);
     act(() => renderer.unmount());
   });
+
+  it("shows Recommended badge, criteria popover, and Add Recommended vs Add All in GameReviewSummaryCard", () => {
+    const { store, service, game } = setupAnalyzedStore();
+    const puzzles = store.listUserPuzzles({ gameId: game.id });
+    expect(puzzles.length).toBeGreaterThan(0);
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="light">
+          <PracticeViewportProvider value={{ width: 390, height: 844, fontScale: 1 }}>
+            <GameReviewScreen
+              BoardComponent={MockReviewBoard}
+              game={game}
+              practiceService={service}
+              store={store}
+            />
+          </PracticeViewportProvider>
+        </ThemeProvider>
+      );
+    });
+
+    expect(findByTestId(renderer, "game-review-add-recommended-review")).toBeTruthy();
+    expect(queryByTestId(renderer, "game-review-recommended-criteria")).toBeNull();
+    act(() => {
+      findByTestId(renderer, "game-review-recommended-info").props.onPress();
+    });
+    expect(findByTestId(renderer, "game-review-recommended-criteria")).toBeTruthy();
+    act(() => {
+      findByTestId(renderer, "game-review-add-recommended-review").props.onPress();
+    });
+    expect(service.listReviewQueue().length).toBeGreaterThan(0);
+    act(() => renderer.unmount());
+  });
 });

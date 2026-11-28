@@ -11,6 +11,8 @@ import {
   type PuzzleExtractionEngine
 } from "../../../../../packages/core/src/index.ts";
 import { createNativeHumanPolicyModel } from "../../platform/nativeHumanPolicy.ts";
+import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
+import { autoEnrollRecommendedPuzzlesForGame } from "./autoEnrollRecommended.ts";
 import {
   gamePlyEvaluationFromStored,
   inferUserGameMetaFromStoredGame,
@@ -49,6 +51,7 @@ export const INITIAL_GAMES_BATCH_STATE: GamesBatchAnalysisState = {
 
 export interface UseGamesBatchAnalysisOptions {
   store: GameReviewStore;
+  practiceService?: PracticeService;
   getEngine: () => (GameReviewEngine & PuzzleExtractionEngine) | null;
   humanPolicy?: ManagedHumanPolicyModel | null;
   onGameUpdated?: () => void;
@@ -80,6 +83,7 @@ type PauseReason = "none" | "user" | "background" | "cancel";
 
 export function useGamesBatchAnalysis({
   store,
+  practiceService,
   getEngine,
   humanPolicy,
   onGameUpdated,
@@ -286,6 +290,7 @@ export function useGamesBatchAnalysis({
           result.puzzles,
           inferUserGameMetaFromStoredGame(latestGame, {})
         );
+        autoEnrollRecommendedPuzzlesForGame(practiceService, latestGame.id);
 
         completedGamesRef.current += 1;
         generatedPuzzlesRef.current += storedPuzzles.length;
@@ -367,7 +372,7 @@ export function useGamesBatchAnalysis({
       errorMessage: null,
       pausedByBackground: false
     });
-  }, [persistPartialCheckpoint, resolveHumanPolicy, store]);
+  }, [persistPartialCheckpoint, practiceService, resolveHumanPolicy, store]);
 
   const requestPause = useCallback((reason: "user" | "background"): void => {
     if (!runningRef.current) {

@@ -595,12 +595,90 @@ function runStoreContractSuite(
         assert.equal(store.countUserPuzzles({ gameId: g1.id, includeArchived: false }), 1);
       }
 
-      // Deleting the game cascades game_ply_evals & user_puzzles cleanly without breaking existing attempts:
+      // Deleting the game cascades game_ply_evals & user_puzzles cleanly:
       store.deleteImportedGame(g1.id);
       assert.equal(store.getImportedGame(g1.id), undefined);
       assert.deepEqual(store.listGamePlyEvaluations(g1.id), []);
       assert.deepEqual(store.listUserPuzzles({ gameId: g1.id, includeArchived: true }), []);
       assert.equal(store.countAttempts({ puzzleId: lineStored.id }), 1);
+    } finally {
+      await ctx.cleanup();
+    }
+  });
+
+  test(`${label}: deleteImportedGame cascades active user_puzzle attempts and review queue, and persists autoAddRecommendedToReview`, async () => {
+    const ctx = await createStore();
+    try {
+      let store = ctx.store;
+      assert.equal(store.getSettings().gameReview?.autoAddRecommendedToReview, false);
+      store.saveSettings({
+        ...store.getSettings(),
+        gameReview: { autoAddRecommendedToReview: true }
+      });
+      if (ctx.reopen) {
+        store = await ctx.reopen();
+      }
+      assert.equal(store.getSettings().gameReview?.autoAddRecommendedToReview, true);
+
+      const g1 = makeImportedGame({ id: "chess_com:live:cascade1" });
+      const g2 = makeImportedGame({ id: "chess_com:live:cascade2" });
+      store.upsertImportedGames([g1, g2], "2026-10-02T00:00:00.000Z");
+      const [p1] = store.replaceGameUserPuzzles(
+        g1.id,
+        [makeExtractedLinePuzzle(g1.id)],
+        { nowIso: "2026-10-02T00:01:00.000Z" }
+      );
+      const [p2] = store.replaceGameUserPuzzles(
+        g2.id,
+        [
+          makeExtractedLinePuzzle(g2.id, {
+            idSeed: `${g2.id}:4:line:opponent_mistake_missed:pos2`,
+            initialFen: LINE_PUZZLE_2_INITIAL_FEN,
+            solutionMoves: [...LINE_PUZZLE_2_MOVES]
+          })
+        ],
+        { nowIso: "2026-10-02T00:02:00.000Z" }
+      );
+      const service = new PracticeService(store);
+      service.enrollReview({
+        puzzleId: p1!.id,
+        mode: "standard",
+        ratingKey: "ug_my_game_puzzles:standard"
+      });
+      service.recordReviewAttempt(
+        {
+          puzzleId: p1!.id,
+          mode: "standard",
+          ratingKey: "ug_my_game_puzzles:standard",
+          result: "wrong",
+          submittedMove: "e2e3",
+          expectedMove: "d8h4"
+        },
+        "2026-10-02T00:03:00.000Z"
+      );
+      service.recordReviewAttempt(
+        {
+          puzzleId: p2!.id,
+          mode: "standard",
+          ratingKey: "ug_my_game_puzzles:standard",
+          result: "correct",
+          submittedMove: "c6d4",
+          expectedMove: "c6d4"
+        },
+        "2026-10-02T00:04:00.000Z"
+      );
+
+      store.deleteImportedGame(g1.id);
+      assert.equal(store.getImportedGame(g1.id), undefined);
+      assert.equal(store.countAttempts({ puzzleId: p1!.id }), 0);
+      assert.deepEqual(
+        store.listReviewQueue().map((item) => item.puzzleId),
+        [p2!.id]
+      );
+      assert.equal(store.getPuzzle(p1!.id), undefined);
+      // g2's puzzle & attempt remain intact
+      assert.equal(store.getImportedGame(g2.id)?.id, g2.id);
+      assert.equal(store.countAttempts({ puzzleId: p2!.id }), 1);
     } finally {
       await ctx.cleanup();
     }

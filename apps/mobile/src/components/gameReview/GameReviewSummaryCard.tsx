@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import {
   curatedPuzzleThemes,
-  isWithinReviewDifficultyBand
+  isWithinReviewDifficultyBand,
+  selectRecommendedGamePuzzleIds
 } from "../../../../../packages/core/src/index.ts";
 import type { StoredUserPuzzle } from "../../../../../packages/storage/src/game-review-store.ts";
 import { makeStyles } from "../../theme/index.ts";
@@ -19,6 +20,7 @@ export interface GameReviewSummaryCardProps {
   enrolledPuzzleIds: ReadonlySet<string>;
   onSelectPuzzle?: (puzzle: StoredUserPuzzle) => void;
   onToggleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
+  onEnrollRecommendedPuzzles?: () => void;
   onEnrollAllPuzzles?: () => void;
   onPracticeGamePuzzles?: () => void;
   testID?: string;
@@ -32,13 +34,29 @@ export function GameReviewSummaryCard({
   enrolledPuzzleIds,
   onSelectPuzzle,
   onToggleReviewEnrollment,
+  onEnrollRecommendedPuzzles,
   onEnrollAllPuzzles,
   onPracticeGamePuzzles,
   testID = "game-review-summary-card"
 }: GameReviewSummaryCardProps): React.JSX.Element {
   const styles = useStyles();
   const { locale, t } = useTranslation();
+  const [recommendedInfoOpen, setRecommendedInfoOpen] = useState(false);
   const { puzzles } = summary;
+  const recommendedPuzzleIds = useMemo(
+    () =>
+      selectRecommendedGamePuzzleIds(puzzles, {
+        getUserRating: () => userRating
+      }),
+    [puzzles, userRating]
+  );
+  const recommendedPuzzles = useMemo(
+    () => puzzles.filter((puzzle) => recommendedPuzzleIds.has(puzzle.id)),
+    [puzzles, recommendedPuzzleIds]
+  );
+  const allRecommendedInReview =
+    recommendedPuzzles.length > 0 &&
+    recommendedPuzzles.every((puzzle) => enrolledPuzzleIds.has(puzzle.id));
   const allPuzzlesInReview =
     puzzles.length > 0 && puzzles.every((puzzle) => enrolledPuzzleIds.has(puzzle.id));
   const whiteLabel = t("common.white");
@@ -107,21 +125,73 @@ export function GameReviewSummaryCard({
           <AppText style={styles.puzzlesTitleText} variant="subheadline">
             {t("gameReview.summary.puzzlesCount", { count: puzzles.length })}
           </AppText>
-          {puzzles.length > 1 && onEnrollAllPuzzles ? (
-            <Button
-              disabled={allPuzzlesInReview}
-              label={
-                allPuzzlesInReview
-                  ? t("games.puzzles.allInReview")
-                  : t("games.puzzles.addAllToReview")
-              }
-              onPress={onEnrollAllPuzzles}
-              size="compact"
-              testID="game-review-add-all-review"
-              variant={allPuzzlesInReview ? "plain" : "secondary"}
-            />
+          {puzzles.length > 0 && (onEnrollRecommendedPuzzles || onEnrollAllPuzzles) ? (
+            <View style={styles.puzzlesHeaderActions}>
+              {recommendedPuzzles.length > 0 && onEnrollRecommendedPuzzles ? (
+                <View style={styles.recommendedActionGroup}>
+                  <Button
+                    disabled={allRecommendedInReview}
+                    label={
+                      allRecommendedInReview
+                        ? t("games.puzzles.recommendedInReview")
+                        : t("games.puzzles.addRecommendedToReview", {
+                            count: recommendedPuzzles.length
+                          })
+                    }
+                    onPress={onEnrollRecommendedPuzzles}
+                    size="compact"
+                    testID="game-review-add-recommended-review"
+                    variant={allRecommendedInReview ? "plain" : "secondary"}
+                  />
+                  <Pressable
+                    accessibilityLabel={t("games.puzzles.recommendedInfoA11y")}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: recommendedInfoOpen }}
+                    onPress={() => setRecommendedInfoOpen((current) => !current)}
+                    style={({ pressed }) => [
+                      styles.infoButton,
+                      recommendedInfoOpen ? styles.infoButtonActive : null,
+                      pressed ? styles.pressed : null
+                    ]}
+                    testID="game-review-recommended-info"
+                  >
+                    <AppText
+                      style={
+                        recommendedInfoOpen ? styles.infoButtonTextActive : styles.infoButtonText
+                      }
+                      variant="caption"
+                    >
+                      ?
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
+              {puzzles.length > 1 && onEnrollAllPuzzles ? (
+                <Button
+                  disabled={allPuzzlesInReview}
+                  label={
+                    allPuzzlesInReview
+                      ? t("games.puzzles.allInReview")
+                      : t("games.puzzles.addAllToReview")
+                  }
+                  onPress={onEnrollAllPuzzles}
+                  size="compact"
+                  testID="game-review-add-all-review"
+                  variant={allPuzzlesInReview ? "plain" : "secondary"}
+                />
+              ) : null}
+            </View>
           ) : null}
         </View>
+
+        {recommendedInfoOpen ? (
+          <View style={styles.criteriaCard} testID="game-review-recommended-criteria">
+            <AppText variant="footnote">{t("games.puzzles.recommendedCriteriaTitle")}</AppText>
+            <AppText tone="secondary" variant="caption">
+              {t("games.puzzles.recommendedCriteriaBody")}
+            </AppText>
+          </View>
+        ) : null}
 
         {puzzles.length === 0 ? (
           <AppText tone="secondary" variant="footnote">
@@ -140,6 +210,7 @@ export function GameReviewSummaryCard({
                 puzzle.ratingSource !== undefined && puzzle.ratingSource !== "game_anchor";
               const overReviewBand =
                 hasEstimatedRating && !isWithinReviewDifficultyBand(puzzle.rating, userRating);
+              const isRecommended = recommendedPuzzleIds.has(puzzle.id);
 
               return (
                 <View
@@ -156,6 +227,13 @@ export function GameReviewSummaryCard({
                   >
                     <View style={styles.puzzleBadges}>
                       <Badge label={kindLabel} tone="accent" />
+                      {isRecommended ? (
+                        <Badge
+                          label={t("games.puzzles.recommendedBadge")}
+                          testID={`summary-puzzle-recommended-${puzzle.id}`}
+                          tone="positive"
+                        />
+                      ) : null}
                       {hasEstimatedRating ? (
                         <Badge
                           label={`~${puzzle.rating}`}
@@ -327,6 +405,51 @@ const useStyles = makeStyles((theme) => ({
   },
   puzzlesTitleText: {
     flexShrink: 1
+  },
+  puzzlesHeaderActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  recommendedActionGroup: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  infoButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: "center",
+    width: 28
+  },
+  infoButtonActive: {
+    backgroundColor: theme.colors.accent.fill,
+    borderColor: theme.colors.accent.fill
+  },
+  infoButtonText: {
+    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeight.bold
+  },
+  infoButtonTextActive: {
+    color: theme.colors.text.onAccent,
+    fontWeight: theme.fontWeight.bold
+  },
+  pressed: {
+    opacity: 0.72
+  },
+  criteriaCard: {
+    backgroundColor: theme.colors.surfaceSunken,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8
   },
   puzzlesList: {
     gap: 8

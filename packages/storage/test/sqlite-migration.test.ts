@@ -345,6 +345,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
         language: "system",
         sync: { iCloudEnabled: true },
         arrowDuel: { opponentReplyEnabled: true },
+        gameReview: { autoAddRecommendedToReview: false },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
         sprintGuides: {
@@ -604,6 +605,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
         language: "system",
         sync: { iCloudEnabled: false },
         arrowDuel: { opponentReplyEnabled: true },
+        gameReview: { autoAddRecommendedToReview: false },
         notifications: {
           reviewReminder: { mode: "fixed", fixedLocalTime: "07:35" }
         },

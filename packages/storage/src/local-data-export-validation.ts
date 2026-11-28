@@ -109,6 +109,7 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     typeof sync.iCloudEnabled !== "boolean" ||
     !isRecord(arrowDuel) ||
     typeof arrowDuel.opponentReplyEnabled !== "boolean" ||
+    !isOptional(value.gameReview, isGameReviewSettings) ||
     !isRecord(notifications) ||
     !isReviewReminder(notifications.reviewReminder) ||
     !isRecord(moveFeedback) ||
@@ -131,6 +132,10 @@ function isReleaseVersionText(value: unknown): boolean {
 
 function isAppearancePreference(value: unknown): boolean {
   return value === "system" || value === "light" || value === "dark";
+}
+
+function isGameReviewSettings(value: unknown): boolean {
+  return isRecord(value) && typeof value.autoAddRecommendedToReview === "boolean";
 }
 
 function isLanguagePreference(value: unknown): boolean {

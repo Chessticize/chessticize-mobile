@@ -1139,9 +1139,35 @@ export class MemoryStore implements PracticeStore {
   deleteImportedGame(gameId: string): void {
     this.importedGames.delete(gameId);
     this.gamePlyEvals.delete(gameId);
+    const deletedPuzzleIds = new Set<string>();
     for (const [puzzleId, puzzle] of this.userPuzzles) {
       if (puzzle.gameId === gameId) {
         this.userPuzzles.delete(puzzleId);
+        deletedPuzzleIds.add(puzzleId);
+      }
+    }
+    if (deletedPuzzleIds.size > 0) {
+      let removedAttempts = false;
+      for (let index = this.attempts.length - 1; index >= 0; index -= 1) {
+        if (deletedPuzzleIds.has(this.attempts[index]!.puzzleId)) {
+          this.attempts.splice(index, 1);
+          removedAttempts = true;
+        }
+      }
+      if (removedAttempts) {
+        this.tacticalProfileSourceRevision += 1;
+      }
+      for (const [key, item] of this.reviewQueue) {
+        if (deletedPuzzleIds.has(item.puzzleId)) {
+          this.reviewQueue.delete(key);
+        }
+      }
+      for (const [key, removal] of this.reviewRemovals) {
+        if (deletedPuzzleIds.has(removal.puzzleId)) {
+          this.reviewRemovals.delete(key);
+        }
+      }
+      for (const puzzleId of deletedPuzzleIds) {
         if (!this.isPuzzleReferencedByHistoryOrReview(puzzleId)) {
           this.puzzles.delete(puzzleId);
         }

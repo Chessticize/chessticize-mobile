@@ -35,6 +35,9 @@ export function defaultPracticeSettings(): PracticeSettings {
     arrowDuel: {
       opponentReplyEnabled: true
     },
+    gameReview: {
+      autoAddRecommendedToReview: false
+    },
     notifications: {
       reviewReminder: {
         mode: "smart"
@@ -61,6 +64,9 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
     },
     arrowDuel: {
       opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
+    },
+    gameReview: {
+      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false)
     },
     notifications: {
       reviewReminder: settings.notifications.reviewReminder
@@ -94,6 +100,9 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
     },
     arrowDuel: {
       opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
+    },
+    gameReview: {
+      autoAddRecommendedToReview: Boolean(settings.gameReview?.autoAddRecommendedToReview ?? false)
     },
     notifications: {
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)

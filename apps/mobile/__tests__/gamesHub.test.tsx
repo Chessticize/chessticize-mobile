@@ -273,6 +273,13 @@ describe("GamesHubScreen", () => {
     changeText(renderer, "games-import-username-input", "alice");
     await pressAsync(renderer, "games-import-link-submit");
 
+    // Modal stays open after Link & Sync so users can add multiple accounts, and clears the username input.
+    expect(hasTestID(renderer, "games-import-modal")).toBe(true);
+    expect(findByTestID(renderer, "games-import-username-input").props.value).toBe("");
+    expect(hasTestID(renderer, "games-import-status")).toBe(true);
+    press(renderer, "games-import-close");
+    expect(hasTestID(renderer, "games-import-modal")).toBe(false);
+
     expect(requests.length).toBe(2);
     expect(hasTestID(renderer, "games-empty-state")).toBe(false);
     expect(hasTestID(renderer, "games-list")).toBe(true);
@@ -1112,11 +1119,14 @@ describe("GamesHubScreen", () => {
     );
 
     press(renderer, "games-hub-view-puzzles");
-    // Add All to Review enrolls the ~1380 puzzle and skips the ~1950 (> 1400 + 300) puzzle.
-    press(renderer, "games-puzzles-add-all-review");
+    // Add Recommended enrolls the ~1380 puzzle and skips the ~1950 (> 1400 + 300) puzzle.
+    press(renderer, "games-puzzles-add-recommended-review");
     const enrolled = service.listReviewQueue();
     expect(enrolled.length).toBe(1);
     expect(enrolled[0]?.puzzleId).toBe(stored[0]?.id);
+    // Add All enrolls both puzzles when the user explicitly opts in to all visible puzzles.
+    press(renderer, "games-puzzles-add-all-review");
+    expect(service.listReviewQueue().length).toBe(2);
 
     // Difficulty filter pills toggle between At my level and Stretch puzzles cleanly.
     press(renderer, "games-filter-toggle");
@@ -1301,5 +1311,150 @@ describe("GamesHubScreen", () => {
     // Alice's retained data remains untouched.
     expect(service.getImportedGame("g-alice-1")).toBeDefined();
     expect(service.listUserPuzzles({ gameId: "g-alice-1" })).toHaveLength(1);
+  });
+
+  it("shows Recommended badge, criteria popover, Add Recommended vs Add All, and Apple-style bulk game selection/deletion with history cleanup", () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    service.upsertImportedGames([
+      makeDraft({
+        id: "g-blitz-1",
+        timeClass: "blitz",
+        white: { username: "alice", rating: 1400, isAi: false },
+        black: { username: "Foe1", rating: 1400, isAi: false }
+      }),
+      makeDraft({
+        id: "g-rapid-1",
+        timeClass: "rapid",
+        white: { username: "alice", rating: 1400, isAi: false },
+        black: { username: "Foe2", rating: 1400, isAi: false }
+      })
+    ]);
+    const blitzPuzzles = service.replaceGameUserPuzzles(
+      "g-blitz-1",
+      [
+        {
+          idSeed: "rec-top1",
+          ply: 10,
+          moveNumber: 5,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 95,
+          clockRemainingSec: 120,
+          timeSpentSec: 12,
+          estimatedRating: 1450,
+          ratingSource: "maia2_sf_v1"
+        },
+        {
+          idSeed: "time-trouble",
+          ply: 14,
+          moveNumber: 7,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["pin"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 99,
+          clockRemainingSec: 8,
+          timeSpentSec: 4,
+          estimatedRating: 1400,
+          ratingSource: "maia2_sf_v1"
+        },
+        {
+          idSeed: "stretch-hard",
+          ply: 18,
+          moveNumber: 9,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["skewer"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 90,
+          clockRemainingSec: 100,
+          timeSpentSec: 15,
+          estimatedRating: 1900,
+          ratingSource: "maia2_sf_v1"
+        }
+      ],
+      { opponentName: "Foe1", timeClass: "blitz" }
+    );
+    // Record a practice attempt for a blitz puzzle to verify bulk game delete cleans up history too.
+    service.recordReviewAttempt(
+      {
+        puzzleId: blitzPuzzles[0]!.id,
+        mode: "standard",
+        ratingKey: "ug_my_game_puzzles:standard",
+        result: "wrong",
+        submittedMove: "a2a3",
+        expectedMove: "f3d4"
+      },
+      NOW_ISO
+    );
+
+    const renderer = render(
+      <GamesHubScreen
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+
+    // Switch to Puzzles view: only rec-top1 has Recommended badge; ? toggles criteria explanation.
+    press(renderer, "games-hub-view-puzzles");
+    expect(hasTestID(renderer, `games-puzzle-recommended-${blitzPuzzles[0]!.id}`)).toBe(true);
+    expect(hasTestID(renderer, `games-puzzle-recommended-${blitzPuzzles[1]!.id}`)).toBe(false);
+    expect(hasTestID(renderer, `games-puzzle-recommended-${blitzPuzzles[2]!.id}`)).toBe(false);
+
+    expect(hasTestID(renderer, "games-puzzles-recommended-criteria")).toBe(false);
+    press(renderer, "games-puzzles-recommended-info");
+    expect(hasTestID(renderer, "games-puzzles-recommended-criteria")).toBe(true);
+
+    // Add Recommended enrolls only the 1 recommended puzzle; Add All enrolls all 3.
+    press(renderer, "games-puzzles-add-recommended-review");
+    expect(service.listReviewQueue()).toHaveLength(1);
+    press(renderer, "games-puzzles-add-all-review");
+    expect(service.listReviewQueue()).toHaveLength(3);
+
+    // Switch back to Games view, filter to Blitz, enter Select mode, select all filtered, confirm delete.
+    press(renderer, "games-hub-view-games");
+    press(renderer, "games-filter-toggle");
+    press(renderer, "games-filter-time-blitz");
+    press(renderer, "games-select-toggle");
+    expect(hasTestID(renderer, "games-selection-bar")).toBe(true);
+    press(renderer, "games-select-all-filtered");
+    press(renderer, "games-delete-selected");
+    expect(hasTestID(renderer, "games-bulk-delete-confirm")).toBe(true);
+    press(renderer, "games-bulk-delete-confirm-submit");
+
+    // Blitz game, its puzzles, its review entries, and its attempt history are all deleted; Rapid game survives.
+    expect(service.getImportedGame("g-blitz-1")).toBeUndefined();
+    expect(service.getImportedGame("g-rapid-1")).toBeDefined();
+    expect(service.listUserPuzzles({ gameId: "g-blitz-1" })).toHaveLength(0);
+    expect(service.listReviewQueue()).toHaveLength(0);
+    expect(store.countAttempts({ puzzleId: blitzPuzzles[0]!.id })).toBe(0);
   });
 });

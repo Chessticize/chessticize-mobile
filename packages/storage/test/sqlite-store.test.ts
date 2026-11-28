@@ -215,6 +215,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
       pieceSet: "default",
       language: "system",
       arrowDuel: { opponentReplyEnabled: true },
+      gameReview: { autoAddRecommendedToReview: false },
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
       moveFeedback: { soundEnabled: false, hapticsEnabled: true },
@@ -282,6 +283,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
       sync_icloud_enabled: 1,
       sync_upload_allowed: 0,
       arrow_duel_opponent_reply_enabled: 0,
+      game_review_auto_add_recommended: 0,
       review_reminder_mode: "off",
       review_reminder_fixed_local_time: null,
       move_feedback_sound_enabled: 0,
@@ -892,6 +894,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           arrowDuel: {
             opponentReplyEnabled: true
           },
+          gameReview: {
+            autoAddRecommendedToReview: false
+          },
           sync: {
             iCloudEnabled: true
           },
@@ -966,6 +971,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           language: "system",
           arrowDuel: {
             opponentReplyEnabled: false
+          },
+          gameReview: {
+            autoAddRecommendedToReview: false
           },
           sync: {
             iCloudEnabled: true

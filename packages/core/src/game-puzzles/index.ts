@@ -134,6 +134,17 @@ export type {
 export { MAIA2_MOVE_TO_INDEX, MAIA2_MOVE_VOCAB } from "./maia2-vocab.ts";
 
 export {
+  DEFAULT_MAX_RECOMMENDED_PUZZLES_PER_GAME,
+  isEligibleForRecommendedGamePuzzleReview,
+  selectRecommendedGamePuzzleIds
+} from "./recommended-review.ts";
+export type {
+  RecommendedGamePuzzleCandidate,
+  RecommendedGamePuzzleEligibilityOptions,
+  SelectRecommendedGamePuzzlesOptions
+} from "./recommended-review.ts";
+
+export {
   ALREADY_WINNING_CP,
   CHECK_FOUND_LINE_DEPTH,
   CHECK_FOUND_LINE_MAX_WIN_CHANCE_DROP,

@@ -4,8 +4,8 @@ import {
   evaluateGamePass1,
   extractGamePuzzles,
   gameReviewReportToPlyEvalInputs,
-  isWithinReviewDifficultyBand,
   parsePgnGame,
+  selectRecommendedGamePuzzleIds,
   submitArrowDuelChoice,
   submitLineMove,
   type EngineAnalysisLine,
@@ -14,6 +14,7 @@ import {
   type ParsedGame
 } from "../../../../../packages/core/src/index.ts";
 import { createNativeHumanPolicyModel } from "../../platform/nativeHumanPolicy.ts";
+import { autoEnrollRecommendedPuzzlesForGame } from "../games/autoEnrollRecommended.ts";
 import {
   gamePlyEvaluationFromStored,
   storedGamePlyEvalFromEvaluation,
@@ -385,6 +386,7 @@ export function useGameReviewController({
           ...(game.playedAt ? { playedAt: game.playedAt } : {}),
           ...(game.timeClass ? { timeClass: game.timeClass } : {})
         });
+        autoEnrollRecommendedPuzzlesForGame(practiceService, game.id);
         persistCheckpoint(report.plies, "complete", {
           whiteAccuracy: report.whiteAccuracy,
           blackAccuracy: report.blackAccuracy
@@ -1161,21 +1163,44 @@ export function useGameReviewController({
     [practiceService]
   );
 
-  const enrollAllPuzzlesInReview = useCallback(() => {
+  const enrollRecommendedPuzzlesInReview = useCallback(() => {
     if (userPuzzles.length === 0) {
       return;
     }
     const userRating =
       game.userColor === "w" ? game.white.rating : game.black.rating;
+    const recommendedIds = selectRecommendedGamePuzzleIds(userPuzzles, {
+      getUserRating: () => userRating
+    });
     const enrolledIds = new Set<string>();
     for (const puzzle of userPuzzles) {
-      if (
-        puzzle.ratingSource !== undefined &&
-        puzzle.ratingSource !== "game_anchor" &&
-        !isWithinReviewDifficultyBand(puzzle.rating, userRating)
-      ) {
+      if (!recommendedIds.has(puzzle.id)) {
         continue;
       }
+      const ctx = reviewContextForUserPuzzle(puzzle);
+      if (!practiceService.getReviewQueueState(ctx)) {
+        practiceService.enrollReview(ctx);
+      }
+      enrolledIds.add(puzzle.id);
+    }
+    if (enrolledIds.size === 0) {
+      return;
+    }
+    setEnrolledPuzzleIds((previous) => {
+      const next = new Set(previous);
+      for (const id of enrolledIds) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [game.black.rating, game.userColor, game.white.rating, practiceService, userPuzzles]);
+
+  const enrollAllPuzzlesInReview = useCallback(() => {
+    if (userPuzzles.length === 0) {
+      return;
+    }
+    const enrolledIds = new Set<string>();
+    for (const puzzle of userPuzzles) {
       const ctx = reviewContextForUserPuzzle(puzzle);
       if (!practiceService.getReviewQueueState(ctx)) {
         practiceService.enrollReview(ctx);
@@ -1189,7 +1214,7 @@ export function useGameReviewController({
       }
       return next;
     });
-  }, [game.black.rating, game.userColor, game.white.rating, practiceService, userPuzzles]);
+  }, [practiceService, userPuzzles]);
 
   const toggleFreeAnalysis = useCallback(() => {
     setFreeAnalysisOpen((value) => !value);
@@ -1481,6 +1506,7 @@ export function useGameReviewController({
     stepRefutationForward,
     stepRefutationBackward,
     togglePuzzleReviewEnrollment,
+    enrollRecommendedPuzzlesInReview,
     enrollAllPuzzlesInReview,
     toggleFreeAnalysis,
     toggleShowEngineArrows,

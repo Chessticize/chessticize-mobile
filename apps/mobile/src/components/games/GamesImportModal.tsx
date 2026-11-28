@@ -42,7 +42,7 @@ export interface GamesImportModalProps {
     platform: LinkedGameAccountPlatform;
     username: string;
     maxGames: number;
-  }) => Promise<void>;
+  }) => Promise<boolean | void>;
   onImportOlderForAccount?: (account: LinkedGameAccount) => Promise<void>;
   onRemoveAccount: (
     platform: LinkedGameAccountPlatform,
@@ -72,7 +72,7 @@ export function GamesImportModal({
   const styles = useStyles();
   const theme = useTheme();
   const { locale, t } = useTranslation();
-  const { height, width } = usePracticeViewport();
+  const { width } = usePracticeViewport();
 
   const [activeTab, setActiveTab] = useState<GamesImportTab>(initialTab);
   const [username, setUsername] = useState("");
@@ -116,22 +116,24 @@ export function GamesImportModal({
     { label: t("common.black"), testID: "games-import-color-black", value: "b" }
   ];
 
-  const centered = width >= 600;
-  const maxHeight = Math.max(300, height - 64);
+  const wide = width >= 600;
 
   const handleSelectTab = (next: GamesImportTab): void => {
     setActiveTab(next);
     onClearFeedback?.();
   };
 
-  const handleSubmitAccount = (): void => {
+  const handleSubmitAccount = async (): Promise<void> => {
     const trimmed = username.trim();
     if (!trimmed || busy) {
       return;
     }
     const platform: LinkedGameAccountPlatform =
       activeTab === "lichess" ? "lichess" : "chess_com";
-    void onLinkAndSync({ platform, username: trimmed, maxGames });
+    const succeeded = await onLinkAndSync({ platform, username: trimmed, maxGames });
+    if (succeeded !== false) {
+      setUsername("");
+    }
   };
 
   const handleSubmitPgn = (): void => {
@@ -144,20 +146,16 @@ export function GamesImportModal({
 
   return (
     <AppModal
-      animationType="fade"
-      transparent
+      animationType="slide"
+      presentationStyle="fullScreen"
+      transparent={false}
       visible
       onRequestClose={onClose}
     >
-      <SafeAreaModalBackdrop
-        style={[
-          styles.backdrop,
-          { justifyContent: centered ? "center" : "flex-end" }
-        ]}
-      >
+      <SafeAreaModalBackdrop style={styles.backdrop}>
         <View
           accessibilityViewIsModal
-          style={[styles.sheet, { maxHeight }]}
+          style={[styles.sheet, wide ? styles.sheetWide : null]}
           testID="games-import-modal"
         >
           <View style={styles.header}>
@@ -246,7 +244,9 @@ export function GamesImportModal({
                   label={busy ? t("games.action.syncing") : t("games.modal.linkAndSync")}
                   stretch
                   testID="games-import-link-submit"
-                  onPress={handleSubmitAccount}
+                  onPress={() => {
+                    void handleSubmitAccount();
+                  }}
                 />
 
                 {linkedAccounts.length > 0 ? (
@@ -409,16 +409,16 @@ export function GamesImportModal({
 const useStyles = makeStyles((theme) => ({
   backdrop: {
     alignItems: "center",
-    backgroundColor: theme.colors.scrimSoft,
-    flex: 1,
-    padding: 12
+    backgroundColor: theme.colors.surfaceFloating,
+    flex: 1
   },
   sheet: {
     backgroundColor: theme.colors.surfaceFloating,
-    borderRadius: theme.shape.sheet,
-    maxWidth: 540,
-    overflow: "hidden",
+    flex: 1,
     width: "100%"
+  },
+  sheetWide: {
+    maxWidth: 640
   },
   header: {
     alignItems: "center",
@@ -430,12 +430,12 @@ const useStyles = makeStyles((theme) => ({
     paddingVertical: 12
   },
   scroll: {
-    flexGrow: 0,
-    flexShrink: 1
+    flex: 1
   },
   body: {
     gap: 16,
-    padding: 16
+    padding: 16,
+    paddingBottom: 32
   },
   formSection: {
     gap: 14

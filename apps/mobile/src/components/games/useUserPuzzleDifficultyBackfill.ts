@@ -9,10 +9,13 @@ import type {
   GameReviewStore,
   StoredUserPuzzle
 } from "../../../../../packages/storage/src/game-review-store.ts";
+import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import { createNativeHumanPolicyModel } from "../../platform/nativeHumanPolicy.ts";
+import { autoEnrollRecommendedPuzzlesForGame } from "./autoEnrollRecommended.ts";
 
 export interface UseUserPuzzleDifficultyBackfillOptions {
   store: GameReviewStore;
+  practiceService?: PracticeService;
   puzzles: readonly StoredUserPuzzle[];
   getEngine: () => PuzzleExtractionEngine | null;
   paused?: boolean;
@@ -44,6 +47,7 @@ export function needsDifficultyBackfill(
  */
 export function useUserPuzzleDifficultyBackfill({
   store,
+  practiceService,
   puzzles,
   getEngine,
   paused = false,
@@ -52,6 +56,8 @@ export function useUserPuzzleDifficultyBackfill({
 }: UseUserPuzzleDifficultyBackfillOptions): void {
   const attemptedIdsRef = useRef<Set<string>>(new Set());
   const runningRef = useRef(false);
+  const practiceServiceRef = useRef(practiceService);
+  practiceServiceRef.current = practiceService;
   const onPuzzleRatedRef = useRef(onPuzzleRated);
   onPuzzleRatedRef.current = onPuzzleRated;
   const getEngineRef = useRef(getEngine);
@@ -132,6 +138,7 @@ export function useUserPuzzleDifficultyBackfill({
               break;
             }
             store.updateUserPuzzleRating(puzzle.id, estimate.rating, estimate.ratingSource);
+            autoEnrollRecommendedPuzzlesForGame(practiceServiceRef.current, puzzle.gameId);
             onPuzzleRatedRef.current?.();
           } catch (error) {
             const isAbort =

@@ -228,6 +228,7 @@ export interface GameReviewController {
   stepRefutationForward: () => void;
   stepRefutationBackward: () => void;
   togglePuzzleReviewEnrollment: (puzzle: StoredUserPuzzle) => void;
+  enrollRecommendedPuzzlesInReview: () => void;
   enrollAllPuzzlesInReview: () => void;
   toggleFreeAnalysis: () => void;
   toggleShowEngineArrows: () => void;

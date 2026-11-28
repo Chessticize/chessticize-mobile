@@ -7,6 +7,7 @@ import {
   importLichessGames,
   importPgnBatch,
   isWithinReviewDifficultyBand,
+  selectRecommendedGamePuzzleIds,
   UciEngineArbiter,
   type GameColor,
   type GameImportHttpClient,
@@ -89,6 +90,8 @@ export interface GamesHubScreenProps {
   nowMs?: number;
   onOpenGameReview: (gameId: string) => void;
   onPracticeMyGamePuzzles?: (options?: MyGamePuzzlesLaunchOptions) => void;
+  hubView?: "games" | "puzzles";
+  onHubViewChange?: (view: "games" | "puzzles") => void;
   importModalVisible?: boolean;
   onImportModalVisibleChange?: (visible: boolean) => void;
   initialImportTab?: GamesImportTab;
@@ -107,6 +110,8 @@ export function GamesHubScreen({
   nowMs = Date.now(),
   onOpenGameReview,
   onPracticeMyGamePuzzles,
+  hubView: controlledHubView,
+  onHubViewChange,
   importModalVisible,
   onImportModalVisibleChange,
   initialImportTab = "chess_com",
@@ -120,7 +125,18 @@ export function GamesHubScreen({
   const { locale, t } = useTranslation();
 
   const [revision, setRevision] = useState(0);
-  const [hubView, setHubView] = useState<"games" | "puzzles">("games");
+  const [internalHubView, setInternalHubView] = useState<"games" | "puzzles">("games");
+  const hubView = controlledHubView ?? internalHubView;
+  const setHubView = useCallback(
+    (next: "games" | "puzzles"): void => {
+      if (onHubViewChange) {
+        onHubViewChange(next);
+      } else {
+        setInternalHubView(next);
+      }
+    },
+    [onHubViewChange]
+  );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
@@ -140,6 +156,10 @@ export function GamesHubScreen({
   const [hubError, setHubError] = useState<string | null>(initialError);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalStatus, setModalStatus] = useState<string | null>(null);
+  const [recommendedInfoOpen, setRecommendedInfoOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedGameIds, setSelectedGameIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
   const modalOpen = importModalVisible ?? internalModalOpen;
   const setModalOpen = useCallback(
@@ -193,6 +213,7 @@ export function GamesHubScreen({
 
   const batch = useGamesBatchAnalysis({
     store: service.gameReviewStore,
+    practiceService: service,
     getEngine: resolveAnalysisEngine,
     onGameUpdated: refreshHub,
     ...(initialBatchState ? { initialState: initialBatchState } : {})
@@ -569,7 +590,7 @@ export function GamesHubScreen({
       platform: LinkedGameAccountPlatform;
       username: string;
       maxGames: number;
-    }): Promise<void> => {
+    }): Promise<boolean> => {
       setSyncing(true);
       setModalError(null);
       setModalStatus(null);
@@ -584,15 +605,16 @@ export function GamesHubScreen({
               })
             : t("games.import.summary", { count: result.inserted })
         );
-        setModalOpen(false);
+        return true;
       } catch (error) {
         const message = gameImportErrorMessage(error, locale);
         setModalError(message);
+        return false;
       } finally {
         setSyncing(false);
       }
     },
-    [locale, setModalOpen, syncAccount, t]
+    [locale, syncAccount, t]
   );
 
   const handleSyncAllLinked = useCallback(async (): Promise<void> => {
@@ -739,20 +761,7 @@ export function GamesHubScreen({
               game.platform === platform &&
               (game.username ?? "").trim().toLowerCase() === targetLower
           );
-        const reviewQueue = service.listReviewQueue();
         for (const game of matchingGames) {
-          const gamePuzzleIds = new Set(
-            service.listUserPuzzles({ gameId: game.id }).map((puzzle) => puzzle.id)
-          );
-          for (const entry of reviewQueue) {
-            if (gamePuzzleIds.has(entry.puzzleId)) {
-              service.removeReview({
-                puzzleId: entry.puzzleId,
-                mode: entry.mode,
-                ratingKey: entry.ratingKey
-              });
-            }
-          }
           service.deleteImportedGame(game.id);
         }
       }
@@ -816,13 +825,10 @@ export function GamesHubScreen({
     [refreshHub, service]
   );
 
-  const handleAddAllUserPuzzlesToReview = useCallback(
+  const handleAddUserPuzzlesToReview = useCallback(
     (puzzles: readonly StoredUserPuzzle[]): void => {
       let changed = false;
       for (const puzzle of puzzles) {
-        if (!isPuzzleWithinReviewBand(puzzle)) {
-          continue;
-        }
         const mode = puzzle.puzzleKind === "arrow_duel" ? "arrow_duel" : "standard";
         const ctx = {
           puzzleId: puzzle.id,
@@ -838,7 +844,7 @@ export function GamesHubScreen({
         refreshHub();
       }
     },
-    [isPuzzleWithinReviewBand, refreshHub, service]
+    [refreshHub, service]
   );
 
   const isEmpty = snapshot.allGames.length === 0;
@@ -846,6 +852,7 @@ export function GamesHubScreen({
 
   useUserPuzzleDifficultyBackfill({
     store: service.gameReviewStore,
+    practiceService: service,
     puzzles: snapshot.orderedUserPuzzles,
     getEngine: resolveAnalysisEngine,
     paused: batchBusy,
@@ -853,10 +860,91 @@ export function GamesHubScreen({
   });
   const effectiveHubView: "games" | "puzzles" =
     snapshot.userPuzzleCount > 0 ? hubView : "games";
-  const reviewBandVisiblePuzzles = filteredOrderedUserPuzzles.filter(isPuzzleWithinReviewBand);
+  const recommendedPuzzleIds = useMemo(
+    () =>
+      selectRecommendedGamePuzzleIds(snapshot.orderedUserPuzzles, {
+        getUserRating: (gameId) => {
+          const sourceGame = snapshot.gameById.get(gameId);
+          if (!sourceGame) {
+            return undefined;
+          }
+          return sourceGame.userColor === "w"
+            ? sourceGame.white.rating
+            : sourceGame.black.rating;
+        }
+      }),
+    [snapshot.gameById, snapshot.orderedUserPuzzles]
+  );
+  const visibleRecommendedPuzzles = useMemo(
+    () => filteredOrderedUserPuzzles.filter((puzzle) => recommendedPuzzleIds.has(puzzle.id)),
+    [filteredOrderedUserPuzzles, recommendedPuzzleIds]
+  );
+  const allVisibleRecommendedEnrolled =
+    visibleRecommendedPuzzles.length > 0 &&
+    visibleRecommendedPuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
   const allVisiblePuzzlesEnrolled =
-    reviewBandVisiblePuzzles.length > 0 &&
-    reviewBandVisiblePuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
+    filteredOrderedUserPuzzles.length > 0 &&
+    filteredOrderedUserPuzzles.every((puzzle) => snapshot.enrolledPuzzleIds.has(puzzle.id));
+
+  const exitSelectMode = useCallback((): void => {
+    setSelectMode(false);
+    setSelectedGameIds(new Set());
+    setBulkDeleteConfirmOpen(false);
+  }, []);
+
+  const toggleGameSelection = useCallback((gameId: string): void => {
+    setBulkDeleteConfirmOpen(false);
+    setSelectedGameIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(gameId)) {
+        next.delete(gameId);
+      } else {
+        next.add(gameId);
+      }
+      return next;
+    });
+  }, []);
+
+  const filteredGameIdSet = useMemo(
+    () => new Set(filteredGames.map((game) => game.id)),
+    [filteredGames]
+  );
+
+  const activeSelectedGameIds = useMemo(() => {
+    if (selectedGameIds.size === 0) {
+      return [] as string[];
+    }
+    return [...selectedGameIds].filter((id) => filteredGameIdSet.has(id));
+  }, [filteredGameIdSet, selectedGameIds]);
+
+  const allFilteredGamesSelected =
+    filteredGames.length > 0 && activeSelectedGameIds.length === filteredGames.length;
+
+  const handleToggleSelectAllFiltered = useCallback((): void => {
+    setBulkDeleteConfirmOpen(false);
+    if (allFilteredGamesSelected) {
+      setSelectedGameIds(new Set());
+    } else {
+      setSelectedGameIds(new Set(filteredGames.map((game) => game.id)));
+    }
+  }, [allFilteredGamesSelected, filteredGames]);
+
+  const handleConfirmBulkDelete = useCallback((): void => {
+    if (activeSelectedGameIds.length === 0) {
+      return;
+    }
+    for (const gameId of activeSelectedGameIds) {
+      service.deleteImportedGame(gameId);
+    }
+    exitSelectMode();
+    refreshHub();
+  }, [activeSelectedGameIds, exitSelectMode, refreshHub, service]);
+
+  useEffect(() => {
+    if (effectiveHubView !== "games" || filteredGames.length === 0) {
+      exitSelectMode();
+    }
+  }, [effectiveHubView, exitSelectMode, filteredGames.length]);
 
   return (
     <View
@@ -1219,6 +1307,47 @@ export function GamesHubScreen({
                     />
                   ) : null}
                   <View style={styles.puzzlesTabActions}>
+                    {visibleRecommendedPuzzles.length > 0 ? (
+                      <View style={styles.recommendedActionGroup}>
+                        <Button
+                          disabled={allVisibleRecommendedEnrolled}
+                          label={
+                            allVisibleRecommendedEnrolled
+                              ? t("games.puzzles.recommendedInReview")
+                              : t("games.puzzles.addRecommendedToReview", {
+                                  count: visibleRecommendedPuzzles.length
+                                })
+                          }
+                          size="compact"
+                          testID="games-puzzles-add-recommended-review"
+                          variant={allVisibleRecommendedEnrolled ? "plain" : "secondary"}
+                          onPress={() => handleAddUserPuzzlesToReview(visibleRecommendedPuzzles)}
+                        />
+                        <Pressable
+                          accessibilityLabel={t("games.puzzles.recommendedInfoA11y")}
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded: recommendedInfoOpen }}
+                          style={({ pressed }) => [
+                            styles.infoButton,
+                            recommendedInfoOpen ? styles.infoButtonActive : null,
+                            pressed ? styles.pressed : null
+                          ]}
+                          testID="games-puzzles-recommended-info"
+                          onPress={() => setRecommendedInfoOpen((current) => !current)}
+                        >
+                          <AppText
+                            style={
+                              recommendedInfoOpen
+                                ? styles.infoButtonTextActive
+                                : styles.infoButtonText
+                            }
+                            variant="caption"
+                          >
+                            ?
+                          </AppText>
+                        </Pressable>
+                      </View>
+                    ) : null}
                     <Button
                       disabled={allVisiblePuzzlesEnrolled}
                       label={
@@ -1229,9 +1358,22 @@ export function GamesHubScreen({
                       size="compact"
                       testID="games-puzzles-add-all-review"
                       variant={allVisiblePuzzlesEnrolled ? "plain" : "secondary"}
-                      onPress={() => handleAddAllUserPuzzlesToReview(filteredOrderedUserPuzzles)}
+                      onPress={() => handleAddUserPuzzlesToReview(filteredOrderedUserPuzzles)}
                     />
                   </View>
+                  {recommendedInfoOpen ? (
+                    <View
+                      style={styles.recommendedCriteriaCard}
+                      testID="games-puzzles-recommended-criteria"
+                    >
+                      <AppText variant="footnote">
+                        {t("games.puzzles.recommendedCriteriaTitle")}
+                      </AppText>
+                      <AppText tone="secondary" variant="caption">
+                        {t("games.puzzles.recommendedCriteriaBody")}
+                      </AppText>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
@@ -1284,6 +1426,7 @@ export function GamesHubScreen({
                     const overReviewBand = !isPuzzleWithinReviewBand(puzzle);
                     const hasEstimatedRating =
                       puzzle.ratingSource !== undefined && puzzle.ratingSource !== "game_anchor";
+                    const isRecommended = recommendedPuzzleIds.has(puzzle.id);
 
                     return (
                       <View
@@ -1316,6 +1459,13 @@ export function GamesHubScreen({
                           ) : null}
                           <View style={styles.puzzleListBadges}>
                             <Badge label={kindLabel} tone="accent" />
+                            {isRecommended ? (
+                              <Badge
+                                label={t("games.puzzles.recommendedBadge")}
+                                testID={`games-puzzle-recommended-${puzzle.id}`}
+                                tone="positive"
+                              />
+                            ) : null}
                             {hasEstimatedRating ? (
                               <Badge
                                 label={`~${puzzle.rating}`}
@@ -1412,17 +1562,94 @@ export function GamesHubScreen({
                 onResume={batch.resume}
               />
 
-              {unanalyzedGames.length > 0 && !batchBusy ? (
+              {!batchBusy && (unanalyzedGames.length > 0 || filteredGames.length > 0) ? (
                 <View style={styles.controlsStrip} testID="games-top-bar">
-                  <View style={styles.secondaryActionRow}>
-                    <Button
-                      label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
-                      size="compact"
-                      testID="games-analyze-recent"
-                      variant="secondary"
-                      onPress={handleAnalyzeAll}
-                    />
-                  </View>
+                  {selectMode ? (
+                    <View style={styles.selectionBar} testID="games-selection-bar">
+                      <Button
+                        label={
+                          allFilteredGamesSelected
+                            ? t("games.selection.deselectAll")
+                            : t("games.selection.selectAllFiltered", {
+                                count: filteredGames.length
+                              })
+                        }
+                        size="compact"
+                        testID="games-select-all-filtered"
+                        variant="secondary"
+                        onPress={handleToggleSelectAllFiltered}
+                      />
+                      <Button
+                        disabled={activeSelectedGameIds.length === 0}
+                        label={t("games.selection.deleteSelected", {
+                          count: activeSelectedGameIds.length
+                        })}
+                        size="compact"
+                        testID="games-delete-selected"
+                        variant="destructive"
+                        onPress={() => setBulkDeleteConfirmOpen(true)}
+                      />
+                      <Button
+                        label={t("common.done")}
+                        size="compact"
+                        testID="games-select-done"
+                        variant="plain"
+                        onPress={exitSelectMode}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.secondaryActionRow}>
+                      {unanalyzedGames.length > 0 ? (
+                        <Button
+                          label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
+                          size="compact"
+                          testID="games-analyze-recent"
+                          variant="secondary"
+                          onPress={handleAnalyzeAll}
+                        />
+                      ) : null}
+                      {filteredGames.length > 0 ? (
+                        <Button
+                          label={t("games.action.select")}
+                          size="compact"
+                          testID="games-select-toggle"
+                          variant="secondary"
+                          onPress={() => {
+                            setSelectedGameIds(new Set());
+                            setBulkDeleteConfirmOpen(false);
+                            setSelectMode(true);
+                          }}
+                        />
+                      ) : null}
+                    </View>
+                  )}
+                  {selectMode && bulkDeleteConfirmOpen && activeSelectedGameIds.length > 0 ? (
+                    <View style={styles.bulkDeleteConfirmCard} testID="games-bulk-delete-confirm">
+                      <AppText tone="secondary" variant="footnote">
+                        {t("games.delete.bulkConfirmBody", {
+                          count: activeSelectedGameIds.length
+                        })}
+                      </AppText>
+                      <View style={styles.secondaryActionRow}>
+                        <Button
+                          label={t("games.delete.bulkConfirmAction", {
+                            count: activeSelectedGameIds.length
+                          })}
+                          size="compact"
+                          testID="games-bulk-delete-confirm-submit"
+                          variant="destructive"
+                          onPress={handleConfirmBulkDelete}
+                        />
+                        <Button
+                          label={t("common.cancel")}
+                          size="compact"
+                          testID="games-bulk-delete-confirm-cancel"
+                          variant="secondary"
+                          onPress={() => setBulkDeleteConfirmOpen(false)}
+                        />
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
@@ -1448,7 +1675,15 @@ export function GamesHubScreen({
                       key={game.id}
                       game={game}
                       nowMs={nowMs}
-                      onPress={() => onOpenGameReview(game.id)}
+                      selectMode={selectMode}
+                      selected={selectMode && selectedGameIds.has(game.id)}
+                      onPress={() => {
+                        if (selectMode) {
+                          toggleGameSelection(game.id);
+                        } else {
+                          onOpenGameReview(game.id);
+                        }
+                      }}
                     />
                   ))}
                 </Section>
@@ -1607,10 +1842,14 @@ function LinkedAccountPill({
 function GameRow({
   game,
   nowMs,
+  selectMode = false,
+  selected = false,
   onPress
 }: {
   game: StoredImportedGame;
   nowMs: number;
+  selectMode?: boolean;
+  selected?: boolean;
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
@@ -1694,11 +1933,25 @@ function GameRow({
         opponent: opponentLine,
         meta: metaLine
       })}
-      accessibilityRole="button"
+      accessibilityRole={selectMode ? "checkbox" : "button"}
+      accessibilityState={selectMode ? { checked: selected } : undefined}
       style={({ pressed }) => [styles.gameRow, pressed ? styles.gameRowPressed : null]}
       testID={`game-row-${game.id}`}
       onPress={onPress}
     >
+      {selectMode ? (
+        <View
+          style={[
+            styles.selectCheckCircle,
+            selected ? styles.selectCheckCircleSelected : null
+          ]}
+          testID={`game-row-check-${game.id}`}
+        >
+          {selected ? (
+            <Icon color={theme.colors.text.onAccent} name="check" size={13} weight="bold" />
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.gameRowLeading}>
         <Badge
           label={gameResultShortLabel(outcome, locale)}
@@ -1803,6 +2056,33 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     gap: 8
   },
+  selectionBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  bulkDeleteConfirmCard: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
+  },
+  selectCheckCircle: {
+    alignItems: "center",
+    borderColor: theme.colors.border.strong,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    height: 22,
+    justifyContent: "center",
+    width: 22
+  },
+  selectCheckCircleSelected: {
+    backgroundColor: theme.colors.accent.fill,
+    borderColor: theme.colors.accent.fill
+  },
   filtersBlock: {
     gap: 8
   },
@@ -1842,6 +2122,42 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  recommendedActionGroup: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  infoButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: "center",
+    width: 28
+  },
+  infoButtonActive: {
+    backgroundColor: theme.colors.accent.fill,
+    borderColor: theme.colors.accent.fill
+  },
+  infoButtonText: {
+    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeight.bold
+  },
+  infoButtonTextActive: {
+    color: theme.colors.text.onAccent,
+    fontWeight: theme.fontWeight.bold
+  },
+  recommendedCriteriaCard: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.control,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10
   },
   loadOlderFooter: {
     paddingTop: 2,
