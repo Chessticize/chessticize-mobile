@@ -1267,16 +1267,17 @@ export function ratingLabelFromKey(
   ratingKey: string,
   locale: SupportedLocale = getActiveLocale()
 ): string {
-  if (/\barrow[_ ]duel\b/.test(ratingKey)) {
-    return translate(locale, "common.arrowDuel");
+  const baseLabel = /\barrow[_ ]duel\b/.test(ratingKey)
+    ? translate(locale, "common.arrowDuel")
+    : /\bblitz\b/.test(ratingKey)
+      ? translate(locale, "common.blitz")
+      : /\bcustom\b/.test(ratingKey)
+        ? translate(locale, "common.custom")
+        : translate(locale, "common.standard");
+  if (ratingKey.startsWith("ug_")) {
+    return `${translate(locale, "common.originGames")} · ${baseLabel}`;
   }
-  if (/\bblitz\b/.test(ratingKey)) {
-    return translate(locale, "common.blitz");
-  }
-  if (/\bcustom\b/.test(ratingKey)) {
-    return translate(locale, "common.custom");
-  }
-  return translate(locale, "common.standard");
+  return baseLabel;
 }
 
 function advancedRatingBucketLabel(label: string, ratingKey: string, t: TranslateFn): string {

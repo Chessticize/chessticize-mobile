@@ -7,6 +7,7 @@ import {
 import { ratingLabelFromKey } from "../settings/SettingsPanel.tsx";
 import { makeStyles } from "../../../theme/index.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import { localizeBuiltInRunName } from "../shared/practiceUtils.ts";
 import {
   formatDateForLocale,
   formatLocalDateForLocale,
@@ -292,7 +293,8 @@ export function historyRatingKeyLabel(
 ): string {
   const speed = runPerPuzzleSeconds ?? Number(ratingKey.match(/\/(\d+)\b/)?.[1]);
   const speedLabel = speed ? translate(locale, "review.paceSuffix", { seconds: speed }) : "";
-  return `${runName ?? ratingLabelFromKey(ratingKey, locale)}${speedLabel}`;
+  const localizedName = localizeBuiltInRunName(runName, locale);
+  return `${localizedName ?? ratingLabelFromKey(ratingKey, locale)}${speedLabel}`;
 }
 
 const useStyles = makeStyles((theme) => ({

@@ -12175,7 +12175,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`).findByType(ReactNative.ScrollView).props.horizontal).toBe(true);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
-      /^Sprint · \d+s · \d+s pace · (Today|Yesterday|Scheduled|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/
+      /^Puzzle Pack · Sprint · \d+s · \d+s pace · (Today|Yesterday|Scheduled|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/
     );
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-status`)).toThrow();
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-chevron`)).toBeTruthy();
@@ -12877,7 +12877,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attention-all");
 
     expect(collectText(findByTestId(renderer, "history-attempt-same-day-attempt-meta"))).toBe(
-      "Sprint · 5s · 20s pace · Yesterday"
+      "Puzzle Pack · Sprint · 5s · 20s pace · Yesterday"
     );
     expect(findByTestId(renderer, "history-attempt-same-day-attempt").props.accessibilityLabel).toContain(
       formatLocalCalendarDate(completedAt)
@@ -13883,7 +13883,7 @@ describe("PracticePocScreen", () => {
     expect(dueItem.props.accessibilityLabel).not.toContain("Due now");
     expect(dueItem.props.accessibilityLabel).not.toContain("Overdue");
     expect(collectText(findByTestId(renderer, `${dueItemTestID}-meta`))).toBe(
-      "1 attempt · 1 miss · Standard · 20s pace"
+      "1 attempt · 1 miss · Puzzle Pack · Standard · 20s pace"
     );
     expect(findByTestId(renderer, `${dueItemTestID}-badge`).findByProps({ name: "review" })).toBeTruthy();
 
@@ -14012,10 +14012,10 @@ describe("PracticePocScreen", () => {
     expect(firstRetryRow.props.accessibilityLabel).not.toContain("Due now");
     expect(firstRetryRow.props.accessibilityLabel).not.toContain("Overdue");
     expect(collectText(findByTestId(renderer, "review-due-item-review-badge-0-standard-standard-5-20-meta"))).toBe(
-      "1 attempt · 1 miss · Standard · 20s pace"
+      "1 attempt · 1 miss · Puzzle Pack · Standard · 20s pace"
     );
     expect(collectText(findByTestId(renderer, "review-due-item-review-badge-1-standard-standard-5-20-meta"))).toBe(
-      "2 attempts · 1 miss · Standard · 20s pace"
+      "2 attempts · 1 miss · Puzzle Pack · Standard · 20s pace"
     );
     expect(findByTestId(renderer, "review-due-item-review-badge-0-standard-standard-5-20-badge")
       .findByProps({ name: "review" })).toBeTruthy();

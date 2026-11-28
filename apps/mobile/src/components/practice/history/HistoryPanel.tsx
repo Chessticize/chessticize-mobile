@@ -14,6 +14,7 @@ import {
   type HistoryAttemptView,
   type HistoryAttentionReason,
   type HistoryPerformance,
+  type HistoryPuzzleOriginFilter,
   type HistoryRatingRangeFilter,
   type HistoryResultFilter,
   type HistoryTimeRange,
@@ -31,7 +32,13 @@ import { ToolbarIconButton } from "../shared/ToolbarIconButton.tsx";
 import { FilterGlyph } from "../shared/Glyphs.tsx";
 import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegion.tsx";
 import { FilterButton } from "../shared/FilterButton.tsx";
-import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import {
+  isUserGamePuzzleOrigin,
+  localizeBuiltInRunName,
+  modeLabel,
+  puzzleOriginLabel,
+  safeTestId
+} from "../shared/practiceUtils.ts";
 import { AttemptStatusTile } from "../shared/AttemptStatusTile.tsx";
 import {
   ALL_THEMES_FILTER,
@@ -60,6 +67,7 @@ export function HistoryPanel({
   selectedRatingKey,
   timeRange,
   sourceFilter,
+  puzzleOriginFilter = "all",
   resultFilter,
   ratingRangeFilter,
   sideFilter,
@@ -72,6 +80,7 @@ export function HistoryPanel({
   onRatingKeyChange,
   onTimeRangeChange,
   onSourceFilterChange,
+  onPuzzleOriginFilterChange,
   onResultFilterChange,
   onRatingRangeFilterChange,
   onSideFilterChange,
@@ -94,6 +103,7 @@ export function HistoryPanel({
   selectedRatingKey: string | null;
   timeRange: HistoryTimeRange;
   sourceFilter: "all" | AttemptSource;
+  puzzleOriginFilter?: HistoryPuzzleOriginFilter;
   resultFilter: HistoryResultFilter;
   ratingRangeFilter: HistoryRatingRangeFilter;
   sideFilter: "all" | PuzzleSide;
@@ -106,6 +116,7 @@ export function HistoryPanel({
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
   onSourceFilterChange: (source: "all" | AttemptSource) => void;
+  onPuzzleOriginFilterChange?: (origin: HistoryPuzzleOriginFilter) => void;
   onResultFilterChange: (result: HistoryResultFilter) => void;
   onRatingRangeFilterChange: (ratingRange: HistoryRatingRangeFilter) => void;
   onSideFilterChange: (side: "all" | PuzzleSide) => void;
@@ -135,6 +146,7 @@ export function HistoryPanel({
     attentionReasons,
     sideFilter,
     sourceFilter,
+    puzzleOriginFilter,
     themeFilters: namedThemeFilters,
     timeRange,
     locale
@@ -186,6 +198,13 @@ export function HistoryPanel({
             <FilterButton active={sourceFilter === "sprint"} label={t("history.source.sprint")} testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
             <FilterButton active={sourceFilter === "scheduled_review"} label={t("history.source.review")} testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
           </HistoryChipRow>
+          {onPuzzleOriginFilterChange ? (
+            <HistoryChipRow testID="history-origin-filters">
+              <FilterButton active={puzzleOriginFilter === "all"} label={t("history.origin.all")} testID="history-origin-all" onPress={() => onPuzzleOriginFilterChange("all")} />
+              <FilterButton active={puzzleOriginFilter === "pack"} label={t("common.originPuzzlePack")} testID="history-origin-pack" onPress={() => onPuzzleOriginFilterChange("pack")} />
+              <FilterButton active={puzzleOriginFilter === "user_game"} label={t("common.originGames")} testID="history-origin-user-game" onPress={() => onPuzzleOriginFilterChange("user_game")} />
+            </HistoryChipRow>
+          ) : null}
           <HistoryChipRow testID="history-result-filters">
             <FilterButton active={resultFilter === "all"} label={t("history.result.all")} testID="history-result-all" onPress={() => onResultFilterChange("all")} />
             <FilterButton active={resultFilter === "correct"} label={t("history.result.correct")} testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
@@ -455,6 +474,7 @@ type HistoryActiveFilterInput = {
   resultFilter: HistoryResultFilter;
   sideFilter: "all" | PuzzleSide;
   sourceFilter: "all" | AttemptSource;
+  puzzleOriginFilter?: HistoryPuzzleOriginFilter;
   themeFilters: readonly string[];
   timeRange: HistoryTimeRange;
 };
@@ -469,6 +489,7 @@ function historyActiveFilterLabels({
   resultFilter,
   sideFilter,
   sourceFilter,
+  puzzleOriginFilter = "all",
   themeFilters,
   timeRange
 }: HistoryActiveFilterInput): string[] {
@@ -483,6 +504,13 @@ function historyActiveFilterLabels({
       sourceFilter === "scheduled_review"
         ? translate(locale, "history.activeFilter.sourceReview")
         : translate(locale, "history.activeFilter.sourceSprint")
+    );
+  }
+  if (puzzleOriginFilter !== "all") {
+    labels.push(
+      puzzleOriginFilter === "user_game"
+        ? translate(locale, "history.activeFilter.originGames")
+        : translate(locale, "history.activeFilter.originPuzzlePack")
     );
   }
   if (resultFilter !== "all") {
@@ -741,6 +769,10 @@ function HistoryAttemptRow({
         : isWrong
           ? t("history.attempt.playedVsBest", { played: detail.submittedMove, best: detail.expectedMove })
           : t("history.attempt.movePlayed", { move: detail.submittedMove });
+  const originLabel = puzzleOriginLabel(
+    isUserGamePuzzleOrigin(attempt.puzzleId, attempt.ratingKey),
+    locale
+  );
   const sourceLabel = historyAttemptSourceLabel(detail.source, locale);
   const themeContext = visibleThemes.map((theme) => customThemeLabel(theme, locale)).join(", ");
   const compactContext = [themeContext, paceLabel].filter(Boolean).join(" · ");
@@ -751,8 +783,8 @@ function HistoryAttemptRow({
   const durationLabel = detail.elapsedSeconds === null
     ? t("history.attempt.durationUnavailable")
     : t("common.secondsCompact", { count: detail.elapsedSeconds });
-  const compactMeta = [sourceLabel, durationLabel, paceLabel, dateLabel].filter(Boolean).join(" · ");
-  const accessibleMeta = [sourceLabel, durationLabel, paceLabel, accessibleDateLabel].filter(Boolean).join(" · ");
+  const compactMeta = [originLabel, sourceLabel, durationLabel, paceLabel, dateLabel].filter(Boolean).join(" · ");
+  const accessibleMeta = [originLabel, sourceLabel, durationLabel, paceLabel, accessibleDateLabel].filter(Boolean).join(" · ");
   const rowAccessibilityLabel = [
     t("history.attempt.replayA11y", { mode: historyAttemptModeLabel(detail.mode, locale) }),
     resultLabel,
@@ -782,7 +814,9 @@ function HistoryAttemptRow({
       />
       <View style={styles.attemptRowCopy}>
         <View style={styles.historyAttemptHeader}>
-          <AppText variant="headline">{attempt.runName ?? historyAttemptModeLabel(detail.mode, locale)}</AppText>
+          <AppText variant="headline">
+            {localizeBuiltInRunName(attempt.runName, locale) ?? historyAttemptModeLabel(detail.mode, locale)}
+          </AppText>
           <AppText
             testID={`history-attempt-${attempt.id}-result`}
             tone={isCorrect ? "positive" : isTimedOut || isWrong ? "negative" : "secondary"}

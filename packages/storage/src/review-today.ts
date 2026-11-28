@@ -14,6 +14,7 @@ import type {
 import type { AttemptHistoryRow } from "./query-types.ts";
 
 export type ReviewTodayFilter = "all" | "overdue" | "missed_twice" | "arrow_duel";
+export type ReviewPuzzleOriginFilter = "all" | "pack" | "user_game";
 
 export interface CompletedReviewItem {
   attempt: AttemptHistoryRow;
@@ -94,14 +95,20 @@ export function buildReviewTodayPresentation(
 
 export function filterReviewTodayPresentation(
   presentation: ReviewTodayPresentation,
-  filter: ReviewTodayFilter
+  filter: ReviewTodayFilter,
+  originFilter: ReviewPuzzleOriginFilter = "all"
 ): ReviewTodayPresentation {
-  if (filter === "all") {
+  if (filter === "all" && originFilter === "all") {
     return presentation;
   }
+  const matches = (
+    entry: ReviewTodayDueItemPresentation | ReviewTodayCompletedItemPresentation
+  ): boolean =>
+    (filter === "all" || reviewTodayItemMatches(entry, filter)) &&
+    (originFilter === "all" || reviewTodayItemMatchesOrigin(entry, originFilter));
   return {
-    dueItems: presentation.dueItems.filter((entry) => reviewTodayItemMatches(entry, filter)),
-    completedItems: presentation.completedItems.filter((entry) => reviewTodayItemMatches(entry, filter))
+    dueItems: presentation.dueItems.filter(matches),
+    completedItems: presentation.completedItems.filter(matches)
   };
 }
 
@@ -109,6 +116,18 @@ export function reviewTodayContextKey(
   context: Pick<ReviewContext, "puzzleId" | "mode" | "ratingKey">
 ): string {
   return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+}
+
+function reviewTodayItemMatchesOrigin(
+  entry: ReviewTodayDueItemPresentation | ReviewTodayCompletedItemPresentation,
+  originFilter: Exclude<ReviewPuzzleOriginFilter, "all">
+): boolean {
+  const ctx = reviewTodayItemContext(entry);
+  const isUserGame =
+    entry.item.puzzle.source === "user_game" ||
+    ctx.puzzleId.startsWith("ug_") ||
+    ctx.ratingKey.startsWith("ug_");
+  return originFilter === "user_game" ? isUserGame : !isUserGame;
 }
 
 function reviewTodayItemMatches(
@@ -126,7 +145,7 @@ function reviewTodayItemMatches(
 
 function reviewTodayItemContext(
   entry: ReviewTodayDueItemPresentation | ReviewTodayCompletedItemPresentation
-): Pick<ReviewContext, "mode"> {
+): Pick<ReviewContext, "puzzleId" | "mode" | "ratingKey"> {
   return "review" in entry.item ? entry.item.review : entry.item.attempt;
 }
 
