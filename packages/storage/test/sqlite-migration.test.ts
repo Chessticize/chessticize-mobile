@@ -33,8 +33,16 @@ const SNAPSHOT_TABLES = [
   "app_review_request_state",
   "app_settings",
   "game_ply_evals",
+  "games_v1_sync_state",
+  "games_v1_synced_hashes",
+  "games_v1_tombstones",
   "imported_games",
   "linked_accounts",
+  "maia_active_game",
+  "maia_preferences",
+  "maia_rated_games",
+  "maia_rating_anchors",
+  "maia_ratings",
   "puzzles",
   "ratings",
   "sprint_sessions",
@@ -345,7 +353,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
         language: "system",
         sync: { iCloudEnabled: true },
         arrowDuel: { opponentReplyEnabled: true },
-        gameReview: { autoAddRecommendedToReview: false },
+        gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 10 },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
         sprintGuides: {
@@ -610,7 +618,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
         language: "system",
         sync: { iCloudEnabled: false },
         arrowDuel: { opponentReplyEnabled: true },
-        gameReview: { autoAddRecommendedToReview: false },
+        gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 10 },
         notifications: {
           reviewReminder: { mode: "fixed", fixedLocalTime: "07:35" }
         },
@@ -1954,7 +1962,7 @@ test("SQLite v26 adds device-local language preference without touching Progress
   }
 });
 
-test("SQLite v30 adds device-local 2.0 onboarding guide columns without touching ProgressV2 outbox", async () => {
+test("SQLite v33 adds device-local 2.0 onboarding guide columns without touching ProgressV2 outbox", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-onboarding-migration-"));
   const databasePath = join(directory, "practice.sqlite");
   try {
@@ -1970,7 +1978,7 @@ test("SQLite v30 adds device-local 2.0 onboarding guide columns without touching
     setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN onboarding_welcome_seen");
     setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN onboarding_games_guide_seen");
     setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN onboarding_game_review_guide_seen");
-    setupStore.db.exec("PRAGMA user_version = 29");
+    setupStore.db.exec("PRAGMA user_version = 32");
     setupStore.close();
 
     const migratedStore = new SQLiteStore(databasePath);

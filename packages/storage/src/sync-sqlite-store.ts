@@ -5,12 +5,14 @@ import {
   clonePracticeRun,
   buildSessionMistakeReview,
   createDefaultRating,
+  DEFAULT_MAIA_SETUP_PREFERENCES,
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultPuzzleTimingPolicy,
   effectivePuzzleRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   isUserGamePuzzleId,
+  normalizeMaiaSetupPreferences,
   normalizeThemeSelection,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
@@ -49,6 +51,10 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   UserGamePuzzleRatingSource,
   MoveClassification,
   Puzzle,
@@ -81,6 +87,7 @@ import type {
 } from "./practice-store.ts";
 import {
   DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
   DEFAULT_LIGHT_BOARD_THEME,
   exportReviewQueueState,
   normalizeImportedReviewQueueState
@@ -90,6 +97,7 @@ import {
   defaultPracticeSettings,
   normalizeAppearancePreference,
   normalizeBoardTheme,
+  normalizeGameReviewAutoSyncCooldownMinutes,
   normalizeLanguagePreference,
   normalizePieceSet,
   normalizeReviewReminderPreference,
@@ -128,6 +136,22 @@ import type {
   ProgressV2StatePatch,
   ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
+import {
+  applyGamesV1BatchToTarget,
+  gamesV1IdentityMapKey,
+  linkedAccountEntityKey,
+  type GamesV1ApplyResult,
+  type GamesV1ImportedGameBundle,
+  type GamesV1LocalSnapshot,
+  type GamesV1LocalState,
+  type GamesV1Persistence,
+  type GamesV1RecordIdentity,
+  type GamesV1RemoteMergeBatch,
+  type GamesV1StatePatch,
+  type GamesV1Tombstone
+} from "./games-sync-v1.ts";
+import { isUserGameRatingKey } from "./game-review-store.ts";
+import type { MaiaRatedGameRecord, MaiaRatingAnchorRecord } from "../../core/src/index.ts";
 import { selectUserGamePuzzlesFromStore } from "./composite-puzzle-source.ts";
 import {
   extractedGamePuzzleToStoredUserPuzzle,
@@ -303,6 +327,7 @@ interface AppSettingsRow {
   sync_upload_allowed: number;
   arrow_duel_opponent_reply_enabled: number;
   game_review_auto_add_recommended?: number;
+  game_review_auto_sync_cooldown_minutes?: number;
   appearance: PracticeSettings["appearance"];
   light_board_theme: PracticeSettings["lightBoardTheme"];
   dark_board_theme: PracticeSettings["darkBoardTheme"];
@@ -507,7 +532,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 30;
+export const CURRENT_SCHEMA_VERSION = 33;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -546,12 +571,16 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 26, to: 27, apply: migrateV26ToV27 },
   { from: 27, to: 28, apply: migrateV27ToV28 },
   { from: 28, to: 29, apply: migrateV28ToV29 },
-  { from: 29, to: 30, apply: migrateV29ToV30 }
+  { from: 29, to: 30, apply: migrateV29ToV30 },
+  { from: 30, to: 31, apply: migrateV30ToV31 },
+  { from: 31, to: 32, apply: migrateV31ToV32 },
+  { from: 32, to: 33, apply: migrateV32ToV33 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
   readonly db: SyncSqliteDatabase;
   readonly progressV2: ProgressV2Persistence;
+  readonly gamesV1: GamesV1Persistence;
   private readonly options: SyncSQLiteStoreOptions;
   private transactionDepth = 0;
 
@@ -573,6 +602,18 @@ export class SyncSQLiteStore implements PracticeStore {
       commitStateAndStage: (patch, entries, enqueuedAt) =>
         this.commitProgressV2StateAndStage(patch, entries, enqueuedAt)
     };
+    this.gamesV1 = {
+      readState: () => this.readGamesV1State(),
+      writeState: (patch) => this.writeGamesV1State(patch),
+      readSyncedHashes: () => this.readGamesV1SyncedHashes(),
+      writeSyncedHashes: (updates, deletes) => this.writeGamesV1SyncedHashes(updates, deletes),
+      listTombstones: () => this.listGamesV1Tombstones(),
+      recordTombstones: (tombstones) => this.recordGamesV1Tombstones(tombstones),
+      clearTombstone: (identity) => this.clearGamesV1Tombstone(identity),
+      exportGamesV1Snapshot: () => this.exportGamesV1Snapshot(),
+      applyGamesV1RemoteBatch: (batch, statePatch, syncedHashUpdates) =>
+        this.applyGamesV1RemoteBatchInternal(batch, statePatch, syncedHashUpdates)
+    };
   }
 
   migrate(): void {
@@ -588,29 +629,39 @@ export class SyncSQLiteStore implements PracticeStore {
       hasCurrentSettingsColumns(this.db) &&
       hasProgressV2Schema(this.db) &&
       hasSurvivalSchema(this.db) &&
-      hasGameReviewSchema(this.db)
+      hasGameReviewSchema(this.db) &&
+      hasMaiaPlaySchema(this.db) &&
+      hasGamesV1Schema(this.db)
     ) {
       return;
     }
 
-    this.transaction(() => {
-      let version = startingVersion;
-      while (version < CURRENT_SCHEMA_VERSION) {
-        const migration = SQLITE_MIGRATIONS.find((candidate) => candidate.from === version);
-        if (!migration || migration.to !== version + 1 || migration.to > CURRENT_SCHEMA_VERSION) {
-          throw new Error(`No SQLite migration is registered from schema version ${version}`);
+    // Disable FK enforcement during schema rebuilds (e.g., v30 imported_games CHECK widening)
+    // so parent table swaps never cascade-delete child evals/puzzles, then re-verify immediately.
+    this.db.exec("PRAGMA foreign_keys = OFF");
+    try {
+      this.transaction(() => {
+        let version = startingVersion;
+        while (version < CURRENT_SCHEMA_VERSION) {
+          const migration = SQLITE_MIGRATIONS.find((candidate) => candidate.from === version);
+          if (!migration || migration.to !== version + 1 || migration.to > CURRENT_SCHEMA_VERSION) {
+            throw new Error(`No SQLite migration is registered from schema version ${version}`);
+          }
+          migration.apply(this.db);
+          assertForeignKeyIntegrity(this.db);
+          setSchemaVersion(this.db, migration.to);
+          version = migration.to;
         }
-        migration.apply(this.db);
+        if (version !== CURRENT_SCHEMA_VERSION) {
+          throw new Error(`SQLite migration stopped at schema version ${version}`);
+        }
+        repairKnownSchemaDrift(this.db);
         assertForeignKeyIntegrity(this.db);
-        setSchemaVersion(this.db, migration.to);
-        version = migration.to;
-      }
-      if (version !== CURRENT_SCHEMA_VERSION) {
-        throw new Error(`SQLite migration stopped at schema version ${version}`);
-      }
-      repairKnownSchemaDrift(this.db);
-      assertForeignKeyIntegrity(this.db);
-    });
+      });
+    } finally {
+      this.db.exec("PRAGMA foreign_keys = ON");
+    }
+    assertForeignKeyIntegrity(this.db);
   }
 
   transaction<T>(work: () => T): T {
@@ -1248,6 +1299,7 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_upload_allowed,
           arrow_duel_opponent_reply_enabled,
           game_review_auto_add_recommended,
+          game_review_auto_sync_cooldown_minutes,
           appearance,
           light_board_theme,
           dark_board_theme,
@@ -1266,12 +1318,13 @@ export class SyncSQLiteStore implements PracticeStore {
           onboarding_welcome_seen,
           onboarding_games_guide_seen,
           onboarding_game_review_guide_seen
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
           arrow_duel_opponent_reply_enabled = excluded.arrow_duel_opponent_reply_enabled,
           game_review_auto_add_recommended = excluded.game_review_auto_add_recommended,
+          game_review_auto_sync_cooldown_minutes = excluded.game_review_auto_sync_cooldown_minutes,
           appearance = excluded.appearance,
           light_board_theme = excluded.light_board_theme,
           dark_board_theme = excluded.dark_board_theme,
@@ -1296,6 +1349,9 @@ export class SyncSQLiteStore implements PracticeStore {
         0,
         boolToInt(cloned.arrowDuel.opponentReplyEnabled),
         boolToInt(cloned.gameReview?.autoAddRecommendedToReview ?? false),
+        normalizeGameReviewAutoSyncCooldownMinutes(
+          cloned.gameReview?.autoSyncCooldownMinutes ?? DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+        ),
         cloned.appearance,
         cloned.lightBoardTheme,
         cloned.darkBoardTheme,
@@ -2348,6 +2404,10 @@ export class SyncSQLiteStore implements PracticeStore {
            last_synced_at = excluded.last_synced_at`
       )
       .run(account.platform, username, lastSyncedAt, createdAt);
+    this.clearGamesV1Tombstone({
+      kind: "linked_account",
+      entityKey: linkedAccountEntityKey(account.platform, username)
+    });
 
     return {
       platform: account.platform,
@@ -2358,9 +2418,22 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   removeLinkedAccount(platform: LinkedGameAccountPlatform, username: string): void {
+    const trimmed = username.trim();
+    const existing = this.db
+      .prepare("SELECT 1 FROM linked_accounts WHERE platform = ? AND username = ?")
+      .get(platform, trimmed);
     this.db
       .prepare("DELETE FROM linked_accounts WHERE platform = ? AND username = ?")
-      .run(platform, username.trim());
+      .run(platform, trimmed);
+    if (existing) {
+      this.recordGamesV1Tombstones([
+        {
+          kind: "linked_account",
+          entityKey: linkedAccountEntityKey(platform, trimmed),
+          deletedAt: new Date().toISOString()
+        }
+      ]);
+    }
   }
 
   upsertImportedGames(
@@ -2440,6 +2513,7 @@ export class SyncSQLiteStore implements PracticeStore {
             nowIso,
             nowIso
           );
+          this.clearGamesV1Tombstone({ kind: "imported_game", entityKey: draft.id });
           inserted += 1;
           continue;
         }
@@ -2523,28 +2597,47 @@ export class SyncSQLiteStore implements PracticeStore {
 
   deleteImportedGame(gameId: string): void {
     this.transaction(() => {
-      const userPuzzleIds = (
-        this.db
-          .prepare("SELECT id FROM user_puzzles WHERE game_id = ?")
-          .all(gameId) as Array<{ id: string }>
-      ).map((row) => row.id);
-      const deleteAttempts = this.db.prepare("DELETE FROM attempts WHERE puzzle_id = ?");
-      const deleteReviewEvents = this.db.prepare("DELETE FROM review_events WHERE puzzle_id = ?");
-      const deleteReviewQueue = this.db.prepare("DELETE FROM review_queue WHERE puzzle_id = ?");
-      const deleteReviewRemovals = this.db.prepare(
-        "DELETE FROM review_schedule_removals WHERE puzzle_id = ?"
+      const existed = Boolean(
+        this.db.prepare("SELECT 1 FROM imported_games WHERE id = ?").get(gameId)
       );
-      for (const puzzleId of userPuzzleIds) {
-        deleteAttempts.run(puzzleId);
-        deleteReviewEvents.run(puzzleId);
-        deleteReviewQueue.run(puzzleId);
-        deleteReviewRemovals.run(puzzleId);
-      }
-      this.db.prepare("DELETE FROM imported_games WHERE id = ?").run(gameId);
-      for (const puzzleId of userPuzzleIds) {
-        this.deleteUnreferencedUserPuzzleCacheRow(puzzleId);
+      const userPuzzleIds = this.deleteImportedGameRows(gameId);
+      if (existed) {
+        const deletedAt = new Date().toISOString();
+        this.recordGamesV1Tombstones([
+          { kind: "imported_game", entityKey: gameId, deletedAt },
+          ...userPuzzleIds.map((puzzleId) => ({
+            kind: "user_puzzle" as const,
+            entityKey: puzzleId,
+            deletedAt
+          }))
+        ]);
       }
     });
+  }
+
+  private deleteImportedGameRows(gameId: string): string[] {
+    const userPuzzleIds = (
+      this.db
+        .prepare("SELECT id FROM user_puzzles WHERE game_id = ?")
+        .all(gameId) as Array<{ id: string }>
+    ).map((row) => row.id);
+    const deleteAttempts = this.db.prepare("DELETE FROM attempts WHERE puzzle_id = ?");
+    const deleteReviewEvents = this.db.prepare("DELETE FROM review_events WHERE puzzle_id = ?");
+    const deleteReviewQueue = this.db.prepare("DELETE FROM review_queue WHERE puzzle_id = ?");
+    const deleteReviewRemovals = this.db.prepare(
+      "DELETE FROM review_schedule_removals WHERE puzzle_id = ?"
+    );
+    for (const puzzleId of userPuzzleIds) {
+      deleteAttempts.run(puzzleId);
+      deleteReviewEvents.run(puzzleId);
+      deleteReviewQueue.run(puzzleId);
+      deleteReviewRemovals.run(puzzleId);
+    }
+    this.db.prepare("DELETE FROM imported_games WHERE id = ?").run(gameId);
+    for (const puzzleId of userPuzzleIds) {
+      this.deleteUnreferencedUserPuzzleCacheRow(puzzleId);
+    }
+    return userPuzzleIds;
   }
 
   saveGamePlyEvaluations(
@@ -2870,6 +2963,665 @@ export class SyncSQLiteStore implements PracticeStore {
     this.db
       .prepare("UPDATE user_puzzles SET archived = ? WHERE id = ?")
       .run(boolToInt(archived), puzzleId);
+  }
+
+  getMaiaRating(timeClass: MaiaTimeClass): MaiaRatingRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT time_class, rating, rating_deviation, volatility, games, wins, losses, draws, updated_at
+         FROM maia_ratings
+         WHERE time_class = ?`
+      )
+      .get(timeClass) as
+      | {
+          time_class: MaiaTimeClass;
+          rating: number;
+          rating_deviation: number;
+          volatility: number;
+          games: number;
+          wins: number;
+          losses: number;
+          draws: number;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      timeClass: row.time_class,
+      rating: row.rating,
+      ratingDeviation: row.rating_deviation,
+      volatility: row.volatility,
+      games: row.games,
+      wins: row.wins,
+      losses: row.losses,
+      draws: row.draws,
+      updatedAt: row.updated_at
+    };
+  }
+
+  listMaiaRatings(): MaiaRatingRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT time_class, rating, rating_deviation, volatility, games, wins, losses, draws, updated_at
+         FROM maia_ratings
+         ORDER BY time_class ASC`
+      )
+      .all() as Array<{
+      time_class: MaiaTimeClass;
+      rating: number;
+      rating_deviation: number;
+      volatility: number;
+      games: number;
+      wins: number;
+      losses: number;
+      draws: number;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      timeClass: row.time_class,
+      rating: row.rating,
+      ratingDeviation: row.rating_deviation,
+      volatility: row.volatility,
+      games: row.games,
+      wins: row.wins,
+      losses: row.losses,
+      draws: row.draws,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  saveMaiaRating(record: MaiaRatingRecord): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_ratings (
+          time_class,
+          rating,
+          rating_deviation,
+          volatility,
+          games,
+          wins,
+          losses,
+          draws,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        record.timeClass,
+        Math.round(record.rating),
+        record.ratingDeviation,
+        record.volatility,
+        record.games,
+        record.wins,
+        record.losses,
+        record.draws,
+        record.updatedAt
+      );
+  }
+
+  listMaiaRatedGames(timeClass?: MaiaTimeClass): MaiaRatedGameRecord[] {
+    const rows = (
+      timeClass === undefined
+        ? this.db
+            .prepare(
+              `SELECT game_id, time_class, played_at, outcome, opponent_rating, initial_rating_anchor
+               FROM maia_rated_games
+               ORDER BY played_at ASC, game_id ASC`
+            )
+            .all()
+        : this.db
+            .prepare(
+              `SELECT game_id, time_class, played_at, outcome, opponent_rating, initial_rating_anchor
+               FROM maia_rated_games
+               WHERE time_class = ?
+               ORDER BY played_at ASC, game_id ASC`
+            )
+            .all(timeClass)
+    ) as Array<{
+      game_id: string;
+      time_class: MaiaTimeClass;
+      played_at: string;
+      outcome: "win" | "loss" | "draw";
+      opponent_rating: number;
+      initial_rating_anchor: number | null;
+    }>;
+    return rows.map((row) => ({
+      gameId: row.game_id,
+      timeClass: row.time_class,
+      playedAt: row.played_at,
+      outcome: row.outcome,
+      opponentRating: row.opponent_rating,
+      ...(row.initial_rating_anchor === null
+        ? {}
+        : { initialRatingAnchor: row.initial_rating_anchor })
+    }));
+  }
+
+  upsertMaiaRatedGame(record: MaiaRatedGameRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO maia_rated_games (
+          game_id, time_class, played_at, outcome, opponent_rating, initial_rating_anchor
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(game_id) DO UPDATE SET
+          initial_rating_anchor = COALESCE(maia_rated_games.initial_rating_anchor, excluded.initial_rating_anchor)`
+      )
+      .run(
+        record.gameId,
+        record.timeClass,
+        record.playedAt,
+        record.outcome,
+        Math.round(record.opponentRating),
+        record.initialRatingAnchor === undefined ? null : Math.round(record.initialRatingAnchor)
+      );
+  }
+
+  getMaiaRatingAnchor(timeClass: MaiaTimeClass): MaiaRatingAnchorRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT time_class, initial_rating, set_at
+         FROM maia_rating_anchors
+         WHERE time_class = ?`
+      )
+      .get(timeClass) as
+      | { time_class: MaiaTimeClass; initial_rating: number; set_at: string }
+      | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      timeClass: row.time_class,
+      initialRating: row.initial_rating,
+      setAt: row.set_at
+    };
+  }
+
+  listMaiaRatingAnchors(): MaiaRatingAnchorRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT time_class, initial_rating, set_at
+         FROM maia_rating_anchors
+         ORDER BY time_class ASC`
+      )
+      .all() as Array<{ time_class: MaiaTimeClass; initial_rating: number; set_at: string }>;
+    return rows.map((row) => ({
+      timeClass: row.time_class,
+      initialRating: row.initial_rating,
+      setAt: row.set_at
+    }));
+  }
+
+  saveMaiaRatingAnchor(anchor: MaiaRatingAnchorRecord): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_rating_anchors (time_class, initial_rating, set_at)
+         VALUES (?, ?, ?)`
+      )
+      .run(anchor.timeClass, Math.round(anchor.initialRating), anchor.setAt);
+  }
+
+  private readGamesV1State(): GamesV1LocalState {
+    const row = this.db
+      .prepare(
+        `SELECT zone_initialized, server_change_token, server_change_token_fingerprint, last_pull_at, last_push_at
+         FROM games_v1_sync_state
+         WHERE id = 'default'`
+      )
+      .get() as
+      | {
+          zone_initialized: number;
+          server_change_token: string | null;
+          server_change_token_fingerprint: string | null;
+          last_pull_at: string | null;
+          last_push_at: string | null;
+        }
+      | undefined;
+    if (!row) {
+      return { zoneInitialized: false };
+    }
+    return {
+      zoneInitialized: row.zone_initialized !== 0,
+      ...(row.server_change_token === null ? {} : { serverChangeToken: row.server_change_token }),
+      ...(row.server_change_token_fingerprint === null
+        ? {}
+        : { serverChangeTokenFingerprint: row.server_change_token_fingerprint }),
+      ...(row.last_pull_at === null ? {} : { lastPullAt: row.last_pull_at }),
+      ...(row.last_push_at === null ? {} : { lastPushAt: row.last_push_at })
+    };
+  }
+
+  private writeGamesV1State(patch: GamesV1StatePatch): void {
+    const current = this.readGamesV1State();
+    const zoneInitialized = patch.zoneInitialized ?? current.zoneInitialized;
+    const serverChangeToken =
+      patch.serverChangeToken === undefined
+        ? (current.serverChangeToken ?? null)
+        : patch.serverChangeToken;
+    const serverChangeTokenFingerprint =
+      patch.serverChangeTokenFingerprint === undefined
+        ? (current.serverChangeTokenFingerprint ?? null)
+        : patch.serverChangeTokenFingerprint;
+    const lastPullAt =
+      patch.lastPullAt === undefined ? (current.lastPullAt ?? null) : patch.lastPullAt;
+    const lastPushAt =
+      patch.lastPushAt === undefined ? (current.lastPushAt ?? null) : patch.lastPushAt;
+    this.db
+      .prepare(
+        `INSERT INTO games_v1_sync_state (
+          id, zone_initialized, server_change_token, server_change_token_fingerprint, last_pull_at, last_push_at
+        ) VALUES ('default', ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          zone_initialized = excluded.zone_initialized,
+          server_change_token = excluded.server_change_token,
+          server_change_token_fingerprint = excluded.server_change_token_fingerprint,
+          last_pull_at = excluded.last_pull_at,
+          last_push_at = excluded.last_push_at`
+      )
+      .run(
+        boolToInt(zoneInitialized),
+        serverChangeToken,
+        serverChangeTokenFingerprint,
+        lastPullAt,
+        lastPushAt
+      );
+  }
+
+  private readGamesV1SyncedHashes(): Map<string, string> {
+    const rows = this.db
+      .prepare("SELECT kind, entity_key, content_hash FROM games_v1_synced_hashes")
+      .all() as Array<{ kind: GamesV1RecordIdentity["kind"]; entity_key: string; content_hash: string }>;
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      map.set(gamesV1IdentityMapKey({ kind: row.kind, entityKey: row.entity_key }), row.content_hash);
+    }
+    return map;
+  }
+
+  private writeGamesV1SyncedHashes(
+    updates: ReadonlyMap<string, string>,
+    deletes?: readonly string[]
+  ): void {
+    this.transaction(() => {
+      const upsert = this.db.prepare(
+        `INSERT INTO games_v1_synced_hashes (kind, entity_key, content_hash)
+         VALUES (?, ?, ?)
+         ON CONFLICT(kind, entity_key) DO UPDATE SET content_hash = excluded.content_hash`
+      );
+      for (const [mapKey, hash] of updates) {
+        const sep = mapKey.indexOf("\u0000");
+        if (sep <= 0) continue;
+        upsert.run(mapKey.slice(0, sep), mapKey.slice(sep + 1), hash);
+      }
+      if (deletes && deletes.length > 0) {
+        const del = this.db.prepare(
+          "DELETE FROM games_v1_synced_hashes WHERE kind = ? AND entity_key = ?"
+        );
+        for (const mapKey of deletes) {
+          const sep = mapKey.indexOf("\u0000");
+          if (sep <= 0) continue;
+          del.run(mapKey.slice(0, sep), mapKey.slice(sep + 1));
+        }
+      }
+    });
+  }
+
+  private listGamesV1Tombstones(): GamesV1Tombstone[] {
+    const rows = this.db
+      .prepare("SELECT kind, entity_key, deleted_at FROM games_v1_tombstones")
+      .all() as Array<{ kind: GamesV1RecordIdentity["kind"]; entity_key: string; deleted_at: string }>;
+    return rows.map((row) => ({
+      kind: row.kind,
+      entityKey: row.entity_key,
+      deletedAt: row.deleted_at
+    }));
+  }
+
+  private recordGamesV1Tombstones(tombstones: readonly GamesV1Tombstone[]): void {
+    if (tombstones.length === 0) {
+      return;
+    }
+    const upsert = this.db.prepare(
+      `INSERT INTO games_v1_tombstones (kind, entity_key, deleted_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(kind, entity_key) DO UPDATE SET
+         deleted_at = CASE
+           WHEN excluded.deleted_at > games_v1_tombstones.deleted_at THEN excluded.deleted_at
+           ELSE games_v1_tombstones.deleted_at
+         END`
+    );
+    for (const t of tombstones) {
+      upsert.run(t.kind, t.entityKey, t.deletedAt);
+    }
+  }
+
+  private clearGamesV1Tombstone(identity: GamesV1RecordIdentity): void {
+    this.db
+      .prepare("DELETE FROM games_v1_tombstones WHERE kind = ? AND entity_key = ?")
+      .run(identity.kind, identity.entityKey);
+  }
+
+  private exportGamesV1Snapshot(): GamesV1LocalSnapshot {
+    const allExported = this.exportLocalData();
+    return {
+      settings: this.getSettings(),
+      maiaSetup: this.getMaiaSetupPreferences(),
+      linkedAccounts: this.listLinkedAccounts(),
+      importedGames: this.listImportedGames().map((game) => ({
+        game,
+        plyEvals: this.listGamePlyEvaluations(game.id)
+      })),
+      userPuzzles: this.listUserPuzzles({ includeArchived: true }),
+      ugAttempts: allExported.attempts.filter((a) => isUserGamePuzzleId(a.puzzleId)),
+      ugReviewQueue: allExported.reviewQueue.filter((r) => isUserGamePuzzleId(r.puzzleId)),
+      ugReviewRemovals: (allExported.reviewRemovals ?? []).filter((r) =>
+        isUserGamePuzzleId(r.puzzleId)
+      ),
+      ugRatings: allExported.ratings.filter((r) => isUserGameRatingKey(r.key)),
+      maiaRatedGames: this.listMaiaRatedGames(),
+      maiaRatingAnchors: this.listMaiaRatingAnchors()
+    };
+  }
+
+  private applyGamesV1RemoteBatchInternal(
+    batch: GamesV1RemoteMergeBatch,
+    statePatch: GamesV1StatePatch,
+    syncedHashUpdates: ReadonlyMap<string, string>
+  ): GamesV1ApplyResult {
+    return this.transaction(() => {
+      const applied = applyGamesV1BatchToTarget(
+        {
+          getSettings: () => this.getSettings(),
+          saveSettings: (settings) => this.saveSettings(settings),
+          getMaiaSetupPreferences: () => this.getMaiaSetupPreferences(),
+          saveMaiaSetupPreferences: (prefs) => this.saveMaiaSetupPreferences(prefs),
+          listLinkedAccounts: () => this.listLinkedAccounts(),
+          upsertSyncedLinkedAccount: (account) => {
+            this.db
+              .prepare(
+                `INSERT INTO linked_accounts (platform, username, last_synced_at, created_at)
+                 VALUES (?, ?, ?, ?)
+                 ON CONFLICT(platform, username) DO UPDATE SET
+                   username = excluded.username,
+                   last_synced_at = excluded.last_synced_at,
+                   created_at = excluded.created_at`
+              )
+              .run(
+                account.platform,
+                account.username.trim(),
+                account.lastSyncedAt ?? null,
+                account.createdAt
+              );
+          },
+          removeLinkedAccountWithoutTombstone: (platform, username) => {
+            this.db
+              .prepare("DELETE FROM linked_accounts WHERE platform = ? AND username = ?")
+              .run(platform, username.trim());
+          },
+          getImportedGame: (gameId) => this.getImportedGame(gameId),
+          listGamePlyEvaluations: (gameId) => this.listGamePlyEvaluations(gameId),
+          upsertSyncedImportedGameBundle: (bundle: GamesV1ImportedGameBundle) => {
+            const g = bundle.game;
+            this.db
+              .prepare(
+                `INSERT INTO imported_games (
+                  id, platform, username, user_color, played_at, time_control, time_class, rated,
+                  url, white_username, white_rating, white_is_ai, black_username, black_rating,
+                  black_is_ai, winner, termination, eco, opening, pgn,
+                  analysis_status, analysis_checkpoint_ply, white_accuracy, black_accuracy,
+                  puzzle_count, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  platform = excluded.platform,
+                  username = excluded.username,
+                  user_color = excluded.user_color,
+                  played_at = excluded.played_at,
+                  time_control = excluded.time_control,
+                  time_class = excluded.time_class,
+                  rated = excluded.rated,
+                  url = excluded.url,
+                  white_username = excluded.white_username,
+                  white_rating = excluded.white_rating,
+                  white_is_ai = excluded.white_is_ai,
+                  black_username = excluded.black_username,
+                  black_rating = excluded.black_rating,
+                  black_is_ai = excluded.black_is_ai,
+                  winner = excluded.winner,
+                  termination = excluded.termination,
+                  eco = excluded.eco,
+                  opening = excluded.opening,
+                  pgn = excluded.pgn,
+                  analysis_status = excluded.analysis_status,
+                  analysis_checkpoint_ply = excluded.analysis_checkpoint_ply,
+                  white_accuracy = excluded.white_accuracy,
+                  black_accuracy = excluded.black_accuracy,
+                  puzzle_count = excluded.puzzle_count,
+                  created_at = excluded.created_at,
+                  updated_at = excluded.updated_at`
+              )
+              .run(
+                g.id,
+                g.platform,
+                g.username ?? null,
+                g.userColor,
+                g.playedAt,
+                g.timeControl ?? null,
+                g.timeClass,
+                boolToInt(g.rated),
+                g.url ?? null,
+                g.white.username,
+                g.white.rating ?? null,
+                boolToInt(g.white.isAi ?? false),
+                g.black.username,
+                g.black.rating ?? null,
+                boolToInt(g.black.isAi ?? false),
+                g.winner ?? null,
+                g.termination ?? null,
+                g.eco ?? null,
+                g.opening ?? null,
+                g.pgn,
+                g.analysisStatus,
+                g.analysisCheckpointPly,
+                g.whiteAccuracy ?? null,
+                g.blackAccuracy ?? null,
+                g.puzzleCount,
+                g.createdAt,
+                g.updatedAt
+              );
+            if (bundle.plyEvals.length > 0) {
+              this.saveGamePlyEvaluations(g.id, bundle.plyEvals, {
+                analysisStatus: g.analysisStatus,
+                analysisCheckpointPly: g.analysisCheckpointPly,
+                ...(g.whiteAccuracy === undefined ? {} : { whiteAccuracy: g.whiteAccuracy }),
+                ...(g.blackAccuracy === undefined ? {} : { blackAccuracy: g.blackAccuracy }),
+                updatedAt: g.updatedAt
+              });
+            }
+          },
+          deleteImportedGameWithoutTombstone: (gameId) => {
+            this.deleteImportedGameRows(gameId);
+          },
+          getUserPuzzle: (puzzleId) => this.getUserPuzzle(puzzleId),
+          upsertSyncedUserPuzzle: (stored) => {
+            this.db
+              .prepare(
+                `INSERT INTO user_puzzles (
+                  id, game_id, game_ply, game_move_number, puzzle_kind, game_moment_kind,
+                  initial_fen, solution_moves_json, stockfish_eval, stockfish_best_move,
+                  stockfish_eval_after_first_move, punishment_line_json, themes_json,
+                  rating, rating_source, opponent_name, played_at, time_class, clock_remaining_sec,
+                  time_spent_sec, caliber_score, created_at, archived
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  game_id = excluded.game_id,
+                  game_ply = excluded.game_ply,
+                  game_move_number = excluded.game_move_number,
+                  puzzle_kind = excluded.puzzle_kind,
+                  game_moment_kind = excluded.game_moment_kind,
+                  initial_fen = excluded.initial_fen,
+                  solution_moves_json = excluded.solution_moves_json,
+                  stockfish_eval = excluded.stockfish_eval,
+                  stockfish_best_move = excluded.stockfish_best_move,
+                  stockfish_eval_after_first_move = excluded.stockfish_eval_after_first_move,
+                  punishment_line_json = excluded.punishment_line_json,
+                  themes_json = excluded.themes_json,
+                  rating = excluded.rating,
+                  rating_source = excluded.rating_source,
+                  opponent_name = excluded.opponent_name,
+                  played_at = excluded.played_at,
+                  time_class = excluded.time_class,
+                  clock_remaining_sec = excluded.clock_remaining_sec,
+                  time_spent_sec = excluded.time_spent_sec,
+                  caliber_score = excluded.caliber_score,
+                  created_at = excluded.created_at,
+                  archived = excluded.archived`
+              )
+              .run(
+                stored.id,
+                stored.gameId,
+                stored.gamePly,
+                stored.gameMoveNumber,
+                stored.puzzleKind,
+                stored.momentKind,
+                stored.initialFen,
+                JSON.stringify(stored.solutionMoves),
+                stored.stockfishEval ?? null,
+                stored.stockfishBestMove ?? null,
+                stored.stockfishEvalAfterFirstMove ?? null,
+                stored.punishmentLine === undefined ? null : JSON.stringify(stored.punishmentLine),
+                JSON.stringify(stored.themes),
+                stored.rating,
+                stored.ratingSource ?? null,
+                stored.opponentName ?? null,
+                stored.playedAt ?? null,
+                stored.timeClass ?? null,
+                stored.clockRemainingSec ?? null,
+                stored.timeSpentSec ?? null,
+                stored.caliberScore ?? null,
+                stored.createdAt,
+                boolToInt(stored.archived)
+              );
+            this.seedPuzzles([storedUserPuzzleToPuzzle(stored)]);
+          },
+          deleteSyncedUserPuzzle: (puzzleId) => {
+            this.db.prepare("DELETE FROM user_puzzles WHERE id = ?").run(puzzleId);
+            this.deleteUnreferencedUserPuzzleCacheRow(puzzleId);
+          },
+          importSyncedUserGameProgress: ({ attempts, reviewQueue, reviewRemovals, ratings }) => {
+            const res = this.importLocalData({
+              schemaVersion: 1,
+              settings: this.getSettings(),
+              ratings,
+              attempts,
+              reviewQueue,
+              reviewRemovals,
+              sprintSessions: [],
+              practiceRuns: []
+            });
+            return { attempts: res.attempts, reviewQueue: res.reviewQueue };
+          },
+          listMaiaRatedGames: (tc) => this.listMaiaRatedGames(tc),
+          upsertMaiaRatedGame: (record) => this.upsertMaiaRatedGame(record),
+          getMaiaRatingAnchor: (tc) => this.getMaiaRatingAnchor(tc),
+          saveMaiaRatingAnchor: (anchor) => this.saveMaiaRatingAnchor(anchor),
+          getMaiaRating: (tc) => this.getMaiaRating(tc),
+          saveMaiaRating: (record) => this.saveMaiaRating(record),
+          recordTombstones: (tombstones) => this.recordGamesV1Tombstones(tombstones),
+          clearTombstone: (identity) => this.clearGamesV1Tombstone(identity),
+          listTombstones: () => this.listGamesV1Tombstones()
+        },
+        batch
+      );
+      if (syncedHashUpdates.size > 0) {
+        this.writeGamesV1SyncedHashes(syncedHashUpdates);
+      }
+      this.writeGamesV1State(statePatch);
+      return applied;
+    });
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    const row = this.db
+      .prepare(
+        `SELECT time_control_json, rated, opponent_rating, color_preference, thinking_pace
+         FROM maia_preferences
+         WHERE singleton_id = 1`
+      )
+      .get() as
+      | {
+          time_control_json: string;
+          rated: number;
+          opponent_rating: number;
+          color_preference: string;
+          thinking_pace: string;
+        }
+      | undefined;
+    if (!row) {
+      return normalizeMaiaSetupPreferences(DEFAULT_MAIA_SETUP_PREFERENCES);
+    }
+    try {
+      const parsedTimeControl = JSON.parse(row.time_control_json) as MaiaSetupPreferences["timeControl"];
+      return normalizeMaiaSetupPreferences({
+        timeControl: parsedTimeControl,
+        rated: row.rated !== 0,
+        opponentRating: row.opponent_rating,
+        colorPreference: row.color_preference as MaiaSetupPreferences["colorPreference"],
+        thinkingPace: row.thinking_pace as MaiaSetupPreferences["thinkingPace"]
+      });
+    } catch {
+      return normalizeMaiaSetupPreferences(DEFAULT_MAIA_SETUP_PREFERENCES);
+    }
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    const normalized = normalizeMaiaSetupPreferences(preferences);
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_preferences (
+          singleton_id,
+          time_control_json,
+          rated,
+          opponent_rating,
+          color_preference,
+          thinking_pace,
+          updated_at
+        ) VALUES (1, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        JSON.stringify(normalized.timeControl),
+        boolToInt(normalized.rated),
+        normalized.opponentRating,
+        normalized.colorPreference,
+        normalized.thinkingPace,
+        new Date().toISOString()
+      );
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    const row = this.db
+      .prepare("SELECT state_json FROM maia_active_game WHERE singleton_id = 1")
+      .get() as { state_json: string } | undefined;
+    if (!row?.state_json) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(row.state_json) as MaiaGameState;
+    } catch {
+      return undefined;
+    }
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO maia_active_game (singleton_id, state_json, updated_at)
+         VALUES (1, ?, ?)`
+      )
+      .run(JSON.stringify(state), new Date().toISOString());
+  }
+
+  clearActiveMaiaGame(): void {
+    this.db.prepare("DELETE FROM maia_active_game WHERE singleton_id = 1").run();
   }
 
   private deleteUnreferencedUserPuzzleCacheRow(puzzleId: string): void {
@@ -3999,11 +4751,15 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV27ToV28(db);
   migrateV28ToV29(db);
   migrateV29ToV30(db);
+  migrateV30ToV31(db);
+  migrateV31ToV32(db);
+  migrateV32ToV33(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
     hasColumn(db, "app_settings", "game_review_auto_add_recommended") &&
+    hasColumn(db, "app_settings", "game_review_auto_sync_cooldown_minutes") &&
     hasColumn(db, "app_settings", "appearance") &&
     hasColumn(db, "app_settings", "light_board_theme") &&
     hasColumn(db, "app_settings", "dark_board_theme") &&
@@ -4051,6 +4807,20 @@ function hasGameReviewSchema(db: SyncSqliteDatabase): boolean {
     hasTable(db, "game_ply_evals") &&
     hasTable(db, "user_puzzles") &&
     hasColumn(db, "user_puzzles", "rating_source");
+}
+
+function importedGamesAllowsMaiaPlatform(db: SyncSqliteDatabase): boolean {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'imported_games'")
+    .get() as { sql?: string } | undefined;
+  return typeof row?.sql === "string" && row.sql.includes("'maia'");
+}
+
+function hasMaiaPlaySchema(db: SyncSqliteDatabase): boolean {
+  return hasTable(db, "maia_ratings") &&
+    hasTable(db, "maia_preferences") &&
+    hasTable(db, "maia_active_game") &&
+    importedGamesAllowsMaiaPlatform(db);
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -4919,7 +5689,7 @@ function migrateV26ToV27(db: SyncSqliteDatabase): void {
 
     CREATE TABLE IF NOT EXISTS imported_games (
       id TEXT PRIMARY KEY,
-      platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn')),
+      platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn', 'maia')),
       username TEXT NOT NULL,
       user_color TEXT NOT NULL CHECK (user_color IN ('w', 'b')),
       played_at TEXT NOT NULL,
@@ -5175,7 +5945,188 @@ function migrateV28ToV29(db: SyncSqliteDatabase): void {
   );
 }
 
+// Local Play-with-Maia persistence (independent blitz/rapid/classical Glicko-2 ratings,
+// remembered setup preferences, resumable active game, and widening imported_games.platform
+// CHECK to include 'maia' without touching ProgressV2 sync).
 function migrateV29ToV30(db: SyncSqliteDatabase): void {
+  if (hasTable(db, "imported_games") && !importedGamesAllowsMaiaPlatform(db)) {
+    const existingCount = countRows(db, "imported_games");
+    db.exec(`
+      CREATE TABLE imported_games_v30 (
+        id TEXT PRIMARY KEY,
+        platform TEXT NOT NULL CHECK (platform IN ('chess_com', 'lichess', 'pgn', 'maia')),
+        username TEXT NOT NULL,
+        user_color TEXT NOT NULL CHECK (user_color IN ('w', 'b')),
+        played_at TEXT NOT NULL,
+        time_control TEXT NOT NULL,
+        time_class TEXT NOT NULL,
+        rated INTEGER NOT NULL CHECK (rated IN (0, 1)),
+        url TEXT,
+        white_username TEXT NOT NULL,
+        white_rating INTEGER,
+        white_is_ai INTEGER NOT NULL DEFAULT 0 CHECK (white_is_ai IN (0, 1)),
+        black_username TEXT NOT NULL,
+        black_rating INTEGER,
+        black_is_ai INTEGER NOT NULL DEFAULT 0 CHECK (black_is_ai IN (0, 1)),
+        winner TEXT NOT NULL CHECK (winner IN ('w', 'b', 'none')),
+        termination TEXT NOT NULL,
+        eco TEXT,
+        opening TEXT,
+        pgn TEXT NOT NULL,
+        analysis_status TEXT NOT NULL DEFAULT 'none'
+          CHECK (analysis_status IN ('none', 'partial', 'pass1_done', 'complete')),
+        analysis_checkpoint_ply INTEGER NOT NULL DEFAULT 0 CHECK (analysis_checkpoint_ply >= 0),
+        white_accuracy REAL,
+        black_accuracy REAL,
+        puzzle_count INTEGER NOT NULL DEFAULT 0 CHECK (puzzle_count >= 0),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO imported_games_v30 (
+        id, platform, username, user_color, played_at, time_control, time_class, rated, url,
+        white_username, white_rating, white_is_ai, black_username, black_rating, black_is_ai,
+        winner, termination, eco, opening, pgn, analysis_status, analysis_checkpoint_ply,
+        white_accuracy, black_accuracy, puzzle_count, created_at, updated_at
+      )
+      SELECT
+        id, platform, username, user_color, played_at, time_control, time_class, rated, url,
+        white_username, white_rating, white_is_ai, black_username, black_rating, black_is_ai,
+        winner, termination, eco, opening, pgn, analysis_status, analysis_checkpoint_ply,
+        white_accuracy, black_accuracy, puzzle_count, created_at, updated_at
+      FROM imported_games;
+    `);
+    if (countRows(db, "imported_games_v30") !== existingCount) {
+      throw new Error("SQLite v30 imported_games rebuild changed the row count");
+    }
+    db.exec(`
+      DROP TABLE imported_games;
+      ALTER TABLE imported_games_v30 RENAME TO imported_games;
+
+      CREATE INDEX IF NOT EXISTS imported_games_played_at_idx
+        ON imported_games(played_at DESC, id DESC);
+
+      CREATE INDEX IF NOT EXISTS imported_games_platform_time_status_idx
+        ON imported_games(platform, time_class, analysis_status, played_at DESC);
+    `);
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS maia_ratings (
+      time_class TEXT PRIMARY KEY CHECK (time_class IN ('blitz', 'rapid', 'classical')),
+      rating INTEGER NOT NULL CHECK (rating >= 600),
+      rating_deviation REAL NOT NULL DEFAULT 350,
+      volatility REAL NOT NULL DEFAULT 0.06,
+      games INTEGER NOT NULL DEFAULT 0 CHECK (games >= 0),
+      wins INTEGER NOT NULL DEFAULT 0 CHECK (wins >= 0),
+      losses INTEGER NOT NULL DEFAULT 0 CHECK (losses >= 0),
+      draws INTEGER NOT NULL DEFAULT 0 CHECK (draws >= 0),
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS maia_preferences (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      time_control_json TEXT NOT NULL,
+      rated INTEGER NOT NULL DEFAULT 1 CHECK (rated IN (0, 1)),
+      opponent_rating INTEGER NOT NULL DEFAULT 1200 CHECK (opponent_rating >= 600),
+      color_preference TEXT NOT NULL DEFAULT 'random' CHECK (color_preference IN ('random', 'w', 'b')),
+      thinking_pace TEXT NOT NULL DEFAULT 'human' CHECK (thinking_pace IN ('human', 'instant')),
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT OR IGNORE INTO maia_preferences (
+      singleton_id,
+      time_control_json,
+      rated,
+      opponent_rating,
+      color_preference,
+      thinking_pace,
+      updated_at
+    ) VALUES (
+      1,
+      '{"initialMinutes":10,"incrementSeconds":0,"unlimited":false}',
+      1,
+      1200,
+      'random',
+      'human',
+      '1970-01-01T00:00:00.000Z'
+    );
+
+    CREATE TABLE IF NOT EXISTS maia_active_game (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      state_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+}
+
+function migrateV30ToV31(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "game_review_auto_sync_cooldown_minutes",
+    "ALTER TABLE app_settings ADD COLUMN game_review_auto_sync_cooldown_minutes INTEGER NOT NULL DEFAULT 10 " +
+      "CHECK (game_review_auto_sync_cooldown_minutes IN (0, 5, 10, 30))"
+  );
+}
+
+function hasGamesV1Schema(db: SyncSqliteDatabase): boolean {
+  return hasTable(db, "maia_rated_games") &&
+    hasTable(db, "maia_rating_anchors") &&
+    hasTable(db, "games_v1_sync_state") &&
+    hasTable(db, "games_v1_synced_hashes") &&
+    hasTable(db, "games_v1_tombstones");
+}
+
+function migrateV31ToV32(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS maia_rated_games (
+      game_id TEXT PRIMARY KEY,
+      time_class TEXT NOT NULL CHECK (time_class IN ('blitz', 'rapid', 'classical')),
+      played_at TEXT NOT NULL,
+      outcome TEXT NOT NULL CHECK (outcome IN ('win', 'loss', 'draw')),
+      opponent_rating INTEGER NOT NULL,
+      initial_rating_anchor INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS maia_rated_games_time_class_played_at_idx
+      ON maia_rated_games (time_class, played_at ASC, game_id ASC);
+
+    CREATE TABLE IF NOT EXISTS maia_rating_anchors (
+      time_class TEXT PRIMARY KEY CHECK (time_class IN ('blitz', 'rapid', 'classical')),
+      initial_rating INTEGER NOT NULL,
+      set_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS games_v1_sync_state (
+      id TEXT PRIMARY KEY CHECK (id = 'default'),
+      zone_initialized INTEGER NOT NULL DEFAULT 0 CHECK (zone_initialized IN (0, 1)),
+      server_change_token TEXT,
+      server_change_token_fingerprint TEXT,
+      last_pull_at TEXT,
+      last_push_at TEXT
+    );
+
+    INSERT OR IGNORE INTO games_v1_sync_state (id, zone_initialized)
+    VALUES ('default', 0);
+
+    CREATE TABLE IF NOT EXISTS games_v1_synced_hashes (
+      kind TEXT NOT NULL,
+      entity_key TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      PRIMARY KEY (kind, entity_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS games_v1_tombstones (
+      kind TEXT NOT NULL,
+      entity_key TEXT NOT NULL,
+      deleted_at TEXT NOT NULL,
+      PRIMARY KEY (kind, entity_key)
+    );
+  `);
+}
+
+function migrateV32ToV33(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
     "app_settings",
@@ -5389,7 +6340,10 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
       opponentReplyEnabled: intToBool(row.arrow_duel_opponent_reply_enabled ?? 1)
     },
     gameReview: {
-      autoAddRecommendedToReview: intToBool(row.game_review_auto_add_recommended ?? 0)
+      autoAddRecommendedToReview: intToBool(row.game_review_auto_add_recommended ?? 0),
+      autoSyncCooldownMinutes: normalizeGameReviewAutoSyncCooldownMinutes(
+        row.game_review_auto_sync_cooldown_minutes
+      )
     },
     notifications: {
       reviewReminder: reminder

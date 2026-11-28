@@ -13,6 +13,7 @@ import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
 import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository.ts";
 import { GamesHubScreen } from "../src/components/games/GamesHubScreen.tsx";
+import { useGamesBatchAnalysis } from "../src/components/games/useGamesBatchAnalysis.ts";
 import { PracticePocScreen } from "../src/components/PracticePocScreen.tsx";
 import {
   composePackBackedMobilePracticeService,
@@ -1456,5 +1457,165 @@ describe("GamesHubScreen", () => {
     expect(service.listUserPuzzles({ gameId: "g-blitz-1" })).toHaveLength(0);
     expect(service.listReviewQueue()).toHaveLength(0);
     expect(store.countAttempts({ puzzleId: blitzPuzzles[0]!.id })).toBe(0);
+  });
+
+  it("skips auto-sync within the staleness cooldown, re-syncs stale accounts on foreground resume, and prompts to analyze games to find puzzles", async () => {
+    const service = new PracticeService(new MemoryStore());
+    let currentNow = NOW_MS;
+    // Synced 2 minutes ago (< 5 min default cooldown) -> should NOT auto-sync on mount!
+    service.upsertLinkedAccount({
+      platform: "lichess",
+      username: "freshuser",
+      lastSyncedAt: new Date(NOW_MS - 2 * 60 * 1000).toISOString()
+    });
+    service.upsertImportedGames([
+      makeDraft({ id: "g-unanalyzed-prompt", pgn: SAMPLE_PGN_1 })
+    ]);
+
+    const requests: string[] = [];
+    const httpClient: GameImportHttpClient = {
+      async getText(url) {
+        requests.push(url);
+        return { status: 200, text: "" };
+      }
+    };
+
+    const renderer = render(
+      <GamesHubScreen
+        autoSyncOnMount
+        getNowMs={() => currentNow}
+        httpClient={httpClient}
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+    for (let tick = 0; tick < 5; tick += 1) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+
+    // Skipped auto-sync on mount because account was synced 2 minutes ago.
+    expect(requests.length).toBe(0);
+
+    // Prompts user clearly to start analyzing games to find puzzles when 0 puzzles exist yet.
+    expect(hasTestID(renderer, "games-analyze-prompt-card")).toBe(true);
+    expect(hasTestID(renderer, "games-analyze-recent")).toBe(true);
+
+    // Advance time by 11 minutes (> 10 min default cooldown) and simulate app returning from background -> triggers stale auto-sync!
+    currentNow = NOW_MS + 11 * 60 * 1000;
+    await act(async () => {
+      appStateMock.__emit("background");
+      appStateMock.__emit("active");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(requests.length).toBe(1);
+
+    // Turning auto-sync cooldown to 0 (Off) suppresses automatic foreground sync even when stale.
+    service.saveSettings({
+      ...service.getSettings(),
+      gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 0 }
+    });
+    currentNow = NOW_MS + 60 * 60 * 1000;
+    await act(async () => {
+      appStateMock.__emit("background");
+      appStateMock.__emit("active");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(requests.length).toBe(1);
+
+    // Manual sync button still forces immediate sync even when auto-sync is Off.
+    await act(async () => {
+      press(renderer, "games-sync-button");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(requests.length).toBe(2);
+  });
+
+  it("pauses batch analysis when interactive Stockfish is active (suspended) and auto-resumes when done", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    service.upsertImportedGames([
+      makeDraft({ id: "g-suspend-1", pgn: SAMPLE_PGN_1 })
+    ]);
+
+    let callCount = 0;
+    let releaseBlocked: (() => void) | null = null;
+    const controllableEngine: GameReviewEngine & PuzzleExtractionEngine = {
+      async analyze(req) {
+        callCount += 1;
+        if (callCount === 3) {
+          await new Promise<void>((resolve, reject) => {
+            const onAbort = () => {
+              const err = new Error("aborted");
+              err.name = "AbortError";
+              reject(err);
+            };
+            if (req.signal?.aborted) {
+              onAbort();
+              return;
+            }
+            req.signal?.addEventListener("abort", onAbort, { once: true });
+            releaseBlocked = resolve;
+          });
+        }
+        return [{ depth: 10, multipv: 1, move: "e2e4", pv: ["e2e4"], score: { kind: "cp", sideToMoveCentipawns: 20, whiteCentipawns: 20 } }];
+      }
+    };
+
+    let controllerRef: ReturnType<typeof useGamesBatchAnalysis> | null = null;
+
+    function Harness({ suspended }: { suspended: boolean }) {
+      const controller = useGamesBatchAnalysis({
+        store: service.gameReviewStore,
+        practiceService: service,
+        getEngine: () => controllableEngine,
+        humanPolicy: null,
+        suspended
+      });
+      controllerRef = controller;
+      return null;
+    }
+
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<Harness suspended={false} />);
+    });
+
+    await act(async () => {
+      controllerRef!.startBatch(service.listImportedGames());
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(controllerRef!.state.status).toBe("running");
+
+    // Interactive Stockfish opens -> batch auto-pauses with pausedByInteractiveEngine = true.
+    await act(async () => {
+      renderer.update(<Harness suspended />);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(controllerRef!.state.status).toBe("paused");
+    expect(controllerRef!.state.pausedByInteractiveEngine).toBe(true);
+
+    // Interactive Stockfish closes -> batch automatically resumes and completes the game!
+    await act(async () => {
+      renderer.update(<Harness suspended={false} />);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(releaseBlocked).not.toBeNull();
+    expect(controllerRef!.state.status).toBe("completed");
+    expect(service.getImportedGame("g-suspend-1")?.analysisStatus).toBe("complete");
+
+    act(() => renderer.unmount());
   });
 });

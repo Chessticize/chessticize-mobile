@@ -12,6 +12,11 @@ import {
   type ProgressV2Record,
   type ProgressV2Transport
 } from "../../../../packages/storage/src/progress-sync-v2.ts";
+import {
+  FakeGamesV1ZoneTransport,
+  type GamesV1Record,
+  type GamesV1ZoneTransport
+} from "../../../../packages/storage/src/games-sync-v1.ts";
 import type { ProgressSyncSnapshot } from "../../../../packages/storage/src/progress-sync.ts";
 import { normalizeLegacyProgressSyncSnapshot } from "../../../../packages/storage/src/local-data-export-validation.ts";
 
@@ -33,6 +38,7 @@ export function resolveProgressV2ActivePhase(
 export interface ICloudProgressSyncClient extends ProgressV2Transport {
   getAccountStatus(): Promise<ICloudAccountStatus>;
   captureFullV2ZoneForSupport?(): Promise<NativeV2SupportCapture>;
+  createZoneTransport?(zoneName: string): GamesV1ZoneTransport;
 }
 
 export type ProgressV2SupportCapture = {
@@ -71,10 +77,17 @@ const MAX_SUPPORT_CAPTURE_BYTES = 256 * 1024 * 1024;
 type NativeICloudProgressSyncModule = {
   getAccountStatus?: () => Promise<string>;
   ensureV2Zone?: () => Promise<unknown>;
+  ensureZone?: (zoneName: string) => Promise<unknown>;
   fetchV2Changes?: (previousToken: string | null) => Promise<NativeV2ChangePage>;
+  fetchZoneChanges?: (zoneName: string, previousToken: string | null) => Promise<NativeV2ChangePage>;
   captureV2ForSupport?: () => Promise<NativeV2SupportCapture>;
   modifyV2Records?: (
     saving: readonly ProgressV2Record[],
+    deleting: readonly string[]
+  ) => Promise<ProgressV2ModifyResult>;
+  modifyZoneRecords?: (
+    zoneName: string,
+    saving: readonly GamesV1Record[],
     deleting: readonly string[]
   ) => Promise<ProgressV2ModifyResult>;
   fetchV1Metadata?: () => Promise<ProgressV1MetadataResult>;
@@ -106,6 +119,7 @@ export class FakeICloudProgressSyncClient
   extends FakeProgressV2Transport
   implements ICloudProgressSyncClient {
   private status: ICloudAccountStatus;
+  private readonly zoneTransports = new Map<string, FakeGamesV1ZoneTransport>();
 
   constructor(
     options?: ConstructorParameters<typeof FakeProgressV2Transport>[0],
@@ -121,6 +135,19 @@ export class FakeICloudProgressSyncClient
 
   setAccountStatus(status: ICloudAccountStatus): void {
     this.status = status;
+  }
+
+  createZoneTransport(zoneName: string): GamesV1ZoneTransport {
+    let existing = this.zoneTransports.get(zoneName);
+    if (!existing) {
+      existing = new FakeGamesV1ZoneTransport(zoneName);
+      this.zoneTransports.set(zoneName, existing);
+    }
+    return existing;
+  }
+
+  getZoneTransport(zoneName: string): FakeGamesV1ZoneTransport {
+    return this.createZoneTransport(zoneName) as FakeGamesV1ZoneTransport;
   }
 }
 
@@ -196,6 +223,50 @@ export function createNativeICloudProgressSyncClient(): ICloudProgressSyncClient
       }
       return capture;
     };
+  }
+  if (
+    typeof nativeModule.ensureZone === "function" &&
+    typeof nativeModule.fetchZoneChanges === "function" &&
+    typeof nativeModule.modifyZoneRecords === "function"
+  ) {
+    client.createZoneTransport = (zoneName: string): GamesV1ZoneTransport => ({
+      ensureZone: async () => {
+        await nativeModule.ensureZone?.(zoneName);
+      },
+      fetchZoneChanges: async (previousToken) => {
+        try {
+          const page = await nativeModule.fetchZoneChanges?.(zoneName, previousToken ?? null);
+          if (!isNativeV2ChangePage(page)) {
+            throw new Error(`CloudKit returned an invalid ${zoneName} change page`);
+          }
+          return {
+            records: page.records,
+            deletedRecords: page.deletedRecords,
+            nextToken: page.nextToken,
+            moreComing: page.moreComing
+          };
+        } catch (error) {
+          if (isNativeErrorCode(error, "icloud_change_token_expired")) {
+            throw new ProgressV2ChangeTokenExpiredError();
+          }
+          if (isNativeErrorCode(error, "icloud_v2_zone_not_initialized")) {
+            throw new ProgressV2ZoneNotInitializedError();
+          }
+          throw error;
+        }
+      },
+      modifyRecords: async (input) => {
+        const result = await nativeModule.modifyZoneRecords?.(
+          zoneName,
+          input.saving,
+          input.deleting
+        );
+        if (!isNativeModifyResult(result)) {
+          throw new Error(`CloudKit returned an invalid ${zoneName} modify result`);
+        }
+        return result;
+      }
+    });
   }
   return client;
 }

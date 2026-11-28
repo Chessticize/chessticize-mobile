@@ -51,6 +51,8 @@ export interface GamesImportModalProps {
   ) => void;
   onImportPgn: (input: { pgnText: string; defaultUserColor: GameColor }) => void;
   onClearFeedback?: () => void;
+  unanalyzedCount?: number;
+  onStartAnalyzing?: () => void;
 }
 
 const MAX_GAME_OPTIONS = [25, 50, 100] as const;
@@ -67,7 +69,9 @@ export function GamesImportModal({
   onImportOlderForAccount,
   onRemoveAccount,
   onImportPgn,
-  onClearFeedback
+  onClearFeedback,
+  unanalyzedCount = 0,
+  onStartAnalyzing
 }: GamesImportModalProps): React.JSX.Element | null {
   const styles = useStyles();
   const theme = useTheme();
@@ -198,6 +202,15 @@ export function GamesImportModal({
                 <AppText style={styles.statusText} variant="subheadline">
                   {statusMessage}
                 </AppText>
+                {onStartAnalyzing && unanalyzedCount > 0 ? (
+                  <Button
+                    label={t("games.import.startAnalyzing", { count: unanalyzedCount })}
+                    size="compact"
+                    testID="games-import-start-analysis"
+                    variant="primary"
+                    onPress={onStartAnalyzing}
+                  />
+                ) : null}
               </View>
             ) : null}
 
@@ -472,8 +485,10 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.danger.s600
   },
   statusBanner: {
+    alignItems: "flex-start",
     backgroundColor: theme.colors.positive.s100,
     borderRadius: theme.shape.control,
+    gap: 10,
     padding: 12
   },
   statusText: {

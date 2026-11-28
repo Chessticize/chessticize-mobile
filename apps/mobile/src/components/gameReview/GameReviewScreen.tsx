@@ -69,7 +69,10 @@ export interface GameReviewScreenProps {
   BoardComponent?: GameReviewBoardComponent;
   onBack?: () => void;
   onDeleteGame?: (gameId: string) => void;
-  onPracticeGamePuzzles?: (gameId: string) => void;
+  onPracticeGamePuzzles?: (
+    gameId: string,
+    options?: { puzzleIds?: string[]; initialIndex?: number }
+  ) => void;
 }
 
 const EVAL_BAR_SIDE_WIDTH = 44;
@@ -388,6 +391,12 @@ export function GameReviewScreen({
             onPracticeGamePuzzles ? () => onPracticeGamePuzzles(game.id) : undefined
           }
           onSelectPuzzle={(puzzle) => {
+            if (onPracticeGamePuzzles) {
+              const puzzleIds = controller.summary.puzzles.map((item) => item.id);
+              const initialIndex = Math.max(0, puzzleIds.indexOf(puzzle.id));
+              onPracticeGamePuzzles(game.id, { puzzleIds, initialIndex });
+              return;
+            }
             const index = controller.keyMoments.findIndex(
               (item) => item.kind === "puzzle" && item.puzzle.id === puzzle.id
             );

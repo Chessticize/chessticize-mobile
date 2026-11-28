@@ -20,6 +20,7 @@ import {
 } from "react-native-gesture-handler";
 import {
   canPresentWhatsNew,
+  classifyMaiaTimeControl,
   arrowDuelReplyCuePresentationFor,
   buildSprintConfig,
   collectHistoryRatingKeys,
@@ -43,6 +44,7 @@ import {
   SERVER_CURATED_THEME_PRESENTATION,
   sprintHasRunDeadline,
   sprintSessionGuidePlanFor,
+  supportsArrowDuelOpponentReply,
   UciEngineArbiter
 } from "../../../../packages/core/src/index.ts";
 import type {
@@ -73,8 +75,10 @@ import {
   storedUserPuzzleToPuzzle,
   USER_GAME_RATING_KEY_PREFIX
 } from "../../../../packages/storage/src/game-review-store.ts";
-import type {
-  ReviewQueueDuePromotionResult
+import {
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
+  type GameReviewAutoSyncCooldownMinutes,
+  type ReviewQueueDuePromotionResult
 } from "../../../../packages/storage/src/practice-store.ts";
 import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import {
@@ -343,7 +347,10 @@ import {
 } from "./practice/review/ReviewSession.tsx";
 import { ReviewPanel } from "./practice/review/ReviewPanel.tsx";
 import { GamesHubScreen, type MyGamePuzzlesLaunchOptions } from "./games/GamesHubScreen.tsx";
+import { BatchAnalysisBanner } from "./games/BatchAnalysisBanner.tsx";
+import { useGamesBatchAnalysis } from "./games/useGamesBatchAnalysis.ts";
 import { GameReviewScreen } from "./gameReview/index.tsx";
+import { MaiaPlayScreen } from "./maiaPlay/index.tsx";
 import { pickPracticeStyles } from "./practice/shared/practiceStyles.tsx";
 
 interface Props {
@@ -803,6 +810,12 @@ export function PracticePocScreen({
     useState(
       () => service.getSettings().gameReview?.autoAddRecommendedToReview ?? false
     );
+  const [gameReviewAutoSyncCooldownMinutes, setGameReviewAutoSyncCooldownMinutes] =
+    useState<GameReviewAutoSyncCooldownMinutes>(
+      () =>
+        service.getSettings().gameReview?.autoSyncCooldownMinutes ??
+        DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+    );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
       ?? DEFAULT_OPPONENT_REPLY_SECONDS;
@@ -841,6 +854,7 @@ export function PracticePocScreen({
     start: () => void;
   } | null>(null);
   const [personalBestGuideIntent, setPersonalBestGuideIntent] = useState<PersonalBestGuideIntent | null>(null);
+  const [maiaPlayOpen, setMaiaPlayOpen] = useState(false);
   const [personalBestFirstEntryGuideAcknowledged, setPersonalBestFirstEntryGuideAcknowledged] =
     useState(false);
   const [personalBestGuideOpponentReplyEnabled, setPersonalBestGuideOpponentReplyEnabled] =
@@ -1106,6 +1120,19 @@ export function PracticePocScreen({
   }
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
+  const interactiveStockfishActive =
+    reviewAnalysisOpen ||
+    (tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null) ||
+    tab === "analysis";
+  const gamesBatchAnalysis = useGamesBatchAnalysis({
+    store: service.gameReviewStore,
+    practiceService: service,
+    getEngine: getSharedGameReviewArbiter,
+    onGameUpdated: () => {
+      refreshState();
+    },
+    suspended: interactiveStockfishActive
+  });
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [seededHistoryStatus, setSeededHistoryStatus] = useState<string | null>(null);
@@ -1167,6 +1194,7 @@ export function PracticePocScreen({
   const topLevelChromeVisible = isTopLevelChromeVisible({
     feedbackSnapshotVisible: feedbackSnapshot !== null,
     gameReviewOpen: activeGameReviewId !== null,
+    maiaPlayOpen,
     openSession: state?.status === "active" || state?.status === "paused",
     personalBestGuideVisible,
     personalBestHubVisible,
@@ -1638,7 +1666,18 @@ export function PracticePocScreen({
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     internalRunManagement.refresh();
     setAggregateRevision((current) => current + 1);
+    const refreshedSettings = service.getSettings();
     setReviewReminderPreference(service.getReviewReminderPreference());
+    if (!sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting) {
+      setArrowDuelOpponentReplyGlobalEnabled(refreshedSettings.arrowDuel.opponentReplyEnabled);
+    }
+    setGameReviewAutoAddRecommendedEnabled(
+      refreshedSettings.gameReview?.autoAddRecommendedToReview ?? false
+    );
+    setGameReviewAutoSyncCooldownMinutes(
+      refreshedSettings.gameReview?.autoSyncCooldownMinutes ??
+        DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+    );
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
       activeSprint && (activeSprint.status === "active" || activeSprint.status === "paused") && stateRef.current?.id !== activeSprint.id
@@ -1848,7 +1887,25 @@ export function PracticePocScreen({
     const settings = service.getSettings();
     service.saveSettings({
       ...settings,
-      gameReview: { autoAddRecommendedToReview: enabled }
+      gameReview: {
+        autoAddRecommendedToReview: enabled,
+        autoSyncCooldownMinutes:
+          settings.gameReview?.autoSyncCooldownMinutes ??
+          DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+      }
+    });
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function saveGameReviewAutoSyncCooldownMinutes(minutes: GameReviewAutoSyncCooldownMinutes): void {
+    setGameReviewAutoSyncCooldownMinutes(minutes);
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      gameReview: {
+        autoAddRecommendedToReview: settings.gameReview?.autoAddRecommendedToReview ?? false,
+        autoSyncCooldownMinutes: minutes
+      }
     });
     setSettingsRevision((current) => current + 1);
   }
@@ -3791,7 +3848,8 @@ export function PracticePocScreen({
   const arrowDuelReplyChallengeProductionVisible = Boolean(
     !arrowDuelReplyChallengePreviewVisible &&
       state?.config.opponentReply?.enabled &&
-      currentPuzzle?.kind === "arrow_duel"
+      currentPuzzle?.kind === "arrow_duel" &&
+      supportsArrowDuelOpponentReply(currentPuzzle.puzzle)
   );
   const displayedArrowDuelPuzzle =
     feedbackSnapshot?.currentPuzzle.kind === "arrow_duel"
@@ -5132,6 +5190,25 @@ export function PracticePocScreen({
               onReplay={() => showSessionReplay()}
               onReplayMistakes={() => showSessionReplay("mistakes")}
             />
+          ) : maiaPlayOpen ? (
+            <MaiaPlayScreen
+              moveFeedbackClient={moveFeedbackClient}
+              service={service}
+              onBack={() => {
+                setMaiaPlayOpen(false);
+                refreshState();
+              }}
+              onOpenGameReview={(savedGameId) => {
+                setMaiaPlayOpen(false);
+                setActiveGameReviewInitialPly(null);
+                setActiveGameReviewId(savedGameId);
+                setTab("games");
+                refreshState();
+              }}
+              onStoreMutated={() => {
+                refreshState();
+              }}
+            />
           ) : tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame !== null ? (
             <GameReviewScreen
               engine={getSharedGameReviewArbiter()}
@@ -5150,8 +5227,14 @@ export function PracticePocScreen({
                 setActiveGameReviewInitialPly(null);
                 refreshState();
               }}
-              onPracticeGamePuzzles={(gameId) => {
-                startMyGamePuzzlesSessionForOptions({ gameId });
+              onPracticeGamePuzzles={(gameId, options) => {
+                startMyGamePuzzlesSessionForOptions({
+                  gameId,
+                  ...(options?.puzzleIds ? { puzzleIds: options.puzzleIds } : {}),
+                  ...(options?.initialIndex !== undefined
+                    ? { initialIndex: options.initialIndex }
+                    : {})
+                });
               }}
             />
           ) : (
@@ -5201,6 +5284,24 @@ export function PracticePocScreen({
             ]}
           >
             {appHeaderScrolls ? appShellHeader : null}
+            {gamesBatchAnalysis.state.status !== "idle" &&
+            !isOpenSession &&
+            !(tab === "games" && gamePracticeEntries.length === 0 && activeReviewGame === null) ? (
+              <BatchAnalysisBanner
+                compact
+                state={gamesBatchAnalysis.state}
+                testID="global-games-batch-strip"
+                onCancel={gamesBatchAnalysis.cancel}
+                onDismiss={gamesBatchAnalysis.dismiss}
+                onOpenGames={() => {
+                  setGamePracticeEntries([]);
+                  setActiveGameReviewId(null);
+                  setTab("games");
+                }}
+                onPause={gamesBatchAnalysis.pause}
+                onResume={gamesBatchAnalysis.resume}
+              />
+            ) : null}
             {reviewReminderPermissionPromptVisible ? (
               <ReviewReminderPermissionPrompt
                 onDismiss={dismissReviewReminderPermissionPrompt}
@@ -5404,12 +5505,22 @@ export function PracticePocScreen({
                       currentRating={activeRunManagementPresentation
                         ? selectedManagedRun?.elo ?? RATING_FLOOR
                         : currentRating}
+                      maiaPlay={(() => {
+                        const maiaPrefs = service.getMaiaSetupPreferences();
+                        const maiaTimeClass = classifyMaiaTimeControl(maiaPrefs.timeControl);
+                        return {
+                          activeGame: service.getActiveMaiaGame() ?? null,
+                          preferences: maiaPrefs,
+                          rating: service.getMaiaRating(maiaTimeClass)
+                        };
+                      })()}
                       progress={practiceProgress}
                       personalBestChallenge={personalBestPresentation}
                       runManagement={activeRunManagementPresentation}
                       sprintRulesGuide={sprintRulesGuidePresentation}
                       sprintRulesGuideVisible={sprintRulesGuideVisible}
                       tacticalProfile={resolvedTacticalProfilePresentation}
+                      onOpenMaiaPlay={() => setMaiaPlayOpen(true)}
                       resumableSprint={resumableSprint}
                       onDismissSprintRulesGuide={() => {
                         setSprintRulesGuideVisible(false);
@@ -5792,6 +5903,8 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   analysisEngine={tab === "games" ? getSharedGameReviewArbiter() : null}
                   autoSyncOnMount
+                  batchController={gamesBatchAnalysis}
+                  getNowMs={currentTimeMs}
                   hubView={gamesHubView}
                   importModalVisible={gamesImportModalOpen}
                   nowMs={nowMs}
@@ -5810,6 +5923,7 @@ export function PracticePocScreen({
                   onPracticeMyGamePuzzles={(options) => {
                     startMyGamePuzzlesSessionForOptions(options);
                   }}
+                  onPlayWithMaia={() => setMaiaPlayOpen(true)}
                 />
               )
             ) : null}
@@ -5827,6 +5941,12 @@ export function PracticePocScreen({
                   {
                     enabled: gameReviewAutoAddRecommendedEnabled,
                     onChange: saveGameReviewAutoAddRecommendedEnabled
+                  }
+                }
+                gameReviewAutoSyncCooldownSetting={
+                  {
+                    minutes: gameReviewAutoSyncCooldownMinutes,
+                    onChange: saveGameReviewAutoSyncCooldownMinutes
                   }
                 }
                 feedbackIssuesOpener={feedbackIssuesOpener}

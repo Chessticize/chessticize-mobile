@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type AppStateStatus
+} from "react-native";
 import {
   curatedPuzzleThemes,
   defaultOnboardingGuideProgress,
@@ -15,6 +23,9 @@ import {
   type GameReviewEngine,
   type PuzzleExtractionEngine
 } from "../../../../../packages/core/src/index.ts";
+import {
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+} from "../../../../../packages/storage/src/practice-store.ts";
 import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import {
   USER_GAME_RATING_KEY_PREFIX,
@@ -67,6 +78,7 @@ import {
 } from "./gamesPresentation.ts";
 import {
   useGamesBatchAnalysis,
+  type GamesBatchAnalysisController,
   type GamesBatchAnalysisState
 } from "./useGamesBatchAnalysis.ts";
 import { useUserPuzzleDifficultyBackfill } from "./useUserPuzzleDifficultyBackfill.ts";
@@ -82,6 +94,25 @@ export interface MyGamePuzzlesLaunchOptions {
 
 const GAMES_PAGE_SIZE = 50;
 const PUZZLES_PAGE_SIZE = 50;
+export const AUTO_SYNC_STALE_MS = DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES * 60 * 1000;
+
+export function linkedAccountsNeedingAutoSync(
+  accounts: readonly LinkedGameAccount[],
+  nowMs: number,
+  staleMs: number = AUTO_SYNC_STALE_MS
+): LinkedGameAccount[] {
+  const effectiveStaleMs = Math.max(0, staleMs);
+  return accounts.filter((account) => {
+    if (!account.lastSyncedAt) {
+      return true;
+    }
+    const lastSyncedMs = Date.parse(account.lastSyncedAt);
+    if (!Number.isFinite(lastSyncedMs)) {
+      return true;
+    }
+    return nowMs - lastSyncedMs >= effectiveStaleMs;
+  });
+}
 
 export interface GamesHubScreenProps {
   service: PracticeService;
@@ -90,8 +121,10 @@ export interface GamesHubScreenProps {
   analysisEngine?: (GameReviewEngine & PuzzleExtractionEngine) | null;
   stockfish?: MobileStockfishCapabilities;
   nowMs?: number;
+  getNowMs?: () => number;
   onOpenGameReview: (gameId: string) => void;
   onPracticeMyGamePuzzles?: (options?: MyGamePuzzlesLaunchOptions) => void;
+  onPlayWithMaia?: () => void;
   hubView?: "games" | "puzzles";
   onHubViewChange?: (view: "games" | "puzzles") => void;
   importModalVisible?: boolean;
@@ -99,7 +132,9 @@ export interface GamesHubScreenProps {
   initialImportTab?: GamesImportTab;
   initialError?: string | null;
   initialBatchState?: GamesBatchAnalysisState;
+  batchController?: GamesBatchAnalysisController;
   autoSyncOnMount?: boolean;
+  autoSyncStaleMs?: number;
   onStoreMutated?: () => void;
 }
 
@@ -109,9 +144,11 @@ export function GamesHubScreen({
   httpClient,
   analysisEngine,
   stockfish,
-  nowMs = Date.now(),
+  nowMs: nowMsProp,
+  getNowMs,
   onOpenGameReview,
   onPracticeMyGamePuzzles,
+  onPlayWithMaia,
   hubView: controlledHubView,
   onHubViewChange,
   importModalVisible,
@@ -119,9 +156,21 @@ export function GamesHubScreen({
   initialImportTab = "chess_com",
   initialError = null,
   initialBatchState,
+  batchController,
   autoSyncOnMount = false,
+  autoSyncStaleMs,
   onStoreMutated
 }: GamesHubScreenProps): React.JSX.Element {
+  const nowMs = nowMsProp ?? Date.now();
+  const resolveNowMs = useCallback((): number => {
+    if (getNowMs) {
+      return getNowMs();
+    }
+    if (nowMsProp !== undefined) {
+      return nowMsProp;
+    }
+    return Date.now();
+  }, [getNowMs, nowMsProp]);
   const styles = useStyles();
   const theme = useTheme();
   const { locale, t } = useTranslation();
@@ -213,16 +262,20 @@ export function GamesHubScreen({
     };
   }, []);
 
-  const batch = useGamesBatchAnalysis({
+  const localBatch = useGamesBatchAnalysis({
     store: service.gameReviewStore,
     practiceService: service,
     getEngine: resolveAnalysisEngine,
     onGameUpdated: refreshHub,
+    disabled: Boolean(batchController),
     ...(initialBatchState ? { initialState: initialBatchState } : {})
   });
+  const batch = batchController ?? localBatch;
 
   const snapshot = useMemo(() => {
     void revision;
+    void batch.state.completedGames;
+    void batch.state.status;
     const allGames = service.listImportedGames();
     const linkedAccounts = service.listLinkedAccounts();
     const userPuzzles = service.listUserPuzzles();
@@ -266,7 +319,7 @@ export function GamesHubScreen({
       userPuzzleCount,
       diagnosis
     };
-  }, [revision, service]);
+  }, [batch.state.completedGames, batch.state.status, revision, service]);
 
   const availableAccountFilters = useMemo(() => {
     const byKey = new Map<string, { key: string; label: string }>();
@@ -283,6 +336,10 @@ export function GamesHubScreen({
       if (game.platform === "pgn") {
         if (!byKey.has("pgn")) {
           byKey.set("pgn", { key: "pgn", label: "PGN" });
+        }
+      } else if (game.platform === "maia") {
+        if (!byKey.has("maia")) {
+          byKey.set("maia", { key: "maia", label: "Maia" });
         }
       } else if (game.username) {
         const key = `${game.platform}:${game.username.toLowerCase()}`;
@@ -330,6 +387,9 @@ export function GamesHubScreen({
       }
       if (effectiveAccountFilter === "pgn") {
         return game.platform === "pgn";
+      }
+      if (effectiveAccountFilter === "maia") {
+        return game.platform === "maia";
       }
       const key = `${game.platform}:${(game.username ?? "").toLowerCase()}`;
       return key === effectiveAccountFilter;
@@ -570,7 +630,7 @@ export function GamesHubScreen({
               maxGames,
               ...(account.since ? { since: account.since } : {})
             });
-      const syncedAt = new Date(nowMs).toISOString();
+      const syncedAt = new Date(resolveNowMs()).toISOString();
       const upsertResult = service.upsertImportedGames(drafts, syncedAt);
       service.upsertLinkedAccount({
         platform: account.platform,
@@ -580,7 +640,7 @@ export function GamesHubScreen({
       refreshHub();
       return { inserted: upsertResult.inserted, skipped: upsertResult.skipped };
     },
-    [nowMs, refreshHub, resolveHttpClient, service]
+    [refreshHub, resolveHttpClient, resolveNowMs, service]
   );
 
   const handleLinkAndSync = useCallback(
@@ -619,29 +679,60 @@ export function GamesHubScreen({
     [locale, syncAccount, t]
   );
 
+  const syncLinkedAccountsList = useCallback(
+    async (accounts: readonly LinkedGameAccount[]): Promise<void> => {
+      if (syncing || loadingOlder || accounts.length === 0) {
+        return;
+      }
+      setSyncing(true);
+      setHubError(null);
+      try {
+        for (const account of accounts) {
+          await syncAccount(
+            {
+              platform: account.platform,
+              username: account.username,
+              ...(account.lastSyncedAt ? { since: account.lastSyncedAt } : {})
+            },
+            50
+          );
+        }
+      } catch (error) {
+        setHubError(gameImportErrorMessage(error, locale));
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [loadingOlder, locale, syncAccount, syncing]
+  );
+
   const handleSyncAllLinked = useCallback(async (): Promise<void> => {
-    if (syncing || loadingOlder || snapshot.linkedAccounts.length === 0) {
+    await syncLinkedAccountsList(snapshot.linkedAccounts);
+  }, [snapshot.linkedAccounts, syncLinkedAccountsList]);
+
+  const handleAutoSyncStaleLinked = useCallback(async (): Promise<void> => {
+    const effectiveStaleMs =
+      autoSyncStaleMs !== undefined
+        ? autoSyncStaleMs
+        : (() => {
+            const configuredMinutes =
+              service.getSettings().gameReview?.autoSyncCooldownMinutes ??
+              DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES;
+            return configuredMinutes <= 0 ? null : configuredMinutes * 60 * 1000;
+          })();
+    if (effectiveStaleMs === null) {
       return;
     }
-    setSyncing(true);
-    setHubError(null);
-    try {
-      for (const account of snapshot.linkedAccounts) {
-        await syncAccount(
-          {
-            platform: account.platform,
-            username: account.username,
-            ...(account.lastSyncedAt ? { since: account.lastSyncedAt } : {})
-          },
-          50
-        );
-      }
-    } catch (error) {
-      setHubError(gameImportErrorMessage(error, locale));
-    } finally {
-      setSyncing(false);
+    const staleAccounts = linkedAccountsNeedingAutoSync(
+      service.listLinkedAccounts(),
+      resolveNowMs(),
+      effectiveStaleMs
+    );
+    if (staleAccounts.length === 0) {
+      return;
     }
-  }, [loadingOlder, locale, snapshot.linkedAccounts, syncAccount, syncing]);
+    await syncLinkedAccountsList(staleAccounts);
+  }, [autoSyncStaleMs, resolveNowMs, service, syncLinkedAccountsList]);
 
   const handleImportOlderGames = useCallback(
     async (
@@ -744,8 +835,25 @@ export function GamesHubScreen({
       return;
     }
     autoSyncedOnMountRef.current = true;
-    void handleSyncAllLinked();
-  }, [autoSyncOnMount, handleSyncAllLinked, snapshot.linkedAccounts.length]);
+    void handleAutoSyncStaleLinked();
+  }, [autoSyncOnMount, handleAutoSyncStaleLinked, snapshot.linkedAccounts.length]);
+
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState ?? "active");
+  useEffect(() => {
+    if (!autoSyncOnMount) {
+      return;
+    }
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
+      if ((prevState === "background" || prevState === "inactive") && nextState === "active") {
+        void handleAutoSyncStaleLinked();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [autoSyncOnMount, handleAutoSyncStaleLinked]);
 
   const handleRemoveAccount = useCallback(
     (
@@ -1089,6 +1197,15 @@ export function GamesHubScreen({
                 variant="secondary"
                 onPress={() => openModal("pgn")}
               />
+              {onPlayWithMaia ? (
+                <Button
+                  label={t("maiaPlay.title")}
+                  stretch
+                  testID="games-empty-play-maia"
+                  variant="secondary"
+                  onPress={onPlayWithMaia}
+                />
+              ) : null}
             </View>
           </View>
         </Section>
@@ -1590,6 +1707,23 @@ export function GamesHubScreen({
                 onResume={batch.resume}
               />
 
+              {!batchBusy &&
+              batch.state.status === "idle" &&
+              !selectMode &&
+              unanalyzedGames.length > 0 &&
+              snapshot.userPuzzleCount === 0 ? (
+                <View style={styles.analyzePromptCard} testID="games-analyze-prompt-card">
+                  <AppText variant="headline">{t("games.analyzePrompt.title")}</AppText>
+                  <Button
+                    label={t("games.analyzePrompt.action", { count: unanalyzedGames.length })}
+                    size="compact"
+                    testID="games-analyze-recent"
+                    variant="primary"
+                    onPress={handleAnalyzeAll}
+                  />
+                </View>
+              ) : null}
+
               {!batchBusy && (unanalyzedGames.length > 0 || filteredGames.length > 0) ? (
                 <View style={styles.controlsStrip} testID="games-top-bar">
                   {selectMode ? (
@@ -1627,7 +1761,8 @@ export function GamesHubScreen({
                     </View>
                   ) : (
                     <View style={styles.secondaryActionRow}>
-                      {unanalyzedGames.length > 0 ? (
+                      {unanalyzedGames.length > 0 &&
+                      !(batch.state.status === "idle" && snapshot.userPuzzleCount === 0) ? (
                         <Button
                           label={t("games.action.analyzeAll", { count: unanalyzedGames.length })}
                           size="compact"
@@ -1825,6 +1960,7 @@ export function GamesHubScreen({
         initialTab={modalInitialTab}
         linkedAccounts={snapshot.linkedAccounts}
         statusMessage={modalStatus}
+        unanalyzedCount={unanalyzedGames.length}
         visible={modalOpen}
         onClearFeedback={() => {
           setModalError(null);
@@ -1837,6 +1973,14 @@ export function GamesHubScreen({
         onImportPgn={handleImportPgn}
         onLinkAndSync={handleLinkAndSync}
         onRemoveAccount={handleRemoveAccount}
+        onStartAnalyzing={
+          !batchBusy && unanalyzedGames.length > 0
+            ? () => {
+                setModalOpen(false);
+                batch.startBatch(unanalyzedGames);
+              }
+            : undefined
+        }
       />
     </View>
   );
@@ -2339,5 +2483,14 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     gap: 6
+  },
+  analyzePromptCard: {
+    alignItems: "flex-start",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
   }
 }));

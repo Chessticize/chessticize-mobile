@@ -136,7 +136,12 @@ function isAppearancePreference(value: unknown): boolean {
 }
 
 function isGameReviewSettings(value: unknown): boolean {
-  return isRecord(value) && typeof value.autoAddRecommendedToReview === "boolean";
+  return isRecord(value) &&
+    typeof value.autoAddRecommendedToReview === "boolean" &&
+    isOptional(
+      value.autoSyncCooldownMinutes,
+      (v): v is number => v === 0 || v === 5 || v === 10 || v === 30
+    );
 }
 
 function isOnboardingGuideProgress(value: unknown): boolean {

@@ -94,27 +94,6 @@
         "primaryKeyIndex": 0
       },
       {
-        "name": "onboarding_game_review_guide_seen",
-        "type": "INTEGER",
-        "notNull": true,
-        "defaultValue": "0",
-        "primaryKeyIndex": 0
-      },
-      {
-        "name": "onboarding_games_guide_seen",
-        "type": "INTEGER",
-        "notNull": true,
-        "defaultValue": "0",
-        "primaryKeyIndex": 0
-      },
-      {
-        "name": "onboarding_welcome_seen",
-        "type": "INTEGER",
-        "notNull": true,
-        "defaultValue": "0",
-        "primaryKeyIndex": 0
-      },
-      {
         "name": "piece_set",
         "type": "TEXT",
         "notNull": true,
@@ -895,6 +874,160 @@
         "notNull": true,
         "defaultValue": null,
         "primaryKeyIndex": 2
+      }
+    ],
+    "indexes": [],
+    "foreignKeys": []
+  },
+  {
+    "name": "maia_active_game",
+    "columns": [
+      {
+        "name": "singleton_id",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "state_json",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [],
+    "foreignKeys": []
+  },
+  {
+    "name": "maia_preferences",
+    "columns": [
+      {
+        "name": "color_preference",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'random'",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "opponent_rating",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "1200",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rated",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "1",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "singleton_id",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "thinking_pace",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'human'",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "time_control_json",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [],
+    "foreignKeys": []
+  },
+  {
+    "name": "maia_ratings",
+    "columns": [
+      {
+        "name": "draws",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "0",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "games",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "0",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "losses",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "0",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_deviation",
+        "type": "REAL",
+        "notNull": true,
+        "defaultValue": "350",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "time_class",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "volatility",
+        "type": "REAL",
+        "notNull": true,
+        "defaultValue": "0.06",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "wins",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "0",
+        "primaryKeyIndex": 0
       }
     ],
     "indexes": [],

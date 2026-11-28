@@ -363,7 +363,8 @@ test("PracticeService persists settings through the store boundary", () => {
       opponentReplyEnabled: true
     },
     gameReview: {
-      autoAddRecommendedToReview: false
+      autoAddRecommendedToReview: false,
+      autoSyncCooldownMinutes: 10
     },
     sync: {
       iCloudEnabled: true
@@ -436,7 +437,8 @@ test("PracticeService persists settings through the store boundary", () => {
       opponentReplyEnabled: true
     },
     gameReview: {
-      autoAddRecommendedToReview: false
+      autoAddRecommendedToReview: false,
+      autoSyncCooldownMinutes: 10
     },
     sync: {
       iCloudEnabled: true

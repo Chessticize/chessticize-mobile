@@ -477,9 +477,11 @@ function runStoreContractSuite(
         sideToMoveMate: 1
       });
 
-      // Extract BOTH a line puzzle and an arrow_duel puzzle.
+      // Extract BOTH a line puzzle and an arrow_duel puzzle (unique mate-in-1 -> own_mistake_punished).
       const lineExtracted = makeExtractedLinePuzzle(g1.id);
-      const arrowExtracted = makeExtractedArrowDuelPuzzle(g1.id);
+      const arrowExtracted = makeExtractedArrowDuelPuzzle(g1.id, {
+        momentKind: "own_mistake_punished"
+      });
       const saved = store.replaceGameUserPuzzles(
         g1.id,
         [lineExtracted, arrowExtracted],
@@ -611,14 +613,16 @@ function runStoreContractSuite(
     try {
       let store = ctx.store;
       assert.equal(store.getSettings().gameReview?.autoAddRecommendedToReview, false);
+      assert.equal(store.getSettings().gameReview?.autoSyncCooldownMinutes, 10);
       store.saveSettings({
         ...store.getSettings(),
-        gameReview: { autoAddRecommendedToReview: true }
+        gameReview: { autoAddRecommendedToReview: true, autoSyncCooldownMinutes: 30 }
       });
       if (ctx.reopen) {
         store = await ctx.reopen();
       }
       assert.equal(store.getSettings().gameReview?.autoAddRecommendedToReview, true);
+      assert.equal(store.getSettings().gameReview?.autoSyncCooldownMinutes, 30);
 
       const g1 = makeImportedGame({ id: "chess_com:live:cascade1" });
       const g2 = makeImportedGame({ id: "chess_com:live:cascade2" });

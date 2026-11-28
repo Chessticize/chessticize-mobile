@@ -28,6 +28,8 @@
 		B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B35300042E70000100A00001 /* libsqlite3.tbd */; };
 		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
 		C41500032E80000100A00001 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C41500042E80000100A00001 /* StoreKit.framework */; };
+		E77900012F20000100A00001 /* BackgroundBatchAnalysis.m in Sources */ = {isa = PBXBuildFile; fileRef = E77900022F20000100A00001 /* BackgroundBatchAnalysis.m */; };
+		E77900032F20000100A00001 /* BackgroundTasks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E77900042F20000100A00001 /* BackgroundTasks.framework */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		D47430012F10000100A00001 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D47430022F10000100A00001 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
@@ -63,6 +65,8 @@
 		B35300042E70000100A00001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };
 		C41500042E80000100A00001 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		E77900022F20000100A00001 /* BackgroundBatchAnalysis.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = BackgroundBatchAnalysis.m; path = ChessticizeMobile/BackgroundBatchAnalysis.m; sourceTree = "<group>"; };
+		E77900042F20000100A00001 /* BackgroundTasks.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = BackgroundTasks.framework; path = System/Library/Frameworks/BackgroundTasks.framework; sourceTree = SDKROOT; };
 		D47430112F10000100A00001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = ChessticizeMobile/en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		D47430122F10000100A00001 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "ChessticizeMobile/zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		D47430132F10000100A00001 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "ChessticizeMobile/zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
@@ -81,6 +85,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */,
+				E77900032F20000100A00001 /* BackgroundTasks.framework in Frameworks */,
 				C41500032E80000100A00001 /* StoreKit.framework in Frameworks */,
 				9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */,
 				B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */,
@@ -97,6 +102,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				2A7D186A2E50000100A00001 /* ApplicationMetadata.m */,
 				C41500022E80000100A00001 /* AppStoreReviewRequest.m */,
+				E77900022F20000100A00001 /* BackgroundBatchAnalysis.m */,
 				A24700022E70000100A00001 /* MoveFeedback.m */,
 				A76900022E70000100A00001 /* NativeHumanPolicy.m */,
 				A6090B022F00000100A00001 /* ChessticizeSymbolView.mm */,
@@ -358,6 +364,7 @@
 			files = (
 				2A7D186B2E50000100A00001 /* ApplicationMetadata.m in Sources */,
 				C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */,
+				E77900012F20000100A00001 /* BackgroundBatchAnalysis.m in Sources */,
 				A24700012E70000100A00001 /* MoveFeedback.m in Sources */,
 				A76900012E70000100A00001 /* NativeHumanPolicy.m in Sources */,
 				A6090B012F00000100A00001 /* ChessticizeSymbolView.mm in Sources */,

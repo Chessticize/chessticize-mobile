@@ -11,6 +11,13 @@ import {
   type PuzzleExtractionEngine
 } from "../../../../../packages/core/src/index.ts";
 import { createNativeHumanPolicyModel } from "../../platform/nativeHumanPolicy.ts";
+import {
+  createNativeBackgroundBatchAnalysisBridge,
+  INACTIVE_BACKGROUND_BATCH_RESULT,
+  type BackgroundBatchAnalysisBridge,
+  type BackgroundBatchAnalysisMode
+} from "../../platform/backgroundBatchAnalysis.ts";
+import { getActiveLocale, translate } from "../../i18n/index.ts";
 import type { PracticeService } from "../../../../../packages/storage/src/practice-service.ts";
 import { autoEnrollRecommendedPuzzlesForGame } from "./autoEnrollRecommended.ts";
 import {
@@ -34,6 +41,7 @@ export interface GamesBatchAnalysisState {
   generatedPuzzles: number;
   errorMessage: string | null;
   pausedByBackground: boolean;
+  pausedByInteractiveEngine?: boolean;
 }
 
 export const INITIAL_GAMES_BATCH_STATE: GamesBatchAnalysisState = {
@@ -46,7 +54,8 @@ export const INITIAL_GAMES_BATCH_STATE: GamesBatchAnalysisState = {
   completedGames: 0,
   generatedPuzzles: 0,
   errorMessage: null,
-  pausedByBackground: false
+  pausedByBackground: false,
+  pausedByInteractiveEngine: false
 };
 
 export interface UseGamesBatchAnalysisOptions {
@@ -58,6 +67,12 @@ export interface UseGamesBatchAnalysisOptions {
   pass1Options?: Omit<EvaluateGamePass1Options, "initialEvaluations" | "onPlyEvaluated" | "signal">;
   extractionOptions?: Omit<ExtractGamePuzzlesOptions, "signal">;
   initialState?: GamesBatchAnalysisState;
+  /** When true (e.g. interactive Stockfish analysis or single-game review is active), pauses batch and auto-resumes when false. */
+  suspended?: boolean;
+  /** When true, disables internal listeners (used when an external batch controller is injected). */
+  disabled?: boolean;
+  /** Optional platform bridge for Android Foreground Service / iOS BGContinuedProcessingTask & beginBackgroundTask. */
+  backgroundBridge?: BackgroundBatchAnalysisBridge | null;
 }
 
 export interface GamesBatchAnalysisController {
@@ -79,7 +94,7 @@ const DEFAULT_MOBILE_BATCH_PASS2_DEEP_LIMIT = {
   nodes: 250_000
 } as const;
 
-type PauseReason = "none" | "user" | "background" | "cancel";
+type PauseReason = "none" | "user" | "background" | "interactive" | "cancel";
 
 export function useGamesBatchAnalysis({
   store,
@@ -89,7 +104,10 @@ export function useGamesBatchAnalysis({
   onGameUpdated,
   pass1Options,
   extractionOptions,
-  initialState = INITIAL_GAMES_BATCH_STATE
+  initialState = INITIAL_GAMES_BATCH_STATE,
+  suspended = false,
+  disabled = false,
+  backgroundBridge
 }: UseGamesBatchAnalysisOptions): GamesBatchAnalysisController {
   const [state, setState] = useState<GamesBatchAnalysisState>(initialState);
 
@@ -100,11 +118,168 @@ export function useGamesBatchAnalysis({
   const runningRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pauseReasonRef = useRef<PauseReason>("none");
+  const pausedByBackgroundRef = useRef(Boolean(initialState.pausedByBackground));
+  const pausedByInteractiveRef = useRef(Boolean(initialState.pausedByInteractiveEngine));
+  const suspendedRef = useRef(suspended);
+  suspendedRef.current = suspended;
   const mountedRef = useRef(true);
   const runGenerationRef = useRef(0);
   const defaultHumanPolicyRef = useRef<ManagedHumanPolicyModel | null | undefined>(undefined);
   const humanPolicyPropRef = useRef(humanPolicy);
   humanPolicyPropRef.current = humanPolicy;
+  const defaultBackgroundBridgeRef = useRef<BackgroundBatchAnalysisBridge | null | undefined>(
+    undefined
+  );
+  const backgroundBridgePropRef = useRef(backgroundBridge);
+  backgroundBridgePropRef.current = backgroundBridge;
+  const backgroundSessionActiveRef = useRef(false);
+  const supportsContinuedBackgroundRef = useRef(false);
+  const backgroundModeRef = useRef<BackgroundBatchAnalysisMode>("none");
+  const lastProgressPushUnitsRef = useRef(-1);
+  const lastProgressPushAtMsRef = useRef(0);
+
+  const resolveBackgroundBridge = useCallback((): BackgroundBatchAnalysisBridge | null => {
+    if (backgroundBridgePropRef.current !== undefined) {
+      return backgroundBridgePropRef.current;
+    }
+    if (defaultBackgroundBridgeRef.current === undefined) {
+      defaultBackgroundBridgeRef.current = createNativeBackgroundBatchAnalysisBridge();
+    }
+    return defaultBackgroundBridgeRef.current;
+  }, []);
+
+  const resetBackgroundSessionFlags = useCallback((): void => {
+    backgroundSessionActiveRef.current = false;
+    supportsContinuedBackgroundRef.current = false;
+    backgroundModeRef.current = "none";
+    lastProgressPushUnitsRef.current = -1;
+    lastProgressPushAtMsRef.current = 0;
+  }, []);
+
+  const formatAnalyzingSubtitle = useCallback(
+    (current: number, total: number, currentPly = 0, totalPlies = 0): string => {
+      const locale = getActiveLocale();
+      if (totalPlies > 0) {
+        return translate(locale, "games.batch.analyzingWithMove", {
+          current,
+          total,
+          ply: currentPly,
+          totalPlies
+        });
+      }
+      return translate(locale, "games.batch.analyzing", {
+        current,
+        total
+      });
+    },
+    []
+  );
+
+  const startBackgroundSession = useCallback(
+    (totalGames: number, currentIndex: number, generation: number): void => {
+      const bridge = resolveBackgroundBridge();
+      if (!bridge) {
+        resetBackgroundSessionFlags();
+        return;
+      }
+      const locale = getActiveLocale();
+      lastProgressPushUnitsRef.current = -1;
+      lastProgressPushAtMsRef.current = 0;
+      void bridge
+        .start({
+          title: "Chessticize",
+          subtitle: formatAnalyzingSubtitle(Math.max(1, currentIndex), Math.max(1, totalGames)),
+          totalUnits: Math.max(1, totalGames) * 100,
+          pauseLabel: translate(locale, "common.pause"),
+          cancelLabel: translate(locale, "common.cancel")
+        })
+        .then((result) => {
+          const normalized = result ?? INACTIVE_BACKGROUND_BATCH_RESULT;
+          if (!mountedRef.current || generation !== runGenerationRef.current || !runningRef.current) {
+            if (normalized.active) {
+              void bridge.stop();
+            }
+            return;
+          }
+          backgroundSessionActiveRef.current = normalized.active;
+          supportsContinuedBackgroundRef.current = normalized.supportsContinuedBackground;
+          backgroundModeRef.current = normalized.mode;
+        })
+        .catch(() => {
+          resetBackgroundSessionFlags();
+        });
+    },
+    [formatAnalyzingSubtitle, resetBackgroundSessionFlags, resolveBackgroundBridge]
+  );
+
+  const pushBackgroundProgress = useCallback(
+    (
+      currentIndex: number,
+      totalGames: number,
+      completedGames: number,
+      currentPly: number,
+      totalPlies: number,
+      force = false
+    ): void => {
+      const bridge = resolveBackgroundBridge();
+      if (!bridge || !backgroundSessionActiveRef.current) {
+        return;
+      }
+      const safeTotalGames = Math.max(1, totalGames);
+      const totalUnits = safeTotalGames * 100;
+      const inGameUnits =
+        totalPlies > 0 ? Math.min(99, Math.floor((currentPly / totalPlies) * 100)) : 0;
+      const completedUnits = Math.min(totalUnits, completedGames * 100 + inGameUnits);
+      const nowMs = Date.now();
+      if (
+        !force &&
+        Math.abs(completedUnits - lastProgressPushUnitsRef.current) < 2 &&
+        nowMs - lastProgressPushAtMsRef.current < 500
+      ) {
+        return;
+      }
+      lastProgressPushUnitsRef.current = completedUnits;
+      lastProgressPushAtMsRef.current = nowMs;
+      void bridge.updateProgress({
+        title: "Chessticize",
+        subtitle: formatAnalyzingSubtitle(currentIndex, safeTotalGames, currentPly, totalPlies),
+        completedUnits,
+        totalUnits
+      });
+    },
+    [formatAnalyzingSubtitle, resolveBackgroundBridge]
+  );
+
+  const stopBackgroundSession = useCallback((): void => {
+    const bridge = resolveBackgroundBridge();
+    const wasActive = backgroundSessionActiveRef.current;
+    resetBackgroundSessionFlags();
+    if (bridge && wasActive) {
+      void bridge.stop();
+    }
+  }, [resetBackgroundSessionFlags, resolveBackgroundBridge]);
+
+  const finishBackgroundSession = useCallback(
+    (completedGames: number, generatedPuzzles: number): void => {
+      const bridge = resolveBackgroundBridge();
+      const wasActive = backgroundSessionActiveRef.current;
+      resetBackgroundSessionFlags();
+      if (!bridge || !wasActive) {
+        return;
+      }
+      const locale = getActiveLocale();
+      const body = translate(locale, "games.batch.completed", {
+        games: translate(locale, "games.batch.gamesCount", { count: completedGames }),
+        puzzles: translate(locale, "common.puzzlesCount", { count: generatedPuzzles })
+      });
+      void bridge.finish({
+        title: "Chessticize",
+        body,
+        notifyIfBackgrounded: true
+      });
+    },
+    [resetBackgroundSessionFlags, resolveBackgroundBridge]
+  );
 
   const resolveHumanPolicy = useCallback((): ManagedHumanPolicyModel | null => {
     if (humanPolicyPropRef.current !== undefined) {
@@ -149,6 +324,7 @@ export function useGamesBatchAnalysis({
     const engine = getEngineRef.current();
     if (!engine) {
       runningRef.current = false;
+      stopBackgroundSession();
       if (mountedRef.current) {
         setState((current) => ({
           ...current,
@@ -158,6 +334,8 @@ export function useGamesBatchAnalysis({
       }
       return;
     }
+
+    startBackgroundSession(queueRef.current.length, nextIndexRef.current + 1, generation);
 
     while (nextIndexRef.current < queueRef.current.length) {
       if (!mountedRef.current || generation !== runGenerationRef.current) {
@@ -198,6 +376,14 @@ export function useGamesBatchAnalysis({
           pausedByBackground: false
         });
       }
+      pushBackgroundProgress(
+        index + 1,
+        queueRef.current.length,
+        completedGamesRef.current,
+        initialEvaluations.length,
+        0,
+        true
+      );
 
       try {
         const userRating =
@@ -224,6 +410,14 @@ export function useGamesBatchAnalysis({
                   currentPly: progress.completedPlies,
                   totalPlies: progress.totalPlies
                 }));
+                pushBackgroundProgress(
+                  index + 1,
+                  queueRef.current.length,
+                  completedGamesRef.current,
+                  progress.completedPlies,
+                  progress.totalPlies,
+                  false
+                );
               }
             }
           },
@@ -295,6 +489,14 @@ export function useGamesBatchAnalysis({
         completedGamesRef.current += 1;
         generatedPuzzlesRef.current += storedPuzzles.length;
         nextIndexRef.current = index + 1;
+        pushBackgroundProgress(
+          index + 1,
+          queueRef.current.length,
+          completedGamesRef.current,
+          1,
+          1,
+          true
+        );
         onGameUpdatedRef.current?.();
       } catch (error) {
         abortControllerRef.current = null;
@@ -314,6 +516,7 @@ export function useGamesBatchAnalysis({
         }
 
         runningRef.current = false;
+        stopBackgroundSession();
         void resolveHumanPolicy()?.unload();
         setState({
           status: "error",
@@ -340,26 +543,41 @@ export function useGamesBatchAnalysis({
     void resolveHumanPolicy()?.unload();
 
     if (pauseReasonRef.current === "cancel") {
+      stopBackgroundSession();
       queueRef.current = [];
       nextIndexRef.current = 0;
       pauseReasonRef.current = "none";
+      pausedByBackgroundRef.current = false;
+      pausedByInteractiveRef.current = false;
       setState(INITIAL_GAMES_BATCH_STATE);
       return;
     }
 
-    if (pauseReasonRef.current === "user" || pauseReasonRef.current === "background") {
+    if (
+      pauseReasonRef.current === "user" ||
+      pauseReasonRef.current === "background" ||
+      pauseReasonRef.current === "interactive"
+    ) {
+      stopBackgroundSession();
       const pausedByBackground = pauseReasonRef.current === "background";
+      const pausedByInteractiveEngine = pauseReasonRef.current === "interactive";
+      pausedByBackgroundRef.current = pausedByBackground;
+      pausedByInteractiveRef.current = pausedByInteractiveEngine;
       pauseReasonRef.current = "none";
       setState((current) => ({
         ...current,
         status: "paused",
         completedGames: completedGamesRef.current,
         generatedPuzzles: generatedPuzzlesRef.current,
-        pausedByBackground
+        pausedByBackground,
+        pausedByInteractiveEngine
       }));
       return;
     }
 
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
+    finishBackgroundSession(completedGamesRef.current, generatedPuzzlesRef.current);
     setState({
       status: "completed",
       currentIndex: queueRef.current.length,
@@ -370,11 +588,21 @@ export function useGamesBatchAnalysis({
       completedGames: completedGamesRef.current,
       generatedPuzzles: generatedPuzzlesRef.current,
       errorMessage: null,
-      pausedByBackground: false
+      pausedByBackground: false,
+      pausedByInteractiveEngine: false
     });
-  }, [persistPartialCheckpoint, practiceService, resolveHumanPolicy, store]);
+  }, [
+    finishBackgroundSession,
+    persistPartialCheckpoint,
+    practiceService,
+    pushBackgroundProgress,
+    resolveHumanPolicy,
+    startBackgroundSession,
+    stopBackgroundSession,
+    store
+  ]);
 
-  const requestPause = useCallback((reason: "user" | "background"): void => {
+  const requestPause = useCallback((reason: "user" | "background" | "interactive"): void => {
     if (!runningRef.current) {
       return;
     }
@@ -395,6 +623,8 @@ export function useGamesBatchAnalysis({
       completedGamesRef.current = 0;
       generatedPuzzlesRef.current = 0;
       pauseReasonRef.current = "none";
+      pausedByBackgroundRef.current = false;
+      pausedByInteractiveRef.current = false;
       runningRef.current = true;
       void runQueue(runGenerationRef.current);
     },
@@ -402,6 +632,8 @@ export function useGamesBatchAnalysis({
   );
 
   const pause = useCallback((): void => {
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     requestPause("user");
   }, [requestPause]);
 
@@ -411,21 +643,26 @@ export function useGamesBatchAnalysis({
     }
     runGenerationRef.current += 1;
     pauseReasonRef.current = "none";
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     runningRef.current = true;
     void runQueue(runGenerationRef.current);
   }, [runQueue]);
 
   const cancel = useCallback((): void => {
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     if (runningRef.current) {
       pauseReasonRef.current = "cancel";
       abortControllerRef.current?.abort();
       return;
     }
+    stopBackgroundSession();
     queueRef.current = [];
     nextIndexRef.current = 0;
     pauseReasonRef.current = "none";
     setState(INITIAL_GAMES_BATCH_STATE);
-  }, []);
+  }, [stopBackgroundSession]);
 
   const dismiss = useCallback((): void => {
     if (runningRef.current) {
@@ -433,20 +670,70 @@ export function useGamesBatchAnalysis({
     }
     queueRef.current = [];
     nextIndexRef.current = 0;
+    pausedByBackgroundRef.current = false;
+    pausedByInteractiveRef.current = false;
     setState(INITIAL_GAMES_BATCH_STATE);
   }, []);
 
   useEffect(() => {
+    if (disabled) {
+      return;
+    }
+    const bridge = resolveBackgroundBridge();
+    if (!bridge) {
+      return;
+    }
+    return bridge.subscribe((event) => {
+      if (event.type === "pause_requested") {
+        pause();
+      } else if (event.type === "cancel_requested") {
+        cancel();
+      } else if (event.type === "expiration_warning") {
+        requestPause("background");
+      }
+    });
+  }, [cancel, disabled, pause, requestPause, resolveBackgroundBridge]);
+
+  useEffect(() => {
+    if (disabled) {
+      return;
+    }
+    if (suspended) {
+      if (runningRef.current) {
+        requestPause("interactive");
+      }
+      return;
+    }
+    if (pausedByInteractiveRef.current && !pausedByBackgroundRef.current) {
+      resume();
+    }
+  }, [disabled, requestPause, resume, suspended]);
+
+  useEffect(() => {
+    if (disabled) {
+      return;
+    }
     const handleAppStateChange = (nextAppState: AppStateStatus): void => {
       if (nextAppState === "background" && runningRef.current) {
-        requestPause("background");
+        // When Android Foreground Service, iOS 26+ BGContinuedProcessingTask, or iOS Tier-1
+        // beginBackgroundTask is active, keep running in the OS-managed window and checkpoint
+        // cleanly if an expiration_warning arrives.
+        if (!backgroundSessionActiveRef.current) {
+          requestPause("background");
+        }
+      } else if (
+        nextAppState === "active" &&
+        pausedByBackgroundRef.current &&
+        !suspendedRef.current
+      ) {
+        resume();
       }
     };
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => {
       subscription.remove();
     };
-  }, [requestPause]);
+  }, [disabled, requestPause, resume]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -455,9 +742,10 @@ export function useGamesBatchAnalysis({
       pauseReasonRef.current = "cancel";
       abortControllerRef.current?.abort();
       runningRef.current = false;
+      stopBackgroundSession();
       void defaultHumanPolicyRef.current?.unload();
     };
-  }, []);
+  }, [stopBackgroundSession]);
 
   return {
     state,

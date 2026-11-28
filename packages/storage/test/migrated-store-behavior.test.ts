@@ -110,7 +110,7 @@ for (const label of STORE_LABELS) {
         pieceSet: "cburnett",
         language: "system",
         arrowDuel: { opponentReplyEnabled: false },
-        gameReview: { autoAddRecommendedToReview: false },
+        gameReview: { autoAddRecommendedToReview: false, autoSyncCooldownMinutes: 10 },
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },

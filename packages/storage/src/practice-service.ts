@@ -1,6 +1,7 @@
 import {
   acknowledgeArrowDuelReplyCue,
   appendSurvivalPuzzleBatch,
+  applyMaiaGameRatingResult,
   abandonSprint as abandonSprintCore,
   advanceArrowDuelReplyCueSprint,
   advanceSprintTime as advanceSprintTimeCore,
@@ -8,6 +9,7 @@ import {
   archivePracticeRun,
   assertValidManualRating,
   assertValidPracticeRunRating,
+  buildImportedGameDraftFromMaiaGame,
   buildSessionReplay,
   buildSprintConfig,
   sprintHasRunDeadline,
@@ -17,11 +19,15 @@ import {
   clonePracticeRun,
   compactSurvivalPuzzleBuffer,
   createCustomPracticeRun,
+  createDefaultMaiaRatingRecord,
   createDefaultRating,
+  defaultSprintConfig,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
   evaluateAppReviewRequestEligibility,
   isAttemptMistake,
+  MAIA_TIME_CLASSES,
+  maiaGameOutcomeForUser,
   namedThemesForSelection,
   normalizeThemeSelection,
   practiceRunSprintConfig,
@@ -39,6 +45,7 @@ import {
   startSurvival as startSurvivalCore,
   startSprint,
   submitSprintMove,
+  suggestInitialMaiaRating,
   SURVIVAL_PUZZLE_BATCH_SIZE,
   SURVIVAL_RULE_VERSION,
   survivalLevelForRating,
@@ -56,6 +63,10 @@ import type {
   HistoryQuery,
   HistoryView,
   ImportedGameDraft,
+  MaiaGameState,
+  MaiaRatingRecord,
+  MaiaSetupPreferences,
+  MaiaTimeClass,
   OpponentReplyConfig,
   Puzzle,
   PracticeRunRecord,
@@ -112,6 +123,7 @@ import type {
   ProgressV2StatePatch,
   ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
+import type { GamesV1Persistence } from "./games-sync-v1.ts";
 import {
   indexSprintSessionsByRatingKey,
   reconcileRatingWithSprintSessions
@@ -304,6 +316,13 @@ export class PracticeService {
     return this.store.progressV2;
   }
 
+  get gamesV1(): GamesV1Persistence {
+    if (!this.store.gamesV1) {
+      throw new Error("Games V1 persistence is unavailable for this store");
+    }
+    return this.store.gamesV1;
+  }
+
   get gameReviewStore(): GameReviewStore {
     return this.store;
   }
@@ -387,6 +406,166 @@ export class PracticeService {
 
   archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
     this.store.archiveUserPuzzle(puzzleId, archived);
+  }
+
+  private suggestSeedMaiaRating(timeClass: MaiaTimeClass): number {
+    const recentGames = this.store.listImportedGames({ limit: 50 });
+    const importedGameRatings: Partial<Record<MaiaTimeClass, number>> = {};
+    let fallbackImportedRating: number | undefined;
+
+    for (const game of recentGames) {
+      if (game.platform === "maia") {
+        continue;
+      }
+      const userRating = game.userColor === "w" ? game.white.rating : game.black.rating;
+      if (typeof userRating !== "number" || !Number.isFinite(userRating) || userRating < 400) {
+        continue;
+      }
+      if (fallbackImportedRating === undefined) {
+        fallbackImportedRating = userRating;
+      }
+      if (
+        (game.timeClass === "blitz" || game.timeClass === "rapid" || game.timeClass === "classical") &&
+        importedGameRatings[game.timeClass] === undefined
+      ) {
+        importedGameRatings[game.timeClass] = userRating;
+      }
+    }
+
+    const standardKey = defaultSprintConfig("standard").ratingKey;
+    const standardRecord = this.store.listRatings().find((record) => record.key === standardKey);
+    const sprintRating = standardRecord && standardRecord.games > 0 ? standardRecord.rating : undefined;
+
+    return suggestInitialMaiaRating({
+      timeClass,
+      importedGameRatings,
+      ...(fallbackImportedRating === undefined ? {} : { fallbackImportedRating }),
+      ...(sprintRating === undefined ? {} : { sprintRating })
+    });
+  }
+
+  getMaiaRating(timeClass: MaiaTimeClass, now = new Date().toISOString()): MaiaRatingRecord {
+    const existing = this.store.getMaiaRating(timeClass);
+    if (existing) {
+      return existing;
+    }
+    return createDefaultMaiaRatingRecord(
+      timeClass,
+      this.suggestSeedMaiaRating(timeClass),
+      now
+    );
+  }
+
+  listMaiaRatings(now = new Date().toISOString()): MaiaRatingRecord[] {
+    return MAIA_TIME_CLASSES.map((tc) => this.getMaiaRating(tc, now));
+  }
+
+  setInitialMaiaRating(
+    timeClass: MaiaTimeClass,
+    rating: number,
+    now = new Date().toISOString()
+  ): MaiaRatingRecord {
+    const current = this.getMaiaRating(timeClass, now);
+    if (current.games > 0) {
+      return current;
+    }
+    const next = createDefaultMaiaRatingRecord(timeClass, rating, now);
+    this.store.saveMaiaRatingAnchor({
+      timeClass,
+      initialRating: next.rating,
+      setAt: now
+    });
+    this.store.saveMaiaRating(next);
+    return next;
+  }
+
+  getMaiaSetupPreferences(): MaiaSetupPreferences {
+    return this.store.getMaiaSetupPreferences();
+  }
+
+  saveMaiaSetupPreferences(preferences: MaiaSetupPreferences): void {
+    this.store.saveMaiaSetupPreferences(preferences);
+  }
+
+  getActiveMaiaGame(): MaiaGameState | undefined {
+    return this.store.getActiveMaiaGame();
+  }
+
+  saveActiveMaiaGame(state: MaiaGameState): void {
+    this.store.saveActiveMaiaGame(state);
+  }
+
+  clearActiveMaiaGame(): void {
+    this.store.clearActiveMaiaGame();
+  }
+
+  completeMaiaGame(
+    state: MaiaGameState,
+    userLabel = "You",
+    now = new Date().toISOString()
+  ): {
+    state: MaiaGameState;
+    savedGameId?: string;
+    ratingRecord: MaiaRatingRecord;
+  } {
+    return this.store.transaction(() => {
+      const nowIso = state.endedAt ?? now;
+      const currentRating = this.getMaiaRating(state.timeClass, nowIso);
+
+      if (state.status === "aborted") {
+        this.store.clearActiveMaiaGame();
+        return { state, ratingRecord: currentRating };
+      }
+
+      let nextRatingRecord = currentRating;
+      let nextState: MaiaGameState = {
+        ...state,
+        endedAt: nowIso
+      };
+
+      if (state.rated) {
+        const outcome = maiaGameOutcomeForUser(state);
+        const applied = applyMaiaGameRatingResult(
+          currentRating,
+          outcome,
+          nowIso,
+          state.maiaRating
+        );
+        nextRatingRecord = applied.nextRecord;
+        this.store.saveMaiaRating(nextRatingRecord);
+        nextState = {
+          ...nextState,
+          userRatingAfter: applied.change.ratingAfter,
+          userRatingChange: applied.change.ratingChange
+        };
+      }
+
+      const draft = buildImportedGameDraftFromMaiaGame(nextState, userLabel);
+      this.store.upsertImportedGames([draft], nowIso);
+      if (state.rated) {
+        const outcome = maiaGameOutcomeForUser(state);
+        this.store.upsertMaiaRatedGame({
+          gameId: draft.id,
+          timeClass: state.timeClass,
+          playedAt: draft.playedAt,
+          outcome,
+          opponentRating: state.maiaRating,
+          ...(currentRating.games === 0 ? { initialRatingAnchor: currentRating.rating } : {})
+        });
+      }
+      this.store.clearActiveMaiaGame();
+
+      nextState = {
+        ...nextState,
+        savedGameId: draft.id
+      };
+
+      return {
+        state: nextState,
+        savedGameId: draft.id,
+        ratingRecord: nextRatingRecord
+      };
+    });
   }
 
   getProgressV2Diagnostics(): ProgressV2Diagnostics {

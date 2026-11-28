@@ -1,4 +1,4 @@
-export type GamePlatform = "chess_com" | "lichess" | "pgn";
+export type GamePlatform = "chess_com" | "lichess" | "pgn" | "maia";
 
 export type GameColor = "w" | "b";
 
