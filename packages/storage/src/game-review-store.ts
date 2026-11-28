@@ -165,6 +165,11 @@ export interface GameReviewStore {
   listUserPuzzles(filter?: UserPuzzleFilter): StoredUserPuzzle[];
   countUserPuzzles(filter?: Omit<UserPuzzleFilter, "limit">): number;
   getUserPuzzle(puzzleId: string): StoredUserPuzzle | undefined;
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: UserGamePuzzleRatingSource
+  ): void;
   archiveUserPuzzle(puzzleId: string, archived?: boolean): void;
 }
 

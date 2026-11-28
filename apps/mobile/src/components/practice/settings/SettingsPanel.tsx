@@ -89,6 +89,7 @@ import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
+const MAIA2_SOURCE_URL = "https://github.com/CSSLab/maia2";
 
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
@@ -678,6 +679,16 @@ export function SettingsPanel({
           testID="settings-stockfish-source"
           onPress={() => {
             void Linking.openURL(applicationMetadata.stockfishSourceUrl);
+          }}
+        />
+        <SettingsExternalLinkRow
+          label={t("settings.about.maia")}
+          value={t("settings.about.maiaValue")}
+          detail={t("settings.about.maiaDetail")}
+          linkLabel="github.com/CSSLab/maia2"
+          testID="settings-maia-source"
+          onPress={() => {
+            void Linking.openURL(MAIA2_SOURCE_URL);
           }}
         />
         <SettingsExternalLinkRow

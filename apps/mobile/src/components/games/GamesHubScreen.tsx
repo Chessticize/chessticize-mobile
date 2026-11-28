@@ -66,6 +66,7 @@ import {
   useGamesBatchAnalysis,
   type GamesBatchAnalysisState
 } from "./useGamesBatchAnalysis.ts";
+import { useUserPuzzleDifficultyBackfill } from "./useUserPuzzleDifficultyBackfill.ts";
 
 export interface MyGamePuzzlesLaunchOptions {
   mode?: "standard" | "arrow_duel";
@@ -125,6 +126,9 @@ export function GamesHubScreen({
   const [statusFilter, setStatusFilter] = useState<GamesStatusFilter>("all");
   const [timeClassFilter, setTimeClassFilter] = useState<GamesTimeClassFilter>("all");
   const [puzzleKindFilter, setPuzzleKindFilter] = useState<"all" | "arrow_duel" | "line">("all");
+  const [puzzleDifficultyFilter, setPuzzleDifficultyFilter] = useState<
+    "all" | "at_level" | "stretch"
+  >("all");
   const [puzzleThemeFilter, setPuzzleThemeFilter] = useState<string>("all");
   const [visibleGamesLimit, setVisibleGamesLimit] = useState<number>(GAMES_PAGE_SIZE);
   const [visiblePuzzlesLimit, setVisiblePuzzlesLimit] = useState<number>(PUZZLES_PAGE_SIZE);
@@ -200,8 +204,6 @@ export function GamesHubScreen({
     const linkedAccounts = service.listLinkedAccounts();
     const userPuzzles = service.listUserPuzzles();
     const userPuzzleCount = userPuzzles.length;
-    const arrowDuelCount = userPuzzles.filter((puzzle) => puzzle.puzzleKind === "arrow_duel").length;
-    const lineCount = userPuzzles.filter((puzzle) => puzzle.puzzleKind === "line").length;
     const gameById = new Map<string, StoredImportedGame>();
     const gameOrderById = new Map<string, number>();
     allGames.forEach((game, index) => {
@@ -239,8 +241,6 @@ export function GamesHubScreen({
       orderedUserPuzzles,
       enrolledPuzzleIds,
       userPuzzleCount,
-      arrowDuelCount,
-      lineCount,
       diagnosis
     };
   }, [revision, service]);
@@ -381,12 +381,59 @@ export function GamesHubScreen({
       ? puzzleThemeFilter
       : "all";
 
+  const isPuzzleWithinReviewBand = useCallback(
+    (puzzle: StoredUserPuzzle): boolean => {
+      if (!puzzle.ratingSource || puzzle.ratingSource === "game_anchor") {
+        return true;
+      }
+      const sourceGame = snapshot.gameById.get(puzzle.gameId);
+      const userRating = sourceGame
+        ? sourceGame.userColor === "w"
+          ? sourceGame.white.rating
+          : sourceGame.black.rating
+        : undefined;
+      return isWithinReviewDifficultyBand(puzzle.rating, userRating);
+    },
+    [snapshot.gameById]
+  );
+
+  const hasDifficultySplitInScope = useMemo(() => {
+    let hasWithin = false;
+    let hasStretch = false;
+    for (const puzzle of puzzlesInGameScope) {
+      if (isPuzzleWithinReviewBand(puzzle)) {
+        hasWithin = true;
+      } else {
+        hasStretch = true;
+      }
+      if (hasWithin && hasStretch) {
+        return true;
+      }
+    }
+    return false;
+  }, [isPuzzleWithinReviewBand, puzzlesInGameScope]);
+
+  const effectivePuzzleDifficultyFilter: "all" | "at_level" | "stretch" =
+    hasDifficultySplitInScope ? puzzleDifficultyFilter : "all";
+
   const filteredOrderedUserPuzzles = useMemo(
     () =>
       puzzlesInGameScope.filter((puzzle) => {
         if (
           effectivePuzzleKindFilter !== "all" &&
           puzzle.puzzleKind !== effectivePuzzleKindFilter
+        ) {
+          return false;
+        }
+        if (
+          effectivePuzzleDifficultyFilter === "at_level" &&
+          !isPuzzleWithinReviewBand(puzzle)
+        ) {
+          return false;
+        }
+        if (
+          effectivePuzzleDifficultyFilter === "stretch" &&
+          isPuzzleWithinReviewBand(puzzle)
         ) {
           return false;
         }
@@ -398,17 +445,13 @@ export function GamesHubScreen({
         }
         return true;
       }),
-    [effectivePuzzleKindFilter, effectivePuzzleThemeFilter, puzzlesInGameScope]
-  );
-
-  const filteredArrowDuelPuzzles = useMemo(
-    () => filteredOrderedUserPuzzles.filter((puzzle) => puzzle.puzzleKind === "arrow_duel"),
-    [filteredOrderedUserPuzzles]
-  );
-
-  const filteredStandardPuzzles = useMemo(
-    () => filteredOrderedUserPuzzles.filter((puzzle) => puzzle.puzzleKind === "line"),
-    [filteredOrderedUserPuzzles]
+    [
+      effectivePuzzleDifficultyFilter,
+      effectivePuzzleKindFilter,
+      effectivePuzzleThemeFilter,
+      isPuzzleWithinReviewBand,
+      puzzlesInGameScope
+    ]
   );
 
   const filteredDiagnosis = useMemo(() => {
@@ -446,6 +489,7 @@ export function GamesHubScreen({
     setVisiblePuzzlesLimit(PUZZLES_PAGE_SIZE);
   }, [
     effectiveAccountFilter,
+    effectivePuzzleDifficultyFilter,
     effectivePuzzleKindFilter,
     effectivePuzzleThemeFilter,
     effectiveTimeClassFilter
@@ -456,6 +500,7 @@ export function GamesHubScreen({
     statusFilter !== "all" ||
     effectiveTimeClassFilter !== "all" ||
     effectivePuzzleKindFilter !== "all" ||
+    effectivePuzzleDifficultyFilter !== "all" ||
     effectivePuzzleThemeFilter !== "all";
 
   const resetAllFilters = useCallback((): void => {
@@ -463,6 +508,7 @@ export function GamesHubScreen({
     setStatusFilter("all");
     setTimeClassFilter("all");
     setPuzzleKindFilter("all");
+    setPuzzleDifficultyFilter("all");
     setPuzzleThemeFilter("all");
     setVisibleGamesLimit(GAMES_PAGE_SIZE);
     setVisiblePuzzlesLimit(PUZZLES_PAGE_SIZE);
@@ -678,8 +724,38 @@ export function GamesHubScreen({
   }, [autoSyncOnMount, handleSyncAllLinked, snapshot.linkedAccounts.length]);
 
   const handleRemoveAccount = useCallback(
-    (platform: LinkedGameAccountPlatform, username: string): void => {
+    (
+      platform: LinkedGameAccountPlatform,
+      username: string,
+      options?: { deleteData?: boolean }
+    ): void => {
       service.removeLinkedAccount(platform, username);
+      if (options?.deleteData) {
+        const targetLower = username.trim().toLowerCase();
+        const matchingGames = service
+          .listImportedGames()
+          .filter(
+            (game) =>
+              game.platform === platform &&
+              (game.username ?? "").trim().toLowerCase() === targetLower
+          );
+        const reviewQueue = service.listReviewQueue();
+        for (const game of matchingGames) {
+          const gamePuzzleIds = new Set(
+            service.listUserPuzzles({ gameId: game.id }).map((puzzle) => puzzle.id)
+          );
+          for (const entry of reviewQueue) {
+            if (gamePuzzleIds.has(entry.puzzleId)) {
+              service.removeReview({
+                puzzleId: entry.puzzleId,
+                mode: entry.mode,
+                ratingKey: entry.ratingKey
+              });
+            }
+          }
+          service.deleteImportedGame(game.id);
+        }
+      }
       refreshHub();
     },
     [refreshHub, service]
@@ -740,22 +816,6 @@ export function GamesHubScreen({
     [refreshHub, service]
   );
 
-  const isPuzzleWithinReviewBand = useCallback(
-    (puzzle: StoredUserPuzzle): boolean => {
-      if (!puzzle.ratingSource || puzzle.ratingSource === "game_anchor") {
-        return true;
-      }
-      const sourceGame = snapshot.gameById.get(puzzle.gameId);
-      const userRating = sourceGame
-        ? sourceGame.userColor === "w"
-          ? sourceGame.white.rating
-          : sourceGame.black.rating
-        : undefined;
-      return isWithinReviewDifficultyBand(puzzle.rating, userRating);
-    },
-    [snapshot.gameById]
-  );
-
   const handleAddAllUserPuzzlesToReview = useCallback(
     (puzzles: readonly StoredUserPuzzle[]): void => {
       let changed = false;
@@ -783,6 +843,14 @@ export function GamesHubScreen({
 
   const isEmpty = snapshot.allGames.length === 0;
   const batchBusy = batch.state.status === "running";
+
+  useUserPuzzleDifficultyBackfill({
+    store: service.gameReviewStore,
+    puzzles: snapshot.orderedUserPuzzles,
+    getEngine: resolveAnalysisEngine,
+    paused: batchBusy,
+    onPuzzleRated: refreshHub
+  });
   const effectiveHubView: "games" | "puzzles" =
     snapshot.userPuzzleCount > 0 ? hubView : "games";
   const reviewBandVisiblePuzzles = filteredOrderedUserPuzzles.filter(isPuzzleWithinReviewBand);
@@ -1031,6 +1099,32 @@ export function GamesHubScreen({
                 />
               </View>
             ) : null}
+            {effectiveHubView === "puzzles" && hasDifficultySplitInScope ? (
+              <View
+                accessibilityLabel={t("games.filter.difficultyA11y")}
+                style={styles.filterRow}
+                testID="games-puzzle-difficulty-filters"
+              >
+                <FilterButton
+                  active={effectivePuzzleDifficultyFilter === "all"}
+                  label={t("games.filter.all")}
+                  testID="games-filter-puzzle-difficulty-all"
+                  onPress={() => setPuzzleDifficultyFilter("all")}
+                />
+                <FilterButton
+                  active={effectivePuzzleDifficultyFilter === "at_level"}
+                  label={t("games.filter.atMyLevel")}
+                  testID="games-filter-puzzle-difficulty-at_level"
+                  onPress={() => setPuzzleDifficultyFilter("at_level")}
+                />
+                <FilterButton
+                  active={effectivePuzzleDifficultyFilter === "stretch"}
+                  label={t("games.filter.stretch")}
+                  testID="games-filter-puzzle-difficulty-stretch"
+                  onPress={() => setPuzzleDifficultyFilter("stretch")}
+                />
+              </View>
+            ) : null}
             {effectiveHubView === "puzzles" && availablePuzzleThemes.length > 0 ? (
               <ScrollView
                 accessibilityLabel={t("games.filter.themeA11y")}
@@ -1107,6 +1201,7 @@ export function GamesHubScreen({
                         if (
                           effectiveAccountFilter !== "all" ||
                           effectivePuzzleKindFilter !== "all" ||
+                          effectivePuzzleDifficultyFilter !== "all" ||
                           effectivePuzzleThemeFilter !== "all"
                         ) {
                           onPracticeMyGamePuzzles({
@@ -1124,60 +1219,6 @@ export function GamesHubScreen({
                     />
                   ) : null}
                   <View style={styles.puzzlesTabActions}>
-                    {onPracticeMyGamePuzzles &&
-                    filteredArrowDuelPuzzles.length > 0 &&
-                    filteredStandardPuzzles.length > 0 ? (
-                      <>
-                        <Button
-                          label={`${t("common.arrowDuel")} (${filteredArrowDuelPuzzles.length})`}
-                          size="compact"
-                          testID="games-practice-arrow-duel"
-                          variant="secondary"
-                          onPress={() => {
-                            if (
-                              effectiveAccountFilter !== "all" ||
-                              effectivePuzzleThemeFilter !== "all"
-                            ) {
-                              onPracticeMyGamePuzzles({
-                                puzzleIds: filteredArrowDuelPuzzles.map((p) => p.id),
-                                initialIndex: 0
-                              });
-                            } else {
-                              onPracticeMyGamePuzzles({
-                                mode: "arrow_duel",
-                                ...(effectiveTimeClassFilter !== "all"
-                                  ? { timeClass: effectiveTimeClassFilter }
-                                  : {})
-                              });
-                            }
-                          }}
-                        />
-                        <Button
-                          label={`${t("common.standard")} (${filteredStandardPuzzles.length})`}
-                          size="compact"
-                          testID="games-practice-lines"
-                          variant="secondary"
-                          onPress={() => {
-                            if (
-                              effectiveAccountFilter !== "all" ||
-                              effectivePuzzleThemeFilter !== "all"
-                            ) {
-                              onPracticeMyGamePuzzles({
-                                puzzleIds: filteredStandardPuzzles.map((p) => p.id),
-                                initialIndex: 0
-                              });
-                            } else {
-                              onPracticeMyGamePuzzles({
-                                mode: "standard",
-                                ...(effectiveTimeClassFilter !== "all"
-                                  ? { timeClass: effectiveTimeClassFilter }
-                                  : {})
-                              });
-                            }
-                          }}
-                        />
-                      </>
-                    ) : null}
                     <Button
                       disabled={allVisiblePuzzlesEnrolled}
                       label={

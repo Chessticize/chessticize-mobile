@@ -112,6 +112,28 @@ export type {
 } from "./difficulty.ts";
 
 export {
+  MAIA2_BOARD_SIZE,
+  MAIA2_TENSOR_CHANNELS,
+  MAIA2_TENSOR_FLOATS,
+  MAIA2_VOCAB_SIZE,
+  createMaia2HumanPolicyModel,
+  decodeMaia2MaskedProbabilities,
+  encodeFenToMaia2Tensor,
+  encodeLegalMovesForMaia2,
+  maia2EloCategory,
+  mirrorUciMove,
+  summarizeMaia2EloStats
+} from "./maia2-encoding.ts";
+export type {
+  EncodedMaia2Board,
+  EncodedMaia2LegalMoves,
+  Maia2TensorBatchInput,
+  Maia2TensorRunner,
+  ManagedHumanPolicyModel
+} from "./maia2-encoding.ts";
+export { MAIA2_MOVE_TO_INDEX, MAIA2_MOVE_VOCAB } from "./maia2-vocab.ts";
+
+export {
   ALREADY_WINNING_CP,
   CHECK_FOUND_LINE_DEPTH,
   CHECK_FOUND_LINE_MAX_WIN_CHANCE_DROP,

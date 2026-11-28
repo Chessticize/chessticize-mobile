@@ -66,6 +66,7 @@ export interface GameReviewScreenProps {
   moveFeedbackClient?: MoveFeedbackClient | null;
   BoardComponent?: GameReviewBoardComponent;
   onBack?: () => void;
+  onDeleteGame?: (gameId: string) => void;
   onPracticeGamePuzzles?: (gameId: string) => void;
 }
 
@@ -93,6 +94,7 @@ export function GameReviewScreen({
   moveFeedbackClient = null,
   BoardComponent = Chessboard as unknown as GameReviewBoardComponent,
   onBack,
+  onDeleteGame,
   onPracticeGamePuzzles
 }: GameReviewScreenProps): React.JSX.Element {
   const styles = useStyles();
@@ -101,6 +103,7 @@ export function GameReviewScreen({
   const { pieceSet } = useBoardAppearance();
   const viewport = usePracticeViewport();
   const [measuredStageWidth, setMeasuredStageWidth] = useState<number | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const layout = useMemo(
     () =>
@@ -350,6 +353,7 @@ export function GameReviewScreen({
         <GameReviewSummaryCard
           blackPlayerName={game.black.username}
           enrolledPuzzleIds={controller.enrolledPuzzleIds}
+          userRating={game.userColor === "w" ? game.white.rating : game.black.rating}
           onEnrollAllPuzzles={controller.enrollAllPuzzlesInReview}
           onPracticeGamePuzzles={
             onPracticeGamePuzzles ? () => onPracticeGamePuzzles(game.id) : undefined
@@ -368,6 +372,45 @@ export function GameReviewScreen({
           summary={controller.summary}
           whitePlayerName={game.white.username}
         />
+      ) : null}
+
+      {onDeleteGame ? (
+        deleteConfirmOpen ? (
+          <View style={styles.deleteConfirmCard} testID="game-review-delete-confirm">
+            <AppText tone="secondary" variant="footnote">
+              {t("gameReview.delete.confirmBody")}
+            </AppText>
+            <View style={styles.deleteConfirmActions}>
+              <Button
+                label={t("gameReview.delete.confirmAction")}
+                size="compact"
+                testID="game-review-delete-confirm-submit"
+                variant="destructive"
+                onPress={() => {
+                  setDeleteConfirmOpen(false);
+                  onDeleteGame(game.id);
+                }}
+              />
+              <Button
+                label={t("common.cancel")}
+                size="compact"
+                testID="game-review-delete-confirm-cancel"
+                variant="secondary"
+                onPress={() => setDeleteConfirmOpen(false)}
+              />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.deleteRow}>
+            <Button
+              label={t("gameReview.delete.action")}
+              size="compact"
+              testID="game-review-delete-game"
+              variant="plain"
+              onPress={() => setDeleteConfirmOpen(true)}
+            />
+          </View>
+        )
       ) : null}
     </View>
   );
@@ -1318,5 +1361,23 @@ const useStyles = makeStyles((theme) => ({
   panelsStack: {
     gap: 10,
     width: "100%"
+  },
+  deleteRow: {
+    alignItems: "center",
+    paddingTop: 4
+  },
+  deleteConfirmCard: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.shape.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
+  },
+  deleteConfirmActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
   }
 }));

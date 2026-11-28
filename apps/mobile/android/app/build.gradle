@@ -54,6 +54,10 @@ abstract class GenerateChessticizeAssets extends DefaultTask {
     @PathSensitive(PathSensitivity.RELATIVE)
     abstract RegularFileProperty getMoveFeedbackCaptureSound()
 
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ConfigurableFileCollection getOptionalMaia2ModelFiles()
+
     @OutputDirectory
     abstract DirectoryProperty getOutputDirectory()
 
@@ -101,6 +105,12 @@ abstract class GenerateChessticizeAssets extends DefaultTask {
             spec.from(moveFeedbackCaptureSound.get().asFile) {
                 into "move-feedback"
                 rename { "capture.mp3" }
+            }
+            def existingMaia2Models = optionalMaia2ModelFiles.files.findAll { it.isFile() }
+            if (!existingMaia2Models.isEmpty()) {
+                spec.from(existingMaia2Models) {
+                    into "models"
+                }
             }
         }
     }
@@ -405,6 +415,10 @@ androidComponents {
             moveFeedbackCaptureSound.set(file(
                 "$rootDir/../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"
             ))
+            def maia2OnnxFile = file("$rootDir/../../../fixtures/models/maia2-rapid-int8.onnx")
+            if (maia2OnnxFile.isFile()) {
+                optionalMaia2ModelFiles.from(maia2OnnxFile)
+            }
             outputDirectory.set(
                 layout.buildDirectory.dir("generated/assets/chessticize/${variant.name}")
             )
@@ -420,6 +434,7 @@ dependencies {
     implementation("com.facebook.react:react-android")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("com.google.android.play:review:2.0.2")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("com.wix:detox:+")
     androidTestImplementation("androidx.test:core:1.6.1")

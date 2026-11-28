@@ -483,6 +483,16 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.getUserPuzzle(puzzleId);
   }
 
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: StoredUserPuzzle["ratingSource"]
+  ): void {
+    if (ratingSource !== undefined) {
+      this.userStore.updateUserPuzzleRating(puzzleId, rating, ratingSource);
+    }
+  }
+
   archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
     this.userStore.archiveUserPuzzle(puzzleId, archived);
   }

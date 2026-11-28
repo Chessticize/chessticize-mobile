@@ -377,6 +377,14 @@ export class PracticeService {
     return this.store.getUserPuzzle(puzzleId);
   }
 
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: NonNullable<StoredUserPuzzle["ratingSource"]>
+  ): void {
+    this.store.updateUserPuzzleRating(puzzleId, rating, ratingSource);
+  }
+
   archiveUserPuzzle(puzzleId: string, archived?: boolean): void {
     this.store.archiveUserPuzzle(puzzleId, archived);
   }

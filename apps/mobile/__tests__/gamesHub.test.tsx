@@ -1117,5 +1117,189 @@ describe("GamesHubScreen", () => {
     const enrolled = service.listReviewQueue();
     expect(enrolled.length).toBe(1);
     expect(enrolled[0]?.puzzleId).toBe(stored[0]?.id);
+
+    // Difficulty filter pills toggle between At my level and Stretch puzzles cleanly.
+    press(renderer, "games-filter-toggle");
+    expect(hasTestID(renderer, "games-puzzle-difficulty-filters")).toBe(true);
+    press(renderer, "games-filter-puzzle-difficulty-at_level");
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[0]!.id}`)).toBe(true);
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[1]!.id}`)).toBe(false);
+
+    press(renderer, "games-filter-puzzle-difficulty-stretch");
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[0]!.id}`)).toBe(false);
+    expect(hasTestID(renderer, `games-puzzle-row-${stored[1]!.id}`)).toBe(true);
+  });
+
+  it("automatically backfills difficulty ratings for existing unrated user puzzles when an engine is available", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    service.upsertImportedGames([
+      makeDraft({
+        id: "g-backfill",
+        userColor: "w",
+        white: { username: "alice", rating: 1400, isAi: false },
+        black: { username: "bob", rating: 1400, isAi: false }
+      })
+    ]);
+    const stored = store.replaceGameUserPuzzles(
+      "g-backfill",
+      [
+        {
+          idSeed: "ply-10",
+          ply: 10,
+          moveNumber: 5,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 85
+        }
+      ],
+      { opponentName: "bob", timeClass: "rapid", ratingAnchor: 1400 }
+    );
+    expect(stored[0]?.ratingSource).toBe("game_anchor");
+
+    const stubEngine = {
+      async analyze() {
+        return [
+          {
+            multipv: 1,
+            depth: 8,
+            move: "f3d4",
+            score: { kind: "cp" as const, sideToMoveCentipawns: 340, whiteCentipawns: 340 },
+            pv: ["f3d4", "e5d4"]
+          },
+          {
+            multipv: 2,
+            depth: 8,
+            move: "c2c3",
+            score: { kind: "cp" as const, sideToMoveCentipawns: 20, whiteCentipawns: 20 },
+            pv: ["c2c3", "d4f3"]
+          }
+        ];
+      }
+    };
+
+    render(
+      <GamesHubScreen
+        analysisEngine={stubEngine}
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+        onPracticeMyGamePuzzles={jest.fn()}
+      />
+    );
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+
+    const updated = store.getUserPuzzle(stored[0]!.id);
+    expect(updated?.ratingSource).toBe("sf_heuristic_v1");
+    expect(updated?.rating).toBeGreaterThanOrEqual(600);
+    expect(updated?.rating).toBeLessThanOrEqual(2200);
+  });
+
+  it("does not submit on keyboard Done and supports Unlink-only vs Unlink-and-delete-data confirmations", () => {
+    const service = new PracticeService(new MemoryStore());
+    service.upsertLinkedAccount({ platform: "chess_com", username: "alice" });
+    service.upsertLinkedAccount({ platform: "lichess", username: "bob" });
+    service.upsertImportedGames([
+      makeDraft({ id: "g-alice-1", platform: "chess_com", username: "alice" }),
+      makeDraft({ id: "g-bob-1", platform: "lichess", username: "bob" })
+    ]);
+    service.replaceGameUserPuzzles(
+      "g-alice-1",
+      [
+        {
+          idSeed: "alice-ply-6",
+          ply: 6,
+          moveNumber: 3,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 85
+        }
+      ],
+      { opponentName: "foe", timeClass: "blitz" }
+    );
+    const bobPuzzles = service.replaceGameUserPuzzles(
+      "g-bob-1",
+      [
+        {
+          idSeed: "bob-ply-6",
+          ply: 6,
+          moveNumber: 3,
+          puzzleKind: "line",
+          momentKind: "opponent_blunder_missed",
+          userColor: "w",
+          puzzleColor: "w",
+          initialFen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+          solutionMoves: ["c6d4", "f3d4", "e5d4"],
+          prevCp: 20,
+          cp: 340,
+          winChanceSwing: 28,
+          themes: ["fork"],
+          lengthTag: "short",
+          phaseTag: "opening",
+          caliberScore: 85
+        }
+      ],
+      { opponentName: "foe", timeClass: "rapid" }
+    );
+    service.enrollReview({
+      puzzleId: bobPuzzles[0]!.id,
+      mode: "standard",
+      ratingKey: "ug_my_game_puzzles:standard"
+    });
+
+    const renderer = render(
+      <GamesHubScreen
+        nowMs={NOW_MS}
+        service={service}
+        onOpenGameReview={jest.fn()}
+      />
+    );
+
+    press(renderer, "games-header-import");
+    const usernameInput = findByTestID(renderer, "games-import-username-input");
+    expect(usernameInput.props.onSubmitEditing).toBeUndefined();
+
+    // Unlink alice only: removes linked account but keeps imported games & puzzles.
+    press(renderer, "games-remove-account-chess_com-alice");
+    expect(hasTestID(renderer, "games-unlink-confirm-chess_com-alice")).toBe(true);
+    press(renderer, "games-unlink-only-chess_com-alice");
+    expect(service.listLinkedAccounts().map((a) => a.username)).toEqual(["bob"]);
+    expect(service.getImportedGame("g-alice-1")).toBeDefined();
+    expect(service.listUserPuzzles({ gameId: "g-alice-1" })).toHaveLength(1);
+
+    // Unlink bob & delete data: removes linked account, bob's games, bob's user puzzles, and review entry.
+    press(renderer, "games-remove-account-lichess-bob");
+    expect(hasTestID(renderer, "games-unlink-confirm-lichess-bob")).toBe(true);
+    press(renderer, "games-unlink-delete-lichess-bob");
+    expect(service.listLinkedAccounts()).toHaveLength(0);
+    expect(service.getImportedGame("g-bob-1")).toBeUndefined();
+    expect(service.listUserPuzzles({ gameId: "g-bob-1" })).toHaveLength(0);
+    expect(service.listReviewQueue()).toHaveLength(0);
+    // Alice's retained data remains untouched.
+    expect(service.getImportedGame("g-alice-1")).toBeDefined();
+    expect(service.listUserPuzzles({ gameId: "g-alice-1" })).toHaveLength(1);
   });
 });

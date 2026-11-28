@@ -7,8 +7,10 @@ import {
   type ExtractGamePuzzlesOptions,
   type GamePlyEvaluation,
   type GameReviewEngine,
+  type ManagedHumanPolicyModel,
   type PuzzleExtractionEngine
 } from "../../../../../packages/core/src/index.ts";
+import { createNativeHumanPolicyModel } from "../../platform/nativeHumanPolicy.ts";
 import {
   gamePlyEvaluationFromStored,
   inferUserGameMetaFromStoredGame,
@@ -48,6 +50,7 @@ export const INITIAL_GAMES_BATCH_STATE: GamesBatchAnalysisState = {
 export interface UseGamesBatchAnalysisOptions {
   store: GameReviewStore;
   getEngine: () => (GameReviewEngine & PuzzleExtractionEngine) | null;
+  humanPolicy?: ManagedHumanPolicyModel | null;
   onGameUpdated?: () => void;
   pass1Options?: Omit<EvaluateGamePass1Options, "initialEvaluations" | "onPlyEvaluated" | "signal">;
   extractionOptions?: Omit<ExtractGamePuzzlesOptions, "signal">;
@@ -78,6 +81,7 @@ type PauseReason = "none" | "user" | "background" | "cancel";
 export function useGamesBatchAnalysis({
   store,
   getEngine,
+  humanPolicy,
   onGameUpdated,
   pass1Options,
   extractionOptions,
@@ -94,6 +98,19 @@ export function useGamesBatchAnalysis({
   const pauseReasonRef = useRef<PauseReason>("none");
   const mountedRef = useRef(true);
   const runGenerationRef = useRef(0);
+  const defaultHumanPolicyRef = useRef<ManagedHumanPolicyModel | null | undefined>(undefined);
+  const humanPolicyPropRef = useRef(humanPolicy);
+  humanPolicyPropRef.current = humanPolicy;
+
+  const resolveHumanPolicy = useCallback((): ManagedHumanPolicyModel | null => {
+    if (humanPolicyPropRef.current !== undefined) {
+      return humanPolicyPropRef.current;
+    }
+    if (defaultHumanPolicyRef.current === undefined) {
+      defaultHumanPolicyRef.current = createNativeHumanPolicyModel();
+    }
+    return defaultHumanPolicyRef.current;
+  }, []);
 
   const onGameUpdatedRef = useRef(onGameUpdated);
   onGameUpdatedRef.current = onGameUpdated;
@@ -209,6 +226,9 @@ export function useGamesBatchAnalysis({
           extractionOptions: {
             deepLimit: DEFAULT_MOBILE_BATCH_PASS2_DEEP_LIMIT,
             ...extractionOptionsRef.current,
+            ...(extractionOptionsRef.current?.humanPolicy === undefined && resolveHumanPolicy()
+              ? { humanPolicy: resolveHumanPolicy()! }
+              : {}),
             signal: controller.signal
           },
           onPass1Complete: (report) => {
@@ -289,6 +309,7 @@ export function useGamesBatchAnalysis({
         }
 
         runningRef.current = false;
+        void resolveHumanPolicy()?.unload();
         setState({
           status: "error",
           currentIndex: index + 1,
@@ -311,6 +332,7 @@ export function useGamesBatchAnalysis({
 
     runningRef.current = false;
     abortControllerRef.current = null;
+    void resolveHumanPolicy()?.unload();
 
     if (pauseReasonRef.current === "cancel") {
       queueRef.current = [];
@@ -345,7 +367,7 @@ export function useGamesBatchAnalysis({
       errorMessage: null,
       pausedByBackground: false
     });
-  }, [persistPartialCheckpoint, store]);
+  }, [persistPartialCheckpoint, resolveHumanPolicy, store]);
 
   const requestPause = useCallback((reason: "user" | "background"): void => {
     if (!runningRef.current) {
@@ -428,6 +450,7 @@ export function useGamesBatchAnalysis({
       pauseReasonRef.current = "cancel";
       abortControllerRef.current?.abort();
       runningRef.current = false;
+      void defaultHumanPolicyRef.current?.unload();
     };
   }, []);
 

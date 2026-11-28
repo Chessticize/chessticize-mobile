@@ -16,6 +16,9 @@ android/build/
 *.sqlite-shm
 *.sqlite-wal
 fixtures/puzzles/bundled-core-pack.sqlite
+fixtures/models/*.onnx
+fixtures/models/*.mlmodelc.zip
+fixtures/models/*.mlmodelc/
 coverage/
 dist/
 build/

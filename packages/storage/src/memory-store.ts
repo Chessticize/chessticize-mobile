@@ -1280,6 +1280,40 @@ export class MemoryStore implements PracticeStore {
     return stored ? cloneStoredUserPuzzle(stored) : undefined;
   }
 
+  updateUserPuzzleRating(
+    puzzleId: string,
+    rating: number,
+    ratingSource: StoredUserPuzzle["ratingSource"]
+  ): void {
+    const existing = this.userPuzzles.get(puzzleId);
+    if (!existing) {
+      return;
+    }
+    const rounded = Math.round(rating);
+    const updated: StoredUserPuzzle = {
+      ...existing,
+      rating: rounded,
+      ...(ratingSource === undefined ? {} : { ratingSource })
+    };
+    this.userPuzzles.set(puzzleId, updated);
+    const cached = this.puzzles.get(puzzleId);
+    if (cached && cached.source === "user_game") {
+      this.puzzles.set(puzzleId, {
+        ...cached,
+        rating: rounded,
+        ...(existing.puzzleKind === "arrow_duel" ? { arrowDuelRating: rounded } : {}),
+        ...(cached.userGameMeta
+          ? {
+              userGameMeta: {
+                ...cached.userGameMeta,
+                ...(ratingSource === undefined ? {} : { ratingSource })
+              }
+            }
+          : {})
+      });
+    }
+  }
+
   archiveUserPuzzle(puzzleId: string, archived = true): void {
     const existing = this.userPuzzles.get(puzzleId);
     if (!existing) {

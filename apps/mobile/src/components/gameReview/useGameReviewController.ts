@@ -4,6 +4,7 @@ import {
   evaluateGamePass1,
   extractGamePuzzles,
   gameReviewReportToPlyEvalInputs,
+  isWithinReviewDifficultyBand,
   parsePgnGame,
   submitArrowDuelChoice,
   submitLineMove,
@@ -12,6 +13,7 @@ import {
   type GamePlyEvaluation,
   type ParsedGame
 } from "../../../../../packages/core/src/index.ts";
+import { createNativeHumanPolicyModel } from "../../platform/nativeHumanPolicy.ts";
 import {
   gamePlyEvaluationFromStored,
   storedGamePlyEvalFromEvaluation,
@@ -351,19 +353,29 @@ export function useGameReviewController({
         setAnalysisStatus("pass1_done");
         setScanPhase("extracting_pass2");
 
-        const extraction = await extractGamePuzzles(
-          {
-            gameId: game.id,
-            userColor: game.userColor,
-            plies: gameReviewReportToPlyEvalInputs(report),
-            ...(game.timeControl ? { timeControl: game.timeControl } : {})
-          },
-          engine,
-          {
-            deepLimit: DEFAULT_MOBILE_PASS2_DEEP_LIMIT,
-            signal: controller.signal
-          }
-        );
+        const userRating =
+          game.userColor === "w" ? game.white.rating : game.black.rating;
+        const humanPolicy = createNativeHumanPolicyModel();
+        let extraction;
+        try {
+          extraction = await extractGamePuzzles(
+            {
+              gameId: game.id,
+              userColor: game.userColor,
+              plies: gameReviewReportToPlyEvalInputs(report),
+              ...(game.timeControl ? { timeControl: game.timeControl } : {}),
+              ...(userRating !== undefined && Number.isFinite(userRating) ? { userRating } : {})
+            },
+            engine,
+            {
+              deepLimit: DEFAULT_MOBILE_PASS2_DEEP_LIMIT,
+              ...(humanPolicy ? { humanPolicy } : {}),
+              signal: controller.signal
+            }
+          );
+        } finally {
+          void humanPolicy?.unload();
+        }
 
         if (cancelled || controller.signal.aborted) {
           return;
@@ -1153,8 +1165,17 @@ export function useGameReviewController({
     if (userPuzzles.length === 0) {
       return;
     }
+    const userRating =
+      game.userColor === "w" ? game.white.rating : game.black.rating;
     const enrolledIds = new Set<string>();
     for (const puzzle of userPuzzles) {
+      if (
+        puzzle.ratingSource !== undefined &&
+        puzzle.ratingSource !== "game_anchor" &&
+        !isWithinReviewDifficultyBand(puzzle.rating, userRating)
+      ) {
+        continue;
+      }
       const ctx = reviewContextForUserPuzzle(puzzle);
       if (!practiceService.getReviewQueueState(ctx)) {
         practiceService.enrollReview(ctx);
@@ -1168,7 +1189,7 @@ export function useGameReviewController({
       }
       return next;
     });
-  }, [practiceService, userPuzzles]);
+  }, [game.black.rating, game.userColor, game.white.rating, practiceService, userPuzzles]);
 
   const toggleFreeAnalysis = useCallback(() => {
     setFreeAnalysisOpen((value) => !value);
