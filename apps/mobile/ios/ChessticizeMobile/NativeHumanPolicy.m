@@ -16,8 +16,12 @@ static const NSInteger kMaia2CoreMLBatchSize = 2;
 @implementation NativeHumanPolicy {
   dispatch_queue_t _inferenceQueue;
   MLModel *_model;
+  MLModel *_backgroundCpuModel;
   NSString *_verifiedWeightSha256;
   id _memoryWarningObserver;
+  id _didEnterBackgroundObserver;
+  id _willEnterForegroundObserver;
+  BOOL _isInBackground;
 }
 
 RCT_EXPORT_MODULE(NativeHumanPolicy);
@@ -37,9 +41,11 @@ RCT_EXPORT_MODULE(NativeHumanPolicy);
       0
     );
     _inferenceQueue = dispatch_queue_create("com.chessticize.mobile.humanPolicy", attr);
+    _isInBackground = NO;
 
     __weak typeof(self) weakSelf = self;
-    _memoryWarningObserver = [[NSNotificationCenter defaultCenter]
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    _memoryWarningObserver = [center
       addObserverForName:UIApplicationDidReceiveMemoryWarningNotification
                   object:nil
                    queue:nil
@@ -50,6 +56,33 @@ RCT_EXPORT_MODULE(NativeHumanPolicy);
                 }
                 dispatch_async(strongSelf->_inferenceQueue, ^{
                   strongSelf->_model = nil;
+                  strongSelf->_backgroundCpuModel = nil;
+                });
+              }];
+    _didEnterBackgroundObserver = [center
+      addObserverForName:UIApplicationDidEnterBackgroundNotification
+                  object:nil
+                   queue:nil
+              usingBlock:^(__unused NSNotification *note) {
+                __strong typeof(self) strongSelf = weakSelf;
+                if (strongSelf == nil) {
+                  return;
+                }
+                dispatch_async(strongSelf->_inferenceQueue, ^{
+                  strongSelf->_isInBackground = YES;
+                });
+              }];
+    _willEnterForegroundObserver = [center
+      addObserverForName:UIApplicationWillEnterForegroundNotification
+                  object:nil
+                   queue:nil
+              usingBlock:^(__unused NSNotification *note) {
+                __strong typeof(self) strongSelf = weakSelf;
+                if (strongSelf == nil) {
+                  return;
+                }
+                dispatch_async(strongSelf->_inferenceQueue, ^{
+                  strongSelf->_isInBackground = NO;
                 });
               }];
   }
@@ -58,9 +91,18 @@ RCT_EXPORT_MODULE(NativeHumanPolicy);
 
 - (void)dealloc
 {
+  NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
   if (_memoryWarningObserver != nil) {
-    [[NSNotificationCenter defaultCenter] removeObserver:_memoryWarningObserver];
+    [center removeObserver:_memoryWarningObserver];
     _memoryWarningObserver = nil;
+  }
+  if (_didEnterBackgroundObserver != nil) {
+    [center removeObserver:_didEnterBackgroundObserver];
+    _didEnterBackgroundObserver = nil;
+  }
+  if (_willEnterForegroundObserver != nil) {
+    [center removeObserver:_willEnterForegroundObserver];
+    _willEnterForegroundObserver = nil;
   }
 }
 
@@ -103,13 +145,15 @@ RCT_EXPORT_MODULE(NativeHumanPolicy);
 }
 
 - (nullable MLModel *)ensureModelLoadedWithExpectedSha256:(nullable NSString *)expectedSha256
+                                                  cpuOnly:(BOOL)cpuOnly
                                                     error:(NSError **)error
 {
-  if (_model != nil) {
+  MLModel *cached = cpuOnly ? _backgroundCpuModel : _model;
+  if (cached != nil) {
     if (expectedSha256.length == 0 ||
         (_verifiedWeightSha256 != nil &&
          [_verifiedWeightSha256 caseInsensitiveCompare:expectedSha256] == NSOrderedSame)) {
-      return _model;
+      return cached;
     }
   }
 
@@ -153,13 +197,19 @@ RCT_EXPORT_MODULE(NativeHumanPolicy);
   }
 
   MLModelConfiguration *config = [[MLModelConfiguration alloc] init];
-  config.computeUnits = MLComputeUnitsAll;
+  // iOS blocks Metal/GPU and ANE execution in background tasks; use CPU-only while backgrounded
+  // so Maia-2 difficulty calibration continues cleanly when the user switches apps.
+  config.computeUnits = cpuOnly ? MLComputeUnitsCPUOnly : MLComputeUnitsAll;
   MLModel *loaded = [MLModel modelWithContentsOfURL:modelURL configuration:config error:error];
   if (loaded == nil) {
     return nil;
   }
-  _model = loaded;
-  return _model;
+  if (cpuOnly) {
+    _backgroundCpuModel = loaded;
+  } else {
+    _model = loaded;
+  }
+  return loaded;
 }
 
 RCT_EXPORT_METHOD(isAvailable:(RCTPromiseResolveBlock)resolve
@@ -179,7 +229,9 @@ RCT_EXPORT_METHOD(loadModel:(nullable NSString *)expectedWeightSha256
 {
   dispatch_async(_inferenceQueue, ^{
     NSError *error = nil;
-    MLModel *model = [self ensureModelLoadedWithExpectedSha256:expectedWeightSha256 error:&error];
+    MLModel *model = [self ensureModelLoadedWithExpectedSha256:expectedWeightSha256
+                                                       cpuOnly:self->_isInBackground
+                                                         error:&error];
     if (model == nil) {
       reject(@"maia2_load_failed", error.localizedDescription ?: @"Failed to load Maia-2 model.", error);
       return;
@@ -209,7 +261,17 @@ RCT_EXPORT_METHOD(scoreBatch:(NSString *)boardsBase64
     }
 
     NSError *error = nil;
-    MLModel *model = [self ensureModelLoadedWithExpectedSha256:self->_verifiedWeightSha256 error:&error];
+    BOOL usingCpuOnly = self->_isInBackground;
+    MLModel *model = [self ensureModelLoadedWithExpectedSha256:self->_verifiedWeightSha256
+                                                       cpuOnly:usingCpuOnly
+                                                         error:&error];
+    if (model == nil && !usingCpuOnly) {
+      error = nil;
+      usingCpuOnly = YES;
+      model = [self ensureModelLoadedWithExpectedSha256:self->_verifiedWeightSha256
+                                                cpuOnly:YES
+                                                  error:&error];
+    }
     if (model == nil) {
       reject(@"maia2_not_loaded", error.localizedDescription ?: @"Maia-2 model is not loaded.", error);
       return;
@@ -219,7 +281,7 @@ RCT_EXPORT_METHOD(scoreBatch:(NSString *)boardsBase64
     NSMutableData *outData = [NSMutableData dataWithLength:(NSUInteger)batchSize * (NSUInteger)kMaia2VocabSize * sizeof(float)];
     float *outPtr = (float *)outData.mutableBytes;
 
-    // Reusable static batch=2 MLMultiArrays for ANE execution.
+    // Reusable static batch=2 MLMultiArrays for ANE/CPU execution.
     MLMultiArray *boardsArray = [[MLMultiArray alloc]
       initWithShape:@[@(kMaia2CoreMLBatchSize), @18, @8, @8]
            dataType:MLMultiArrayDataTypeFloat32
@@ -268,6 +330,20 @@ RCT_EXPORT_METHOD(scoreBatch:(NSString *)boardsBase64
         }
 
         id<MLFeatureProvider> prediction = [model predictionFromFeatures:inputProvider error:&error];
+        if (prediction == nil && !usingCpuOnly) {
+          // If the app entered the background mid-prediction and GPU/ANE access was denied,
+          // seamlessly retry on the CPU-only model instead of failing the batch.
+          NSError *cpuError = nil;
+          MLModel *cpuModel = [self ensureModelLoadedWithExpectedSha256:self->_verifiedWeightSha256
+                                                                cpuOnly:YES
+                                                                  error:&cpuError];
+          if (cpuModel != nil) {
+            usingCpuOnly = YES;
+            model = cpuModel;
+            error = nil;
+            prediction = [model predictionFromFeatures:inputProvider error:&error];
+          }
+        }
         if (prediction == nil) {
           reject(@"maia2_predict_failed", error.localizedDescription ?: @"CoreML prediction failed.", error);
           return;
@@ -318,6 +394,7 @@ RCT_EXPORT_METHOD(unload:(RCTPromiseResolveBlock)resolve
 {
   dispatch_async(_inferenceQueue, ^{
     self->_model = nil;
+    self->_backgroundCpuModel = nil;
     resolve(@YES);
   });
 }
