@@ -355,15 +355,51 @@ test("selectMaiaMove uses HumanPolicyModel when present, falls back cleanly, and
     fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     maiaRating: 1500,
     policyModel: fakePolicy,
+    disableOpeningBook: true,
     rng: () => 0.1
   });
   assert.equal(picked.uci, "e2e4");
   assert.equal(picked.usedFallbackPolicy, false);
 
+  // Opening book serves realistic human openings on move 1 (preventing Maia-2's ply < 10 OOD knight shuffling)
+  const bookPick = await selectMaiaMove({
+    fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    maiaRating: 1500,
+    policyModel: fakePolicy,
+    rng: () => 0.1
+  });
+  assert.equal(bookPick.usedOpeningBook, true);
+  assert.ok(["e2e4", "d2d4", "g1f3", "c2c4"].includes(bookPick.uci));
+
+  // Out-of-book opening guard suppresses Maia-2's ply < 10 Nb1 retreat artifact (1. Nc3 Nf6)
+  const trapPolicy: HumanPolicyModel = {
+    async scoreMoves(requests) {
+      return requests.map((req) => {
+        const probs: Record<string, number> = {};
+        for (const move of req.moves) {
+          probs[move] = move === "c3b1" ? 0.79 : move === "g1f3" ? 0.08 : move === "d2d4" ? 0.07 : 0.06 / Math.max(1, req.moves.length - 3);
+        }
+        return {
+          byElo: Object.fromEntries(req.elos.map((elo) => [elo, { probs, top1Prob: 0.79, entropy: 0.9 }]))
+        };
+      });
+    }
+  };
+  const guardedPick = await selectMaiaMove({
+    fen: "rnbqkb1r/pppppppp/5n2/8/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 2 2",
+    maiaRating: 1450,
+    ply: 2,
+    recentPositionKeys: ["rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"],
+    policyModel: trapPolicy,
+    rng: () => 0.2
+  });
+  assert.notEqual(guardedPick.uci, "c3b1");
+
   const fallbackPicked = await selectMaiaMove({
     fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     maiaRating: 1200,
     policyModel: null,
+    disableOpeningBook: true,
     rng: () => 0.2
   });
   assert.equal(fallbackPicked.usedFallbackPolicy, true);

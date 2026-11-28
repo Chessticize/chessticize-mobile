@@ -281,16 +281,28 @@ RCT_EXPORT_METHOD(scoreBatch:(NSString *)boardsBase64
 
         if (logits.dataType == MLMultiArrayDataTypeFloat32) {
           const float *srcLogits = (const float *)logits.dataPointer;
-          memcpy(
-            outPtr + start * kMaia2VocabSize,
-            srcLogits,
-            (size_t)validInChunk * (size_t)kMaia2VocabSize * sizeof(float)
-          );
+          NSInteger rowStride = logits.strides.count >= 2
+            ? logits.strides[0].integerValue
+            : kMaia2VocabSize;
+          NSInteger colStride = logits.strides.count >= 2
+            ? logits.strides[1].integerValue
+            : 1;
+          for (NSInteger slot = 0; slot < validInChunk; slot += 1) {
+            float *dstRow = outPtr + (start + slot) * kMaia2VocabSize;
+            const float *srcRow = srcLogits + slot * rowStride;
+            if (colStride == 1) {
+              memcpy(dstRow, srcRow, (size_t)kMaia2VocabSize * sizeof(float));
+            } else {
+              for (NSInteger col = 0; col < kMaia2VocabSize; col += 1) {
+                dstRow[col] = srcRow[col * colStride];
+              }
+            }
+          }
         } else {
           for (NSInteger slot = 0; slot < validInChunk; slot += 1) {
             for (NSInteger col = 0; col < kMaia2VocabSize; col += 1) {
-              NSInteger flat = slot * kMaia2VocabSize + col;
-              outPtr[(start + slot) * kMaia2VocabSize + col] = logits[flat].floatValue;
+              NSArray<NSNumber *> *coord = @[@(slot), @(col)];
+              outPtr[(start + slot) * kMaia2VocabSize + col] = [logits objectForKeyedSubscript:coord].floatValue;
             }
           }
         }

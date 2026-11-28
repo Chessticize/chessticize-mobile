@@ -239,9 +239,16 @@ export function MaiaPlayGameView({
     setMaiaThinking(true);
     let cancelled = false;
 
+    const recentPositionKeys = [
+      current.initialFen.split(/\s+/).slice(0, 4).join(" "),
+      ...current.moves.slice(-16).map((m) => m.fenAfter.split(/\s+/).slice(0, 4).join(" "))
+    ];
+
     void selectMaiaMove({
       fen: snapshotFen,
       maiaRating: snapshotRating,
+      ply: snapshotPly,
+      recentPositionKeys,
       policyModel
     }).then((choice) => {
       if (
