@@ -285,7 +285,7 @@ describe("useGamesBatchAnalysis out-of-app background execution", () => {
     mounted.unmount();
   });
 
-  it("iOS Tier 1 beginBackgroundTask proactively pauses on background/lock, flushes checkpoint, and auto-resumes on foreground", async () => {
+  it("iOS Tier 1 beginBackgroundTask keeps running on app switch, pauses cleanly on screen lock / expiration_warning, and auto-resumes on foreground", async () => {
     const store = new MemoryStore();
     const service = new PracticeService(store);
     store.upsertImportedGames([makeSampleGame("lichess:ios-t1")]);
@@ -316,9 +316,17 @@ describe("useGamesBatchAnalysis out-of-app background execution", () => {
     await deferred.stepOne();
     expect(mounted.controller.state.status).toBe("running");
 
-    // Going to background / locking screen proactively pauses cleanly inside beginBackgroundTask
-    await act(async () => {
+    // Switching apps (unlocked background) keeps running inside the OS background window
+    act(() => {
       appStateListener?.("background");
+    });
+    expect(mounted.controller.state.status).toBe("running");
+    expect(mounted.controller.state.pausedByBackground).toBe(false);
+
+    // Screen lock (UIApplicationProtectedDataWillBecomeUnavailableNotification) or OS expiration
+    // emits expiration_warning -> pauses cleanly, flushes checkpoint, and calls stop()
+    await act(async () => {
+      bridge.emit({ type: "expiration_warning" });
       await Promise.resolve();
       await Promise.resolve();
     });
