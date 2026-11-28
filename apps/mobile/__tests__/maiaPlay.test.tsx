@@ -187,4 +187,95 @@ describe("Play with Maia UI", () => {
       renderer.unmount();
     });
   });
+
+  test("MaiaPlayGameView slides Maia moves via ChessboardRef.move and suppresses programmatic onMove echoes", async () => {
+    jest.useFakeTimers();
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    const animatedMoves: Array<{ from: string; to: string; promotion?: string }> = [];
+    const resetFens: string[] = [];
+    let latestOnMove:
+      | ((result: { move: { from: string; to: string; promotion?: string } }) => void)
+      | null = null;
+    let latestHighlights: unknown;
+
+    const RefMockBoard = React.forwardRef<
+      { move: (args: { from: string; to: string; promotion?: string }) => Promise<unknown>; resetBoard: (fen: string) => void },
+      React.ComponentProps<MaiaPlayBoardComponent>
+    >((props, ref) => {
+      latestOnMove = props.onMove as unknown as typeof latestOnMove;
+      latestHighlights = props.squareHighlights;
+      React.useImperativeHandle(ref, () => ({
+        async move(args) {
+          animatedMoves.push(args);
+          // Simulate react-native-chessboard firing onMove during programmatic slide.
+          latestOnMove?.({ move: args });
+          return { from: args.from, to: args.to };
+        },
+        resetBoard(fen: string) {
+          resetFens.push(fen);
+        }
+      }));
+      return React.createElement(View, { testID: "mock-maia-ref-board", accessibilityLabel: props.fen });
+    });
+
+    const fakePolicy: HumanPolicyModel = {
+      async scoreMoves(requests) {
+        return requests.map((req) => {
+          const probs: Record<string, number> = {};
+          for (const move of req.moves) {
+            probs[move] = move === "e7e5" ? 0.92 : 0.08 / Math.max(1, req.moves.length - 1);
+          }
+          return {
+            byElo: Object.fromEntries(
+              req.elos.map((elo) => [elo, { probs, top1Prob: 0.92, entropy: 0.35 }])
+            )
+          };
+        });
+      }
+    };
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <MaiaPlayScreen
+          BoardComponent={RefMockBoard as unknown as MaiaPlayBoardComponent}
+          policyModel={fakePolicy}
+          service={service}
+          onBack={() => undefined}
+          onOpenGameReview={() => undefined}
+        />
+      );
+    });
+
+    await act(async () => {
+      findByTestId(renderer.root, "maia-color-w").props.onPress();
+      findByTestId(renderer.root, "maia-pace-instant").props.onPress();
+    });
+    await act(async () => {
+      findByTestId(renderer.root, "maia-start-game").props.onPress();
+    });
+
+    // User plays 1. e4 -> Maia selects a book/policy reply and animates it via boardRef.move
+    await act(async () => {
+      latestOnMove?.({ move: { from: "e2", to: "e4" } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(150);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(animatedMoves.length).toBe(1);
+    expect(resetFens.length).toBe(1);
+    expect(Array.isArray(latestHighlights) && (latestHighlights as unknown[]).length).toBe(2);
+    const activeGame = service.getActiveMaiaGame();
+    expect(activeGame?.moves.length).toBe(2);
+
+    await act(async () => {
+      renderer.unmount();
+    });
+  });
 });

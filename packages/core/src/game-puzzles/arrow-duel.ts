@@ -26,6 +26,7 @@ export const ARROW_DUEL_MIN_BEST_CP = -75;
 export const ARROW_DUEL_MIN_CP_SWING = 200;
 export const ARROW_DUEL_MIN_WIN_CHANCE_SWING = 0.35;
 export const ARROW_DUEL_MATE_SCORE = 10000;
+export const ARROW_DUEL_MAX_RAW_PV_PLIES = 6;
 
 export const DEFAULT_ARROW_DUEL_LIMIT: SearchLimitConfig = {
   depth: 18,
@@ -38,6 +39,7 @@ export interface VerifyArrowDuelPairParams {
   blunderMove: string;
   expectedUserColor?: "w" | "b";
   limit?: SearchLimitConfig;
+  maxPunishmentPlies?: number;
   signal?: AbortSignal;
 }
 
@@ -144,10 +146,15 @@ export async function verifyArrowDuelPair(
 
   const bestEvalWhite = relativeScoreToCp(scoreForPov(bestLine.score, "w"), ARROW_DUEL_MATE_SCORE);
   const blunderEvalWhite = relativeScoreToCp(scoreForPov(blunderLine.score, "w"), ARROW_DUEL_MATE_SCORE);
+  const maxPunishmentPlies = Math.max(
+    1,
+    Math.floor(params.maxPunishmentPlies ?? ARROW_DUEL_MAX_RAW_PV_PLIES)
+  );
   let punishmentLine = extractLegalPunishmentLine(
     blunderCheckBoard.fen(),
     normalizedBlunder,
-    blunderLine.pv
+    blunderLine.pv,
+    maxPunishmentPlies
   );
   if (punishmentLine.length === 0 && !blunderCheckBoard.isGameOver()) {
     const replyLines = await engine.analyze({
@@ -162,7 +169,8 @@ export async function verifyArrowDuelPair(
       punishmentLine = extractLegalPunishmentLine(
         blunderCheckBoard.fen(),
         "",
-        replyLine.pv.length > 0 ? replyLine.pv : [replyLine.move]
+        replyLine.pv.length > 0 ? replyLine.pv : [replyLine.move],
+        maxPunishmentPlies
       );
     }
   }
@@ -196,9 +204,10 @@ function pickLineForMove(
 function extractLegalPunishmentLine(
   fenAfterBlunder: string,
   blunderMove: string,
-  pv: readonly string[]
+  pv: readonly string[],
+  maxPlies: number
 ): string[] {
-  if (pv.length === 0) {
+  if (pv.length === 0 || maxPlies <= 0) {
     return [];
   }
   const normalizedPv = pv.map(normalizeUci).filter((move) => move.length >= 4);
@@ -208,6 +217,9 @@ function extractLegalPunishmentLine(
   const board = new Chess(fenAfterBlunder);
   const legalLine: string[] = [];
   for (const move of candidateTail) {
+    if (legalLine.length >= maxPlies) {
+      break;
+    }
     const played = tryPlayUci(board, move);
     if (!played) {
       break;

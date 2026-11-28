@@ -895,3 +895,65 @@ test("terminal opponent blunder with immediate opponent resignation does not fab
   });
   assert.equal(missedWhenUserResignedBeforeMove2, false);
 });
+
+test("multi-solution own_blunder Arrow Duel caps punishmentLine to 1 ply instead of dumping raw long PV", async () => {
+  // Real game position: Black is down 3 pawns; Qxc2 (~0.0) keeps counterplay,
+  // while Qxf3 (+4.0) trades queens into a lost endgame where both gxf3 and Rxf3 win easily.
+  const decisionFen = "3r1rk1/p4ppp/1b2p3/4P3/5P2/4PQ2/PPP1q1PP/R1B2RK1 b - - 0 23";
+  const plies = buildPliesFromStart(
+    decisionFen,
+    [
+      { uci: "e2f3" },
+      { uci: "g2f3" }
+    ],
+    45
+  );
+  plies[0]!.evalAfter = whiteCp(398, plies[0]!.fenAfter);
+  plies[1]!.evalAfter = whiteCp(398, plies[1]!.fenAfter);
+
+  const longEndgamePv = [
+    "e2f3",
+    "g2f3",
+    "f7f6",
+    "e5f6",
+    "f8f6",
+    "g1g2",
+    "d8c8",
+    "c2c3",
+    "f6g6",
+    "g2h1"
+  ];
+  const engine = createScriptedEngine((req) => {
+    if (req.fen === decisionFen && req.searchMoves?.[0] === "e2f3") {
+      return [line(req.fen, "e2f3", whiteCp(398, req.fen), { pv: longEndgamePv })];
+    }
+    if (req.fen === decisionFen) {
+      return [line(req.fen, "e2c2", whiteCp(-19, req.fen), { pv: ["e2c2", "b2b3"] })];
+    }
+    if (req.fen === plies[0]!.fenAfter) {
+      // Both gxf3 and Rxf3 win equally -> multi-solution blunder!
+      return [
+        line(req.fen, "g2f3", whiteCp(398, req.fen), { multipv: 1, pv: longEndgamePv.slice(1) }),
+        line(req.fen, "f1f3", whiteCp(399, req.fen), { multipv: 2, pv: ["f1f3", "f7f6"] })
+      ];
+    }
+    return [line(req.fen, "f7f6", whiteCp(398, req.fen), { pv: ["f7f6"] })];
+  });
+
+  const result = await extractGamePuzzles(
+    {
+      gameId: "maia-qxf3-endgame",
+      userColor: "b",
+      plies,
+      initialEval: whiteCp(-19, decisionFen)
+    },
+    engine
+  );
+
+  assert.equal(result.puzzles.length, 1);
+  const puzzle = result.puzzles[0]!;
+  assert.equal(puzzle.puzzleKind, "arrow_duel");
+  assert.equal(puzzle.momentKind, "own_blunder_punished");
+  assert.deepEqual(puzzle.arrowDuel?.punishmentLine, ["g2f3"]);
+  assert.deepEqual(puzzle.solutionMoves, ["e2f3", "g2f3"]);
+});

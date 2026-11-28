@@ -834,10 +834,25 @@ async function analyzePosition(params: {
       blunderMove: setupMove,
       expectedUserColor: input.userColor,
       limit: deepLimit,
+      ...(candidate.isMultiSolutionBlunder ? { maxPunishmentPlies: 1 } : {}),
       ...(signal !== undefined ? { signal } : {})
     });
 
     if (arrowDuel) {
+      const cookedPunishment = !candidate.isMultiSolutionBlunder
+        ? extractLegalMoveSequence(plyInput.fenAfter, candidate.winningMoves)
+        : [];
+      const punishmentLine =
+        cookedPunishment.length > 0
+          ? cookedPunishment
+          : candidate.isMultiSolutionBlunder
+            ? arrowDuel.punishmentLine.slice(0, 1)
+            : arrowDuel.punishmentLine;
+      const finalArrowDuel: ExtractedArrowDuelMeta = {
+        ...arrowDuel,
+        punishmentLine
+      };
+
       return {
         kind: "puzzle",
         puzzle: buildExtractedPuzzle({
@@ -848,12 +863,12 @@ async function analyzePosition(params: {
           momentKind: candidate.momentKind,
           userColor: input.userColor,
           puzzleColor: input.userColor,
-          initialFen: arrowDuel.decisionFen,
-          solutionMoves: [arrowDuel.blunderMove, ...arrowDuel.punishmentLine],
+          initialFen: finalArrowDuel.decisionFen,
+          solutionMoves: [finalArrowDuel.blunderMove, ...finalArrowDuel.punishmentLine],
           prevCp: candidate.prevCp,
           cp: candidate.cp,
           winChanceSwing: candidate.winChanceSwing,
-          arrowDuel,
+          arrowDuel: finalArrowDuel,
           themes,
           lengthTag: tagResult.lengthTag,
           phaseTag: tagResult.phaseTag,
@@ -903,11 +918,17 @@ async function analyzePosition(params: {
       blunderMove: actualUserPly.uci,
       expectedUserColor: input.userColor,
       limit: deepLimit,
+      maxPunishmentPlies: 1,
       ...(signal !== undefined ? { signal } : {})
     });
     if (!arrowDuel) {
       return null;
     }
+
+    const finalArrowDuel: ExtractedArrowDuelMeta = {
+      ...arrowDuel,
+      punishmentLine: arrowDuel.punishmentLine.slice(0, 1)
+    };
 
     return {
       kind: "puzzle",
@@ -919,12 +940,12 @@ async function analyzePosition(params: {
         momentKind: candidate.momentKind,
         userColor: input.userColor,
         puzzleColor: input.userColor,
-        initialFen: arrowDuel.decisionFen,
-        solutionMoves: [arrowDuel.blunderMove, ...arrowDuel.punishmentLine],
+        initialFen: finalArrowDuel.decisionFen,
+        solutionMoves: [finalArrowDuel.blunderMove, ...finalArrowDuel.punishmentLine],
         prevCp: candidate.prevCp,
         cp: candidate.cp,
         winChanceSwing: candidate.winChanceSwing,
-        arrowDuel,
+        arrowDuel: finalArrowDuel,
         themes,
         lengthTag: tagResult.lengthTag,
         phaseTag: tagResult.phaseTag,
@@ -1261,6 +1282,27 @@ function toCandidate(line: EngineAnalysisLine, winner: Color): EngineMoveCandida
     score: scoreForPov(line.score, winner),
     pv
   };
+}
+
+function extractLegalMoveSequence(startFen: string, moves: readonly string[]): string[] {
+  if (moves.length === 0) {
+    return [];
+  }
+  let board: Chess;
+  try {
+    board = new Chess(startFen);
+  } catch {
+    return [];
+  }
+  const legal: string[] = [];
+  for (const rawMove of moves) {
+    const move = normalizeUci(rawMove);
+    if (move.length < 4 || !tryPlayUci(board, move)) {
+      break;
+    }
+    legal.push(move);
+  }
+  return legal;
 }
 
 function sortAnalysisLines(lines: readonly EngineAnalysisLine[]): EngineAnalysisLine[] {

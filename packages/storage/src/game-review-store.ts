@@ -184,6 +184,21 @@ export function userGamePuzzleIdFor(
 }
 
 export function storedUserPuzzleToPuzzle(stored: StoredUserPuzzle): Puzzle {
+  const isMultiSolutionArrowDuel =
+    stored.puzzleKind === "arrow_duel" &&
+    (stored.momentKind === "own_blunder_punished" ||
+      stored.momentKind === "own_blunder_escaped" ||
+      stored.momentKind === "opponent_blunder_missed");
+  const normalizedSolutionMoves = isMultiSolutionArrowDuel
+    ? stored.solutionMoves.slice(0, 2)
+    : [...stored.solutionMoves];
+  const normalizedPunishmentLine =
+    stored.punishmentLine === undefined
+      ? undefined
+      : isMultiSolutionArrowDuel
+        ? stored.punishmentLine.slice(0, 1)
+        : [...stored.punishmentLine];
+
   const userGameMeta: UserGamePuzzleMeta = {
     gameId: stored.gameId,
     gamePly: stored.gamePly,
@@ -197,9 +212,9 @@ export function storedUserPuzzleToPuzzle(stored: StoredUserPuzzle): Puzzle {
       ? {}
       : { clockRemainingSec: stored.clockRemainingSec }),
     ...(stored.timeSpentSec === undefined ? {} : { timeSpentSec: stored.timeSpentSec }),
-    ...(stored.punishmentLine === undefined
+    ...(normalizedPunishmentLine === undefined
       ? {}
-      : { punishmentLine: [...stored.punishmentLine] }),
+      : { punishmentLine: normalizedPunishmentLine }),
     ...(stored.caliberScore === undefined ? {} : { caliberScore: stored.caliberScore }),
     ...(stored.ratingSource === undefined ? {} : { ratingSource: stored.ratingSource })
   };
@@ -207,7 +222,7 @@ export function storedUserPuzzleToPuzzle(stored: StoredUserPuzzle): Puzzle {
   return {
     id: stored.id,
     initialFen: stored.initialFen,
-    solutionMoves: [...stored.solutionMoves],
+    solutionMoves: normalizedSolutionMoves,
     rating: stored.rating,
     ...(stored.puzzleKind === "arrow_duel" ? { arrowDuelRating: stored.rating } : {}),
     themes: [...stored.themes],
