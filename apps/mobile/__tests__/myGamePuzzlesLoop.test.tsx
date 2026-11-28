@@ -164,7 +164,7 @@ describe("Wave 4 My Game Puzzles closed-loop experience (#768)", () => {
 
     expect(findByTestID(rendererFull.root, "games-diagnosis-card")).not.toBeNull();
     expect(findByTestID(rendererFull.root, "games-diagnosis-clock")).not.toBeNull();
-    expect(findByTestID(rendererFull.root, "games-diagnosis-time-classes")).not.toBeNull();
+    expect(findByTestID(rendererFull.root, "games-diagnosis-time-classes")).toBeNull();
 
     // Tapping a blindspot motif chip on Games view launches theme-filtered My Game Puzzles
     const forkChip = findByTestID(rendererFull.root, "games-diagnosis-blindspot-fork");

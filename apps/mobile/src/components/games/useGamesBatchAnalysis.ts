@@ -94,7 +94,7 @@ const DEFAULT_MOBILE_BATCH_PASS2_DEEP_LIMIT = {
   nodes: 250_000
 } as const;
 
-type PauseReason = "none" | "user" | "background" | "interactive" | "cancel";
+type PauseReason = "none" | "user" | "background" | "lock" | "interactive" | "cancel";
 
 export function useGamesBatchAnalysis({
   store,
@@ -119,6 +119,7 @@ export function useGamesBatchAnalysis({
   const abortControllerRef = useRef<AbortController | null>(null);
   const pauseReasonRef = useRef<PauseReason>("none");
   const pausedByBackgroundRef = useRef(Boolean(initialState.pausedByBackground));
+  const pausedByLockRef = useRef(false);
   const pausedByInteractiveRef = useRef(Boolean(initialState.pausedByInteractiveEngine));
   const suspendedRef = useRef(suspended);
   suspendedRef.current = suspended;
@@ -189,13 +190,18 @@ export function useGamesBatchAnalysis({
         .start({
           title: "Chessticize",
           subtitle: formatAnalyzingSubtitle(Math.max(1, currentIndex), Math.max(1, totalGames)),
+          pausedSubtitle: translate(locale, "games.batch.pausedWhileLocked"),
           totalUnits: Math.max(1, totalGames) * 100,
           pauseLabel: translate(locale, "common.pause"),
           cancelLabel: translate(locale, "common.cancel")
         })
         .then((result) => {
           const normalized = result ?? INACTIVE_BACKGROUND_BATCH_RESULT;
-          if (!mountedRef.current || generation !== runGenerationRef.current || !runningRef.current) {
+          if (
+            !mountedRef.current ||
+            generation !== runGenerationRef.current ||
+            (!runningRef.current && !pausedByLockRef.current)
+          ) {
             if (normalized.active) {
               void bridge.stop();
             }
@@ -335,7 +341,9 @@ export function useGamesBatchAnalysis({
       return;
     }
 
-    startBackgroundSession(queueRef.current.length, nextIndexRef.current + 1, generation);
+    if (!backgroundSessionActiveRef.current) {
+      startBackgroundSession(queueRef.current.length, nextIndexRef.current + 1, generation);
+    }
 
     while (nextIndexRef.current < queueRef.current.length) {
       if (!mountedRef.current || generation !== runGenerationRef.current) {
@@ -553,6 +561,24 @@ export function useGamesBatchAnalysis({
       return;
     }
 
+    if (pauseReasonRef.current === "lock") {
+      // Keep the native BGContinuedProcessingTask alive (paused, NOT marked Done/failed)
+      // so unlocking the device resumes analysis immediately even while staying in background.
+      pausedByLockRef.current = true;
+      pausedByBackgroundRef.current = true;
+      pausedByInteractiveRef.current = false;
+      pauseReasonRef.current = "none";
+      setState((current) => ({
+        ...current,
+        status: "paused",
+        completedGames: completedGamesRef.current,
+        generatedPuzzles: generatedPuzzlesRef.current,
+        pausedByBackground: true,
+        pausedByInteractiveEngine: false
+      }));
+      return;
+    }
+
     if (
       pauseReasonRef.current === "user" ||
       pauseReasonRef.current === "background" ||
@@ -561,6 +587,7 @@ export function useGamesBatchAnalysis({
       stopBackgroundSession();
       const pausedByBackground = pauseReasonRef.current === "background";
       const pausedByInteractiveEngine = pauseReasonRef.current === "interactive";
+      pausedByLockRef.current = false;
       pausedByBackgroundRef.current = pausedByBackground;
       pausedByInteractiveRef.current = pausedByInteractiveEngine;
       pauseReasonRef.current = "none";
@@ -575,6 +602,7 @@ export function useGamesBatchAnalysis({
       return;
     }
 
+    pausedByLockRef.current = false;
     pausedByBackgroundRef.current = false;
     pausedByInteractiveRef.current = false;
     finishBackgroundSession(completedGamesRef.current, generatedPuzzlesRef.current);
@@ -602,13 +630,16 @@ export function useGamesBatchAnalysis({
     store
   ]);
 
-  const requestPause = useCallback((reason: "user" | "background" | "interactive"): void => {
-    if (!runningRef.current) {
-      return;
-    }
-    pauseReasonRef.current = reason;
-    abortControllerRef.current?.abort();
-  }, []);
+  const requestPause = useCallback(
+    (reason: "user" | "background" | "lock" | "interactive"): void => {
+      if (!runningRef.current) {
+        return;
+      }
+      pauseReasonRef.current = reason;
+      abortControllerRef.current?.abort();
+    },
+    []
+  );
 
   const startBatch = useCallback(
     (games: readonly StoredImportedGame[]): void => {
@@ -617,25 +648,32 @@ export function useGamesBatchAnalysis({
         return;
       }
       abortControllerRef.current?.abort();
+      stopBackgroundSession();
       runGenerationRef.current += 1;
       queueRef.current = [...targets];
       nextIndexRef.current = 0;
       completedGamesRef.current = 0;
       generatedPuzzlesRef.current = 0;
       pauseReasonRef.current = "none";
+      pausedByLockRef.current = false;
       pausedByBackgroundRef.current = false;
       pausedByInteractiveRef.current = false;
       runningRef.current = true;
       void runQueue(runGenerationRef.current);
     },
-    [runQueue]
+    [runQueue, stopBackgroundSession]
   );
 
   const pause = useCallback((): void => {
+    pausedByLockRef.current = false;
     pausedByBackgroundRef.current = false;
     pausedByInteractiveRef.current = false;
-    requestPause("user");
-  }, [requestPause]);
+    if (runningRef.current) {
+      requestPause("user");
+      return;
+    }
+    stopBackgroundSession();
+  }, [requestPause, stopBackgroundSession]);
 
   const resume = useCallback((): void => {
     if (runningRef.current || nextIndexRef.current >= queueRef.current.length) {
@@ -643,6 +681,7 @@ export function useGamesBatchAnalysis({
     }
     runGenerationRef.current += 1;
     pauseReasonRef.current = "none";
+    pausedByLockRef.current = false;
     pausedByBackgroundRef.current = false;
     pausedByInteractiveRef.current = false;
     runningRef.current = true;
@@ -650,6 +689,7 @@ export function useGamesBatchAnalysis({
   }, [runQueue]);
 
   const cancel = useCallback((): void => {
+    pausedByLockRef.current = false;
     pausedByBackgroundRef.current = false;
     pausedByInteractiveRef.current = false;
     if (runningRef.current) {
@@ -668,12 +708,14 @@ export function useGamesBatchAnalysis({
     if (runningRef.current) {
       return;
     }
+    stopBackgroundSession();
     queueRef.current = [];
     nextIndexRef.current = 0;
+    pausedByLockRef.current = false;
     pausedByBackgroundRef.current = false;
     pausedByInteractiveRef.current = false;
     setState(INITIAL_GAMES_BATCH_STATE);
-  }, []);
+  }, [stopBackgroundSession]);
 
   useEffect(() => {
     if (disabled) {
@@ -688,11 +730,24 @@ export function useGamesBatchAnalysis({
         pause();
       } else if (event.type === "cancel_requested") {
         cancel();
+      } else if (event.type === "lock_paused") {
+        pausedByLockRef.current = true;
+        requestPause("lock");
+      } else if (event.type === "unlock_resumed") {
+        pausedByLockRef.current = false;
+        if (pausedByBackgroundRef.current && !runningRef.current && !suspendedRef.current) {
+          resume();
+        }
       } else if (event.type === "expiration_warning") {
-        requestPause("background");
+        pausedByLockRef.current = false;
+        if (runningRef.current) {
+          requestPause("background");
+        } else {
+          stopBackgroundSession();
+        }
       }
     });
-  }, [cancel, disabled, pause, requestPause, resolveBackgroundBridge]);
+  }, [cancel, disabled, pause, requestPause, resolveBackgroundBridge, resume, stopBackgroundSession]);
 
   useEffect(() => {
     if (disabled) {

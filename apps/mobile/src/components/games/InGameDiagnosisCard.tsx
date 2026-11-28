@@ -8,7 +8,6 @@ import { customThemeLabel } from "../practice/shared/themeCatalog.ts";
 import { useTranslation, type TranslateFn } from "../../i18n/index.ts";
 import { makeStyles, useTheme } from "../../theme/index.ts";
 import { AppText, Badge, Section } from "../ui/index.tsx";
-import { gameTimeClassLabel } from "./gamesPresentation.ts";
 
 export interface InGameDiagnosisCardProps {
   diagnosis: InGameWeaknessDiagnosis;
@@ -129,23 +128,6 @@ export function InGameDiagnosisCard({
         </View>
       ) : null}
 
-      {diagnosis.timeClassSummaries.length >= 2 ? (
-        <View style={styles.timeClassRow} testID="games-diagnosis-time-classes">
-          {diagnosis.timeClassSummaries.map((summary) => (
-            <View key={summary.timeClass} style={styles.timeClassPill}>
-              <AppText tone="secondary" variant="caption">
-                {gameTimeClassLabel(summary.timeClass, locale)}
-              </AppText>
-              <AppText style={styles.timeClassValue} variant="caption">
-                {summary.averageAccuracy !== undefined
-                  ? `${Math.round(summary.averageAccuracy)}%`
-                  : `${summary.gameCount}`}
-              </AppText>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
       {diagnosis.topBlindspots.length > 0 ? (
         <ScrollView
           contentContainerStyle={styles.blindspotsRow}
@@ -205,24 +187,6 @@ const useStyles = makeStyles((theme) => ({
   },
   clockSegment: {
     height: 6
-  },
-  timeClassRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
-  timeClassPill: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceSunken,
-    borderRadius: theme.shape.control,
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4
-  },
-  timeClassValue: {
-    color: theme.colors.text.primary,
-    fontWeight: "700"
   },
   blindspotsRow: {
     alignItems: "center",

@@ -13,6 +13,7 @@ export type BackgroundBatchAnalysisMode =
 export interface BackgroundBatchAnalysisStartInput {
   title: string;
   subtitle: string;
+  pausedSubtitle?: string;
   totalUnits: number;
   pauseLabel: string;
   cancelLabel: string;
@@ -41,7 +42,9 @@ export interface BackgroundBatchAnalysisFinishInput {
 export type BackgroundBatchAnalysisEvent =
   | { type: "pause_requested" }
   | { type: "cancel_requested" }
-  | { type: "expiration_warning" };
+  | { type: "expiration_warning" }
+  | { type: "lock_paused" }
+  | { type: "unlock_resumed" };
 
 export interface BackgroundBatchAnalysisBridge {
   start(input: BackgroundBatchAnalysisStartInput): Promise<BackgroundBatchAnalysisStartResult>;
@@ -95,7 +98,9 @@ function normalizeEvent(raw: unknown): BackgroundBatchAnalysisEvent | null {
   if (
     type === "pause_requested" ||
     type === "cancel_requested" ||
-    type === "expiration_warning"
+    type === "expiration_warning" ||
+    type === "lock_paused" ||
+    type === "unlock_resumed"
   ) {
     return { type };
   }

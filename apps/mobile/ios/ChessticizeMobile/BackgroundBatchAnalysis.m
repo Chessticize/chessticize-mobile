@@ -15,11 +15,14 @@ static NSString * const ChessticizeBatchAnalysisCompletionNotificationId = @"che
 @property (nonatomic, strong, nullable) id activeContinuedTask;
 @property (nonatomic, copy, nullable) NSString *activeContinuedTaskIdentifier;
 @property (nonatomic, assign) BOOL continuedTaskCompleted;
+@property (nonatomic, assign) BOOL pausedForLock;
 @property (nonatomic, copy) NSString *latestTitle;
 @property (nonatomic, copy) NSString *latestSubtitle;
+@property (nonatomic, copy) NSString *pausedSubtitle;
 @property (nonatomic, assign) NSInteger latestCompletedUnits;
 @property (nonatomic, assign) NSInteger latestTotalUnits;
-@property (nonatomic, strong, nullable) id protectedDataObserver;
+@property (nonatomic, strong, nullable) id protectedDataWillLockObserver;
+@property (nonatomic, strong, nullable) id protectedDataDidUnlockObserver;
 @end
 
 @implementation BackgroundBatchAnalysis
@@ -38,11 +41,14 @@ RCT_EXPORT_MODULE();
     _backgroundTaskID = UIBackgroundTaskInvalid;
     _latestTitle = @"Chessticize";
     _latestSubtitle = @"";
+    _pausedSubtitle = @"Paused while locked";
     _latestCompletedUnits = 0;
     _latestTotalUnits = 1;
+    _pausedForLock = NO;
 
     __weak typeof(self) weakSelf = self;
-    _protectedDataObserver = [[NSNotificationCenter defaultCenter]
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    _protectedDataWillLockObserver = [center
       addObserverForName:UIApplicationProtectedDataWillBecomeUnavailable
                   object:nil
                    queue:[NSOperationQueue mainQueue]
@@ -50,15 +56,28 @@ RCT_EXPORT_MODULE();
                 __strong typeof(weakSelf) strongSelf = weakSelf;
                 [strongSelf handleDeviceWillLock];
               }];
+    _protectedDataDidUnlockObserver = [center
+      addObserverForName:UIApplicationProtectedDataDidBecomeAvailable
+                  object:nil
+                   queue:[NSOperationQueue mainQueue]
+              usingBlock:^(__unused NSNotification *note) {
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                [strongSelf handleDeviceDidUnlock];
+              }];
   }
   return self;
 }
 
 - (void)dealloc
 {
-  if (_protectedDataObserver != nil) {
-    [[NSNotificationCenter defaultCenter] removeObserver:_protectedDataObserver];
-    _protectedDataObserver = nil;
+  NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+  if (_protectedDataWillLockObserver != nil) {
+    [center removeObserver:_protectedDataWillLockObserver];
+    _protectedDataWillLockObserver = nil;
+  }
+  if (_protectedDataDidUnlockObserver != nil) {
+    [center removeObserver:_protectedDataDidUnlockObserver];
+    _protectedDataDidUnlockObserver = nil;
   }
   [self stopSessionWithSuccess:YES];
 }
@@ -106,48 +125,87 @@ RCT_EXPORT_MODULE();
 }
 
 /**
- * Proactively pauses batch analysis when the device is about to lock (screen locked with passcode /
- * Face ID) while leaving app-switching (unlocked background) running seamlessly.
+ * Pauses active Stockfish/CoreML work when the device locks while keeping BGContinuedProcessingTask
+ * alive (NOT completed/Done) so unlocking the phone immediately resumes analysis even if the user
+ * stays on the Home Screen or in another app.
  *
- * Finishes any active BGContinuedProcessingTask with success=YES so iOS dismisses the Live
- * Activity cleanly instead of showing a Lock Screen "Task failed (!)" alert, while keeping the
- * Tier-1 beginBackgroundTask alive briefly so JS can flush the current SQLite checkpoint before
- * calling stop().
+ * Updates the Live Activity subtitle to "Paused while locked" so the Lock Screen shows Paused
+ * rather than "Done" or "Task failed". If iOS eventually reclaims the task during a long lock,
+ * expirationHandler cleanly finalizes it and JS auto-resumes upon returning to the app.
  */
 - (void)handleDeviceWillLock
 {
-  id continuedTaskToFinish = nil;
-  NSString *pendingIdentifierToCancel = nil;
-  BOOL shouldEmitPause = NO;
+  id continuedTask = nil;
+  NSString *title = @"Chessticize";
+  NSString *pausedSub = @"Paused while locked";
+  BOOL hasContinuedSession = NO;
+  BOOL hasTier1Only = NO;
 
   @synchronized (self) {
     if (self.activeContinuedTask != nil && !self.continuedTaskCompleted) {
-      continuedTaskToFinish = self.activeContinuedTask;
-      self.continuedTaskCompleted = YES;
-      self.activeContinuedTask = nil;
-      self.activeContinuedTaskIdentifier = nil;
-      shouldEmitPause = YES;
+      continuedTask = self.activeContinuedTask;
+      self.pausedForLock = YES;
+      hasContinuedSession = YES;
+      title = self.latestTitle;
+      pausedSub = self.pausedSubtitle;
     } else if (self.activeContinuedTaskIdentifier.length > 0) {
-      pendingIdentifierToCancel = [self.activeContinuedTaskIdentifier copy];
-      self.activeContinuedTaskIdentifier = nil;
-      shouldEmitPause = YES;
+      self.pausedForLock = YES;
+      hasContinuedSession = YES;
     } else if (self.backgroundTaskID != UIBackgroundTaskInvalid) {
-      shouldEmitPause = YES;
+      hasTier1Only = YES;
     }
   }
 
-  if (continuedTaskToFinish != nil) {
-    if (@available(iOS 13.0, *)) {
-      [(BGTask *)continuedTaskToFinish setTaskCompletedWithSuccess:YES];
-    }
-  } else if (pendingIdentifierToCancel.length > 0) {
-    if (@available(iOS 13.0, *)) {
-      [[BGTaskScheduler sharedScheduler] cancelTaskRequestWithIdentifier:pendingIdentifierToCancel];
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26.0, *)) {
+    if ([continuedTask isKindOfClass:[BGContinuedProcessingTask class]]) {
+      [(BGContinuedProcessingTask *)continuedTask updateTitle:title subtitle:pausedSub];
     }
   }
+#endif
 
-  if (shouldEmitPause) {
+  if (hasContinuedSession) {
+    [self emitBridgeEvent:@"lock_paused"];
+  } else if (hasTier1Only) {
     [self emitBridgeEvent:@"expiration_warning"];
+  }
+}
+
+/**
+ * Automatically resumes a lock-paused BGContinuedProcessingTask as soon as the device unlocks,
+ * even if Chessticize remains in the background.
+ */
+- (void)handleDeviceDidUnlock
+{
+  id continuedTask = nil;
+  NSString *title = @"Chessticize";
+  NSString *subtitle = @"";
+  BOOL shouldResume = NO;
+
+  @synchronized (self) {
+    if (self.pausedForLock) {
+      self.pausedForLock = NO;
+      if (self.activeContinuedTask != nil && !self.continuedTaskCompleted) {
+        continuedTask = self.activeContinuedTask;
+        title = self.latestTitle;
+        subtitle = self.latestSubtitle;
+        shouldResume = YES;
+      } else if (self.activeContinuedTaskIdentifier.length > 0) {
+        shouldResume = YES;
+      }
+    }
+  }
+
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26.0, *)) {
+    if ([continuedTask isKindOfClass:[BGContinuedProcessingTask class]]) {
+      [(BGContinuedProcessingTask *)continuedTask updateTitle:title subtitle:subtitle];
+    }
+  }
+#endif
+
+  if (shouldResume) {
+    [self emitBridgeEvent:@"unlock_resumed"];
   }
 }
 
@@ -157,6 +215,7 @@ RCT_EXPORT_MODULE();
   NSString *pendingIdentifierToCancel = nil;
   @synchronized (self) {
     self.sessionGeneration += 1;
+    self.pausedForLock = NO;
     if (self.activeContinuedTask != nil && !self.continuedTaskCompleted) {
       continuedTaskToFinish = self.activeContinuedTask;
       self.continuedTaskCompleted = YES;
@@ -189,6 +248,9 @@ RCT_EXPORT_METHOD(start:(NSDictionary *)input
     ? input[@"title"]
     : @"Chessticize";
   NSString *subtitle = [input[@"subtitle"] isKindOfClass:[NSString class]] ? input[@"subtitle"] : @"";
+  NSString *pausedSub = [input[@"pausedSubtitle"] isKindOfClass:[NSString class]] && ((NSString *)input[@"pausedSubtitle"]).length > 0
+    ? input[@"pausedSubtitle"]
+    : @"Paused while locked";
   NSInteger totalUnits = [input[@"totalUnits"] isKindOfClass:[NSNumber class]]
     ? MAX(1, [input[@"totalUnits"] integerValue])
     : 1;
@@ -199,9 +261,11 @@ RCT_EXPORT_METHOD(start:(NSDictionary *)input
     generation = self.sessionGeneration;
     self.latestTitle = title;
     self.latestSubtitle = subtitle;
+    self.pausedSubtitle = pausedSub;
     self.latestCompletedUnits = 0;
     self.latestTotalUnits = totalUnits;
     self.continuedTaskCompleted = NO;
+    self.pausedForLock = NO;
   }
 
   __weak typeof(self) weakSelf = self;
@@ -255,7 +319,7 @@ RCT_EXPORT_METHOD(start:(NSDictionary *)input
 #if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
     // Tier 2 (iOS 26+): System-managed BGContinuedProcessingTask so switching to another app
     // continues analyzing smoothly with Dynamic Island / Live Activity progress. Locking the
-    // screen is intercepted by handleDeviceWillLock and completes cleanly with success=YES.
+    // screen pauses work in-place (updating subtitle to Paused) and unlocking resumes immediately.
     if (@available(iOS 26.0, *)) {
       NSString *bundleId = NSBundle.mainBundle.bundleIdentifier;
       if (bundleId.length > 0) {
@@ -281,15 +345,13 @@ RCT_EXPORT_METHOD(start:(NSDictionary *)input
             if (handlerSelf.sessionGeneration != generation ||
                 handlerSelf.activeContinuedTaskIdentifier == nil ||
                 ![handlerSelf.activeContinuedTaskIdentifier isEqualToString:identifier]) {
-              // Session was already stopped, paused, or superseded (e.g. device locked before
-              // launchHandler ran): finish cleanly with success=YES to avoid "Task failed".
               [continuedTask setTaskCompletedWithSuccess:YES];
               return;
             }
             handlerSelf.activeContinuedTask = continuedTask;
             handlerSelf.continuedTaskCompleted = NO;
             initialTitle = handlerSelf.latestTitle;
-            initialSubtitle = handlerSelf.latestSubtitle;
+            initialSubtitle = handlerSelf.pausedForLock ? handlerSelf.pausedSubtitle : handlerSelf.latestSubtitle;
             initialCompleted = handlerSelf.latestCompletedUnits;
             initialTotal = MAX(1, handlerSelf.latestTotalUnits);
           }
@@ -311,6 +373,7 @@ RCT_EXPORT_METHOD(start:(NSDictionary *)input
             @synchronized (expSelf) {
               if (expSelf.sessionGeneration == generation && !expSelf.continuedTaskCompleted) {
                 expSelf.continuedTaskCompleted = YES;
+                expSelf.pausedForLock = NO;
                 expSelf.activeContinuedTask = nil;
                 expSelf.activeContinuedTaskIdentifier = nil;
                 shouldEmit = YES;
@@ -400,6 +463,7 @@ RCT_EXPORT_METHOD(updateProgress:(NSDictionary *)input
     : 1;
 
   id continuedTask = nil;
+  NSString *effectiveSubtitle = subtitle;
   @synchronized (self) {
     self.latestTitle = title;
     self.latestSubtitle = subtitle;
@@ -407,6 +471,9 @@ RCT_EXPORT_METHOD(updateProgress:(NSDictionary *)input
     self.latestTotalUnits = totalUnits;
     if (self.activeContinuedTask != nil && !self.continuedTaskCompleted) {
       continuedTask = self.activeContinuedTask;
+      if (self.pausedForLock) {
+        effectiveSubtitle = self.pausedSubtitle;
+      }
     }
   }
 
@@ -416,7 +483,7 @@ RCT_EXPORT_METHOD(updateProgress:(NSDictionary *)input
       BGContinuedProcessingTask *task = (BGContinuedProcessingTask *)continuedTask;
       task.progress.totalUnitCount = totalUnits;
       task.progress.completedUnitCount = MIN(completedUnits, totalUnits);
-      [task updateTitle:title subtitle:subtitle];
+      [task updateTitle:title subtitle:effectiveSubtitle];
     }
   }
 #endif
@@ -476,8 +543,6 @@ RCT_EXPORT_METHOD(finish:(NSDictionary *)input
 RCT_EXPORT_METHOD(stop:(RCTPromiseResolveBlock)resolve
                   rejecter:(__unused RCTPromiseRejectBlock)reject)
 {
-  // Complete cleanly with success=YES when JS pauses, suspends, or cancels so iOS dismisses
-  // any active BGContinuedProcessingTask Live Activity without flashing "Task failed".
   [self stopSessionWithSuccess:YES];
   resolve(nil);
 }

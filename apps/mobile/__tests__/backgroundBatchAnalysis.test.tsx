@@ -511,4 +511,68 @@ describe("useGamesBatchAnalysis out-of-app background execution", () => {
 
     mounted.unmount();
   });
+
+  it("iOS 26 BGContinuedProcessingTask pauses in-place on lock_paused (without stopping/completing) and auto-resumes on unlock_resumed even while still backgrounded", async () => {
+    const store = new MemoryStore();
+    const service = new PracticeService(store);
+    store.upsertImportedGames([makeSampleGame("lichess:ios-lock-resume")]);
+    const games = store.listImportedGames();
+    const deferred = createDeferredEngine();
+    const bridge = new FakeBackgroundBatchAnalysisBridge({
+      active: true,
+      supportsContinuedBackground: true,
+      mode: "ios_continued_processing"
+    });
+
+    const mounted = mountController({
+      store,
+      service,
+      engine: deferred.engine,
+      bridge
+    });
+
+    act(() => {
+      mounted.controller.startBatch(games);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mounted.controller.state.status).toBe("running");
+    expect(bridge.startCalls).toHaveLength(1);
+    expect(bridge.startCalls[0]?.pausedSubtitle).toBeTruthy();
+
+    // Switching apps keeps running
+    act(() => {
+      appStateListener?.("background");
+    });
+    expect(mounted.controller.state.status).toBe("running");
+
+    // Locking screen emits lock_paused -> pauses Stockfish WITHOUT calling bridge.stop()!
+    await act(async () => {
+      bridge.emit({ type: "lock_paused" });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mounted.controller.state.status).toBe("paused");
+    expect(mounted.controller.state.pausedByBackground).toBe(true);
+    expect(bridge.stopCallCount).toBe(0);
+
+    // Unlocking screen (while STILL in background / another app) emits unlock_resumed ->
+    // immediately resumes using the SAME live BGContinuedProcessingTask (no second start() call)!
+    await act(async () => {
+      bridge.emit({ type: "unlock_resumed" });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mounted.controller.state.status).toBe("running");
+    expect(bridge.startCalls).toHaveLength(1);
+
+    // Finishes cleanly in background and calls bridge.finish()
+    await deferred.drainAll();
+    expect(mounted.controller.state.status).toBe("completed");
+    expect(bridge.finishCalls).toHaveLength(1);
+
+    mounted.unmount();
+  });
 });
