@@ -1847,6 +1847,16 @@ export function GamesHubScreen({
                 </Section>
               ) : (
                 <Section rows testID="games-list">
+                  {visibleGames.some((game) => game.analysisStatus === "complete") ? (
+                    <View style={styles.gamesListHeader} testID="games-list-column-header">
+                      <AppText tone="secondary" variant="caption">
+                        {t("games.list.headerGame")}
+                      </AppText>
+                      <AppText tone="secondary" variant="caption">
+                        {t("games.list.headerAccuracyPuzzles")}
+                      </AppText>
+                    </View>
+                  ) : null}
                   {visibleGames.map((game) => (
                     <GameRow
                       key={game.id}
@@ -2444,6 +2454,15 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     gap: 12,
     paddingVertical: 12
+  },
+  gamesListHeader: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingLeft: 12,
+    paddingRight: 33,
+    paddingVertical: 7
   },
   gameRow: {
     alignItems: "center",

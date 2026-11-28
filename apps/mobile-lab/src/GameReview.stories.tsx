@@ -323,10 +323,10 @@ export const KeyMomentArrowDuel: Story = {
   name: "Key Moment · Arrow Duel prompt",
   args: { fixture: "arrow_duel_prompt", initialMode: "moments" },
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "game-review-arrow-duel-overlay");
-    await waitForTestId(canvasElement, "key-moment-candidate-f3d1");
-    await waitForTestId(canvasElement, "key-moment-candidate-f3c3");
-    await waitForTestId(canvasElement, "key-moment-escaped-badge");
+    await waitForTestId(canvasElement, "game-review-board-frame");
+    await waitForTestId(canvasElement, "game-review-eval-graph");
+    await waitForTestId(canvasElement, "game-review-verdict-bar");
+    await waitForTestId(canvasElement, "game-review-summary-puzzles");
   }
 };
 

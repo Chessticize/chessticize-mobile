@@ -67,12 +67,12 @@ export const DueQueue: Story = {
     await expectTestIdText(
       canvasElement,
       "review-due-item-lab-fork-01-standard-standard-5-20-meta",
-      "1 attempt · 1 miss · Standard · 20s pace"
+      "1 attempt · 1 miss · Puzzle Pack · Standard · 20s pace"
     );
     await expectTestIdText(
       canvasElement,
       "review-due-item-lab-skewer-03-arrow-duel-arrow-duel-5-30-meta",
-      "3 attempts · 2 misses · Arrow Duel · 30s pace"
+      "3 attempts · 2 misses · Puzzle Pack · Arrow Duel · 30s pace"
     );
     await expectTestIdsInOrder(canvasElement, [
       "review-filter-options-motion",
@@ -99,7 +99,7 @@ export const DueQueue: Story = {
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
     await waitForHiddenTestId(canvasElement, "review-filter-summary-motion");
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 96);
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
     await waitForVisibleTestId(canvasElement, "review-filter-summary-motion");
@@ -137,7 +137,7 @@ export const Filters: Story = {
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
     await waitForHiddenTestId(canvasElement, "review-filter-summary-motion");
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 96);
     await expectTestIdText(canvasElement, "review-filter-all", "All");
     await expectTestIdText(canvasElement, "review-filter-overdue", "Overdue");
     await expectTestIdText(canvasElement, "review-filter-repeat-misses", "Missed 2+ times");
