@@ -935,6 +935,7 @@ export function PracticePocScreen({
   const {
     applyHistoryThemeIntent,
     changeHistoryAttentionOnly,
+    changeHistoryPuzzleOriginFilter,
     changeHistoryRatingKey,
     changeHistoryRatingRangeFilter,
     changeHistoryResultFilter,
@@ -945,6 +946,7 @@ export function PracticePocScreen({
     historyFiltersExpanded,
     historyPageOffset,
     historyProgressOpen,
+    historyPuzzleOriginFilter,
     historyQuery,
     historyRatingKey,
     historyRatingRangeFilter,
@@ -5658,6 +5660,7 @@ export function PracticePocScreen({
                   selectedRatingKey={activeHistoryRatingKey}
                   timeRange={historyTimeRange}
                   sourceFilter={historySourceFilter}
+                  puzzleOriginFilter={historyPuzzleOriginFilter}
                   resultFilter={historyResultFilter}
                   ratingRangeFilter={historyRatingRangeFilter}
                   sideFilter={historySideFilter}
@@ -5672,6 +5675,7 @@ export function PracticePocScreen({
                   onRatingKeyChange={changeHistoryRatingKey}
                   onTimeRangeChange={changeHistoryTimeRange}
                   onSourceFilterChange={changeHistorySourceFilter}
+                  onPuzzleOriginFilterChange={changeHistoryPuzzleOriginFilter}
                   onResultFilterChange={changeHistoryResultFilter}
                   onRatingRangeFilterChange={changeHistoryRatingRangeFilter}
                   onSideFilterChange={changeHistorySideFilter}

@@ -5,6 +5,7 @@ import {
   type HistoryAttentionReason,
   type HistoryFilterSelection,
   type HistoryPageQuery,
+  type HistoryPuzzleOriginFilter,
   type HistoryQuery,
   type HistoryRatingRangeFilter,
   type HistoryResultFilter,
@@ -27,6 +28,7 @@ const ALL_HISTORY_ATTENTION_REASONS: readonly HistoryAttentionReason[] = [
 export function useHistoryController() {
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
+  const [historyPuzzleOriginFilter, setHistoryPuzzleOriginFilter] = useState<HistoryPuzzleOriginFilter>("all");
   const historyAttentionReasonOptions = ALL_HISTORY_ATTENTION_REASONS;
   const [historyResultFilter, setHistoryResultFilter] = useState<HistoryResultFilter>("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
@@ -48,6 +50,7 @@ export function useHistoryController() {
     ratingKey: historyRatingKey,
     ratingRange: historyRatingRangeFilter,
     source: historySourceFilter,
+    puzzleOrigin: historyPuzzleOriginFilter,
     result: historyResultFilter,
     side: historySideFilter,
     themes: historyThemeChoices.namedThemes,
@@ -73,6 +76,11 @@ export function useHistoryController() {
     if (source !== "sprint") {
       setHistoryAttentionReasons([]);
     }
+    setHistoryPageOffset(0);
+  }
+
+  function changeHistoryPuzzleOriginFilter(origin: HistoryPuzzleOriginFilter): void {
+    setHistoryPuzzleOriginFilter(origin);
     setHistoryPageOffset(0);
   }
 
@@ -124,6 +132,7 @@ export function useHistoryController() {
   function resetHistoryFilters(): void {
     setHistoryTimeRange("7d");
     setHistorySourceFilter("sprint");
+    setHistoryPuzzleOriginFilter("all");
     setHistoryResultFilter("all");
     setHistorySideFilter("all");
     historyThemeChoices.dispatch({ type: "select-all-themes" });
@@ -136,6 +145,7 @@ export function useHistoryController() {
   return {
     applyHistoryThemeIntent,
     changeHistoryAttentionOnly,
+    changeHistoryPuzzleOriginFilter,
     changeHistoryRatingKey,
     changeHistoryRatingRangeFilter,
     changeHistoryResultFilter,
@@ -146,6 +156,7 @@ export function useHistoryController() {
     historyFiltersExpanded,
     historyPageOffset,
     historyProgressOpen,
+    historyPuzzleOriginFilter,
     historyQuery,
     historyRatingKey,
     historyRatingRangeFilter,
