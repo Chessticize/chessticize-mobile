@@ -302,6 +302,7 @@ interface AppSettingsRow {
   sync_icloud_enabled: number;
   sync_upload_allowed: number;
   arrow_duel_opponent_reply_enabled: number;
+  game_review_auto_add_recommended?: number;
   appearance: PracticeSettings["appearance"];
   light_board_theme: PracticeSettings["lightBoardTheme"];
   dark_board_theme: PracticeSettings["darkBoardTheme"];
@@ -503,7 +504,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 28;
+export const CURRENT_SCHEMA_VERSION = 29;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -540,7 +541,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 24, to: 25, apply: migrateV24ToV25 },
   { from: 25, to: 26, apply: migrateV25ToV26 },
   { from: 26, to: 27, apply: migrateV26ToV27 },
-  { from: 27, to: 28, apply: migrateV27ToV28 }
+  { from: 27, to: 28, apply: migrateV27ToV28 },
+  { from: 28, to: 29, apply: migrateV28ToV29 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1241,6 +1243,7 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_icloud_enabled,
           sync_upload_allowed,
           arrow_duel_opponent_reply_enabled,
+          game_review_auto_add_recommended,
           appearance,
           light_board_theme,
           dark_board_theme,
@@ -1256,11 +1259,12 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
           arrow_duel_opponent_reply_enabled = excluded.arrow_duel_opponent_reply_enabled,
+          game_review_auto_add_recommended = excluded.game_review_auto_add_recommended,
           appearance = excluded.appearance,
           light_board_theme = excluded.light_board_theme,
           dark_board_theme = excluded.dark_board_theme,
@@ -1281,6 +1285,7 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.sync.iCloudEnabled),
         0,
         boolToInt(cloned.arrowDuel.opponentReplyEnabled),
+        boolToInt(cloned.gameReview?.autoAddRecommendedToReview ?? false),
         cloned.appearance,
         cloned.lightBoardTheme,
         cloned.darkBoardTheme,
@@ -2510,6 +2515,18 @@ export class SyncSQLiteStore implements PracticeStore {
           .prepare("SELECT id FROM user_puzzles WHERE game_id = ?")
           .all(gameId) as Array<{ id: string }>
       ).map((row) => row.id);
+      const deleteAttempts = this.db.prepare("DELETE FROM attempts WHERE puzzle_id = ?");
+      const deleteReviewEvents = this.db.prepare("DELETE FROM review_events WHERE puzzle_id = ?");
+      const deleteReviewQueue = this.db.prepare("DELETE FROM review_queue WHERE puzzle_id = ?");
+      const deleteReviewRemovals = this.db.prepare(
+        "DELETE FROM review_schedule_removals WHERE puzzle_id = ?"
+      );
+      for (const puzzleId of userPuzzleIds) {
+        deleteAttempts.run(puzzleId);
+        deleteReviewEvents.run(puzzleId);
+        deleteReviewQueue.run(puzzleId);
+        deleteReviewRemovals.run(puzzleId);
+      }
       this.db.prepare("DELETE FROM imported_games WHERE id = ?").run(gameId);
       for (const puzzleId of userPuzzleIds) {
         this.deleteUnreferencedUserPuzzleCacheRow(puzzleId);
@@ -3966,10 +3983,13 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV24ToV25(db);
   migrateV25ToV26(db);
   migrateV26ToV27(db);
+  migrateV27ToV28(db);
+  migrateV28ToV29(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
+    hasColumn(db, "app_settings", "game_review_auto_add_recommended") &&
     hasColumn(db, "app_settings", "appearance") &&
     hasColumn(db, "app_settings", "light_board_theme") &&
     hasColumn(db, "app_settings", "dark_board_theme") &&
@@ -5128,6 +5148,16 @@ function migrateV27ToV28(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV28ToV29(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "game_review_auto_add_recommended",
+    "ALTER TABLE app_settings ADD COLUMN game_review_auto_add_recommended INTEGER NOT NULL DEFAULT 0 " +
+      "CHECK (game_review_auto_add_recommended IN (0, 1))"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -5316,6 +5346,9 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     },
     arrowDuel: {
       opponentReplyEnabled: intToBool(row.arrow_duel_opponent_reply_enabled ?? 1)
+    },
+    gameReview: {
+      autoAddRecommendedToReview: intToBool(row.game_review_auto_add_recommended ?? 0)
     },
     notifications: {
       reviewReminder: reminder

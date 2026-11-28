@@ -362,6 +362,9 @@ test("PracticeService persists settings through the store boundary", () => {
     arrowDuel: {
       opponentReplyEnabled: true
     },
+    gameReview: {
+      autoAddRecommendedToReview: false
+    },
     sync: {
       iCloudEnabled: true
     },
@@ -426,6 +429,9 @@ test("PracticeService persists settings through the store boundary", () => {
     language: "system",
     arrowDuel: {
       opponentReplyEnabled: true
+    },
+    gameReview: {
+      autoAddRecommendedToReview: false
     },
     sync: {
       iCloudEnabled: true

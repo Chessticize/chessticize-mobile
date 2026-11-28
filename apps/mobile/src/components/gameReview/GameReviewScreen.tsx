@@ -354,6 +354,7 @@ export function GameReviewScreen({
           blackPlayerName={game.black.username}
           enrolledPuzzleIds={controller.enrolledPuzzleIds}
           userRating={game.userColor === "w" ? game.white.rating : game.black.rating}
+          onEnrollRecommendedPuzzles={controller.enrollRecommendedPuzzlesInReview}
           onEnrollAllPuzzles={controller.enrollAllPuzzlesInReview}
           onPracticeGamePuzzles={
             onPracticeGamePuzzles ? () => onPracticeGamePuzzles(game.id) : undefined

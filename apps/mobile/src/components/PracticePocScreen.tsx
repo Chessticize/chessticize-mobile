@@ -788,6 +788,10 @@ export function PracticePocScreen({
       () => sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting?.enabled
         ?? service.getSettings().arrowDuel.opponentReplyEnabled
     );
+  const [gameReviewAutoAddRecommendedEnabled, setGameReviewAutoAddRecommendedEnabled] =
+    useState(
+      () => service.getSettings().gameReview?.autoAddRecommendedToReview ?? false
+    );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
       ?? DEFAULT_OPPONENT_REPLY_SECONDS;
@@ -1822,6 +1826,16 @@ export function PracticePocScreen({
     service.saveSettings({
       ...settings,
       arrowDuel: { opponentReplyEnabled: enabled }
+    });
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function saveGameReviewAutoAddRecommendedEnabled(enabled: boolean): void {
+    setGameReviewAutoAddRecommendedEnabled(enabled);
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      gameReview: { autoAddRecommendedToReview: enabled }
     });
     setSettingsRevision((current) => current + 1);
   }
@@ -5118,18 +5132,6 @@ export function PracticePocScreen({
                 setActiveGameReviewInitialPly(null);
               }}
               onDeleteGame={(gameId) => {
-                const gamePuzzleIds = new Set(
-                  service.listUserPuzzles({ gameId }).map((puzzle) => puzzle.id)
-                );
-                for (const entry of service.listReviewQueue()) {
-                  if (gamePuzzleIds.has(entry.puzzleId)) {
-                    service.removeReview({
-                      puzzleId: entry.puzzleId,
-                      mode: entry.mode,
-                      ratingKey: entry.ratingKey
-                    });
-                  }
-                }
                 service.deleteImportedGame(gameId);
                 setActiveGameReviewId(null);
                 setActiveGameReviewInitialPly(null);
@@ -5802,6 +5804,12 @@ export function PracticePocScreen({
                   {
                     enabled: arrowDuelOpponentReplyGlobalEnabled,
                     onChange: saveArrowDuelOpponentReplyGlobalEnabled
+                  }
+                }
+                gameReviewAutoAddRecommendedSetting={
+                  {
+                    enabled: gameReviewAutoAddRecommendedEnabled,
+                    onChange: saveGameReviewAutoAddRecommendedEnabled
                   }
                 }
                 feedbackIssuesOpener={feedbackIssuesOpener}

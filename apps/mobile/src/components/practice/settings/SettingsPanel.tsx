@@ -165,6 +165,7 @@ export function SettingsPanel({
   appearance,
   applicationMetadata,
   arrowDuelOpponentReplyGlobalSetting,
+  gameReviewAutoAddRecommendedSetting,
   captureBottomInset,
   darkBoardTheme,
   feedbackIssuesOpener,
@@ -208,6 +209,10 @@ export function SettingsPanel({
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
   arrowDuelOpponentReplyGlobalSetting?: {
+    enabled: boolean;
+    onChange: (enabled: boolean) => void;
+  };
+  gameReviewAutoAddRecommendedSetting?: {
     enabled: boolean;
     onChange: (enabled: boolean) => void;
   };
@@ -490,6 +495,38 @@ export function SettingsPanel({
               setStatusMessage(next === "on"
                 ? t("settings.arrowDuel.statusOn")
                 : t("settings.arrowDuel.statusOff"));
+            }}
+          />
+        </SettingsSection>
+      ) : null}
+
+      {gameReviewAutoAddRecommendedSetting ? (
+        <SettingsSection
+          title={t("settings.gameReview.section")}
+          testID="settings-game-review-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <SettingsRow
+            label={t("settings.gameReview.autoAddRecommendedTitle")}
+            value={gameReviewAutoAddRecommendedSetting.enabled ? t("common.on") : t("common.off")}
+            detail={gameReviewAutoAddRecommendedSetting.enabled
+              ? t("settings.gameReview.autoAddRecommendedDetailOn")
+              : t("settings.gameReview.autoAddRecommendedDetailOff")}
+            testID="settings-game-review-auto-add-recommended"
+          />
+          <SettingsSegmentedRow
+            accessibilityLabel={t("settings.gameReview.autoAddRecommendedTitle")}
+            options={[
+              { value: "on", label: t("common.on"), testID: "settings-game-review-auto-add-on" },
+              { value: "off", label: t("common.off"), testID: "settings-game-review-auto-add-off" }
+            ]}
+            testID="settings-game-review-auto-add-controls"
+            value={gameReviewAutoAddRecommendedSetting.enabled ? "on" : "off"}
+            onChange={(next) => {
+              gameReviewAutoAddRecommendedSetting.onChange(next === "on");
+              setStatusMessage(next === "on"
+                ? t("settings.gameReview.statusOn")
+                : t("settings.gameReview.statusOff"));
             }}
           />
         </SettingsSection>

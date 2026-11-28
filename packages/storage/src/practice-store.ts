@@ -154,6 +154,13 @@ export interface PracticeSettings {
   arrowDuel: {
     opponentReplyEnabled: boolean;
   };
+  /**
+   * Device-local Game Review preferences. Excluded from CloudKit ProgressV2 sync
+   * because imported games and user_puzzles stay local to each device.
+   */
+  gameReview?: {
+    autoAddRecommendedToReview: boolean;
+  };
   notifications: {
     reviewReminder: ReviewReminderPreference;
   };
