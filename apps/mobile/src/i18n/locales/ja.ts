@@ -1539,7 +1539,7 @@ export const jaMessages = {
   "games.puzzles.recommendedInReview": "おすすめは追加済み",
   "games.puzzles.recommendedInfoA11y": "おすすめ問題の基準",
   "games.puzzles.recommendedCriteriaTitle": "おすすめ復習問題の基準",
-  "games.puzzles.recommendedCriteriaBody": "時間切迫（残り15秒以下、Bulletは10秒以下）と2秒以内の早指しミスを除外し、対局レート+300以内の問題から1局あたり上位2問までを選びます。",
+  "games.puzzles.recommendedCriteriaBody": "時間切迫（残り15秒以下、Bulletは10秒以下）と2秒以内の早指しミスを除外し、Lichess基準に換算した現在の最高レート+300以内で、復習から外した問題を除き1局あたり上位2問までを選びます。",
   "games.action.select": "選択",
   "games.selection.selectAllFiltered": "表示中をすべて選択 ({{count}})",
   "games.selection.deselectAll": "選択を解除",

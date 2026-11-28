@@ -18,6 +18,7 @@ import {
   beginArrowDuelReply as beginArrowDuelReplyCore,
   clonePracticeRun,
   compactSurvivalPuzzleBuffer,
+  computeEffectiveReviewBenchmarkRating,
   createCustomPracticeRun,
   createDefaultMaiaRatingRecord,
   createDefaultRating,
@@ -29,6 +30,7 @@ import {
   MAIA_TIME_CLASSES,
   maiaGameOutcomeForUser,
   namedThemesForSelection,
+  normalizeGameRatingToPuzzleScale,
   normalizeThemeSelection,
   practiceRunSprintConfig,
   renamePracticeRun,
@@ -408,6 +410,68 @@ export class PracticeService {
     this.store.archiveUserPuzzle(puzzleId, archived);
   }
 
+  /**
+   * Computes the player's effective Lichess/puzzle-scale reference rating across their latest
+   * imported game ratings (calibrated for Chess.com vs Lichess), Play with Maia ratings, and
+   * Chessticize puzzle ratings, taking the maximum so established ratings are never dragged down
+   * and older stretch puzzles unlock automatically as the player improves.
+   */
+  getEffectiveReviewBenchmarkRating(sourceGame?: StoredImportedGame): number | undefined {
+    const recentGames = this.store.listImportedGames({ limit: 50 });
+    const latestByPlatformTimeClass = new Map<string, { rating: number; platform: StoredImportedGame["platform"]; timeClass?: string }>();
+    for (const game of recentGames) {
+      if (game.platform === "maia") {
+        continue;
+      }
+      const rawUserRating = game.userColor === "w" ? game.white.rating : game.black.rating;
+      if (typeof rawUserRating !== "number" || !Number.isFinite(rawUserRating) || rawUserRating < 400) {
+        continue;
+      }
+      const key = `${game.platform}:${game.timeClass ?? "unknown"}`;
+      if (!latestByPlatformTimeClass.has(key)) {
+        latestByPlatformTimeClass.set(key, {
+          rating: rawUserRating,
+          platform: game.platform,
+          timeClass: game.timeClass
+        });
+      }
+    }
+
+    const sourceRating =
+      sourceGame &&
+      typeof (sourceGame.userColor === "w" ? sourceGame.white.rating : sourceGame.black.rating) === "number"
+        ? {
+            rating: (sourceGame.userColor === "w" ? sourceGame.white.rating : sourceGame.black.rating)!,
+            platform: sourceGame.platform,
+            timeClass: sourceGame.timeClass
+          }
+        : undefined;
+
+    const puzzleRatings = this.store
+      .listRatings()
+      .filter((record) => !record.key.startsWith("ug_"))
+      .map((record) => ({ rating: record.rating, games: record.games }));
+
+    const maiaRatings = MAIA_TIME_CLASSES.map((tc) => this.store.getMaiaRating(tc))
+      .filter((record): record is MaiaRatingRecord => record !== undefined)
+      .map((record) => ({ rating: record.rating, games: record.games }));
+
+    return computeEffectiveReviewBenchmarkRating({
+      ...(sourceRating ? { gameRating: sourceRating } : {}),
+      recentGameRatings: [...latestByPlatformTimeClass.values()],
+      puzzleRatings,
+      maiaRatings
+    });
+  }
+
+  listReviewRemovals(): ReviewScheduleRemoval[] {
+    return this.store.listReviewRemovals();
+  }
+
+  listRemovedReviewPuzzleIds(): Set<string> {
+    return new Set(this.store.listReviewRemovals().map((removal) => removal.puzzleId));
+  }
+
   private suggestSeedMaiaRating(timeClass: MaiaTimeClass): number {
     const recentGames = this.store.listImportedGames({ limit: 50 });
     const importedGameRatings: Partial<Record<MaiaTimeClass, number>> = {};
@@ -417,10 +481,17 @@ export class PracticeService {
       if (game.platform === "maia") {
         continue;
       }
-      const userRating = game.userColor === "w" ? game.white.rating : game.black.rating;
-      if (typeof userRating !== "number" || !Number.isFinite(userRating) || userRating < 400) {
+      const rawUserRating = game.userColor === "w" ? game.white.rating : game.black.rating;
+      if (typeof rawUserRating !== "number" || !Number.isFinite(rawUserRating) || rawUserRating < 400) {
         continue;
       }
+      // Maia-2 is trained on Lichess Rapid games, so calibrate Chess.com / fast-control ratings
+      // onto the canonical Lichess scale before seeding initial Maia opponent strength.
+      const userRating = normalizeGameRatingToPuzzleScale(
+        rawUserRating,
+        game.platform,
+        game.timeClass
+      );
       if (fallbackImportedRating === undefined) {
         fallbackImportedRating = userRating;
       }

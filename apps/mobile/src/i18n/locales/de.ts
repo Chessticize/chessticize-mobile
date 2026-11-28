@@ -1568,7 +1568,7 @@ export const deMessages = {
   "games.puzzles.recommendedInReview": "Empfohlene im Review",
   "games.puzzles.recommendedInfoA11y": "Kriterien für empfohlene Aufgaben",
   "games.puzzles.recommendedCriteriaTitle": "Auswahlkriterien für empfohlene Aufgaben",
-  "games.puzzles.recommendedCriteriaBody": "Schließt Zeitnot- (≤15 s, Bullet ≤10 s) und Impulsfehler (≤2 s) aus, begrenzt auf +300 über deiner Partiewertung und wählt bis zu 2 beste Aufgaben pro Partie.",
+  "games.puzzles.recommendedCriteriaBody": "Schließt Zeitnot- (≤15 s, Bullet ≤10 s) und Impulsfehler (≤2 s) aus, kalibriert auf die Lichess-Skala bis +300 über deinem höchsten aktuellen Niveau, überspringt aus Wiederholen entfernte Aufgaben und wählt bis zu 2 pro Partie.",
   "games.action.select": "Auswählen",
   "games.selection.selectAllFiltered": "Alle gefilterten wählen ({{count}})",
   "games.selection.deselectAll": "Auswahl aufheben",

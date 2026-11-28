@@ -1538,7 +1538,7 @@ export const koMessages = {
   "games.puzzles.recommendedInReview": "추천 문제 모두 추가됨",
   "games.puzzles.recommendedInfoA11y": "추천 문제 기준",
   "games.puzzles.recommendedCriteriaTitle": "추천 복습 문제 선정 기준",
-  "games.puzzles.recommendedCriteriaBody": "시간 압박(15초 이하, Bullet 10초 이하)과 2초 이하 성급한 실수를 제외하고, 대국 레이팅 +300 이내 문제 중 대국당 가치 높은 상위 2문제를 선정합니다.",
+  "games.puzzles.recommendedCriteriaBody": "시간 압박(15초 이하, Bullet 10초 이하)과 2초 이하 성급한 실수를 제외하고, Lichess 기준으로 보정한 현재 최고 레이팅 +300 이내에서 복습에서 제외한 문제를 빼고 대국당 상위 2문제를 선정합니다.",
   "games.action.select": "선택",
   "games.selection.selectAllFiltered": "필터 결과 전체 선택 ({{count}})",
   "games.selection.deselectAll": "선택 해제",

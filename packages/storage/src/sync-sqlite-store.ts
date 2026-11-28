@@ -3677,7 +3677,7 @@ export class SyncSQLiteStore implements PracticeStore {
       );
   }
 
-  private listReviewRemovals(): ReviewScheduleRemoval[] {
+  listReviewRemovals(): ReviewScheduleRemoval[] {
     const rows = this.db
       .prepare("SELECT * FROM review_schedule_removals ORDER BY puzzle_id ASC, mode ASC, rating_key ASC")
       .all() as ReviewRemovalRow[];

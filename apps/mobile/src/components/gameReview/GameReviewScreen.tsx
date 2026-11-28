@@ -384,7 +384,8 @@ export function GameReviewScreen({
         <GameReviewSummaryCard
           blackPlayerName={game.black.username}
           enrolledPuzzleIds={controller.enrolledPuzzleIds}
-          userRating={game.userColor === "w" ? game.white.rating : game.black.rating}
+          removedPuzzleIds={controller.removedPuzzleIds}
+          userRating={controller.effectiveUserRating}
           onEnrollRecommendedPuzzles={controller.enrollRecommendedPuzzlesInReview}
           onEnrollAllPuzzles={controller.enrollAllPuzzlesInReview}
           onPracticeGamePuzzles={

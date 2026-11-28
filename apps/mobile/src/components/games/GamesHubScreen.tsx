@@ -16,6 +16,7 @@ import {
   importLichessGames,
   importPgnBatch,
   isWithinReviewDifficultyBand,
+  normalizeGameRatingToPuzzleScale,
   selectRecommendedGamePuzzleIds,
   UciEngineArbiter,
   type GameColor,
@@ -307,12 +308,16 @@ export function GamesHubScreen({
         enrolledPuzzleIds.add(puzzle.id);
       }
     }
+    const removedPuzzleIds = service.listRemovedReviewPuzzleIds();
+    const effectiveBenchmarkRating = service.getEffectiveReviewBenchmarkRating();
     return {
       allGames,
       gameById,
       linkedAccounts,
       orderedUserPuzzles,
       enrolledPuzzleIds,
+      removedPuzzleIds,
+      effectiveBenchmarkRating,
       userPuzzleCount
     };
   }, [batch.state.completedGames, batch.state.status, revision, service]);
@@ -460,20 +465,40 @@ export function GamesHubScreen({
       ? puzzleThemeFilter
       : "all";
 
+  const resolvePuzzleBenchmarkRating = useCallback(
+    (gameId: string): number | undefined => {
+      const sourceGame = snapshot.gameById.get(gameId);
+      const rawGameRating = sourceGame
+        ? sourceGame.userColor === "w"
+          ? sourceGame.white.rating
+          : sourceGame.black.rating
+        : undefined;
+      const calibratedGameRating =
+        sourceGame && typeof rawGameRating === "number" && Number.isFinite(rawGameRating)
+          ? normalizeGameRatingToPuzzleScale(rawGameRating, sourceGame.platform, sourceGame.timeClass)
+          : undefined;
+      if (calibratedGameRating === undefined) {
+        return snapshot.effectiveBenchmarkRating;
+      }
+      if (snapshot.effectiveBenchmarkRating === undefined) {
+        return calibratedGameRating;
+      }
+      return Math.max(snapshot.effectiveBenchmarkRating, calibratedGameRating);
+    },
+    [snapshot.effectiveBenchmarkRating, snapshot.gameById]
+  );
+
   const isPuzzleWithinReviewBand = useCallback(
     (puzzle: StoredUserPuzzle): boolean => {
       if (!puzzle.ratingSource || puzzle.ratingSource === "game_anchor") {
         return true;
       }
-      const sourceGame = snapshot.gameById.get(puzzle.gameId);
-      const userRating = sourceGame
-        ? sourceGame.userColor === "w"
-          ? sourceGame.white.rating
-          : sourceGame.black.rating
-        : undefined;
-      return isWithinReviewDifficultyBand(puzzle.rating, userRating);
+      return isWithinReviewDifficultyBand(
+        puzzle.rating,
+        resolvePuzzleBenchmarkRating(puzzle.gameId)
+      );
     },
-    [snapshot.gameById]
+    [resolvePuzzleBenchmarkRating]
   );
 
   const hasDifficultySplitInScope = useMemo(() => {
@@ -969,17 +994,10 @@ export function GamesHubScreen({
   const recommendedPuzzleIds = useMemo(
     () =>
       selectRecommendedGamePuzzleIds(snapshot.orderedUserPuzzles, {
-        getUserRating: (gameId) => {
-          const sourceGame = snapshot.gameById.get(gameId);
-          if (!sourceGame) {
-            return undefined;
-          }
-          return sourceGame.userColor === "w"
-            ? sourceGame.white.rating
-            : sourceGame.black.rating;
-        }
+        getUserRating: resolvePuzzleBenchmarkRating,
+        excludedPuzzleIds: snapshot.removedPuzzleIds
       }),
-    [snapshot.gameById, snapshot.orderedUserPuzzles]
+    [resolvePuzzleBenchmarkRating, snapshot.orderedUserPuzzles, snapshot.removedPuzzleIds]
   );
   const visibleRecommendedPuzzles = useMemo(
     () => filteredOrderedUserPuzzles.filter((puzzle) => recommendedPuzzleIds.has(puzzle.id)),

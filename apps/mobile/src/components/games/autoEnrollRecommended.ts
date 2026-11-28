@@ -18,18 +18,16 @@ export function autoEnrollRecommendedPuzzlesForGame(
     return 0;
   }
   const game = service.getImportedGame(gameId);
-  const userRating = game
-    ? game.userColor === "w"
-      ? game.white.rating
-      : game.black.rating
-    : undefined;
+  const userRating = service.getEffectiveReviewBenchmarkRating(game);
+  const removedPuzzleIds = service.listRemovedReviewPuzzleIds();
   const gamePuzzles = service.listUserPuzzles({ gameId });
   if (gamePuzzles.length === 0) {
     return 0;
   }
   const recommendedIds = selectRecommendedGamePuzzleIds(gamePuzzles, {
     getUserRating: () => userRating,
-    requireEstimatedRating: true
+    requireEstimatedRating: true,
+    excludedPuzzleIds: removedPuzzleIds
   });
   let enrolled = 0;
   for (const puzzle of gamePuzzles) {

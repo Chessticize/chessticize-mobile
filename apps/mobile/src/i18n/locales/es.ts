@@ -1568,7 +1568,7 @@ export const esMessages = {
   "games.puzzles.recommendedInReview": "Recomendados en Repaso",
   "games.puzzles.recommendedInfoA11y": "Criterios de ejercicios recomendados",
   "games.puzzles.recommendedCriteriaTitle": "Cómo se eligen los recomendados",
-  "games.puzzles.recommendedCriteriaBody": "Excluye errores por apuro de tiempo (≤15 s; Bullet ≤10 s) o impulsivos (≤2 s), limita a +300 sobre tu Elo en la partida y elige hasta los 2 mejores por partida.",
+  "games.puzzles.recommendedCriteriaBody": "Excluye errores por apuro de tiempo (≤15 s; Bullet ≤10 s) o impulsivos (≤2 s), calibra el Elo a la escala de Lichess usando tu nivel máximo actual (+300), omite los ya retirados de Repaso y elige hasta los 2 mejores por partida.",
   "games.action.select": "Seleccionar",
   "games.selection.selectAllFiltered": "Seleccionar todo ({{count}})",
   "games.selection.deselectAll": "Deseleccionar",

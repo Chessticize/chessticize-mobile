@@ -399,6 +399,10 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.listReviewQueue();
   }
 
+  listReviewRemovals(): ReviewScheduleRemoval[] {
+    return this.userStore.listReviewRemovals();
+  }
+
   pruneOrphanedReviewQueue(): number {
     return this.userStore.pruneOrphanedReviewQueue();
   }

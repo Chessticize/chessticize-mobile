@@ -243,6 +243,94 @@ export function isWithinReviewDifficultyBand(
   return puzzleRating <= userRating + maxAboveUserRating;
 }
 
+const CHESS_COM_BLITZ_TO_LICHESS_ANCHORS: readonly (readonly [number, number])[] = [
+  [400, 750],
+  [800, 1150],
+  [1000, 1350],
+  [1200, 1550],
+  [1400, 1720],
+  [1600, 1870],
+  [1800, 2020],
+  [2000, 2150],
+  [2200, 2250],
+  [2400, 2400]
+];
+
+const CHESS_COM_RAPID_TO_LICHESS_ANCHORS: readonly (readonly [number, number])[] = [
+  [400, 700],
+  [800, 1100],
+  [1000, 1300],
+  [1200, 1480],
+  [1450, 1700],
+  [1600, 1820],
+  [1800, 1970],
+  [2000, 2120],
+  [2200, 2230],
+  [2400, 2400]
+];
+
+const LICHESS_FAST_TO_PUZZLE_ANCHORS: readonly (readonly [number, number])[] = [
+  [600, 675],
+  [1800, 1875],
+  [2200, 2200],
+  [2400, 2400]
+];
+
+function interpolateRatingAnchors(
+  rating: number,
+  anchors: readonly (readonly [number, number])[]
+): number {
+  const first = anchors[0]!;
+  if (rating <= first[0]) {
+    const offset = first[1] - first[0];
+    return Math.round(rating + offset);
+  }
+  const last = anchors[anchors.length - 1]!;
+  if (rating >= last[0]) {
+    const offset = last[1] - last[0];
+    return Math.round(rating + offset);
+  }
+  for (let i = 0; i < anchors.length - 1; i += 1) {
+    const [x0, y0] = anchors[i]!;
+    const [x1, y1] = anchors[i + 1]!;
+    if (rating >= x0 && rating <= x1) {
+      const t = (rating - x0) / Math.max(1, x1 - x0);
+      return Math.round(y0 + t * (y1 - y0));
+    }
+  }
+  return Math.round(rating);
+}
+
+/**
+ * Calibrates an external platform's game rating onto the Lichess / Maia-2 / Chessticize
+ * puzzle Elo scale so difficulty-band checks are consistent across Chess.com, Lichess, and Maia.
+ *
+ * Chess.com Blitz/Rapid ratings sit ~200–350 points below Lichess Rapid/Puzzle Elo in the
+ * 800–1800 range and converge toward 1:1 above 2200. Maia-2 is trained directly on Lichess
+ * Rapid games and is already on the Lichess scale.
+ */
+export function normalizeGameRatingToPuzzleScale(
+  rating: number,
+  platform: "chess_com" | "lichess" | "maia" | "pgn",
+  timeClass?: string
+): number {
+  if (!Number.isFinite(rating)) {
+    return 1500;
+  }
+  const tc = timeClass?.trim().toLowerCase() ?? "unknown";
+  const isFast = tc === "blitz" || tc === "bullet" || tc === "ultrabullet";
+  if (platform === "chess_com") {
+    return interpolateRatingAnchors(
+      rating,
+      isFast ? CHESS_COM_BLITZ_TO_LICHESS_ANCHORS : CHESS_COM_RAPID_TO_LICHESS_ANCHORS
+    );
+  }
+  if (platform === "lichess" && isFast) {
+    return interpolateRatingAnchors(rating, LICHESS_FAST_TO_PUZZLE_ANCHORS);
+  }
+  return Math.round(rating);
+}
+
 /**
  * Extracts the exact 14 structural chess features matching `STRUCTURAL_FEATURE_NAMES`
  * in `lichess-presolver/train_puzzle_difficulty_model.py`.

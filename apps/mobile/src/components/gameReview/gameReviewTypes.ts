@@ -192,6 +192,8 @@ export interface GameReviewController {
   isPromptHidingAnswer: boolean;
   userPuzzles: StoredUserPuzzle[];
   enrolledPuzzleIds: ReadonlySet<string>;
+  removedPuzzleIds: ReadonlySet<string>;
+  effectiveUserRating: number | undefined;
   summary: GameReviewSummaryData;
   freeAnalysisOpen: boolean;
   freeAnalysisLoading: boolean;

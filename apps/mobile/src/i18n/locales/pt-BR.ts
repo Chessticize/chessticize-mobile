@@ -1568,7 +1568,7 @@ export const ptBRMessages = {
   "games.puzzles.recommendedInReview": "Recomendados na Revisão",
   "games.puzzles.recommendedInfoA11y": "Critérios dos recomendados",
   "games.puzzles.recommendedCriteriaTitle": "Como os recomendados são escolhidos",
-  "games.puzzles.recommendedCriteriaBody": "Exclui erros em apuro de tempo (≤15 s; Bullet ≤10 s) e impulsivos (≤2 s), limita a +300 acima do seu rating na partida e escolhe até os 2 melhores por partida.",
+  "games.puzzles.recommendedCriteriaBody": "Exclui erros em apuro de tempo (≤15 s; Bullet ≤10 s) e impulsivos (≤2 s), calibra para a escala Lichess usando seu maior nível atual (+300), ignora os já removidos da Revisão e escolhe até os 2 melhores por partida.",
   "games.action.select": "Selecionar",
   "games.selection.selectAllFiltered": "Selecionar tudo ({{count}})",
   "games.selection.deselectAll": "Limpar seleção",

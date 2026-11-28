@@ -265,6 +265,7 @@ export interface PracticeStore
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   listReviewQueue(): ReviewQueueState[];
+  listReviewRemovals(): ReviewScheduleRemoval[];
   pruneOrphanedReviewQueue(): number;
   promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult;
   getDueReviews(now: string): ReviewQueueState[];
