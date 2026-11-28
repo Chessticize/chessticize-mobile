@@ -93,7 +93,7 @@ export interface MyGamePuzzlesLaunchOptions {
 }
 
 const GAMES_PAGE_SIZE = 50;
-const PUZZLES_PAGE_SIZE = 50;
+const PUZZLES_PAGE_SIZE = 20;
 export const AUTO_SYNC_STALE_MS = DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES * 60 * 1000;
 
 export function linkedAccountsNeedingAutoSync(
@@ -126,6 +126,7 @@ export interface GamesHubScreenProps {
   onPracticeMyGamePuzzles?: (options?: MyGamePuzzlesLaunchOptions) => void;
   onPlayWithMaia?: () => void;
   hubView?: "games" | "puzzles";
+  initialHubView?: "games" | "puzzles";
   onHubViewChange?: (view: "games" | "puzzles") => void;
   importModalVisible?: boolean;
   onImportModalVisibleChange?: (visible: boolean) => void;
@@ -150,6 +151,7 @@ export function GamesHubScreen({
   onPracticeMyGamePuzzles,
   onPlayWithMaia,
   hubView: controlledHubView,
+  initialHubView = "games",
   onHubViewChange,
   importModalVisible,
   onImportModalVisibleChange,
@@ -176,17 +178,16 @@ export function GamesHubScreen({
   const { locale, t } = useTranslation();
 
   const [revision, setRevision] = useState(0);
-  const [internalHubView, setInternalHubView] = useState<"games" | "puzzles">("games");
+  const [internalHubView, setInternalHubView] = useState<"games" | "puzzles">(initialHubView);
   const hubView = controlledHubView ?? internalHubView;
   const setHubView = useCallback(
     (next: "games" | "puzzles"): void => {
-      if (onHubViewChange) {
-        onHubViewChange(next);
-      } else {
+      if (controlledHubView === undefined) {
         setInternalHubView(next);
       }
+      onHubViewChange?.(next);
     },
-    [onHubViewChange]
+    [controlledHubView, onHubViewChange]
   );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>("all");
@@ -294,30 +295,25 @@ export function GamesHubScreen({
       }
       return left.gamePly - right.gamePly || left.id.localeCompare(right.id);
     });
+    const enrolledKeySet = new Set<string>();
+    for (const review of service.listReviewQueue()) {
+      enrolledKeySet.add(`${review.puzzleId}|${review.mode}|${review.ratingKey}`);
+    }
     const enrolledPuzzleIds = new Set<string>();
     for (const puzzle of orderedUserPuzzles) {
       const mode = puzzle.puzzleKind === "arrow_duel" ? "arrow_duel" : "standard";
-      const ctx = {
-        puzzleId: puzzle.id,
-        mode,
-        ratingKey: `${USER_GAME_RATING_KEY_PREFIX}my_game_puzzles:${mode}`
-      } as const;
-      if (service.getReviewQueueState(ctx)) {
+      const key = `${puzzle.id}|${mode}|${USER_GAME_RATING_KEY_PREFIX}my_game_puzzles:${mode}`;
+      if (enrolledKeySet.has(key)) {
         enrolledPuzzleIds.add(puzzle.id);
       }
     }
-    const diagnosis = diagnoseInGameWeaknesses({
-      games: allGames,
-      puzzles: userPuzzles
-    });
     return {
       allGames,
       gameById,
       linkedAccounts,
       orderedUserPuzzles,
       enrolledPuzzleIds,
-      userPuzzleCount,
-      diagnosis
+      userPuzzleCount
     };
   }, [batch.state.completedGames, batch.state.status, revision, service]);
 
