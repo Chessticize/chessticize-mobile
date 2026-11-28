@@ -132,6 +132,13 @@ export const DEFAULT_LIGHT_BOARD_THEME: BoardThemeId = "slate";
 export const DEFAULT_DARK_BOARD_THEME: BoardThemeId = "graphite";
 export const DEFAULT_PIECE_SET: ChessPieceSetId = "default";
 
+export const GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS = [0, 5, 10, 30] as const;
+
+export type GameReviewAutoSyncCooldownMinutes =
+  (typeof GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS)[number];
+
+export const DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES: GameReviewAutoSyncCooldownMinutes = 10;
+
 export interface PracticeSettings {
   appearance: AppearancePreference;
   lightBoardTheme: BoardThemeId;
@@ -161,6 +168,8 @@ export interface PracticeSettings {
    */
   gameReview?: {
     autoAddRecommendedToReview: boolean;
+    /** Minimum minutes between automatic Games tab / foreground refreshes; 0 disables auto-sync. */
+    autoSyncCooldownMinutes?: GameReviewAutoSyncCooldownMinutes;
   };
   notifications: {
     reviewReminder: ReviewReminderPreference;

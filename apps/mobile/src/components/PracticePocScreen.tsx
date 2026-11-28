@@ -71,8 +71,10 @@ import {
   storedUserPuzzleToPuzzle,
   USER_GAME_RATING_KEY_PREFIX
 } from "../../../../packages/storage/src/game-review-store.ts";
-import type {
-  ReviewQueueDuePromotionResult
+import {
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
+  type GameReviewAutoSyncCooldownMinutes,
+  type ReviewQueueDuePromotionResult
 } from "../../../../packages/storage/src/practice-store.ts";
 import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import {
@@ -795,6 +797,12 @@ export function PracticePocScreen({
   const [gameReviewAutoAddRecommendedEnabled, setGameReviewAutoAddRecommendedEnabled] =
     useState(
       () => service.getSettings().gameReview?.autoAddRecommendedToReview ?? false
+    );
+  const [gameReviewAutoSyncCooldownMinutes, setGameReviewAutoSyncCooldownMinutes] =
+    useState<GameReviewAutoSyncCooldownMinutes>(
+      () =>
+        service.getSettings().gameReview?.autoSyncCooldownMinutes ??
+        DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
     );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
@@ -1856,7 +1864,25 @@ export function PracticePocScreen({
     const settings = service.getSettings();
     service.saveSettings({
       ...settings,
-      gameReview: { autoAddRecommendedToReview: enabled }
+      gameReview: {
+        autoAddRecommendedToReview: enabled,
+        autoSyncCooldownMinutes:
+          settings.gameReview?.autoSyncCooldownMinutes ??
+          DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+      }
+    });
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function saveGameReviewAutoSyncCooldownMinutes(minutes: GameReviewAutoSyncCooldownMinutes): void {
+    setGameReviewAutoSyncCooldownMinutes(minutes);
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      gameReview: {
+        autoAddRecommendedToReview: settings.gameReview?.autoAddRecommendedToReview ?? false,
+        autoSyncCooldownMinutes: minutes
+      }
     });
     setSettingsRevision((current) => current + 1);
   }
@@ -5889,6 +5915,12 @@ export function PracticePocScreen({
                   {
                     enabled: gameReviewAutoAddRecommendedEnabled,
                     onChange: saveGameReviewAutoAddRecommendedEnabled
+                  }
+                }
+                gameReviewAutoSyncCooldownSetting={
+                  {
+                    minutes: gameReviewAutoSyncCooldownMinutes,
+                    onChange: saveGameReviewAutoSyncCooldownMinutes
                   }
                 }
                 feedbackIssuesOpener={feedbackIssuesOpener}

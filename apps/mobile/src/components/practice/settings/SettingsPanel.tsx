@@ -16,6 +16,10 @@ import {
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduleResult
 } from "../../../platform/reviewReminderScheduler.ts";
+import {
+  GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS,
+  type GameReviewAutoSyncCooldownMinutes
+} from "../../../../../../packages/storage/src/practice-store.ts";
 import type { ProgressV2SyncResult } from "../../../../../../packages/storage/src/progress-sync-v2.ts";
 import type { ICloudAccountStatus } from "../../../platform/iCloudProgressSync.ts";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
@@ -166,6 +170,7 @@ export function SettingsPanel({
   applicationMetadata,
   arrowDuelOpponentReplyGlobalSetting,
   gameReviewAutoAddRecommendedSetting,
+  gameReviewAutoSyncCooldownSetting,
   captureBottomInset,
   darkBoardTheme,
   feedbackIssuesOpener,
@@ -215,6 +220,10 @@ export function SettingsPanel({
   gameReviewAutoAddRecommendedSetting?: {
     enabled: boolean;
     onChange: (enabled: boolean) => void;
+  };
+  gameReviewAutoSyncCooldownSetting?: {
+    minutes: GameReviewAutoSyncCooldownMinutes;
+    onChange: (minutes: GameReviewAutoSyncCooldownMinutes) => void;
   };
   captureBottomInset?: number;
   feedbackIssuesOpener: (url: string) => Promise<void>;
@@ -500,35 +509,71 @@ export function SettingsPanel({
         </SettingsSection>
       ) : null}
 
-      {gameReviewAutoAddRecommendedSetting ? (
+      {gameReviewAutoAddRecommendedSetting || gameReviewAutoSyncCooldownSetting ? (
         <SettingsSection
           title={t("settings.gameReview.section")}
           testID="settings-game-review-section"
           wide={adaptiveLayout.usesWideContent}
         >
-          <SettingsRow
-            label={t("settings.gameReview.autoAddRecommendedTitle")}
-            value={gameReviewAutoAddRecommendedSetting.enabled ? t("common.on") : t("common.off")}
-            detail={gameReviewAutoAddRecommendedSetting.enabled
-              ? t("settings.gameReview.autoAddRecommendedDetailOn")
-              : t("settings.gameReview.autoAddRecommendedDetailOff")}
-            testID="settings-game-review-auto-add-recommended"
-          />
-          <SettingsSegmentedRow
-            accessibilityLabel={t("settings.gameReview.autoAddRecommendedTitle")}
-            options={[
-              { value: "on", label: t("common.on"), testID: "settings-game-review-auto-add-on" },
-              { value: "off", label: t("common.off"), testID: "settings-game-review-auto-add-off" }
-            ]}
-            testID="settings-game-review-auto-add-controls"
-            value={gameReviewAutoAddRecommendedSetting.enabled ? "on" : "off"}
-            onChange={(next) => {
-              gameReviewAutoAddRecommendedSetting.onChange(next === "on");
-              setStatusMessage(next === "on"
-                ? t("settings.gameReview.statusOn")
-                : t("settings.gameReview.statusOff"));
-            }}
-          />
+          {gameReviewAutoAddRecommendedSetting ? (
+            <>
+              <SettingsRow
+                label={t("settings.gameReview.autoAddRecommendedTitle")}
+                value={gameReviewAutoAddRecommendedSetting.enabled ? t("common.on") : t("common.off")}
+                detail={gameReviewAutoAddRecommendedSetting.enabled
+                  ? t("settings.gameReview.autoAddRecommendedDetailOn")
+                  : t("settings.gameReview.autoAddRecommendedDetailOff")}
+                testID="settings-game-review-auto-add-recommended"
+              />
+              <SettingsSegmentedRow
+                accessibilityLabel={t("settings.gameReview.autoAddRecommendedTitle")}
+                options={[
+                  { value: "on", label: t("common.on"), testID: "settings-game-review-auto-add-on" },
+                  { value: "off", label: t("common.off"), testID: "settings-game-review-auto-add-off" }
+                ]}
+                testID="settings-game-review-auto-add-controls"
+                value={gameReviewAutoAddRecommendedSetting.enabled ? "on" : "off"}
+                onChange={(next) => {
+                  gameReviewAutoAddRecommendedSetting.onChange(next === "on");
+                  setStatusMessage(next === "on"
+                    ? t("settings.gameReview.statusOn")
+                    : t("settings.gameReview.statusOff"));
+                }}
+              />
+            </>
+          ) : null}
+          {gameReviewAutoSyncCooldownSetting ? (
+            <>
+              <SettingsRow
+                label={t("settings.gameReview.autoSyncCooldownTitle")}
+                value={gameReviewAutoSyncCooldownSetting.minutes === 0
+                  ? t("common.off")
+                  : t("settings.gameReview.autoSyncCooldownMinutes", {
+                      minutes: gameReviewAutoSyncCooldownSetting.minutes
+                    })}
+                testID="settings-game-review-auto-sync-cooldown"
+              />
+              <SettingsSegmentedRow
+                accessibilityLabel={t("settings.gameReview.autoSyncCooldownTitle")}
+                options={GAME_REVIEW_AUTO_SYNC_COOLDOWN_OPTIONS.map((minutes) => ({
+                  value: String(minutes),
+                  label: minutes === 0
+                    ? t("common.off")
+                    : t("settings.gameReview.autoSyncCooldownOptionMinutes", { minutes }),
+                  testID: `settings-game-review-auto-sync-${minutes}`
+                }))}
+                testID="settings-game-review-auto-sync-controls"
+                value={String(gameReviewAutoSyncCooldownSetting.minutes)}
+                onChange={(next) => {
+                  const parsed = Number(next) as GameReviewAutoSyncCooldownMinutes;
+                  gameReviewAutoSyncCooldownSetting.onChange(parsed);
+                  setStatusMessage(parsed === 0
+                    ? t("settings.gameReview.autoSyncCooldownStatusOff")
+                    : t("settings.gameReview.autoSyncCooldownStatus", { minutes: parsed }));
+                }}
+              />
+            </>
+          ) : null}
         </SettingsSection>
       ) : null}
 

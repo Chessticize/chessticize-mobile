@@ -87,6 +87,7 @@ import type {
 } from "./practice-store.ts";
 import {
   DEFAULT_DARK_BOARD_THEME,
+  DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES,
   DEFAULT_LIGHT_BOARD_THEME,
   exportReviewQueueState,
   normalizeImportedReviewQueueState
@@ -96,6 +97,7 @@ import {
   defaultPracticeSettings,
   normalizeAppearancePreference,
   normalizeBoardTheme,
+  normalizeGameReviewAutoSyncCooldownMinutes,
   normalizeLanguagePreference,
   normalizePieceSet,
   normalizeReviewReminderPreference,
@@ -309,6 +311,7 @@ interface AppSettingsRow {
   sync_upload_allowed: number;
   arrow_duel_opponent_reply_enabled: number;
   game_review_auto_add_recommended?: number;
+  game_review_auto_sync_cooldown_minutes?: number;
   appearance: PracticeSettings["appearance"];
   light_board_theme: PracticeSettings["lightBoardTheme"];
   dark_board_theme: PracticeSettings["darkBoardTheme"];
@@ -510,7 +513,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 30;
+export const CURRENT_SCHEMA_VERSION = 31;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -549,7 +552,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 26, to: 27, apply: migrateV26ToV27 },
   { from: 27, to: 28, apply: migrateV27ToV28 },
   { from: 28, to: 29, apply: migrateV28ToV29 },
-  { from: 29, to: 30, apply: migrateV29ToV30 }
+  { from: 29, to: 30, apply: migrateV29ToV30 },
+  { from: 30, to: 31, apply: migrateV30ToV31 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1260,6 +1264,7 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_upload_allowed,
           arrow_duel_opponent_reply_enabled,
           game_review_auto_add_recommended,
+          game_review_auto_sync_cooldown_minutes,
           appearance,
           light_board_theme,
           dark_board_theme,
@@ -1275,12 +1280,13 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
           arrow_duel_opponent_reply_enabled = excluded.arrow_duel_opponent_reply_enabled,
           game_review_auto_add_recommended = excluded.game_review_auto_add_recommended,
+          game_review_auto_sync_cooldown_minutes = excluded.game_review_auto_sync_cooldown_minutes,
           appearance = excluded.appearance,
           light_board_theme = excluded.light_board_theme,
           dark_board_theme = excluded.dark_board_theme,
@@ -1302,6 +1308,9 @@ export class SyncSQLiteStore implements PracticeStore {
         0,
         boolToInt(cloned.arrowDuel.opponentReplyEnabled),
         boolToInt(cloned.gameReview?.autoAddRecommendedToReview ?? false),
+        normalizeGameReviewAutoSyncCooldownMinutes(
+          cloned.gameReview?.autoSyncCooldownMinutes ?? DEFAULT_GAME_REVIEW_AUTO_SYNC_COOLDOWN_MINUTES
+        ),
         cloned.appearance,
         cloned.lightBoardTheme,
         cloned.darkBoardTheme,
@@ -4181,11 +4190,13 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV27ToV28(db);
   migrateV28ToV29(db);
   migrateV29ToV30(db);
+  migrateV30ToV31(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
     hasColumn(db, "app_settings", "game_review_auto_add_recommended") &&
+    hasColumn(db, "app_settings", "game_review_auto_sync_cooldown_minutes") &&
     hasColumn(db, "app_settings", "appearance") &&
     hasColumn(db, "app_settings", "light_board_theme") &&
     hasColumn(db, "app_settings", "dark_board_theme") &&
@@ -5483,6 +5494,16 @@ function migrateV29ToV30(db: SyncSqliteDatabase): void {
   `);
 }
 
+function migrateV30ToV31(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "game_review_auto_sync_cooldown_minutes",
+    "ALTER TABLE app_settings ADD COLUMN game_review_auto_sync_cooldown_minutes INTEGER NOT NULL DEFAULT 10 " +
+      "CHECK (game_review_auto_sync_cooldown_minutes IN (0, 5, 10, 30))"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -5673,7 +5694,10 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
       opponentReplyEnabled: intToBool(row.arrow_duel_opponent_reply_enabled ?? 1)
     },
     gameReview: {
-      autoAddRecommendedToReview: intToBool(row.game_review_auto_add_recommended ?? 0)
+      autoAddRecommendedToReview: intToBool(row.game_review_auto_add_recommended ?? 0),
+      autoSyncCooldownMinutes: normalizeGameReviewAutoSyncCooldownMinutes(
+        row.game_review_auto_sync_cooldown_minutes
+      )
     },
     notifications: {
       reviewReminder: reminder
