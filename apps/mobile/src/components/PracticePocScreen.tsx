@@ -42,6 +42,7 @@ import {
   SERVER_CURATED_THEME_PRESENTATION,
   sprintHasRunDeadline,
   sprintSessionGuidePlanFor,
+  supportsArrowDuelOpponentReply,
   UciEngineArbiter
 } from "../../../../packages/core/src/index.ts";
 import type {
@@ -3836,7 +3837,8 @@ export function PracticePocScreen({
   const arrowDuelReplyChallengeProductionVisible = Boolean(
     !arrowDuelReplyChallengePreviewVisible &&
       state?.config.opponentReply?.enabled &&
-      currentPuzzle?.kind === "arrow_duel"
+      currentPuzzle?.kind === "arrow_duel" &&
+      supportsArrowDuelOpponentReply(currentPuzzle.puzzle)
   );
   const displayedArrowDuelPuzzle =
     feedbackSnapshot?.currentPuzzle.kind === "arrow_duel"

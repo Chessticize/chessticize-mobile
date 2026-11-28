@@ -12,7 +12,8 @@ import {
   submitArrowDuelChoice,
   submitArrowDuelFollowUpMove,
   submitArrowDuelReply,
-  submitLineMove
+  submitLineMove,
+  supportsArrowDuelOpponentReply
 } from "../src/index.ts";
 import type { Puzzle } from "../src/index.ts";
 
@@ -251,6 +252,7 @@ test("Arrow Duel skips opponent reply handoff cleanly when puzzle has no stored 
     source: "user_game",
     stockfishBestMove: "d2d1"
   };
+  assert.equal(supportsArrowDuelOpponentReply(puzzle), false);
   const state = beginArrowDuelPuzzle(puzzle);
   const result = submitArrowDuelChoice(state, state.correctMove, {
     opponentReply: true
@@ -260,6 +262,54 @@ test("Arrow Duel skips opponent reply handoff cleanly when puzzle has no stored 
   assert.equal(result.feedback.puzzleSolved, true);
   assert.equal(result.state.solved, true);
   assert.equal(result.state.phase, "choice");
+});
+
+test("Arrow Duel skips opponent reply challenge on multi-solution personal-game blunders but keeps it on unique tactics", () => {
+  const baseMeta = {
+    gameId: "maia-game-1",
+    gamePly: 45,
+    gameMoveNumber: 23,
+    puzzleKind: "arrow_duel" as const
+  };
+  const multiSolutionPuzzle: Puzzle = {
+    id: "ug_multi_blunder",
+    initialFen: "3r1rk1/p4ppp/1b2p3/4P3/5P2/4PQ2/PPP1q1PP/R1B2RK1 b - - 0 23",
+    solutionMoves: ["e2f3", "g2f3"],
+    rating: 1450,
+    themes: ["endgame"],
+    source: "user_game",
+    stockfishBestMove: "e2c2",
+    userGameMeta: {
+      ...baseMeta,
+      momentKind: "own_blunder_punished"
+    }
+  };
+  assert.equal(supportsArrowDuelOpponentReply(multiSolutionPuzzle), false);
+  const multiResult = submitArrowDuelChoice(
+    beginArrowDuelPuzzle(multiSolutionPuzzle),
+    "e2c2",
+    { opponentReply: true }
+  );
+  assert.equal(multiResult.state.phase, "choice");
+  assert.equal(multiResult.state.solved, true);
+  assert.equal(multiResult.feedback.puzzleSolved, true);
+
+  const uniqueTacticPuzzle: Puzzle = {
+    ...multiSolutionPuzzle,
+    id: "ug_unique_tactic",
+    userGameMeta: {
+      ...baseMeta,
+      momentKind: "own_mistake_punished"
+    }
+  };
+  assert.equal(supportsArrowDuelOpponentReply(uniqueTacticPuzzle), true);
+  const uniqueResult = submitArrowDuelChoice(
+    beginArrowDuelPuzzle(uniqueTacticPuzzle),
+    "e2c2",
+    { opponentReply: true }
+  );
+  assert.equal(uniqueResult.state.phase, "reply_handoff");
+  assert.equal(uniqueResult.state.solved, false);
 });
 
 test("Arrow Duel Review follow-up uses the same immediate-mate exception", () => {

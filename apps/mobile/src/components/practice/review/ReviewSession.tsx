@@ -31,7 +31,8 @@ import {
   submitArrowDuelChoice,
   submitArrowDuelFollowUpMove,
   submitArrowDuelReply,
-  submitLineMove
+  submitLineMove,
+  supportsArrowDuelOpponentReply
 } from "../../../../../../packages/core/src/index.ts";
 import {
   formatReviewDueLabelForLocale,
@@ -357,7 +358,9 @@ export function ReviewSession({
   const reviewOpponentReply = currentEntry.mode === "arrow_duel"
     ? currentEntry.opponentReply
     : undefined;
-  const reviewReplyChallengeEnabled = reviewOpponentReply?.enabled === true;
+  const reviewReplyChallengeEnabled =
+    reviewOpponentReply?.enabled === true &&
+    supportsArrowDuelOpponentReply(currentEntry.puzzle);
   const hasNextScheduledReview = entryIndex + 1 < entries.length;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -451,6 +454,11 @@ export function ReviewSession({
       ? currentExpectedMove(reviewState.line)
       : undefined;
   const isArrowDuelFollowUpReview = isArrowDuelPunishmentLine;
+  const hasArrowDuelPunishmentFollowUp = isArrowDuelFollowUpReview && (
+    reviewState.kind === "line"
+      ? !reviewState.line.solved
+      : currentEntry.puzzle.solutionMoves.length > 2
+  );
   const reviewBoardLocked = boardLocked || reviewEntryPreview.locked;
   const boardGestureEnabled = !reviewBoardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
@@ -1259,7 +1267,7 @@ export function ReviewSession({
               : undefined
           }
           promptHint={
-            isArrowDuelFollowUpReview
+            hasArrowDuelPunishmentFollowUp
               ? t("review.session.followBlueLine")
               : undefined
           }

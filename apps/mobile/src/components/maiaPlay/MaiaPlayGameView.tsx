@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import type { PieceSymbol, Square } from "chess.js";
 import Chessboard, { type ChessboardRef, type MoveResult } from "react-native-chessboard";
 import {
   abortMaiaGame,
@@ -41,6 +42,7 @@ import {
 import { arrowFromTo, formatUci } from "../practice/shared/boardMove.ts";
 import { chessboardColorsFor } from "../practice/shared/chessboardColors.ts";
 import { chessPieceSpriteFor } from "../practice/shared/chessPieceSprite.ts";
+import { BOARD_MOVE_ANIMATION_MS } from "../practice/shared/sessionTiming.ts";
 import { AppText, Badge, Button, Icon, Section, SegmentedControl } from "../ui/index.tsx";
 import {
   colorBadgeSymbol,
@@ -54,15 +56,28 @@ import {
 export interface MaiaPlayBoardProps {
   boardSize: number;
   colors: Record<string, string | undefined>;
+  draggableColor?: "w" | "b" | null;
+  durations?: { move: number };
   fen: string;
   flipped: boolean;
   gestureEnabled: boolean;
   onMove: (result: MoveResult) => void;
   spriteSource?: ReturnType<typeof chessPieceSpriteFor>;
-  squareTints?: ReturnType<typeof useBoardMoveSquareTints>;
+  squareHighlights?: ReturnType<typeof useBoardMoveSquareTints>;
+  withLetters?: boolean;
+  withNumbers?: boolean;
 }
 
 export type MaiaPlayBoardComponent = React.ComponentType<MaiaPlayBoardProps>;
+
+const MAIA_BOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
+
+function supportsBoardRef(component: MaiaPlayBoardComponent): boolean {
+  if (component === (Chessboard as unknown as MaiaPlayBoardComponent)) {
+    return true;
+  }
+  return Boolean(component && typeof component === "object" && "$$typeof" in component);
+}
 
 export interface MaiaPlayGameViewProps {
   initialState: MaiaGameState;
@@ -128,7 +143,17 @@ export function MaiaPlayGameView({
     startedAtMs: number;
   } | null>(null);
   const maiaRequestSeqRef = useRef(0);
+  const maiaAnimatingRef = useRef(false);
+  const suppressedBoardMovesRef = useRef<string[]>([]);
+  const mountedRef = useRef(true);
   const finishedHandledRef = useRef(initialState.status !== "playing");
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const clearMaiaTimer = useCallback(() => {
     if (maiaTimerRef.current !== null) {
@@ -198,6 +223,48 @@ export function MaiaPlayGameView({
           deductClockMs: isInstant ? 0 : elapsed,
           recordedThinkTimeMs: isInstant ? 0 : elapsed
         });
+        const parsedMove = arrowFromTo(pending.uci);
+        const board = boardRef.current;
+
+        if (board?.move && parsedMove) {
+          maiaAnimatingRef.current = true;
+          suppressedBoardMovesRef.current.push(pending.uci);
+          void (async () => {
+            try {
+              const played = await board.move({
+                from: parsedMove.from as Square,
+                to: parsedMove.to as Square,
+                ...(parsedMove.promotion ? { promotion: parsedMove.promotion as PieceSymbol } : {})
+              });
+              if (!played) {
+                const idx = suppressedBoardMovesRef.current.indexOf(pending.uci);
+                if (idx >= 0) {
+                  suppressedBoardMovesRef.current.splice(idx, 1);
+                }
+              }
+            } catch {
+              const idx = suppressedBoardMovesRef.current.indexOf(pending.uci);
+              if (idx >= 0) {
+                suppressedBoardMovesRef.current.splice(idx, 1);
+              }
+            } finally {
+              maiaAnimatingRef.current = false;
+            }
+            if (
+              !mountedRef.current ||
+              stateRef.current.status !== "playing" ||
+              stateRef.current.id !== pending.gameId ||
+              stateRef.current.moves.length !== pending.ply
+            ) {
+              return;
+            }
+            emitMoveCue(fenBefore, pending.uci, "opponent");
+            commitState(applied.state);
+            board.resetBoard?.(applied.state.currentFen);
+          })();
+          return;
+        }
+
         emitMoveCue(fenBefore, pending.uci, "opponent");
         commitState(applied.state);
       } catch {
@@ -314,6 +381,9 @@ export function MaiaPlayGameView({
       return;
     }
     const interval = setInterval(() => {
+      if (maiaAnimatingRef.current) {
+        return;
+      }
       const current = stateRef.current;
       if (current.status !== "playing" || !current.clocksMs || current.turnStartedAtMs === null) {
         return;
@@ -377,11 +447,19 @@ export function MaiaPlayGameView({
 
   const handleUserBoardMove = useCallback(
     (result: MoveResult) => {
+      const uci = formatUci(result.move);
+      const suppressedIdx = suppressedBoardMovesRef.current.indexOf(uci);
+      if (suppressedIdx >= 0) {
+        suppressedBoardMovesRef.current.splice(suppressedIdx, 1);
+        return;
+      }
+      if (maiaAnimatingRef.current) {
+        return;
+      }
       const current = stateRef.current;
       if (current.status !== "playing" || !isMaiaUserTurn(current)) {
         return;
       }
-      const uci = formatUci(result.move);
       const fenBefore = current.currentFen;
       setDrawNotice(null);
       try {
@@ -555,15 +633,19 @@ export function MaiaPlayGameView({
         testID="maia-game-board-frame"
       >
         <BoardComponent
-          // @ts-expect-error ref forwarding for default Chessboard component
-          ref={BoardComponent === (Chessboard as unknown as MaiaPlayBoardComponent) ? boardRef : undefined}
+          // @ts-expect-error ref forwarding for Chessboard and forwardRef test boards
+          ref={supportsBoardRef(BoardComponent) ? boardRef : undefined}
           boardSize={boardSize}
           colors={boardColors as Record<string, string | undefined>}
+          draggableColor={userTurn ? gameState.userColor : null}
+          durations={MAIA_BOARD_DURATIONS}
           fen={gameState.currentFen}
           flipped={flipped}
           gestureEnabled={userTurn}
           spriteSource={pieceSprite}
-          squareTints={squareTints}
+          squareHighlights={squareTints}
+          withLetters={false}
+          withNumbers={false}
           onMove={handleUserBoardMove}
         />
         <BoardCoordinateOverlay boardSize={boardSize} flipped={flipped} />
