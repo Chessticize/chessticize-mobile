@@ -487,6 +487,7 @@ test("recomputeMaiaRatingFromGames converges identically across all out-of-order
       gameId: "maia-g1",
       timeClass: "rapid",
       outcome: "win",
+      opponentRating: 1400,
       playedAt: "2026-11-27T10:00:00.000Z",
       initialRatingAnchor: 1400
     },
@@ -494,6 +495,7 @@ test("recomputeMaiaRatingFromGames converges identically across all out-of-order
       gameId: "maia-g2",
       timeClass: "rapid",
       outcome: "loss",
+      opponentRating: 1400,
       playedAt: "2026-11-27T10:10:00.000Z",
       initialRatingAnchor: 1400
     },
@@ -501,6 +503,7 @@ test("recomputeMaiaRatingFromGames converges identically across all out-of-order
       gameId: "maia-g3",
       timeClass: "rapid",
       outcome: "draw",
+      opponentRating: 1400,
       playedAt: "2026-11-27T10:10:00.000Z",
       initialRatingAnchor: 1400
     },
@@ -508,6 +511,7 @@ test("recomputeMaiaRatingFromGames converges identically across all out-of-order
       gameId: "maia-g4",
       timeClass: "rapid",
       outcome: "win",
+      opponentRating: 1400,
       playedAt: "2026-11-27T10:30:00.000Z",
       initialRatingAnchor: 1400
     }
@@ -516,7 +520,7 @@ test("recomputeMaiaRatingFromGames converges identically across all out-of-order
   // Expected sequential replay in canonical (playedAt, gameId) order
   let expected = createDefaultMaiaRatingRecord("rapid", 1400, anchor.setAt);
   for (const g of games) {
-    expected = applyMaiaGameRatingResult(expected, g.outcome, g.playedAt).nextRecord;
+    expected = applyMaiaGameRatingResult(expected, g.outcome, g.playedAt, g.opponentRating).nextRecord;
   }
 
   // Test all 24 permutations + injected duplicates + unrelated timeClass noise
@@ -536,6 +540,7 @@ test("recomputeMaiaRatingFromGames converges identically across all out-of-order
     gameId: "maia-blitz-1",
     timeClass: "blitz",
     outcome: "loss",
+    opponentRating: 1200,
     playedAt: "2026-11-27T10:05:00.000Z",
     initialRatingAnchor: 1200
   };

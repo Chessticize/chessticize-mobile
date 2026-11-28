@@ -8,7 +8,8 @@ import {
   createMaiaGameState,
   DEFAULT_MAIA_SETUP_PREFERENCES,
   resignMaiaGame,
-  type ExtractedGamePuzzle
+  type ExtractedGamePuzzle,
+  type ImportedGameDraft
 } from "../../core/src/index.ts";
 import {
   FakeGamesV1ZoneTransport,
@@ -21,7 +22,6 @@ import {
   syncGamesV1,
   syncPracticeProgressV2,
   type GamesV1ZoneTransport,
-  type ImportedGameDraft,
   type PracticeStore,
   type StoredGamePlyEval
 } from "../src/index.ts";
@@ -93,7 +93,7 @@ function sampleGameDraft(
     white: { username: "alice", rating: 1520, isAi: false },
     black: { username: "bob", rating: 1510, isAi: false },
     winner: "b",
-    termination: "normal",
+    termination: "mate",
     eco: "C20",
     opening: "King's Pawn Game",
     pgn: "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#"
@@ -120,7 +120,7 @@ function samplePlyEvals(gameId: string, deep = false): StoredGamePlyEval[] {
       winPercentLoss: 0,
       bestMove: "e2e4",
       classification: "best",
-      clockBucket: "normal",
+      clockBucket: "deliberate",
       isKeyMomentCandidate: false,
       fromPreExistingEval: false,
       deepVerified: deep
@@ -143,7 +143,7 @@ function samplePlyEvals(gameId: string, deep = false): StoredGamePlyEval[] {
       winPercentLoss: 1,
       bestMove: "c7c5",
       classification: "good",
-      clockBucket: "normal",
+      clockBucket: "deliberate",
       isKeyMomentCandidate: false,
       fromPreExistingEval: false,
       deepVerified: deep
